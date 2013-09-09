@@ -6,7 +6,7 @@ output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.
 
 path
 ------
-http://URL/?swfのURL
+http://your_domain/?swf_path
 
 html
 ------
