@@ -18,11 +18,11 @@ html
 `<script type="text/javascript" src="swf2js.js"></script>`  
 `</head>`  
 `<body style="background-color: #000000; padding: 0; margin: 0; text-align: center; width: 100%; height: 100%;">`  
-`<canvas id="swf2canvas" width="240" height="240"></canvas>`  
+`<canvas id="swf2js" width="240" height="240"></canvas>`  
 `<script type="text/javascript">`  
-`    var canvas_id = "swf2canvas";`  
+`    var canvas_id = "swf2js";`  
 `    var url = location.search.substr(1).split("&")[0];`  
-`    var swfpl = new SwfPlayer(canvas_id);`  
+`    var swfpl = new Swf2Js(canvas_id);`  
 `    swfpl.load(url);`  
 `    swfpl.play();`  
 `</script>`  
