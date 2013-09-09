@@ -22,9 +22,9 @@ html
 `<script type="text/javascript">`  
 `    var canvas_id = "swf2js";`  
 `    var url = location.search.substr(1).split("&")[0];`  
-`    var swfpl = new Swf2Js(canvas_id);`  
-`    swfpl.load(url);`  
-`    swfpl.play();`  
+`    var swf2js = new Swf2Js(canvas_id);`  
+`    swf2js.load(url);`  
+`    swf2js.play();`  
 `</script>`  
 `</body>`  
 `</html>`
