@@ -1,18 +1,31 @@
 swf2js
 ======
+swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力  
+output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.
 
-swf(flash lite1.1)をJavaScriptでばバイナリ分解後canvasにして出力。
 
-# path
+path
+------
 http://URL/?swfのURL
 
-# html
-<canvas id="swf2canvas" width="240" height="240"></canvas>
-<script type="text/javascript">
-    var canvas_id = "swf2canvas";
-    var url = location.search.substr(1).split("&")[0];
-    var swfpl = new SwfPlayer(canvas_id);
-    swfpl.load(url);
-    swfpl.play();
-</script>
+html
+------
+`<!DOCTYPE html>`  
+`<html lang="ja">`  
+`<head>`  
+`<meta charset="UTF-8"/>`  
+`<title>swf2js</title>`  
+`<script type="text/javascript" src="swf2js.js"></script>`  
+`</head>`  
+`<body style="background-color: #000000; padding: 0; margin: 0; text-align: center; width: 100%; height: 100%;">`  
+`<canvas id="flashcanvas" width="240" height="240"></canvas>`  
+`<script type="text/javascript">`  
+`    var canvas_id = "flashcanvas";`  
+`    var url = location.search.substr(1).split("&")[0];`  
+`    var swfpl = new SwfPlayer(canvas_id);`  
+`    swfpl.load(url);`  
+`    swfpl.play();`  
+`</script>`  
+`</body>`  
+`</html>`
 
