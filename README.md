@@ -11,8 +11,8 @@ http://your_domain/?swf_path
 
 html
 ------
-`<!DOCTYPE html>  
-<html lang="ja">`  
+`<!DOCTYPE html>` 
+`<html lang="ja">`  
 `<head>`  
 `<meta charset="UTF-8"/>`  
 `<title>swf2js</title>`  
