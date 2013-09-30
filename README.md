@@ -21,10 +21,14 @@ html
 `<body style="background-color: #000000; padding: 0; margin: 0; text-align: center; width: 100%; height: 100%;">`  
 `<canvas id="swf2js" width="240" height="240"></canvas>`  
 `<script type="text/javascript">`  
-`    var canvas_id = "swf2js";`  
-`    var url = location.search.substr(1).split("&")[0];`  
-`    var swf2js = new Swf2Js(canvas_id);`  
-`    swf2js.load(url);`  
+`    var swf2js = new Swf2Js();`  
+`    /**`  
+`     * load`  
+`     *`  
+`     * @param string type ["url" or "binary"]`  
+`     * @param mixed  option [path or binary data]`  
+`     */`  
+`    swf2js.load('url');`  
 `    swf2js.play();`  
 `</script>`  
 `</body>`  
