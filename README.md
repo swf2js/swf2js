@@ -11,7 +11,7 @@ http://your_domain/?swf_path
 
 html
 ------
-`<!DOCTYPE html>` 
+`<!DOCTYPE html>`  
 `<html lang="ja">`  
 `<head>`  
 `<meta charset="UTF-8"/>`  
@@ -37,4 +37,7 @@ html
 TODO
 -------
 mask  
-ActionScript
+bitmap
+DefineButton  
+ActionScript  
+cache  
