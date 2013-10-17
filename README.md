@@ -36,8 +36,7 @@ html
 
 TODO
 -------
-mask  
-bitmap  
 DefineButton  
 ActionScript  
+bitmap  
 cache  
