@@ -18,8 +18,7 @@ html
 `<title>swf2js</title>`  
 `<script type="text/javascript" src="swf2js.js"></script>`  
 `</head>`  
-`<body style="background-color: #000000; padding: 0; margin: 0; text-align: center; width: 100%; height: 100%;">`  
-`<canvas id="swf2js" width="240" height="240"></canvas>`  
+`<body style="background-color: #000000;">`  
 `<script type="text/javascript">`  
 `    var swf2js = new Swf2Js();`  
 `    /**`  
