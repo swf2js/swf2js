@@ -3,12 +3,6 @@ swf2js
 swfをjsに変換。  
 ※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。   
 output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.
-
-
-path
-------
-http://your_domain/?swf_path
-
 html
 ------
 `<!DOCTYPE html>`  
@@ -27,7 +21,7 @@ html
 `     * @param string type ["url" or "binary"]`  
 `     * @param mixed  option [path or binary data]`  
 `     */`  
-`    swf2js.load('url');`  
+`    swf2js.load('url', 'swf_path');`  
 `    swf2js.play();`  
 `</script>`  
 `<div id="swf2js"></div>`  
@@ -37,10 +31,8 @@ html
 TODO
 -------
 text  
-
 ActionScript  
-⇒SWF3 OK
-⇒SWF4 ...
-
+⇒SWF3 OK  
+⇒SWF4 ...  
 bitmap  
 cache  
