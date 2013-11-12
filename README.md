@@ -30,12 +30,17 @@ html
 `    swf2js.load('url');`  
 `    swf2js.play();`  
 `</script>`  
+`<div id="swf2js"></div>`  
 `</body>`  
 `</html>`
 
 TODO
 -------
-DefineButton  
+text  
+
 ActionScript  
+⇒SWF3 OK
+⇒SWF4 ...
+
 bitmap  
 cache  
