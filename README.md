@@ -30,9 +30,19 @@ html
 
 TODO
 -------
-text  
+DefineEditText  
+DefineBits  
+
 ActionScript  
-⇒SWF3 OK  
-⇒SWF4 ...  
-bitmap  
+⇒EndDrag
+⇒WaitForFrame2
+⇒StartDrag
+⇒CharToAscii
+⇒MBAsciiToChar
+⇒MBCharToAscii
+⇒AsciiToChar
+⇒WaitForFrame
+⇒StopSounds
+⇒ToggleQuality
+
 cache  
