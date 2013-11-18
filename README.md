@@ -34,15 +34,15 @@ DefineEditText
 DefineBits  
 
 ActionScript  
-⇒EndDrag
-⇒WaitForFrame2
-⇒StartDrag
-⇒CharToAscii
-⇒MBAsciiToChar
-⇒MBCharToAscii
-⇒AsciiToChar
-⇒WaitForFrame
-⇒StopSounds
-⇒ToggleQuality
+⇒EndDrag  
+⇒WaitForFrame2  
+⇒StartDrag  
+⇒CharToAscii  
+⇒MBAsciiToChar  
+⇒MBCharToAscii  
+⇒AsciiToChar  
+⇒WaitForFrame  
+⇒StopSounds  
+⇒ToggleQuality  
 
 cache  
