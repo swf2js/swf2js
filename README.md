@@ -15,18 +15,12 @@ html
 `<body style="background-color: #000000;">`  
 `<script type="text/javascript">`  
 `    var swf2js = new Swf2Js();`  
-`    /**`  
-`     * load`  
-`     *`  
-`     * @param string type ["url" or "binary"]`  
-`     * @param mixed  option [path or binary data]`  
-`     */`  
-`    swf2js.load('url', 'swf_path');`  
+`    swf2js.load('swf_path');`  
 `    swf2js.play();`  
 `</script>`  
 `<div id="swf2js"></div>`  
 `</body>`  
-`</html>`
+`</html>`  
 
 TODO
 -------
