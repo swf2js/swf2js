@@ -1,8 +1,10 @@
 swf2js
 ======
 swfをjsに変換。  
-※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。   
-output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.
+※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。  
+output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
+ver 0.1.0を2014/01/01にリリース予定。  
+
 
 html
 ------
@@ -39,4 +41,9 @@ ActionScript
 ⇒WaitForFrame  
 ⇒StopSounds  
 ⇒ToggleQuality  
+
+
+Release Notes  
+--[ swf2js 0.1.0 ] Release date: 01 Jan 2014  
+Planned Release.
 
