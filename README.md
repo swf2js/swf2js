@@ -44,6 +44,7 @@ ActionScript
 
 
 Release Notes  
---[ swf2js 0.1.0 ] Release date: 01 Jan 2014  
+-------
+--[ swf2js 0.1.0 ] Release Date: 01 Jan 2014  
 Planned Release.
 
