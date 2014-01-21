@@ -25,7 +25,6 @@ html
 
 TODO
 -------
-DefineBits  
 cache  
 
 ActionScript  
@@ -43,6 +42,13 @@ ActionScript
 
 Release Notes  
 -------
---[ swf2js 0.0.1 ] Release Date: 01 Jan 2014
-Planned Release.
+--[ swf2js 0.0.2 ] Release Date: 21 Jan 2014  
+* [BUGFIX] ActionScript 'CloneSprite', 'RemoveSprite'  
+* [BUGFIX] (function) parseDefineBitsLossLess  
+* [BUGFIX] (function) setBackgroundColor [RBG => RGB]  
+* [BUGFIX] Property '_xscale', '_yscale', '_width', '_height', '_rotation'  
+* [NEW] parse & render speed up  
 
+
+--[ swf2js 0.0.1 ] Release Date: 01 Jan 2014  
+Planned Release.

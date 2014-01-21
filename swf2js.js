@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.1)
+ * swf2js (version 0.0.2)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -17,7 +17,6 @@
     var _floor = _Math.floor;
     var _pow = _Math.pow;
     var _random = _Math.random;
-    var _Function = Function;
     var _void = void 0;
     var _String = String;
     var _fromCharCode = _String.fromCharCode;
@@ -41,13 +40,12 @@
     var _clearPre = clearPre;
     var _setStyle = setStyle;
     var _action = action;
-    var _localDraw = localDraw;
     var _putFrame = putFrame;
     var _renderBtn = renderBtn;
     var _drawBtn = drawBtn;
     var _changeScreenSize = changeScreenSize;
     var _getGradientLogic = getGradientLogic;
-    var _getColor = getColor;
+    var _generateColor = generateColor;
     var _clone = clone;
     var _parse = parse;
     var _decodeToShiftJis = decodeToShiftJis;
@@ -55,17 +53,46 @@
     var _isSwfHeader = isSwfHeader;
     var _setMovieHeader = setMovieHeader;
 
+    // canvas
+    var _renderCanvas = renderCanvas;
+    var _setCanvasArray = setCanvasArray;
+    var _getCanvasArray = getCanvasArray;
+    var _generateRGBA = generateRGBA;
+    var _setMoveTo = setMoveTo;
+    var _setQuadraticCurveTo = setQuadraticCurveTo;
+    var _setLineTo = setLineTo;
+    var _setTransform = setTransform;
+    var _setSetTransform = setSetTransform;
+    var _setBeginPath = setBeginPath;
+    var _setSave = setSave;
+    var _setRestore = setRestore;
+    var _setClosePath = setClosePath;
+    var _setFillStyle = setFillStyle;
+    var _setStrokeStyle = setStrokeStyle;
+    var _setFill = setFill;
+    var _setStroke = setStroke;
+    var _setLineWidth = setLineWidth;
+    var _setLineCap = setLineCap;
+    var _setLineJoin = setLineJoin;
+    var _setClip = setClip;
+    var _setRotate = setRotate;
+    var _setDrawImage = setDrawImage;
+    var _setScale = setScale;
+    var _setImage = setImage;
+    var _setFont = setFont;
+    var _setTextAlign = setTextAlign;
+    var _setFillText= setFillText;
+
+
     // params
     var baseCanvas, context, preContext;
     var messageName = "zero-timeout-message";
     var canvasArray = [];
-    var functions = [];
+    var bitMapData = [];
     var layer = [];
     var btnLayer = [];
     var touchCtx = [];
     var FontData = [];
-    var BitData = [];
-    var btnCache = [];
     var loadingText = ['NOW LOADING', 'NOW LOADING.', 'NOW LOADING..', 'NOW LOADING...'];
     var timeouts = 0;
     var devicePixelRatio = _window.devicePixelRatio || 1;
@@ -77,7 +104,6 @@
     var loading = 0;
     var touchClass = {};
     var currentPosition = {x:0, y:0};
-    var enterBtn = null;
     var startDate = new Date();
     var isTouch = false;
     var touchFlag = false;
@@ -114,8 +140,10 @@
         // div
         var div = _document.getElementById('swf2js');
         var style = div.style;
-        _setStyle(style, 'position', 'absolute');
-        _setStyle(style, 'top', 0);
+        _setStyle(style, 'position', 'relative');
+        var minSize = _min(_window.innerWidth, _window.innerHeight);
+        _setStyle(style, 'width', minSize + 'px');
+        _setStyle(style, 'height', minSize + 'px');
 
         // main canvasをセット
         var canvas = baseCanvas.cloneNode(false);
@@ -123,6 +151,7 @@
         _setStyle(style, 'zIndex', 0);
         _setStyle(style, 'zoom', 100 / devicePixelRatio + '%');
         _setStyle(style, 'position', 'absolute');
+        _setStyle(style, 'top', 0);
 
         // タッチイベントの登録
         canvas.addEventListener(startEvent, touchStart, false);
@@ -134,6 +163,7 @@
 
         // main canvas
         context = canvas.getContext('2d');
+        setTimeout(_onEnterFrame, 1);
 
         // pre canvas
         var preCanvas = baseCanvas.cloneNode(false);
@@ -148,7 +178,7 @@
     _window.onresize = function()
     {
         // clear
-        enterBtn = null;
+        enterBtn = {};
 
         // リサイズ開始
         _changeScreenSize();
@@ -191,12 +221,12 @@
         var style = div.style;
         _setStyle(style, 'width', minSize);
         _setStyle(style, 'height', minSize);
-        _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
 
         // main
         var canvas = context.canvas;
         _setStyle(canvas, 'width', width);
         _setStyle(canvas, 'height', height);
+        _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
 
         // pre
         var canvas = preContext.canvas;
@@ -232,7 +262,7 @@
 
     /**
      * player
-     * @type {{playStartFlag: boolean, Xmax: number, Ymax: number, Xmin: number, Ymin: number, bgR: number, bgG: number, bgB: number, layer: {}, frameCount: number, fps: number, fileLength: number, frameRate: number, frame: number}}
+     * @type {{playStartFlag: boolean, Xmax: number, Ymax: number, Xmin: number, Ymin: number, layer: {}, frameCount: number, fps: number, fileLength: number, frameRate: number, frame: number}}
      */
     var player = {
         playStartFlag: false,
@@ -240,9 +270,6 @@
         Ymax: 0,
         Xmin: 0,
         Ymin: 0,
-        bgR: 0,
-        bgG: 0,
-        bgB: 0,
         layer: {},
         frame: 1,
         frameCount: 0,
@@ -706,7 +733,6 @@
                     bitio = _void;
                     currentPosition = _void;
                     tagType = _void;
-                    BitData = _void;
                     break;
                 }
             }
@@ -1356,10 +1382,6 @@
             var fillFlag1 = false;
             var lineFlag = false;
 
-            var f0Color = null;
-            var f1Color = null;
-            var lColor = null;
-
             var f0Idx = 0;
             var f1Idx = 0;
 
@@ -1391,35 +1413,38 @@
                     }
 
                     // 新しい色をセット
+                    var StateFillStyle0 = record.StateFillStyle0;
+                    var FillStyle0 = record.FillStyle0;
+                    var StateFillStyle1 = record.StateFillStyle1;
+                    var FillStyle1 = record.FillStyle1;
+                    var StateLineStyle = record.StateLineStyle;
+                    var LineStyle = record.LineStyle;
+
                     if (record.StateNewStyles == 1) {
                         // fillStyle
                         if (record.NumFillBits > 0) {
-                            fillStyle = record.FillStyles.fillStyles;
+                            var FillStyles = record.FillStyles;
+                            fillStyle = FillStyles.fillStyles;
                         }
 
                         // lineStyle
                         if (record.NumLineBits > 0) {
-                            lineStyle = record.LineStyles.lineStyles;
+                            var LineStyles = record.LineStyles;
+                            lineStyle = LineStyles.lineStyles;
                         }
 
                         // fillFlag0
-                        if (record.StateFillStyle0 == 1
-                            && record.FillStyle0 == 0
-                        ) {
+                        if (StateFillStyle0 == 1 && FillStyle0 == 0) {
                             fillFlag0 = false;
                         }
 
                         // fillFlag1
-                        if (record.StateFillStyle1 == 1
-                            && record.FillStyle1 == 0
-                        ) {
+                        if (StateFillStyle1 == 1 && FillStyle1 == 0) {
                             fillFlag1 = false;
                         }
 
                         // lineFlag
-                        if (record.StateLineStyle == 1
-                            && record.LineStyle == 0
-                        ) {
+                        if (StateLineStyle == 1 && LineStyle == 0) {
                             lineFlag = false;
                         }
 
@@ -1437,114 +1462,106 @@
                     depth++;
 
                     // fill0
-                    fillFlag0 = ((record.StateFillStyle0 > 0 && record.FillStyle0 > 0)
-                        || (fillFlag0 && record.StateFillStyle0 == 0 && record.FillStyle0 == undefined)
+                    fillFlag0 = ((StateFillStyle0 > 0 && FillStyle0 > 0)
+                        || (fillFlag0 && StateFillStyle0 == 0
+                            && FillStyle0 == undefined)
                     );
                     if (fillFlag0) {
                         // 色の算出
                         var bitmapObj = null;
-                        if (record.FillStyle0) {
-                            f0Idx = (record.FillStyle0 - 1);
+                        if (FillStyle0) {
+                            f0Idx = (FillStyle0 - 1);
                             var f0ColorObj = fillStyle[f0Idx];
-
-                            f0Color = null;
-                            if (f0ColorObj.fillStyleType == 0) {
-                                f0Color = _getColor(f0ColorObj.Color);
-                            } else if (f0ColorObj.fillStyleType != 0x10
-                                && f0ColorObj.fillStyleType != 0x12
+                            var fillStyleType = f0ColorObj.fillStyleType;
+                            if (fillStyleType != 0x00
+                                && fillStyleType != 0x10
+                                && fillStyleType != 0x12
                             ) {
                                 bitmapObj = f0ColorObj;
                             }
                         }
 
                         // 初期設定
-                        if (canvasF0Array[stack][depth] == undefined) {
-                            canvasF0Array[stack][depth] = {
+                        var f0Base = canvasF0Array[stack];
+                        if (f0Base[depth] == undefined) {
+                            f0Base[depth] = {
                                 StartX: StartX,
                                 StartY: StartY,
                                 Depth: depth,
                                 ColorObj: f0ColorObj,
-                                Color: f0Color,
                                 ColorIdx: f0Idx,
                                 BitMapObj: bitmapObj,
-                                isGradient: (f0ColorObj.fillStyleType == 0x10 || f0ColorObj.fillStyleType == 0x12),
+                                isGradient: (fillStyleType == 0x10 || fillStyleType == 0x12),
                                 cArray: [],
-                                func: [],
                                 fArray: []
                             };
 
                             if (bitmapObj == null) {
-                                canvasF0Array[stack][depth].func[0] =
-                                    new _Function("c", "c.moveTo("+StartX+", "+StartY+")");
-                                canvasF0Array[stack][depth].fArray[0] = 2;
-                                canvasF0Array[stack][depth].fArray[1] = StartX;
-                                canvasF0Array[stack][depth].fArray[2] = StartY;
+                                var f0cArray = f0Base[depth].fArray;
+                                f0Base[depth].fArray =
+                                    _setMoveTo(f0cArray, StartX, StartY);
                             }
                         }
                     }
 
                     // fill1
-                    fillFlag1 = ((record.StateFillStyle1 > 0 && record.FillStyle1 > 0)
-                        || (fillFlag1 && record.StateFillStyle1 == 0 && record.FillStyle1 == undefined)
+                    fillFlag1 = ((StateFillStyle1 > 0 && FillStyle1 > 0)
+                        || (fillFlag1 && StateFillStyle1 == 0
+                        && FillStyle1 == undefined)
                     );
                     if (fillFlag1) {
                         // 色の算出
                         var bitmapObj = null;
-                        if (record.FillStyle1) {
-                            f1Idx = (record.FillStyle1 - 1);
+                        if (FillStyle1) {
+                            f1Idx = (FillStyle1 - 1);
                             var f1ColorObj = fillStyle[f1Idx];
-
-                            f1Color = null;
-                            if (f1ColorObj.fillStyleType == 0) {
-                                f1Color = _getColor(f1ColorObj.Color);
-                            } else if (f1ColorObj.fillStyleType != 0x10
-                                && f1ColorObj.fillStyleType != 0x12
+                            var fillStyleType = f1ColorObj.fillStyleType;
+                            if (fillStyleType != 0x00
+                                && fillStyleType != 0x10
+                                && fillStyleType != 0x12
                             ) {
                                 bitmapObj = f1ColorObj;
                             }
                         }
 
                         // 初期設定
-                        if (canvasF1Array[stack][depth] == undefined) {
-                            canvasF1Array[stack][depth] = {
+                        var f1Base = canvasF1Array[stack];
+                        if (f1Base[depth] == undefined) {
+                            f1Base[depth] = {
                                 StartX: StartX,
                                 StartY: StartY,
                                 Depth: depth,
                                 ColorObj: f1ColorObj,
-                                Color: f1Color,
                                 ColorIdx: f1Idx,
                                 BitMapObj: bitmapObj,
-                                isGradient: (f1ColorObj.fillStyleType == 0x10 || f1ColorObj.fillStyleType == 0x12),
+                                isGradient: (fillStyleType == 0x10 || fillStyleType == 0x12),
                                 cArray: [],
-                                func: [],
                                 fArray: []
                             };
 
                             if (bitmapObj == null) {
-                                canvasF1Array[stack][depth].func[0] =
-                                    new _Function("c", "c.moveTo("+StartX+", "+StartY+")");
-                                canvasF1Array[stack][depth].fArray[0] = 2;
-                                canvasF1Array[stack][depth].fArray[1] = StartX;
-                                canvasF1Array[stack][depth].fArray[2] = StartY;
+                                var f1cArray = f1Base[depth].fArray;
+                                f1Base[depth].fArray =
+                                    _setMoveTo(f1cArray, StartX, StartY);
                             }
                         }
                     }
 
                     // line
-                    lineFlag  = ((record.StateLineStyle > 0 && record.LineStyle > 0)
-                        || (lineFlag && record.StateLineStyle == 0 && record.LineStyle == undefined)
+                    lineFlag  = ((StateLineStyle > 0 && LineStyle > 0)
+                        || (lineFlag && StateLineStyle == 0 && LineStyle == undefined)
                     );
                     if (lineFlag) {
-                        if (record.LineStyle) {
-                            var nKey   = (record.LineStyle - 1);
+                        if (LineStyle) {
+                            var nKey   = (LineStyle - 1);
                             var colorObj = lineStyle[nKey];
-                            lColor = _getColor(colorObj.Color);
                             var Width  = lineStyle[nKey].Width / 20;
                         }
 
                         // 初期設定
-                        if (canvasLArray[stack][depth] == undefined) {
-                            canvasLArray[stack][depth] = {
+                        var lBase = canvasLArray[stack];
+                        if (lBase[depth] == undefined) {
+                            lBase[depth] = {
                                 StartX: StartX,
                                 StartY: StartY,
                                 Depth: depth,
@@ -1552,17 +1569,13 @@
                                 merge: false,
                                 ColorObj: colorObj,
                                 BitMapObj: null,
-                                Color: lColor,
                                 cArray: [],
-                                func: [],
                                 fArray: []
                             };
 
-                            canvasLArray[stack][depth].func[0] =
-                                new _Function("c", "c.moveTo("+StartX+", "+StartY+")");
-                            canvasLArray[stack][depth].fArray[0] = 2;
-                            canvasLArray[stack][depth].fArray[1] = StartX;
-                            canvasLArray[stack][depth].fArray[2] = StartY;
+                            var lcArray = lBase[depth].fArray;
+                            lBase[depth].fArray =
+                                _setMoveTo(lcArray, StartX, StartY);
                         }
                     }
                 } else {
@@ -1577,18 +1590,7 @@
                     Ymin = _min(Ymin, AnchorY);
 
                     // 描画データ
-                    if (record.isCurved) {
-                        var cFunc =
-                            new _Function("c", "c.quadraticCurveTo("
-                            + ControlX +", "+ ControlY +", "
-                            + AnchorX  +", "+ AnchorY  +");");
-                        var fArray = [0, ControlX, ControlY, AnchorX, AnchorY];
-                    } else {
-                        var cFunc =
-                            new _Function("c", "c.lineTo("
-                            + AnchorX +","+ AnchorY +");");
-                        var fArray = [1, AnchorX, AnchorY];
-                    }
+                    var isCurved = record.isCurved;
 
                     // fill0
                     if (fillFlag0) {
@@ -1603,11 +1605,15 @@
                                 ControlX: ControlX,
                                 ControlY: ControlY
                             };
-                            obj.func[obj.func.length] = cFunc;
 
-                            var fLen = fArray.length;
-                            for (var f = 0; f < fLen; f++) {
-                                obj.fArray[obj.fArray.length] = fArray[f];
+                            var fArray = obj.fArray;
+                            if (isCurved) {
+                                fArray = _setQuadraticCurveTo(fArray,
+                                    ControlX, ControlY,
+                                    AnchorX, AnchorY
+                                );
+                            } else {
+                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
                             }
                         }
                     }
@@ -1625,11 +1631,15 @@
                                 ControlX: ControlX,
                                 ControlY: ControlY
                             };
-                            obj.func[obj.func.length] = cFunc;
 
-                            var fLen = fArray.length;
-                            for (var f = 0; f < fLen; f++) {
-                                obj.fArray[obj.fArray.length] = fArray[f];
+                            var fArray = obj.fArray;
+                            if (isCurved) {
+                                fArray = _setQuadraticCurveTo(fArray,
+                                    ControlX, ControlY,
+                                    AnchorX, AnchorY
+                                );
+                            } else {
+                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
                             }
                         }
                     }
@@ -1647,11 +1657,15 @@
                                 ControlX: ControlX,
                                 ControlY: ControlY
                             };
-                            obj.func[obj.func.length] = cFunc;
 
-                            var fLen = fArray.length;
-                            for (var f = 0; f < fLen; f++) {
-                                obj.fArray[obj.fArray.length] = fArray[f];
+                            var fArray = obj.fArray;
+                            if (isCurved) {
+                                fArray = _setQuadraticCurveTo(fArray,
+                                    ControlX, ControlY,
+                                    AnchorX, AnchorY
+                                );
+                            } else {
+                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
                             }
                         }
                     }
@@ -1735,22 +1749,26 @@
                     }
 
                     // 初期情報
-                    obj.func.unshift(new _Function("c", "c.lineWidth = "+ obj.Width / 1.1 +";"));
-                    obj.func.unshift(new _Function("c", "c.lineCap = 'round';"));
-                    obj.func.unshift(new _Function("c", "c.lineJoin = 'round';"));
-                    obj.func.unshift(new _Function("c", "c.strokeStyle = '"+ obj.Color +"';"));
-                    obj.func.unshift(new _Function("c", "c.beginPath();"));
-                    obj.func[obj.func.length] = new _Function("c", "c.stroke();");
+                    var objArray = obj.fArray;
+                    objArray = _setLineWidth(objArray, obj.Width / 1.1);
+                    objArray = _setLineCap(objArray);
+                    objArray = _setLineJoin(objArray);
+                    var color = _generateRGBA(obj.ColorObj.Color);
+                    objArray = _setStrokeStyle(
+                        objArray,
+                        color.R, color.G, color.B, color.A, true);
+                    objArray = _setBeginPath(objArray, true);
+                    objArray = _setStroke(objArray);
 
-                    delete obj.StartX;
-                    delete obj.StartY;
-                    delete obj.EndX;
-                    delete obj.EndY;
-                    delete obj.cArray;
-                    delete obj.merge;
+                    obj.StartX = _void;
+                    obj.StartY = _void;
+                    obj.EndX = _void;
+                    obj.EndY = _void;
+                    obj.cArray = _void;
+                    obj.merge = _void;
 
-                    var len = canvasArray[s][d].length;
-                    canvasArray[s][d][len] = obj;
+                    var l = canvasArray[s][d].length;
+                    canvasArray[s][d][l] = obj;
                 }
             }
 
@@ -1814,21 +1832,9 @@
                                 continue;
                             }
 
-                            var functions = obj.func;
-                            var leng = functions.length;
-                            for (var i = 0; i < leng; i++) {
-                                var func = functions[i];
-                                if (func == undefined) {
-                                    continue;
-                                }
-
-                                var len = array[depth].func.length;
-                                array[depth].func[len] = func;
-                            }
-
                             var cArray = obj.cArray;
-                            var leng = cArray.length;
-                            for (var i = 0; i < leng; i++) {
+                            var length = cArray.length;
+                            for (var i = 0; i < length; i++) {
                                 var value = cArray[i];
                                 if (value == undefined) {
                                     continue;
@@ -1836,6 +1842,18 @@
 
                                 var len = array[depth].cArray.length;
                                 array[depth].cArray[len] = value;
+                            }
+
+                            var fCArray = obj.fArray;
+                            var length = fCArray.length;
+                            for (var i = 0; i < length; i++) {
+                                var value = fCArray[i];
+                                if (value == undefined) {
+                                    continue;
+                                }
+
+                                var baseArray = array[depth].fArray;
+                                baseArray[baseArray.length] = value;
                             }
 
                             // 使ったので削除
@@ -1882,82 +1900,69 @@
                                 results[s][obj.Depth] = [];
                             }
 
+                            var objArray = obj.fArray;
                             if (obj.isGradient) {
-                                obj.func.unshift(
-                                    new _Function("c", _getGradientLogic(obj, undefined))
-                                );
-                                obj.func.unshift(new _Function("c", "c.beginPath();"));
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.closePath();");
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.save();");
-
                                 // Matrix
                                 var Matrix = obj.ColorObj.gradientMatrix;
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.transform("
-                                        + Matrix.ScaleX +", "
-                                        + Matrix.RotateSkew0 +", "
-                                        + Matrix.RotateSkew1 +", "
-                                        + Matrix.ScaleY +", "
-                                        + Matrix.TranslateX +", "
-                                        + Matrix.TranslateY +");"
-                                    );
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.fill();");
+                                var gradientLogic = _getGradientLogic(obj, undefined);
+                                var len = gradientLogic.length;
+                                for (var i = len; i--;) {
+                                    objArray.unshift(gradientLogic[i]);
+                                }
+                                objArray = _setBeginPath(objArray, true);
+                                objArray = _setClosePath(objArray);
+                                objArray = _setSave(objArray);
+                                objArray = _setTransform(
+                                    objArray,
+                                    Matrix.ScaleX,
+                                    Matrix.RotateSkew0,
+                                    Matrix.RotateSkew1,
+                                    Matrix.ScaleY,
+                                    Matrix.TranslateX,
+                                    Matrix.TranslateY
+                                );
 
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.restore();");
-
-                                delete obj.Color;
+                                objArray = _setFill(objArray);
+                                objArray = _setRestore(objArray);
                             } else if (obj.BitMapObj != null) {
                                 var bitMapObj = obj.BitMapObj;
-                                var imageData = BitData[bitMapObj.bitmapId];
                                 var Matrix = bitMapObj.bitmapMatrix;
-
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.beginPath();");
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.transform("
-                                        + Matrix.ScaleX / 20 +", "
-                                        + Matrix.RotateSkew0 +", "
-                                        + Matrix.RotateSkew1 +", "
-                                        + Matrix.ScaleY / 20 +", "
-                                        + Matrix.TranslateX +", "
-                                        + Matrix.TranslateY +");"
-                                    );
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "var img = new Image(); " +
-                                        "img.src = '"+ imageData +"'; " +
-                                        "c.drawImage(img, 0, 0);");
-                            } else {
-                                obj.func.unshift(
-                                    new _Function("c", "c.fillStyle = '"+ obj.Color +"';")
+                                objArray = _setBeginPath(objArray);
+                                objArray = _setTransform(
+                                    objArray,
+                                    (Matrix.ScaleX / 20),
+                                    Matrix.RotateSkew0,
+                                    Matrix.RotateSkew1,
+                                    (Matrix.ScaleY / 20),
+                                    Matrix.TranslateX,
+                                    Matrix.TranslateY
                                 );
-                                obj.func.unshift(new _Function("c", "c.beginPath();"));
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.closePath();");
-                                obj.func[obj.func.length] =
-                                    new _Function("c", "c.fill();");
-
-                                obj.fArray.unshift(obj.Color);
-                                obj.fArray.unshift(7);
-                                obj.fArray.unshift(5);
-                                obj.fArray[obj.fArray.length] = 6;
-                                obj.fArray[obj.fArray.length] = 8;
+                                objArray = _setImage(
+                                    objArray,
+                                    bitMapObj.bitmapId
+                                );
+                            } else {
+                                var color = _generateRGBA(obj.ColorObj.Color);
+                                objArray = _setFillStyle(
+                                    objArray,
+                                    color.R, color.G, color.B, color.A,
+                                    true);
+                                objArray = _setBeginPath(objArray, true);
+                                objArray = _setClosePath(objArray);
+                                objArray = _setFill(objArray);
                             }
 
                             var len = results[s][obj.Depth].length;
                             results[s][obj.Depth][len] = obj;
 
                             // 未使用のものは削除
-                            delete obj.cArray;
-                            delete obj.StartX;
-                            delete obj.StartY;
-                            delete obj.EndX;
-                            delete obj.EndY;
-                            delete obj.ColorIdx;
-                            delete obj.Depth;
+                            obj.cArray = _void;
+                            obj.StartX = _void;
+                            obj.StartY = _void;
+                            obj.EndX = _void;
+                            obj.EndY = _void;
+                            obj.ColorIdx = _void;
+                            obj.Depth = _void;
                         }
                     }
                 }
@@ -2095,13 +2100,6 @@
                                     cArray[cArray.length] = copyArray[i];
                                 }
 
-                                var copyFunc = copy.func;
-                                copyFunc.shift();
-                                var len = copyFunc.length;
-                                for (var i = 0; i < len; i++) {
-                                    fArray[fArray.length] = copyFunc[i];
-                                }
-
                                 var copyFArray = copy.fArray;
                                 copyFArray.shift();
                                 copyFArray.shift();
@@ -2112,7 +2110,9 @@
                                 }
 
                                 // lineがあればマージ
-                                if (lineLength > 0 && lineArray[copy.Depth] != undefined) {
+                                if (lineLength > 0
+                                    && lineArray[copy.Depth] != undefined
+                                ) {
                                     var lObj = lineArray[copy.Depth];
                                     lObj.merge = true;
 
@@ -2120,12 +2120,6 @@
                                     var len = lineCArray.length;
                                     for (var i = 0; i < len; i++) {
                                         lArray[lArray.length] = lineCArray[i];
-                                    }
-
-                                    var lineFunc = lObj.func;
-                                    var len = lineFunc.length;
-                                    for (var i = 0; i < len; i++) {
-                                        flArray[flArray.length] = lineFunc[i];
                                     }
 
                                     var lineFArray = lObj.fArray;
@@ -2136,7 +2130,7 @@
                                 }
 
                                 copy.cArray = null;
-                                copy.func = null;
+                                copy.fArray = null;
                                 limit = 0;
                                 count = 0;
                             } else if (total <= count &&
@@ -2153,13 +2147,6 @@
                                     cArray[cArray.length] = copyArray[i];
                                 }
 
-                                var copyFunc = copy.func;
-                                copyFunc.shift();
-                                var len = copyFunc.length;
-                                for (var i = 0; i < len; i++) {
-                                    fArray[fArray.length] = copyFunc[i];
-                                }
-
                                 var copyFArray = copy.fArray;
                                 copyFArray.shift();
                                 copyFArray.shift();
@@ -2170,7 +2157,9 @@
                                 }
 
                                 // lineがあればマージ
-                                if (lineLength > 0 && lineArray[copy.Depth] != undefined) {
+                                if (lineLength > 0
+                                    && lineArray[copy.Depth] != undefined
+                                ) {
                                     var lObj = lineArray[copy.Depth];
                                     lObj.merge = true;
                                     _this.fillReverse(lObj);
@@ -2181,12 +2170,6 @@
                                         lArray[lArray.length] = lineCArray[i];
                                     }
 
-                                    var lineFunc = lObj.func;
-                                    var len = lineFunc.length;
-                                    for (var i = 0; i < len; i++) {
-                                        flArray[flArray.length] = lineFunc[i];
-                                    }
-
                                     var lineFArray = lObj.fArray;
                                     var len = lineFArray.length;
                                     for (var i = 0; i < len; i++) {
@@ -2195,7 +2178,7 @@
                                 }
 
                                 copy.cArray = null;
-                                copy.func = null;
+                                copy.fArray = null;
                                 limit = 0;
                                 count = 0;
                             } else {
@@ -2231,12 +2214,6 @@
                                     bCArray[bCArray.length] = cArray[i];
                                 }
 
-                                var bFArray = base.func;
-                                var len = fArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    bFArray[bFArray.length] = fArray[i];
-                                }
-
                                 var bFArray = base.fArray;
                                 var len = cfArray.length;
                                 for (var i = 0; i < len; i++) {
@@ -2255,12 +2232,6 @@
                                     var lCArray = lObj.cArray;
                                     for (var i = 0; i < len; i++) {
                                         lCArray[lCArray.length] = lArray[i];
-                                    }
-
-                                    var lFArray = lObj.func;
-                                    var len = flArray.length;
-                                    for (var i = 0; i < len; i++) {
-                                        lFArray[lFArray.length] = flArray[i];
                                     }
 
                                     var lFArray = lObj.fArray;
@@ -2342,44 +2313,24 @@
             obj.EndY   = StartY;
 
             // 描画の入れ替え
-            obj.func = [];
-            obj.func[obj.func.length] = new _Function(
-                "c", "c.moveTo("+ obj.StartX +", "+ obj.StartY +");"
-            );
-
-            obj.fArray = [];
-            obj.fArray[0] = 2;
-            obj.fArray[1] = obj.StartX;
-            obj.fArray[2] = obj.StartY;
+            var fCArray = [];
+            fCArray = _setMoveTo(fCArray, obj.StartX, obj.StartY);
 
             // 並べ替え
             for (var i = len; i--;) {
                 var data = cArray[i];
                 if (data.isCurved) {
-                    obj.func[obj.func.length] =
-                        new _Function("c", "c.quadraticCurveTo("
-                            + data.ControlX +", "+ data.ControlY +", "
-                            + data.AnchorX  +", "+ data.AnchorY  +");"
-                        );
-
-                    var fLen = obj.fArray.length;
-                    obj.fArray[fLen++] = 0;
-                    obj.fArray[fLen++] = data.ControlX;
-                    obj.fArray[fLen++] = data.ControlY;
-                    obj.fArray[fLen++] = data.AnchorX;
-                    obj.fArray[fLen++] = data.AnchorY;
+                    fCArray = _setQuadraticCurveTo(fCArray,
+                        data.ControlX, data.ControlY,
+                        data.AnchorX, data.AnchorY
+                    );
                 } else {
-                    obj.func[obj.func.length]
-                        = new _Function("c", "c.lineTo("
-                            + data.AnchorX +", "+ data.AnchorY +");"
-                        );
-
-                    var fLen = obj.fArray.length;
-                    obj.fArray[fLen++] = 1;
-                    obj.fArray[fLen++] = data.AnchorX;
-                    obj.fArray[fLen++] = data.AnchorY;
+                    fCArray = _setLineTo(fCArray,
+                        data.AnchorX, data.AnchorY
+                    );
                 }
             }
+            obj.fArray = fCArray;
 
             return obj;
         },
@@ -2425,10 +2376,12 @@
                     var idx = (colorTableSize)
                         ? data[cmIdx++] * bpp
                         : cmIdx++ * bpp;
+
                     if(!isAlpha){
                         pxData[pxIdx++] = data[idx++];
                         pxData[pxIdx++] = data[idx++];
                         pxData[pxIdx++] = data[idx++];
+                        var alpha = data[idx++];
                         pxData[pxIdx++] = 255;
                     } else {
                         var alpha = data[idx++];
@@ -2444,10 +2397,7 @@
             imageCanvas.width = width;
             imageCanvas.height = height;
             imageContext.putImageData(imgData, 0, 0);
-            var uri = imageCanvas.toDataURL();
-
-            // set
-            BitData[cid] = uri;
+            bitMapData[cid] = imageContext.canvas;
         },
 
         /**
@@ -2504,7 +2454,7 @@
 
                 obj.FontNameLen = bitio.getUI8();
                 if (obj.FontNameLen) {
-                    obj.FontName = bitio.getData(obj.FontNameLen);
+                    obj.FontName = _decodeToShiftJis(bitio.getData(obj.FontNameLen));
                 }
 
                 var numGlyphs = bitio.getUI16();
@@ -2697,7 +2647,13 @@
                     var tag = {
                         CharacterId: characterId,
                         Depth: 0,
-                        CloneData: {data: result.data},
+                        CloneData: {
+                            data: result.data,
+                            Xmax: 0,
+                            Xmin: 0,
+                            Ymax: 0,
+                            Ymin: 0
+                        },
                         PlaceFlagHasMatrix: 1,
                         Matrix: mtx,
                         PlaceFlagHasColorTransform: 0,
@@ -2865,8 +2821,8 @@
                     obj: obj,
                     FontName: font.FontName,
                     isGradient: false,
-                    ColorObj: _getColor(obj.TextColor),
-                    func: generateText(obj, font.FontName, undefined)
+                    ColorObj: obj.TextColor,
+                    fArray: generateText(obj, font.FontName, undefined)
                 },
                 Xmax: obj.Bound.Xmax / 20,
                 Xmin: obj.Bound.Xmin / 20,
@@ -3468,7 +3424,7 @@
             var stack = [];
             var actionData = null;
             var origin = obj;
-            var isCall = false;
+            var newBitio = new BitIO();
 
             // BitIO
             var abitio = new BitIO();
@@ -3489,14 +3445,12 @@
                     // ********************************************
                     // GotoFrame
                     case 0x81:
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
                         var n = _floor(newBitio.getUI16()) + 1;
 
                         if (n == obj.getFrame()) {
-                            isCall = false;
                             break;
                         }
 
@@ -3504,30 +3458,25 @@
                             n = 1;
                         }
 
-                        isCall = true;
                         obj.setFrame(n);
+                        obj.actionStart();
 
                         break;
                     // NextFrame
                     case 0x04:
                         obj.nextFrame();
-                        if (isCall) {
-                            obj.actionStart();
-                        }
+                        obj.actionStart();
+                        //_action(obj);
                         break;
                     // PreviousFrame
                     case 0x05:
                         obj.previousFrame();
-                        if (isCall) {
-                            obj.actionStart();
-                        }
+                        obj.actionStart();
+                        //_action(obj);
                         break;
                     // Play
                     case 0x06:
                         obj.play();
-                        if (isCall) {
-                            obj.actionStart();
-                        }
                         break;
                     // Stop
                     case 0x07:
@@ -3547,15 +3496,12 @@
                     case 0x8A:
                         // TODO 未実装
                         console.log('WaitForFrame');
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
                         var frame = newBitio.getUI16();
                         var skipCount = newBitio.getUI8();
-
                         break;
                     case 0x8B: // SetTarget
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
                         var targetName = newBitio.getDataUntil("\0");
@@ -3566,22 +3512,23 @@
                                 obj = origin;
                                 break;
                             }
-                            isCall = true;
                         } else {
-                            isCall = false;
                             obj = origin;
                         }
 
                         break;
                     // GoToLabel
                     case 0x8C:
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
                         var label = newBitio.getDataUntil("\0");
                         var frame = obj.getLabel(label);
+                        if (frame == undefined) {
+                            break;
+                        }
                         obj.setFrame(frame);
+                        obj.actionStart();
 
                         break;
                     // GetUrl
@@ -3814,7 +3761,6 @@
                         break;
                     // Push
                     case 0x96:
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
@@ -3985,7 +3931,6 @@
                     // ムービー制御 ***********************************
                     // GetURL2
                     case 0x9A:
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
@@ -4101,7 +4046,6 @@
                         break;
                     // GoToFrame2
                     case 0x9F:
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
@@ -4120,6 +4064,8 @@
                                 if (aClass instanceof AnimationClass) {
                                     frame = aClass.getLabel(splitData[1]);
                                     aClass.setFrame(frame);
+                                    aClass.actionStart();
+
                                     if (PlayFlag) {
                                         aClass.play();
                                     } else {
@@ -4129,6 +4075,7 @@
                             } else {
                                 frame = obj.getLabel(splitData[0]);
                                 obj.setFrame(frame);
+                                obj.actionStart();
                                 if (PlayFlag) {
                                     obj.play();
                                 } else {
@@ -4137,6 +4084,7 @@
                             }
                         } else {
                             obj.setFrame(frame);
+                            obj.actionStart();
                             if (PlayFlag) {
                                 obj.play();
                             } else {
@@ -4152,7 +4100,6 @@
                             obj = origin;
                             break;
                         }
-                        isCall = true;
                         break;
                     // SetProperty
                     case  0x23:
@@ -4196,9 +4143,19 @@
                                 targetObj._visible = _parseFloat(value);
                                 break;
                             case 8:
-                                targetObj._width = _parseFloat(value);
+                                var v = _parseFloat(value);
+                                var per = v / targetObj._width;
+                                targetObj._xscale = (targetObj._xscale == null)
+                                    ? per
+                                    : targetObj._xscale + per;
+                                targetObj._width = v;
                                 break;
                             case 9:
+                                var v = _parseFloat(value);
+                                var per = v / targetObj._height;
+                                targetObj._yscale = (targetObj._yscale == null)
+                                    ? per
+                                    : targetObj._yscale + per;
                                 targetObj._height = _parseFloat(value);
                                 break;
                             case 10:
@@ -4255,7 +4212,6 @@
                     case 0x8D:
                         // TODO 未実装
                         console.log('WaitForFrame2');
-                        var newBitio = new BitIO();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
                         var skipCount = newBitio.getUI8();
@@ -4266,15 +4222,17 @@
                         var depth = stack.pop();
                         var target = stack.pop() + '';
                         var source = stack.pop() + '';
-                        var aClass = _clone(obj.nameMap[source]);
+
+                        var aClass = this.getAnimationClass(source, obj);
+                        var cloneClass = _clone(aClass);
 
                         // 初期化
-                        aClass._visible = 1;
-                        aClass.frame = 1;
-                        aClass.Depth = depth;
+                        cloneClass._visible = 1;
+                        cloneClass.frame = 1;
+                        cloneClass.Depth = depth;
 
                         // set
-                        obj.nameMap[target] = aClass;
+                        obj.nameMap[target] = cloneClass;
                         var frameTags = obj.frameTags;
                         var len = frameTags.length;
                         for (var i = len; i--;) {
@@ -4293,8 +4251,9 @@
                                 var func = function () {};
                                 func.prototype = cTag;
                                 var tag = new func();
-                                tag.CloneData = aClass;
+                                tag.CloneData = cloneClass;
                                 tag.Depth = depth;
+                                tag.PlaceFlagHasColorTransform = 0;
                                 array[depth] = tag;
                             }
                         }
@@ -4303,9 +4262,10 @@
                     // RemoveSprite
                     case 0x25:
                         var target = stack.pop() + '';
-                        var aClass = obj.nameMap[target];
-                        if (aClass != undefined) {
-                            var depth = aClass.Depth;
+                        var aClass = this.getAnimationClass(target, obj);
+                        var cloneClass = _clone(aClass);
+                        if (cloneClass != undefined) {
+                            var depth = cloneClass.Depth;
                             var frameTags = obj.frameTags;
                             var len = frameTags.length;
                             for (var i = len; i--;) {
@@ -4344,11 +4304,10 @@
                     // Trace
                     case 0x26:
                         var value = stack.pop();
-                        console.log('[trace] '+value);
+                        console.log('[trace] ' + value);
                         break;
                     case 0x00:
                         isEnd = true;
-                        isCall = false;
                         break;
                     default:
                         break;
@@ -4429,8 +4388,8 @@
         // Property
         this._x = 0;
         this._y = 0;
-        this._xscale = 1;
-        this._yscale = 1;
+        this._xscale = null;
+        this._yscale = null;
         this._currentframe = 0;
         this._alpha = 1;
         this._visible = 1;
@@ -4547,6 +4506,7 @@
                 // 最初に戻す
                 frame = 1;
             }
+
             _this.setFrame(frame);
         },
 
@@ -4805,7 +4765,8 @@
         actionStart: function()
         {
             var _this = this;
-            var ActionScript = _this.actions[_this.getFrame()];
+            var frame = _this.getFrame();
+            var ActionScript = _this.actions[frame];
             if (ActionScript != undefined) {
                 var len = ActionScript.length;
                 for (var i = 0; i < len; i++) {
@@ -4861,11 +4822,6 @@
         }
     }
 
-    var root = function(){}
-    root.prototype = {
-
-    }
-
     /**
      * btn
      *
@@ -4883,15 +4839,14 @@
         // Matrix
         if (tag.PlaceFlagHasMatrix) {
             var Matrix = tag.Matrix;
-            btnTransform[btnTransform.length] =
-                new _Function("c", "c.transform("
-                    + Matrix.ScaleX +", "
-                    + Matrix.RotateSkew0 +", "
-                    + Matrix.RotateSkew1 +", "
-                    + Matrix.ScaleY +", "
-                    + Matrix.TranslateX +", "
-                    + Matrix.TranslateY +");"
-                );
+            btnTransform[btnTransform.length] = {
+                ScaleX: Matrix.ScaleX,
+                RotateSkew0: Matrix.RotateSkew0,
+                RotateSkew1: Matrix.RotateSkew1,
+                ScaleY: Matrix.ScaleY,
+                TranslateX: Matrix.TranslateX,
+                TranslateY: Matrix.TranslateY
+            }
         }
 
         if (aData instanceof AnimationClass) {
@@ -4907,7 +4862,7 @@
                 }
             }
         } else {
-            ctx = _drawBtn(aClass, transform, btnTransform);
+            ctx = _drawBtn(aData, transform, btnTransform);
         }
 
         if (tag.PlaceFlagHasMatrix) {
@@ -4926,44 +4881,54 @@
      */
     function drawBtn(aData, transform, btnTransform)
     {
-        // hit
-        var _btnCache = btnCache;
-
-        var cid = aData.cid;
-        var ctx = _btnCache[cid];
-        if (ctx == undefined) {
-            var hitCanvas = baseCanvas.cloneNode(false);
-            hitCanvas.width = width;
-            hitCanvas.height = height;
-            ctx = hitCanvas.getContext('2d');
-
-            // cache
-            _btnCache[cid] = ctx;
-        }
+        var x = 0;
+        var y = 0;
 
         // transform
         var len = transform.length;
         for (var i = 0; i < len; i++) {
-            var func = transform[i];
-            func(ctx);
+            var transformObj = transform[i];
+            x = x * transformObj.ScaleX
+                + y * transformObj.RotateSkew1
+                + transformObj.TranslateX;
+
+            y = x * transformObj.RotateSkew0
+                + y * transformObj.ScaleY
+                + transformObj.TranslateY;
         }
 
         // btnTransform
         var len = btnTransform.length;
         for (var i = 0; i < len; i++) {
-            var func = btnTransform[i];
-            func(ctx);
+            var transformObj = btnTransform[i];
+            x = x * transformObj.ScaleX
+                + y * transformObj.RotateSkew1
+                + transformObj.TranslateX;
+
+            y = x * transformObj.RotateSkew0
+                + y * transformObj.ScaleY
+                + transformObj.TranslateY;
         }
 
-        // 無色の四角
-        var Xmax = aData.Xmax;
-        var Ymax = aData.Ymax;
-        var Xmin = aData.Xmin;
-        var Ymin = aData.Ymin;
-        ctx.rect(Xmin, Ymin, (Xmax - Xmin), (Ymax - Ymin));
-        ctx.fill();
+        x = x * scale + y * 0 + 0;
+        y = x * 0 + y * scale + 0;
 
-        return ctx;
+        // 無色の四角
+        var Xmax = aData.Xmax * scale;
+        var Ymax = aData.Ymax * scale;
+        var Xmin = aData.Xmin * scale;
+        var Ymin = aData.Ymin * scale;
+
+        //context.fillStyle = 'red';
+        //context.rect(Xmin + x, Ymin + y, (Xmax - Xmin), (Ymax - Ymin));
+        //context.fill();
+
+        return {
+            Xmax: x + (Xmax - Xmin),
+            Xmin: x + Xmin,
+            Ymax: y + (Ymax - Ymin),
+            Ymin: y + Ymin
+        };
     }
 
     /**
@@ -4996,41 +4961,41 @@
                     }
 
                     if (obj.isGradient) {
-                        var gradientRecords = obj.ColorObj.gradient.GradientRecords;
+                        var ColorObj = obj.ColorObj;
+                        var gradient = ColorObj.gradient;
+                        var gradientRecords = gradient.GradientRecords;
                         var colors = [];
                         var gLen = gradientRecords.length;
                         for (var g = 0; g < gLen; g++) {
                             var colorObj = gradientRecords[g];
                             colors[g] = {};
                             colors[g].Ratio = colorObj.Ratio;
-                            colors[g].Color = generateColor(ct, colorObj.Color);
+                            colors[g].Color = _generateColor(ct, colorObj.Color);
                         }
-
-                        obj.func.splice(1, 1,
-                            new _Function("c", _getGradientLogic(obj, colors))
-                        );
+                        var objArray = obj.fArray;
+                        var gradientLogic = _getGradientLogic(obj, colors);
+                        var s = 1;
+                        var cLen = 6 + (gLen * 6);
+                        for (var c = cLen; c--;) {
+                            objArray.splice(s, 1, gradientLogic[(s-1)]);
+                            s++;
+                        }
                     } else {
-                        var color  = obj.ColorObj.Color;
-                        var colorObj = generateColor(ct, color);
+                        var ColorObj = obj.ColorObj;
+                        var color  = ColorObj.Color;
+                        var colorObj = _generateColor(ct, color);
+                        var fArray = obj.fArray;
                         if (obj.Width == undefined) {
-                            obj.func.splice(1, 1,
-                                new _Function("c",
-                                    "c.fillStyle = 'rgba("
-                                        + colorObj.R +","
-                                        + colorObj.G +","
-                                        + colorObj.B +","
-                                        + colorObj.A +")';"
-                                )
+                            fArray.splice(
+                                1, 5,
+                                'fillStyle',
+                                colorObj.R, colorObj.G, colorObj.B, colorObj.A
                             );
                         } else {
-                            obj.func.splice(1, 1,
-                                new _Function("c",
-                                    "c.strokeStyle = 'rgba("
-                                        + colorObj.R +","
-                                        + colorObj.G +","
-                                        + colorObj.B +","
-                                        + colorObj.A +")';"
-                                )
+                            fArray.splice(
+                                1, 5,
+                                'strokeStyle',
+                                colorObj.R, colorObj.G, colorObj.B, colorObj.A
                             );
                         }
                     }
@@ -5118,25 +5083,39 @@
                 var aLen = array.length;
                 for (var a = 0; a < aLen; a++) {
                     var obj = array[a];
+
+                    if (obj.BitMapObj != null) {
+                        continue;
+                    }
+
                     // グラデーション対応
                     if (obj.isGradient) {
-                        obj.func.splice(1, 1,
-                            new _Function("c",
-                                _getGradientLogic(obj, undefined)
-                            )
-                        );
+                        var ColorObj = obj.ColorObj;
+                        var gradient = ColorObj.gradient;
+                        var gradientRecords = gradient.GradientRecords;
+                        var gLen = gradientRecords.length;
+                        var objArray = obj.fArray;
+                        var gradientLogic = _getGradientLogic(obj, undefined);
+                        var s = 1;
+                        var cLen = 6 + (gLen * 6);
+                        for (var c = cLen; c--;) {
+                            objArray.splice(s, 1, gradientLogic[(s-1)]);
+                            s++;
+                        }
+
                     } else {
+                        var fArray = obj.fArray;
+                        var ColorObj = obj.ColorObj;
+                        var color  = _generateRGBA(ColorObj.Color);
                         if (obj.Width == undefined) {
-                            obj.func.splice(1, 1,
-                                new _Function(
-                                    "c", "c.fillStyle = '"+ obj.Color +"';"
-                                )
+                            fArray.splice(1, 5,
+                                'fillStyle',
+                                color.R, color.G, color.B, color.A
                             );
                         } else {
-                            obj.func.splice(1, 1,
-                                new _Function(
-                                    "c", "c.strokeStyle = '"+ obj.Color +"';"
-                                )
+                            fArray.splice(1, 5,
+                                'strokeStyle',
+                                color.R, color.G, color.B, color.A
                             );
                         }
                     }
@@ -5155,16 +5134,41 @@
      */
     function drawVector(aData, transform, tag, aClass)
     {
-        var _setDraw = setDraw;
+        var array = _getCanvasArray();
 
         if (!isClipDepth) {
-            _setDraw(function (c) { c.save(); });
+            array = _setSave(array);
         }
 
         // transform
         var len = transform.length;
+        _setSetTransform(_getCanvasArray(), scale, 0, 0, scale, 0, 0);
         for (var i = 0; i < len; i++) {
-            _setDraw(transform[i]);
+            var transformObj = transform[i];
+            var type = transformObj.type;
+            switch (type) {
+                case 0:
+                    array = _setTransform(
+                        array,
+                        transformObj.ScaleX,
+                        transformObj.RotateSkew0,
+                        transformObj.RotateSkew1,
+                        transformObj.ScaleY,
+                        transformObj.TranslateX,
+                        transformObj.TranslateY
+                    );
+                    break;
+                case 1:
+                    array = _setRotate(array, transformObj.angle);
+                    break;
+                case 2:
+                    array = _setScale(
+                        array,
+                        transformObj.ScaleX,
+                        transformObj.ScaleY
+                    );
+                    break;
+            }
         }
 
         var data = aData.data;
@@ -5177,7 +5181,7 @@
         }
 
         if (!isClipDepth) {
-            _setDraw(function (c) { c.restore(); });
+            _setRestore(array);
         }
     }
 
@@ -5188,9 +5192,7 @@
     function mask(data)
     {
         var dLen = data.length;
-        var _setDraw = setDraw;
-
-        _setDraw(function (c) { c.beginPath(); });
+        _setBeginPath(_getCanvasArray());
         for (var i = 0; i < dLen; i++) {
             var stack = data[i];
             var sLen = stack.length;
@@ -5203,15 +5205,15 @@
                 var aLen = array.length;
                 for (var a = 0; a < aLen; a++) {
                     var obj = array[a];
-                    var functions = obj.func;
-                    var fLen = functions.length - 2;
-                    for (var f = 2; f < fLen; f++) {
-                        _setDraw(functions[f]);
+                    var fArray = obj.fArray;
+                    var length = fArray.length - 2;
+                    for (var c = 7; c < length; c++) {
+                        _setCanvasArray(fArray[c]);
                     }
                 }
             }
         }
-        _setDraw(function (c) { c.clip(); });
+        _setClip(_getCanvasArray());
     }
 
     /**
@@ -5222,23 +5224,22 @@
     function draw(data, aClass)
     {
         var dLen = data.length;
-        var _setDraw = setDraw;
 
         if (data.isText) {
             var obj = data.obj;
-            var functions = data.func;
+            var fArray = data.fArray;
             var name = obj.VariableName;
             var text = null;
             if (name != '') {
                 text = _getAnimationClassVariable(name, aClass);
                 if (text != null) {
-                    functions = generateText(obj, data.FontName, text)
+                    fArray = generateText(obj, data.FontName, text)
                 }
             }
 
-            var fLen = functions.length;
+            var fLen = fArray.length;
             for (var f = 0; f < fLen; f++) {
-                _setDraw(functions[f]);
+                _setCanvasArray(fArray[f]);
             }
         } else {
             for (var i = 0; i < dLen; i++) {
@@ -5253,10 +5254,10 @@
                     var aLen = array.length;
                     for (var a = 0; a < aLen; a++) {
                         var obj = array[a];
-                        var functions = obj.func;
-                        var fLen = functions.length;
-                        for (var f = 0; f < fLen; f++) {
-                            _setDraw(functions[f]);
+                        var fArray = obj.fArray;
+                        var length = fArray.length;
+                        for (var c = 0; c < length; c++) {
+                            _setCanvasArray(fArray[c]);
                         }
                     }
                 }
@@ -5356,6 +5357,7 @@
         // reset
         swftag = _void;
         SwfTag = _void;
+        isLoad = true;
     }
 
     /**
@@ -5413,14 +5415,17 @@
     {
         _clearMain();
         if (isLoad && player.playStartFlag) {
+            // main
             var canvas = preContext.canvas;
             context.drawImage(canvas, 0, 0);
             _setBuffer();
         } else {
             // loading
+            setTimeout(_onEnterFrame, 100);
+
             context.fillStyle = '#000';
-            context.font = (18 * devicePixelRatio) +"px";
-            context.fillText(loadingText[loading], 30, 50);
+            context.font = (25 * devicePixelRatio) +"px";
+            context.fillText(loadingText[loading], 50, 50);
 
             loading++;
             if (loading === 4) {
@@ -5442,12 +5447,6 @@
         // action script
         _action(_layer);
 
-        // transform
-        var transform = [];
-        transform[0] = function (c) {
-            c.setTransform(scale, 0, 0, scale, 0, 0);
-        };
-
         // pre clear
         _clearPre();
 
@@ -5460,19 +5459,12 @@
             if (tag == undefined) {
                 continue;
             }
-
-            // 実行
-            _render(_layer, tag, transform, []);
+            _render(_layer, tag, [], []);
         }
+        _renderCanvas();
 
-        // localDraw
-        _localDraw();
-
-        // animation
+        // next animation
         _putFrame(_layer);
-
-        // comp
-        isLoad = true;
     }
 
     /**
@@ -5535,14 +5527,13 @@
         // 複数対応
         data.setView();
 
-        // paramse
-
+        // delete count
         var count = 0;
 
         // mask終了判定
         if (isClipDepth && tag.Depth > endDepth) {
             isClipDepth = false;
-            setDraw(new Function("c", "c.restore();"));
+            _setRestore(_getCanvasArray());
         }
 
         // ColorTransform
@@ -5556,8 +5547,12 @@
         // Property
         var x = 0;
         var y = 0;
-        var xScale = 1;
-        var yScale = 1;
+        var ScaleX = 1;
+        var ScaleY = 1;
+        var xScale = null;
+        var yScale = null;
+        var isRotation = false;
+        var angle = 0;
         if (aData instanceof AnimationClass && aData.cid) {
             if (!aData._visible) {
                 return false;
@@ -5569,28 +5564,46 @@
             xScale = aData._xscale;
             yScale = aData._yscale;
 
-            count++;
-            var angle = aData._rotation * Math.PI / 180;
-            transform[transform.length] =
-                function (c) { c.rotate(angle); };
+            if (aData._rotation != 0) {
+                angle = aData._rotation * Math.PI / 180;
+                isRotation = true;
+            }
+
+            ScaleX = (xScale == null) ? 1 : xScale;
+            ScaleY = (yScale == null) ? 1 : yScale;
         }
 
         // Matrix
         if (tag.PlaceFlagHasMatrix) {
             count++;
             var Matrix = tag.Matrix;
-            var ScaleX = (xScale != null) ? Matrix.ScaleX - (1-xScale) : Matrix.ScaleX;
-            var ScaleY = (yScale != null) ? Matrix.ScaleY - (1-yScale) : Matrix.ScaleY;
+            transform[transform.length] = {
+                type: 0,
+                ScaleX: Matrix.ScaleX,
+                RotateSkew0: Matrix.RotateSkew0,
+                RotateSkew1: Matrix.RotateSkew1,
+                ScaleY: Matrix.ScaleY,
+                TranslateX: (x + Matrix.TranslateX),
+                TranslateY: (y + Matrix.TranslateY)
+            };
+        }
 
-            transform[transform.length] = function (c) {
-                c.transform(
-                    ScaleX,
-                    Matrix.RotateSkew0,
-                    Matrix.RotateSkew1,
-                    ScaleY,
-                    (x + Matrix.TranslateX),
-                    (y + Matrix.TranslateY)
-                );
+        // Rotation
+        if (isRotation) {
+            count++;
+            transform[transform.length] = {
+                type: 1,
+                angle: angle
+            }
+        }
+
+        // Scale
+        if (xScale != null || yScale != null) {
+            count++;
+            transform[transform.length] = {
+                type: 2,
+                ScaleX: ScaleX,
+                ScaleY: ScaleY
             }
         }
 
@@ -5620,26 +5633,17 @@
                     // enter btn
                     var keyPress = btnActions.CondKeyPress;
                     if (keyPress == 13) {
-                        // cache
-                        if (enterBtn == null) {
-                            // hit
-                            var hitCanvas = baseCanvas.cloneNode(false);
-                            hitCanvas.width = width;
-                            hitCanvas.height = height;
-                            var ctx = hitCanvas.getContext('2d');
-
-                            // 無色の四角
-                            ctx.rect(0, 0, width, height);
-                            ctx.fill();
-
-                            // cache
-                            enterBtn = ctx;
-                        }
-
                         // set
                         var tCtx = _touchCtx.pop();
                         var btnData = tCtx.data;
-                        btnData[btnData.length] = enterBtn;
+                        btnData[btnData.length] = {
+                            Xmax: width,
+                            Xmin: 0,
+                            Ymax: height,
+                            Ymin: 0
+                        };
+                        tCtx.CondOverUpToOverDown =
+                            btnActions.CondOverUpToOverDown;
                         _touchCtx[_touchCtx.length] = tCtx;
                     } else if (bLen
                         && (keyPress == 0 || (keyPress >= 48 && keyPress <= 57))
@@ -5663,7 +5667,6 @@
                             btnData[btnData.length] = ctx;
                             tCtx.CondOverUpToOverDown =
                                 btnActions.CondOverUpToOverDown;
-
                             _touchCtx[_touchCtx.length] = tCtx;
                         }
                     } else {
@@ -5687,7 +5690,6 @@
                                 continue;
                             }
                         }
-
                         _render(bClass, bTag, transform, colorTransform);
                     }
                 }
@@ -5793,7 +5795,6 @@
                         }
                     }
                 }
-
                 _putFrame(data);
             }
         }
@@ -5819,27 +5820,385 @@
     }
 
     /**
-     * setDraw
+     * setQuadraticCurveTo
+     * @param base
+     * @param cx
+     * @param cy
+     * @param ax
+     * @param ay
+     * @returns {*}
      */
-    function setDraw(func)
+    function setQuadraticCurveTo(base, cx, cy, ax, ay)
     {
-        functions[functions.length] = func;
+        var len = base.length;
+        base[len++] = 'quadraticCurveTo';
+        base[len++] = cx;
+        base[len++] = cy;
+        base[len++] = ax;
+        base[len] = ay;
+        return base;
     }
 
     /**
-     * localDraw
+     * setLineTo
+     * @param base
+     * @param x
+     * @param y
+     * @returns {*}
      */
-    function localDraw()
+    function setLineTo(base, x, y)
     {
-        var len = functions.length;
-        functions.reverse();
-        var _preContext = preContext;
-        for (var i = len; i--;) {
-            functions[i](_preContext);
-        }
-        functions = [];
+        var len = base.length;
+        base[len++] = 'lineTo';
+        base[len++] = x;
+        base[len] = y;
+        return base;
     }
 
+    /**
+     * setMoveTo
+     * @param base
+     * @param x
+     * @param y
+     * @returns {*}
+     */
+    function setMoveTo(base, x, y)
+    {
+        var len = base.length;
+        base[len++] = 'moveTo';
+        base[len++] = x;
+        base[len] = y;
+        return base;
+    }
+
+    /**
+     * setSave
+     * @param base
+     * @returns {*}
+     */
+    function setSave(base)
+    {
+        base[base.length] = 'save';
+        return base;
+    }
+
+    /**
+     * setRestore
+     * @param base
+     * @returns {*}
+     */
+    function setRestore(base)
+    {
+        base[base.length] = 'restore';
+        return base;
+    }
+
+    /**
+     * setBeginPath
+     * @param base
+     * @param isUnShift
+     * @returns {*}
+     */
+    function setBeginPath(base, isUnShift)
+    {
+        if (isUnShift) {
+            base.unshift('beginPath')
+        } else {
+            base[base.length] = 'beginPath';
+        }
+        return base;
+    }
+
+    /**
+     * setClosePath
+     * @param base
+     * @returns {*}
+     */
+    function setClosePath(base)
+    {
+        base[base.length] = 'closePath';
+        return base;
+    }
+
+    /**
+     * setFillStyle
+     * @param base
+     * @param r
+     * @param g
+     * @param b
+     * @param a
+     * @returns {*}
+     */
+    function setFillStyle(base, r, g, b, a, isUnShift)
+    {
+        if (isUnShift) {
+            base.unshift(a);
+            base.unshift(b);
+            base.unshift(g);
+            base.unshift(r);
+            base.unshift('fillStyle');
+        } else {
+            var len = base.length;
+            base[len++] = 'fillStyle';
+            base[len++] = r;
+            base[len++] = g;
+            base[len++] = b;
+            base[len] = a;
+        }
+
+        return base;
+    }
+
+    /**
+     * setFill
+     * @param base
+     * @returns {*}
+     */
+    function setFill(base)
+    {
+        base[base.length] = 'fill';
+        return base;
+    }
+
+    /**
+     * setStrokeStyle
+     * @param base
+     * @param r
+     * @param g
+     * @param b
+     * @param a
+     * @param isUnShift
+     * @returns {*}
+     */
+    function setStrokeStyle(base, r, g, b, a, isUnShift)
+    {
+        var len = base.length;
+        if (isUnShift) {
+            base.unshift(a);
+            base.unshift(b);
+            base.unshift(g);
+            base.unshift(r);
+            base.unshift('strokeStyle');
+        } else {
+            base[len++] = 'strokeStyle';
+            base[len++] = r;
+            base[len++] = g;
+            base[len++] = b;
+            base[len] = a;
+        }
+
+        return base;
+    }
+
+    /**
+     * setLineWidth
+     * @param base
+     * @param width
+     * @returns {*}
+     */
+    function setLineWidth(base, width)
+    {
+        base.unshift(width);
+        base.unshift('lineWidth');
+        return base;
+    }
+
+    /**
+     * setLineCap
+     * @param base
+     * @returns {*}
+     */
+    function setLineCap(base)
+    {
+        base.unshift('lineCap');
+        return base;
+    }
+
+    /**
+     * setLineCap
+     * @param base
+     * @returns {*}
+     */
+    function setLineJoin(base)
+    {
+        base.unshift('lineJoin');
+        return base;
+    }
+
+    /**
+     * setStroke
+     * @returns {*}
+     */
+    function setStroke(base)
+    {
+        base[base.length] = 'stroke';
+        return base;
+    }
+
+    /**
+     * setClip
+     * @param base
+     * @returns {*}
+     */
+    function setClip(base)
+    {
+        base[base.length] = 'clip';
+        return base;
+    }
+
+    /**
+     * setSetTransform
+     * @param base
+     * @param sx
+     * @param r0
+     * @param r1
+     * @param sy
+     * @param tx
+     * @param ty
+     * @returns {*}
+     */
+    function setSetTransform(base, sx, r0, r1, sy, tx, ty)
+    {
+        var len = base.length;
+        base[len++] = 'setTransform';
+        base[len++] = sx;
+        base[len++] = r0;
+        base[len++] = r1;
+        base[len++] = sy;
+        base[len++] = tx;
+        base[len] = ty;
+        return base;
+    }
+
+    /**
+     * setTransform
+     * @param base
+     * @param sx
+     * @param r0
+     * @param r1
+     * @param sy
+     * @param tx
+     * @param ty
+     * @returns {*}
+     */
+    function setTransform(base, sx, r0, r1, sy, tx, ty)
+    {
+        var len = base.length;
+        base[len++] = 'transform';
+        base[len++] = sx;
+        base[len++] = r0;
+        base[len++] = r1;
+        base[len++] = sy;
+        base[len++] = tx;
+        base[len] = ty;
+        return base;
+    }
+
+    /**
+     * setRotate
+     * @param base
+     * @param a
+     * @returns {*}
+     */
+    function setRotate(base, a)
+    {
+        var len = base.length;
+        base[len++] = 'rotate';
+        base[len] = a;
+        return base;
+    }
+
+    /**
+     * setDrawImage
+     * @param base
+     * @param image
+     * @returns {*}
+     */
+    function setDrawImage(base, image)
+    {
+        var len = base.length;
+        base[len++] = 'drawImage';
+        base[len] = image;
+        return base;
+    }
+
+    /**
+     * setScale
+     * @param base
+     * @param x
+     * @param y
+     * @returns {*}
+     */
+    function setScale(base, x, y)
+    {
+        var len = base.length;
+        base[len++] = 'scale';
+        base[len++] = x;
+        base[len] = y;
+        return base;
+    }
+
+    /**
+     * setImage
+     * @param base
+     * @param id
+     * @returns {*}
+     */
+    function setImage(base, id)
+    {
+        var len = base.length;
+        base[len++] = 'image';
+        base[len] = id;
+        return base;
+    }
+
+    /**
+     * setFont
+     * @param base
+     * @param size
+     * @param name
+     * @returns {*}
+     */
+    function setFont(base, size, name)
+    {
+        var len = base.length;
+        base[len++] = 'font';
+        base[len++] = size;
+        base[len] = name;
+        return base;
+    }
+
+    /**
+     * setTextAlign
+     * @param base
+     * @param point
+     * @returns {*}
+     */
+    function setTextAlign(base, point)
+    {
+        var len = base.length;
+        base[len++] = 'textAlign';
+        base[len] = point;
+        return base;
+    }
+
+    /**
+     * setFillText
+     * @param base
+     * @param name
+     * @param x
+     * @param y
+     * @returns {*}
+     */
+    function setFillText(base, name, x, y)
+    {
+        var len = base.length;
+        base[len++] = 'fillText';
+        base[len++] = name;
+        base[len++] = x;
+        base[len] = y;
+        return base;
+    }
 
     /**
      * setCanvasArray
@@ -5851,6 +6210,15 @@
     }
 
     /**
+     * getCanvasArray
+     * @returns {Array}
+     */
+    function getCanvasArray()
+    {
+        return canvasArray;
+    }
+
+    /**
      * renderCanvas
      */
     function renderCanvas()
@@ -5858,79 +6226,135 @@
         var len = canvasArray.length;
         var i = 0;
         var _preContext = preContext;
+        var grad = null;
 
-        while (true) {
+        while (len) {
             var type = canvasArray[i++];
             switch (type) {
-                case 0: // quadraticCurveTo
+                case 'quadraticCurveTo':
                     _preContext.quadraticCurveTo(
                         canvasArray[i++], canvasArray[i++],
                         canvasArray[i++], canvasArray[i++]
                     );
                     break;
-                case 1: // lineTo
+                case 'lineTo':
                     _preContext.lineTo(canvasArray[i++], canvasArray[i++]);
                     break;
-                case 2: // moveTo
+                case 'moveTo':
                     _preContext.moveTo(canvasArray[i++], canvasArray[i++]);
                     break;
-                case 3: // save
+                case 'save':
                     _preContext.save();
                     break;
-                case 4: // restore
+                case 'restore':
                     _preContext.restore();
                     break;
-                case 5: // beginPath
+                case 'beginPath':
                     _preContext.beginPath();
                     break;
-                case 6: // closePath
+                case 'closePath':
                     _preContext.closePath();
                     break;
-                case 7: // fillStyle
-                    _preContext.fillStyle = canvasArray[i++];
+                case 'fillStyle':
+                    _preContext.fillStyle = "rgba("
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +")";
                     break;
-                case 8: // fill
+                case 'fill':
                     _preContext.fill();
                     break;
-                case 9: // strokeStyle
-                    _preContext.strokeStyle = canvasArray[i++];
+                case 'strokeStyle':
+                    _preContext.strokeStyle = "rgba("
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +", "
+                        + canvasArray[i++] +")";
                     break;
-                case 10: // lineWidth
+                case 'lineWidth':
                     _preContext.lineWidth = canvasArray[i++];
                     break;
-                case 11: // lineCap
+                case 'lineCap':
                     _preContext.lineCap = 'round';
                     break;
-                case 12: // lineJoin
+                case 'lineJoin':
                     _preContext.lineJoin = 'round';
                     break;
-                case 13: // stroke
+                case 'stroke':
                     _preContext.stroke();
                     break;
-                case 14: // clip
+                case 'clip':
                     _preContext.clip();
                     break;
-                case 15: // setTransform
+                case 'setTransform':
                     _preContext.setTransform(
                         canvasArray[i++], canvasArray[i++],
                         canvasArray[i++], canvasArray[i++],
                         canvasArray[i++], canvasArray[i++]
                     );
                     break;
-                case 16: // transform
+                case 'transform':
                     _preContext.transform(
                         canvasArray[i++], canvasArray[i++],
                         canvasArray[i++], canvasArray[i++],
                         canvasArray[i++], canvasArray[i++]
                     );
                     break;
-                case 17: // rotate
+                case 'rotate':
                     _preContext.rotate(canvasArray[i++]);
                     break;
-                case 18: // drawImage
+                case 'drawImage':
                     _preContext.drawImage(canvasArray[i++],0,0);
                     break;
-
+                case 'scale':
+                    _preContext.scale(canvasArray[i++], canvasArray[i++]);
+                    break;
+                case 'createRadialGradient':
+                    grad = _preContext.createRadialGradient(
+                        canvasArray[i++], canvasArray[i++],
+                        canvasArray[i++], canvasArray[i++],
+                        canvasArray[i++], canvasArray[i++]
+                    );
+                    break;
+                case 'createLinearGradient':
+                    grad = _preContext.createLinearGradient(
+                        canvasArray[i++], canvasArray[i++],
+                        canvasArray[i++], canvasArray[i++]
+                    );
+                    break;
+                case 'addColorStop':
+                    grad.addColorStop(
+                        canvasArray[i++], "rgba("
+                           + canvasArray[i++] +", "
+                           + canvasArray[i++] +", "
+                           + canvasArray[i++] +", "
+                           + canvasArray[i++] +")"
+                    );
+                    break;
+                case 'setFillGradient':
+                    _preContext.fillStyle = grad;
+                    break;
+                case 'setLineGradient':
+                    _preContext.strokeStyle = grad;
+                    break;
+                case 'image':
+                    _preContext.drawImage(bitMapData[canvasArray[i++]],0,0);
+                    break;
+                case 'font':
+                    _preContext.font =
+                        canvasArray[i++] +"px '"+ canvasArray[i++] +"'";
+                    break;
+                case 'textAlign':
+                    _preContext.textAlign = canvasArray[i++];
+                    break;
+                case 'fillText':
+                    _preContext.fillText(
+                        canvasArray[i++],
+                        canvasArray[i++],
+                        canvasArray[i++]
+                    );
+                    break;
             }
 
             if (i == len) {
@@ -5938,6 +6362,7 @@
             }
         }
 
+        // 初期化
         canvasArray = [];
     }
 
@@ -5948,17 +6373,23 @@
     function touchStart(event)
     {
         // フリックによるスクロールを禁止
-        event.preventDefault();
+        //event.preventDefault();
+
+        var div = _document.getElementById('swf2js');
+        var bounds = div.getBoundingClientRect();
+        var x = bounds.left;
+        var y = bounds.top;
 
         if (isTouch) {
-            var changedTouche = event.changedTouches[0];
-            var touchX = changedTouche.pageX * devicePixelRatio;
-            var touchY = changedTouche.pageY * devicePixelRatio;
+            var changedTouche = event.targetTouches[0];
+            var touchX = (changedTouche.pageX - x) * devicePixelRatio;
+            var touchY = (changedTouche.pageY - y) * devicePixelRatio;
         } else {
-            var touchX = event.layerX;
-            var touchY = event.layerY;
+            var touchX = event.pageX - x;
+            var touchY = event.pageY - y;
         }
 
+        touchFlag = false;
         var _touchCtx = touchCtx;
         var len = _touchCtx.length;
         for (var i = len; i--;) {
@@ -5975,7 +6406,9 @@
                 }
 
                 var ctx = data[o];
-                if (ctx.isPointInPath(touchX, touchY)) {
+                if (touchX >= ctx.Xmin && touchX <= ctx.Xmax
+                    && touchY >= ctx.Ymin && touchY <= ctx.Ymax
+                ){
                     touchId = obj.ButtonId;
                     touchClass = obj.aClass;
                     touchFlag = true;
@@ -5994,9 +6427,9 @@
     function touchMove(event)
     {
         // フリックによるスクロールを禁止
-        event.preventDefault();
+        //event.preventDefault();
 
-        if (isBtnAction && (isTouch || touchFlag)) {
+        if (!isBtnAction && (isTouch || touchFlag)) {
             touchStart(event);
         }
     }
@@ -6008,7 +6441,7 @@
     function touchEnd(event)
     {
         // フリックによるスクロールを禁止
-        event.preventDefault();
+        //event.preventDefault();
 
         if (touchFlag) {
             touchEvent(event);
@@ -6017,7 +6450,6 @@
         // reset
         touchId = 0;
         isBtnAction = false;
-        touchFlag = false;
         touchClass = {};
     }
 
@@ -6032,6 +6464,7 @@
             aClass.btnAction(touchClass);
             isBtnAction = true;
         }
+        touchFlag = false;
     }
 
     /**
@@ -6053,28 +6486,32 @@
         return data;
     }
 
-
     /**
-     * 色情報を取得
-     *
+     * generateRGBA
      * @param color
-     * @returns {string}
+     * @returns {{R: number, G: number, B: number, A: number}}
      */
-    function getColor(color) {
+    function generateRGBA(color)
+    {
         if ('A' in color) {
             var alpha = color.A.toFixed(1);
         } else {
             var alpha = 1;
         }
-        return "rgba("+color.R+", "+color.G+", "+color.B+", "+alpha+")";
+
+        return {
+            R: color.R,
+            G: color.G,
+            B: color.B,
+            A: alpha
+        };
     }
 
     /**
      * グラデーションセット
-     *
      * @param obj
      * @param transformColors
-     * @returns {string}
+     * @returns {Array}
      */
     function getGradientLogic(obj, transformColors)
     {
@@ -6087,12 +6524,19 @@
         var type = data.fillStyleType;
 
         if (type == 18 || type == 19) {
-            logic[logic.length] = "var grad = c.createRadialGradient(0,0,0,0,0,"
-                + average +");\n";
+            logic[logic.length] = 'createRadialGradient';
+            logic[logic.length] = 0;
+            logic[logic.length] = 0;
+            logic[logic.length] = 0;
+            logic[logic.length] = 0;
+            logic[logic.length] = 0;
+            logic[logic.length] = average;
         } else if (type == 16) {
-            logic[logic.length] = "var grad = c.createLinearGradient("
-                + (average*-1) +", 0,"
-                + average +", 0);\n";
+            logic[logic.length] = 'createLinearGradient';
+            logic[logic.length] = (average*-1);
+            logic[logic.length] = 0;
+            logic[logic.length] = average;
+            logic[logic.length] = 0;
         }
 
         // グラデーションをセット
@@ -6104,13 +6548,18 @@
         for (var i = 0; i < len; i++) {
             var value = array[i];
             var n = (value.Ratio / 255);
-            logic[logic.length] = "grad.addColorStop("
-                + n.toFixed(1) + ", "
-                +"'"+ getColor(value.Color) +"');\n";
+            logic[logic.length] = 'addColorStop';
+            logic[logic.length] = n.toFixed(1);
+            var color = _generateRGBA(value.Color);
+            logic[logic.length] = color.R;
+            logic[logic.length] = color.G;
+            logic[logic.length] = color.B;
+            logic[logic.length] = color.A;
         }
 
-        logic[logic.length] = "c.fillStyle = grad;\n";
-        return logic.join('');
+        logic[logic.length] = 'setFillGradient';
+
+        return logic;
     }
 
     /**
@@ -6118,11 +6567,10 @@
      */
     function setBackgroundColor()
     {
-        player.bgR = bitio.getUI8();
-        player.bgB = bitio.getUI8();
-        player.bgG = bitio.getUI8();
-
-        var color = "rgb("+player.bgR+","+player.bgG+","+player.bgB+")";
+        var color = "rgb("
+            + bitio.getUI8() +","
+            + bitio.getUI8() +","
+            + bitio.getUI8() +")";
         var canvas = context.canvas;
         var style = canvas.style;
         _setStyle(style, 'backgroundColor', color);
@@ -6188,23 +6636,21 @@
     {
         var x = obj.RightMargin + obj.Indent;
         var y = obj.FontHeight;
-        var func = [];
+        var fArray = [];
+        var _preContext = preContext;
 
-        func[func.length] = new _Function("c", "c.beginPath();");
-        func[func.length] = new _Function("c", "c.fillStyle = '"
-            + _getColor(obj.TextColor) +"'");
-        func[func.length] = new _Function("c", "c.font = \""
-            + obj.FontHeight +"px '"
-            + FontName +"'\";"
+        fArray = _setBeginPath(fArray);
+        var color = _generateRGBA(obj.TextColor);
+        fArray = _setFillStyle(
+            fArray, color.R, color.G, color.B, color.A
         );
+        fArray = _setFont(fArray, obj.FontHeight, FontName);
 
         if (obj.Align == 1) {
-            func[func.length] =
-                new _Function("c", "c.textAlign = 'end';");
+            fArray = _setTextAlign(fArray, 'end');
             var x = (obj.Bound.Xmax - obj.Bound.Xmin) / 20;
         } else if (obj.Align == 2) {
-            func[func.length] =
-                new _Function("c", "c.textAlign = 'center';");
+            fArray = _setTextAlign(fArray, 'center');
             var x = (obj.Bound.Xmax - obj.Bound.Xmin) / 20 / 2;
         }
 
@@ -6212,16 +6658,16 @@
         var splitData = inText.split('@LFCR');
         var len = splitData.length;
         for (var i = 0; i < len; i++) {
-            var lineHeight = preContext.measureText("あ").width * 2;
+            var lineHeight = _preContext.measureText("あ").width * 2;
             var Leading = (i > 0) ? obj.Leading : 0;
-            func[func.length] = new _Function("c", "c.fillText('"
-                + splitData[i] +"', "
-                + x +", "
-                + ((y + lineHeight * i) + Leading) +");"
+            fArray = _setFillText(
+                fArray, splitData[i],
+                x,
+                ((y + lineHeight * i) + Leading)
             );
         }
 
-        return func;
+        return fArray;
     }
 
     /**
@@ -6239,10 +6685,12 @@
     var JCT11280 = new Function('var a="zKV33~jZ4zN=~ji36XazM93y!{~k2y!o~k0ZlW6zN?3Wz3W?{EKzK[33[`y|;-~j^YOTz$!~kNy|L1$353~jV3zKk3~k-4P4zK_2+~jY4y!xYHR~jlz$_~jk4z$e3X5He<0y!wy|X3[:~l|VU[F3VZ056Hy!nz/m1XD61+1XY1E1=1y|bzKiz!H034zKj~mEz#c5ZA3-3X$1~mBz$$3~lyz#,4YN5~mEz#{ZKZ3V%7Y}!J3X-YEX_J(3~mAz =V;kE0/y|F3y!}~m>z/U~mI~j_2+~mA~jp2;~m@~k32;~m>V}2u~mEX#2x~mBy+x2242(~mBy,;2242(~may->2&XkG2;~mIy-_2&NXd2;~mGz,{4<6:.:B*B:XC4>6:.>B*BBXSA+A:X]E&E<~r#z+625z s2+zN=`HXI@YMXIAXZYUM8X4K/:Q!Z&33 3YWX[~mB`{zKt4z (zV/z 3zRw2%Wd39]S11z$PAXH5Xb;ZQWU1ZgWP%3~o@{Dgl#gd}T){Uo{y5_d{e@}C(} WU9|cB{w}bzvV|)[} H|zT}d||0~{]Q|(l{|x{iv{dw}(5}[Z|kuZ }cq{{y|ij}.I{idbof%cu^d}Rj^y|-M{ESYGYfYsZslS`?ZdYO__gLYRZ&fvb4oKfhSf^d<Yeasc1f&a=hnYG{QY{D`Bsa|u,}Dl|_Q{C%xK|Aq}C>|c#ryW=}eY{L+`)][YF_Ub^h4}[X|?r|u_ex}TL@YR]j{SrXgo*|Gv|rK}B#mu{R1}hs|dP{C7|^Qt3|@P{YVV |8&}#D}ef{e/{Rl|>Hni}R1{Z#{D[}CQlQ||E}[s{SG_+i8eplY[=[|ec[$YXn#`hcm}YR|{Ci(_[ql|?8p3]-}^t{wy}4la&pc|3e{Rp{LqiJ],] `kc(]@chYnrM`O^,ZLYhZB]ywyfGY~aex!_Qww{a!|)*lHrM{N+n&YYj~Z b c#e_[hZSon|rOt`}hBXa^i{lh|<0||r{KJ{kni)|x,|0auY{D!^Sce{w;|@S|cA}Xn{C1h${E]Z-XgZ*XPbp]^_qbH^e[`YM|a||+=]!Lc}]vdBc=j-YSZD]YmyYLYKZ9Z>Xcczc2{Yh}9Fc#Z.l{}(D{G{{mRhC|L3b#|xK[Bepj#ut`H[,{E9Yr}1b{[e]{ZFk7[ZYbZ0XL]}Ye[(`d}c!|*y`Dg=b;gR]Hm=hJho}R-[n}9;{N![7k_{UbmN]rf#pTe[x8}!Qcs_rs[m`|>N}^V})7{^r|/E}),}HH{OYe2{Skx)e<_.cj.cjoMhc^d}0uYZd!^J_@g,[[[?{i@][|3S}Yl3|!1|eZ|5IYw|1D}e7|Cv{OHbnx-`wvb[6[4} =g+k:{C:}ed{S]|2M]-}WZ|/q{LF|dYu^}Gs^c{Z=}h>|/i|{W]:|ip{N:|zt|S<{DH[p_tvD{N<[8Axo{X4a.^o^X>Yfa59`#ZBYgY~_t^9`jZHZn`>G[oajZ;X,i)Z.^~YJe ZiZF^{][[#Zt^|]Fjx]&_5dddW]P0C[-]}]d|y {C_jUql] |OpaA[Z{lp|rz}:Mu#]_Yf6{Ep?f5`$[6^D][^u[$[6^.Z8]]ePc2U/=]K^_+^M{q*|9tYuZ,s(dS{i=|bNbB{uG}0jZOa:[-]dYtu3]:]<{DJ_SZIqr_`l=Yt`gkTnXb3d@kiq0a`Z{|!B|}e}Ww{Sp,^Z|0>_Z}36|]A|-t}lt{R6pi|v8hPu#{C>YOZHYmg/Z4nicK[}hF_Bg|YRZ7c|crkzYZY}_iXcZ.|)U|L5{R~qi^Uga@Y[xb}&qdbd6h5|Btw[}c<{Ds53[Y7]?Z<|e0{L[ZK]mXKZ#Z2^tavf0`PE[OSOaP`4gi`qjdYMgys/?[nc,}EEb,eL]g[n{E_b/vcvgb.{kcwi`~v%|0:|iK{Jh_vf5lb}KL|(oi=LrzhhY_^@`zgf[~g)[J_0fk_V{T)}I_{D&_/d9W/|MU[)f$xW}?$xr4<{Lb{y4}&u{XJ|cm{Iu{jQ}CMkD{CX|7A}G~{kt)nB|d5|<-}WJ}@||d@|Iy}Ts|iL|/^|no|0;}L6{Pm]7}$zf:|r2}?C_k{R(}-w|`G{Gy[g]bVje=_0|PT{^Y^yjtT[[[l!Ye_`ZN]@[n_)j3nEgMa]YtYpZy].d-Y_cjb~Y~[nc~sCi3|zg}B0}do{O^{|$`_|D{}U&|0+{J3|8*]iayx{a{xJ_9|,c{Ee]QXlYb]$[%YMc*]w[aafe]aVYi[fZEii[xq2YQZHg]Y~h#|Y:thre^@^|_F^CbTbG_1^qf7{L-`VFx Zr|@EZ;gkZ@slgko`[e}T:{Cu^pddZ_`yav^Ea+[#ZBbSbO`elQfLui}.F|txYcbQ`XehcGe~fc^RlV{D_0ZAej[l&jShxG[ipB_=u:eU}3e8[=j|{D(}dO{Do[BYUZ0/]AYE]ALYhZcYlYP/^-^{Yt_1_-;YT`P4BZG=IOZ&]H[e]YYd[9^F[1YdZxZ?Z{Z<]Ba2[5Yb[0Z4l?]d_;_)a?YGEYiYv`_XmZs4ZjY^Zb]6gqGaX^9Y}dXZr[g|]Y}K aFZp^k^F]M`^{O1Ys]ZCgCv4|E>}8eb7}l`{L5[Z_faQ|c2}Fj}hw^#|Ng|B||w2|Sh{v+[G}aB|MY}A{|8o}X~{E8paZ:]i^Njq]new)`-Z>haounWhN}c#{DfZ|fK]KqGZ=:u|fqoqcv}2ssm}.r{]{nIfV{JW)[K|,Z{Uxc|]l_KdCb%]cfobya3`p}G^|LZiSC]U|(X|kBlVg[kNo({O:g:|-N|qT}9?{MBiL}Sq{`P|3a|u.{Uaq:{_o|^S}jX{Fob0`;|#y_@[V[K|cw[<_ }KU|0F}d3|et{Q7{LuZttsmf^kYZ`Af`}$x}U`|Ww}d]| >}K,r&|XI|*e{C/a-bmr1fId4[;b>tQ_:]hk{b-pMge]gfpo.|(w[jgV{EC1Z,YhaY^q,_G[c_g[J0YX]`[h^hYK^_Yib,` {i6vf@YM^hdOKZZn(jgZ>bzSDc^Z%[[o9[2=/YHZ(_/Gu_`*|8z{DUZxYt^vuvZjhi^lc&gUd4|<UiA`z]$b/Z?l}YI^jaHxe|;F}l${sQ}5g}hA|e4}?o{ih}Uz{C)jPe4]H^J[Eg[|AMZMlc}:,{iz}#*|gc{Iq|/:|zK{l&}#u|myd{{M&v~nV};L|(g|I]ogddb0xsd7^V})$uQ{HzazsgxtsO^l}F>ZB]r|{7{j@cU^{{CbiYoHlng]f+nQ[bkTn/}<-d9q {KXadZYo+n|l[|lc}V2{[a{S4Zam~Za^`{HH{xx_SvF|ak=c^[v^7_rYT`ld@]:_ub%[$[m](Shu}G2{E.ZU_L_R{tz`vj(f?^}hswz}GdZ}{S:h`aD|?W|`dgG|if{a8|J1{N,}-Ao3{H#{mfsP|[ bzn+}_Q{MT{u4kHcj_q`eZj[8o0jy{p7}C|[}l){MuYY{|Ff!Ykn3{rT|m,^R|,R}$~Ykgx{P!]>iXh6[l[/}Jgcg{JYZ.^qYfYIZl[gZ#Xj[Pc7YyZD^+Yt;4;`e8YyZVbQ7YzZxXja.7SYl[s]2^/Ha$[6ZGYrb%XiYdf2]H]kZkZ*ZQ[ZYS^HZXcCc%Z|[(bVZ]]:OJQ_DZCg<[,]%Zaa [g{C00HY[c%[ChyZ,Z_`PbXa+eh`^&jPi0a[ggvhlekL]w{Yp^v}[e{~;k%a&k^|nR_z_Qng}[E}*Wq:{k^{FJZpXRhmh3^p>de^=_7`|ZbaAZtdhZ?n4ZL]u`9ZNc3g%[6b=e.ZVfC[ZZ^^^hD{E(9c(kyZ=bb|Sq{k`|vmr>izlH[u|e`}49}Y%}FT{[z{Rk}Bz{TCc/lMiAqkf(m$hDc;qooi[}^o:c^|Qm}a_{mrZ(pA`,}<2sY| adf_%|}`}Y5U;}/4|D>|$X{jw{C<|F.hK|*A{MRZ8Zsm?imZm_?brYWZrYx`yVZc3a@f?aK^ojEd {bN}/3ZH]/$YZhm^&j 9|(S|b]mF}UI{q&aM]LcrZ5^.|[j`T_V_Gak}9J[ ZCZD|^h{N9{~&[6Zd{}B}2O|cv]K}3s}Uy|l,fihW{EG`j_QOp~Z$F^zexS`dcISfhZBXP|.vn|_HYQ|)9|cr]<`&Z6]m_(ZhPcSg>`Z]5`~1`0Xcb4k1{O!bz|CN_T{LR|a/gFcD|j<{Z._[f)mPc:1`WtIaT1cgYkZOaVZOYFrEe[}T$}Ch}mk{K-^@]fH{Hdi`c*Z&|Kt{if[C{Q;{xYB`dYIX:ZB[}]*[{{p9|4GYRh2ao{DS|V+[zd$`F[ZXKadb*A] Ys]Maif~a/Z2bmclb8{Jro_rz|x9cHojbZ{GzZx_)]:{wAayeDlx}<=`g{H1{l#}9i|)=|lP{Qq}.({La|!Y{i2EZfp=c*}Cc{EDvVB|;g}2t{W4av^Bn=]ri,|y?|3+}T*ckZ*{Ffr5e%|sB{lx^0]eZb]9[SgAjS_D|uHZx]dive[c.YPkcq/}db{EQh&hQ|eg}G!ljil|BO]X{Qr_GkGl~YiYWu=c3eb}29v3|D|}4i||.{Mv})V{SP1{FX}CZW6{cm|vO{pS|e#}A~|1i}81|Mw}es|5[}3w{C`h9aL]o{}p[G`>i%a1Z@`Ln2bD[$_h`}ZOjhdTrH{[j_:k~kv[Sdu]CtL}41{I |[[{]Zp$]XjxjHt_eThoa#h>sSt8|gK|TVi[Y{t=}Bs|b7Zpr%{gt|Yo{CS[/{iteva|cf^hgn}($_c^wmb^Wm+|55jrbF|{9^ q6{C&c+ZKdJkq_xOYqZYSYXYl`8]-cxZAq/b%b*_Vsa[/Ybjac/OaGZ4fza|a)gY{P?| I|Y |,pi1n7}9bm9ad|=d{aV|2@[(}B`d&|Uz}B}{`q|/H|!JkM{FU|CB|.{}Az}#P|lk}K{|2rk7{^8^?`/|k>|Ka{Sq}Gz}io{DxZh[yK_#}9<{TRdgc]`~Z>JYmYJ]|`!ZKZ]gUcx|^E[rZCd`f9oQ[NcD_$ZlZ;Zr}mX|=!|$6ZPZYtIo%fj}CpcN|B,{VDw~gb}@hZg`Q{LcmA[(bo`<|@$|o1|Ss}9Z_}tC|G`{F/|9nd}i=}V-{L8aaeST]daRbujh^xlpq8|}zs4bj[S`J|]?G{P#{rD{]I`OlH{Hm]VYuSYUbRc*6[j`8]pZ[bt_/^Jc*[<Z?YE|Xb|?_Z^Vcas]h{t9|Uwd)_(=0^6Zb{Nc} E[qZAeX[a]P^|_J>e8`W^j_Y}R{{Jp__]Ee#e:iWb9q_wKbujrbR}CY`,{mJ}gz{Q^{t~N|? gSga`V_||:#mi}3t|/I`X{N*|ct|2g{km}gi|{={jC}F;|E}{ZZjYf*frmu}8Tdroi{T[|+~}HG{cJ}DM{Lp{Ctd&}$hi3|FZ| m}Kr|38}^c|m_|Tr{Qv|36}?Up>|;S{DV{k_as}BK{P}}9p|t`jR{sAm4{D=b4pWa[}Xi{EjwEkI}3S|E?u=X0{jf} S|NM|JC{qo^3cm]-|JUx/{Cj{s>{Crt[UXuv|D~|j|d{YXZR}Aq}0r}(_{pJfi_z}0b|-vi)Z mFe,{f4|q`b{}^Z{HM{rbeHZ|^x_o|XM|L%|uFXm}@C_{{Hhp%a7|0p[Xp+^K}9U{bP}: tT}B|}+$|b2|[^|~h{FAby[`{}xgygrt~h1[li`c4vz|,7p~b(|mviN}^pg[{N/|g3|^0c,gE|f%|7N{q[|tc|TKA{LU}I@|AZp(}G-sz{F |qZ{}F|f-}RGn6{Z]_5})B}UJ{FFb2]4ZI@v=k,]t_Dg5Bj]Z-]L]vrpdvdGlk|gF}G]|IW}Y0[G| /bo|Te^,_B}#n^^{QHYI[?hxg{[`]D^IYRYTb&kJ[cri[g_9]Ud~^_]<p@_e_XdNm-^/|5)|h_{J;{kacVopf!q;asqd}n)|.m|bf{QW|U)}b+{tL|w``N|to{t ZO|T]jF}CB|0Q{e5Zw|k |We}5:{HO{tPwf_uajjBfX}-V_C_{{r~gg|Ude;s+}KNXH}! `K}eW{Upwbk%ogaW}9EYN}YY|&v|SL{C3[5s.]Y]I]u{M6{pYZ`^,`ZbCYR[1mNg>rsk0Ym[jrE]RYiZTr*YJ{Ge|%-lf|y(`=[t}E6{k!|3)}Zk} ][G{E~cF{u3U.rJ|a9p#o#ZE|?|{sYc#vv{E=|LC}cu{N8`/`3`9rt[4|He{cq|iSYxY`}V |(Q|t4{C?]k_Vlvk)BZ^r<{CL}#h}R+[<|i=}X|{KAo]|W<`K{NW|Zx}#;|fe{IMr<|K~tJ_x}AyLZ?{GvbLnRgN}X&{H7|x~}Jm{]-| GpNu0}.ok>|c4{PYisrDZ|fwh9|hfo@{H~XSbO]Odv]%`N]b1Y]]|eIZ}_-ZA]aj,>eFn+j[aQ_+]h[J_m_g]%_wf.`%k1e#Z?{CvYu_B^|gk`Xfh^M3`afGZ-Z|[m{L}|k3cp[it ^>YUi~d>{T*}YJ{Q5{Jxa$hg|%4`}|LAgvb }G}{P=|<;Ux{_skR{cV|-*|s-{Mp|XP|$G|_J}c6cM{_=_D|*9^$ec{V;|4S{qO|w_|.7}d0|/D}e}|0G{Dq]Kdp{}dfDi>}B%{Gd|nl}lf{C-{y}|ANZr}#={T~|-(}c&{pI|ft{lsVP}){|@u}!W|bcmB{d?|iW|:dxj{PSkO|Hl]Li:}VYk@|2={fnWt{M3`cZ6|)}|Xj}BYa?vo{e4|L7|B7{L7|1W|lvYO}W8nJ|$Vih|{T{d*_1|:-n2dblk``fT{Ky|-%}m!|Xy|-a{Pz}[l{kFjz|iH}9N{WE{x,|jz}R {P|{D)c=nX|Kq|si}Ge{sh|[X{RF{t`|jsr*fYf,rK|/9}$}}Nf{y!1|<Std}4Wez{W${Fd_/^O[ooqaw_z[L`Nbv[;l7V[ii3_PeM}.h^viqYjZ*j1}+3{bt{DR[;UG}3Og,rS{JO{qw{d<_zbAh<R[1_r`iZTbv^^a}c{iEgQZ<exZFg.^Rb+`Uj{a+{z<[~r!]`[[|rZYR|?F|qppp]L|-d|}K}YZUM|=Y|ktm*}F]{D;g{uI|7kg^}%?Z%ca{N[_<q4xC]i|PqZC]n}.bDrnh0Wq{tr|OMn6tM|!6|T`{O`|>!]ji+]_bTeU}Tq|ds}n|{Gm{z,f)}&s{DPYJ`%{CGd5v4tvb*hUh~bf]z`jajiFqAii]bfy^U{Or|m+{I)cS|.9k:e3`^|xN}@Dnlis`B|Qo{`W|>||kA}Y}{ERYuYx`%[exd`]|OyiHtb}HofUYbFo![5|+]gD{NIZR|Go}.T{rh^4]S|C9_}xO^i`vfQ}C)bK{TL}cQ|79iu}9a];sj{P.o!f[Y]pM``Jda^Wc9ZarteBZClxtM{LW}l9|a.mU}KX}4@{I+f1}37|8u}9c|v${xGlz}jP{Dd1}e:}31}%3X$|22i<v+r@~mf{sN{C67G97855F4YL5}8f{DT|xy{sO{DXB334@55J1)4.G9A#JDYtXTYM4, YQD9;XbXm9SX]IB^4UN=Xn<5(;(F3YW@XkH-X_VM[DYM:5XP!T&Y`6|,^{IS-*D.H>:LXjYQ0I3XhAF:9:(==.F*3F1189K/7163D,:@|e2{LS36D4hq{Lw/84443@4.933:0307::6D7}&l{Mx657;89;,K5678H&93D(H<&<>0B90X^I;}Ag1{P%3A+>><975}[S{PZE453?4|T2{Q+5187;>447:81{C=hL6{Me^:=7ii{R=.=F<81;48?|h8}Uh{SE|,VxL{ST,7?9Y_5Xk3A#:$%YSYdXeKXOD8+TXh7(@>(YdXYHXl9J6X_5IXaL0N?3YK7Xh!1?XgYz9YEXhXaYPXhC3X`-YLY_XfVf[EGXZ5L8BXL9YHX]SYTXjLXdJ: YcXbQXg1PX]Yx4|Jr{Ys4.8YU+XIY`0N,<H%-H;:0@,74/:8546I=9177154870UC]d<C3HXl7ALYzXFXWP<<?E!88E5@03YYXJ?YJ@6YxX-YdXhYG|9o{`iXjY_>YVXe>AYFX[/(I@0841?):-B=14337:8=|14{c&93788|di{cW-0>0<097/A;N{FqYpugAFT%X/Yo3Yn,#=XlCYHYNX[Xk3YN:YRT4?)-YH%A5XlYF3C1=NWyY}>:74-C673<69545v {iT85YED=64=.F4..9878/D4378?48B3:7:7/1VX[f4{D,{l<5E75{dAbRB-8-@+;DBF/$ZfW8S<4YhXA.(5@*11YV8./S95C/0R-A4AXQYI7?68167B95HA1*<M3?1/@;/=54XbYP36}lc{qzSS38:19?,/39193574/66878Yw1X-87E6=;964X`T734:>86>1/=0;(I-1::7ALYGXhF+Xk[@W%TYbX7)KXdYEXi,H-XhYMRXfYK?XgXj.9HX_SX]YL1XmYJ>Y}WwIXiI-3-GXcYyXUYJ$X`Vs[7;XnYEZ;XF! 3;%8;PXX(N3Y[)Xi1YE&/ :;74YQ6X`33C;-(>Xm0(TYF/!YGXg8 9L5P01YPXO-5%C|qd{{/K/E6,=0144:361:955;6443@?B7*7:F89&F35YaX-CYf,XiFYRXE_e{}sF 0*7XRYPYfXa5YXXY8Xf8Y~XmA[9VjYj*#YMXIYOXk,HHX40YxYMXU8OXe;YFXLYuPXP?EB[QV0CXfY{:9XV[FWE0D6X^YVP*$4%OXiYQ(|xp|%c3{}V`1>Y`XH00:8/M6XhQ1:;3414|TE|&o@1*=81G8<3}6<|(f6>>>5-5:8;093B^3U*+*^*UT30XgYU&7*O1953)5@E78--F7YF*B&0:%P68W9Zn5974J9::3}Vk|-,C)=)1AJ4+<3YGXfY[XQXmT1M-XcYTYZXCYZXEYXXMYN,17>XIG*SaS|/eYJXbI?XdNZ+WRYP<F:R PXf;0Xg`$|1GX9YdXjLYxWX!ZIXGYaXNYm6X9YMX?9EXmZ&XZ#XQ>YeXRXfAY[4 ;0X!Zz0XdN$XhYL XIY^XGNXUYS/1YFXhYk.TXn4DXjB{jg|4DEX]:XcZMW=A.+QYL<LKXc[vV$+&PX*Z3XMYIXUQ:ZvW< YSXFZ,XBYeXMM)?Xa XiZ4/EXcP3%}&-|6~:1(-+YT$@XIYRBC<}&,|7aJ6}bp|8)K1|Xg|8C}[T|8Q.89;-964I38361<=/;883651467<7:>?1:.}le|:Z=39;1Y^)?:J=?XfLXbXi=Q0YVYOXaXiLXmJXO5?.SFXiCYW}-;|=u&D-X`N0X^,YzYRXO(QX_YW9`I|>hZ:N&X)DQXP@YH#XmNXi$YWX^=!G6YbYdX>XjY|XlX^XdYkX>YnXUXPYF)FXT[EVTMYmYJXmYSXmNXi#GXmT3X8HOX[ZiXN]IU2>8YdX1YbX<YfWuZ8XSXcZU%0;1XnXkZ_WTG,XZYX5YSX Yp 05G?XcYW(IXg6K/XlYP4XnI @XnO1W4Zp-9C@%QDYX+OYeX9>--YSXkD.YR%Q/Yo YUX].Xi<HYEZ2WdCE6YMXa7F)=,D>-@9/8@5=?7164;35387?N<618=6>7D+C50<6B03J0{Hj|N9$D,9I-,.KB3}m |NzE0::/81YqXjMXl7YG; [.W=Z0X4XQY]:MXiR,XgM?9$9>:?E;YE77VS[Y564760391?14941:0=:8B:;/1DXjFA-564=0B3XlH1+D85:0Q!B#:-6&N/:9<-R3/7Xn<*3J4.H:+334B.=>30H.;3833/76464665755:/83H6633:=;.>5645}&E|Y)?1/YG-,93&N3AE@5 <L1-G/8A0D858/30>8<549=@B8] V0[uVQYlXeD(P#ID&7T&7;Xi0;7T-$YE)E=1:E1GR):--0YI7=E<}n9|aT6783A>D7&4YG7=391W;Zx<5+>F#J39}o/|cc;6=A050EQXg8A1-}D-|d^5548083563695D?-.YOXd37I$@LYLWeYlX<Yd+YR A$;3-4YQ-9XmA0!9/XLY_YT(=5XdDI>YJ5XP1ZAW{9>X_6R(XhYO65&J%DA)C-!B:97#A9;@?F;&;(9=11/=657/H,<8}bz|j^5446>.L+&Y^8Xb6?(CYOXb*YF(8X`FYR(XPYVXmPQ%&DD(XmZXW??YOXZXfCYJ79,O)XnYF7K0!QXmXi4IYFRXS,6<%-:YO(+:-3Q!1E1:W,Zo}Am|n~;3580534*?3Zc4=9334361693:30C<6/717:<1/;>59&:4}6!|rS36=1?75<8}[B|s809983579I.A.>84758=108564741H*9E{L{|u%YQ<%6XfH.YUXe4YL@,>N}Tv|ve*G0X)Z;/)3@A74(4P&A1X:YVH97;,754*A66:1 D739E3553545558E4?-?K17/770843XAYf838A7K%N!YW4.$T19Z`WJ*0XdYJXTYOXNZ 1XaN1A+I&Xi.Xk3Z3GB&5%WhZ1+5#Y[X<4YMXhQYoQXVXbYQ8XSYUX4YXBXWDMG0WxZA[8V+Z8X;D],Va$%YeX?FXfX[XeYf<X:Z[WsYz8X_Y]%XmQ(!7BXIZFX]&YE3F$(1XgYgYE& +[+W!<YMYFXc;+PXCYI9YrWxGXY9DY[!GXiI7::)OC;*$.>N*HA@{C|}&k=:<TB83X`3YL+G4XiK]i}(fYK<=5$.FYE%4*5*H*6XkCYL=*6Xi6!Yi1KXR4YHXbC8Xj,B9ZbWx/XbYON#5B}Ue}+QKXnF1&YV5XmYQ0!*3IXBYb71?1B75XmF;0B976;H/RXU:YZX;BG-NXj;XjI>A#D3B636N;,*%<D:0;YRXY973H5)-4FXOYf0:0;/7759774;7;:/855:543L43<?6=E,.A4:C=L)%4YV!1(YE/4YF+ F3%;S;&JC:%/?YEXJ4GXf/YS-EXEYW,9;E}X$}547EXiK=51-?71C%?57;5>463553Zg90;6447?<>4:9.7538XgN{|!}9K/E&3-:D+YE1)YE/3;37/:05}n<}:UX8Yj4Yt864@JYK..G=.(A Q3%6K>3(P3#AYE$-6H/456*C=.XHY[#S.<780191;057C)=6HXj?955B:K1 E>-B/9,;5.!L?:0>/.@//:;7833YZ56<4:YE=/:7Z_WGC%3I6>XkC*&NA16X=Yz2$X:Y^&J48<99k8}CyB-61<18K946YO4{|N}E)YIB9K0L>4=46<1K0+R;6-=1883:478;4,S+3YJX`GJXh.Yp+Xm6MXcYpX(>7Yo,/:X=Z;Xi0YTYHXjYmXiXj;*;I-8S6N#XgY}.3XfYGO3C/$XjL$*NYX,1 6;YH&<XkK9C#I74.>}Hd`A748X[T450[n75<4439:18A107>|ET}Rf<1;14876/Yb983E<5.YNXd4149>,S=/4E/<306443G/06}0&}UkYSXFYF=44=-5095=88;63844,9E6644{PL}WA8:>)7+>763>>0/B3A545CCnT}Xm|dv}Xq1L/YNXk/H8;;.R63351YY747@15YE4J8;46;.38.>4A369.=-83,;Ye3?:3@YE.4-+N353;/;@(X[YYD>@/05-I*@.:551741Yf5>6A443<3535;.58/86=D4753442$635D1>0359NQ @73:3:>><Xn?;43C14 ?Y|X611YG1&<+,4<*,YLXl<1/AIXjF*N89A4Z576K1XbJ5YF.ZOWN.YGXO/YQ01:4G38Xl1;KI0YFXB=R<7;D/,/4>;$I,YGXm94@O35Yz66695385.>:6A#5}W7n^4336:4157597434433<3|XA}m`>=D>:4A.337370?-6Q96{`E|4A}C`|Qs{Mk|J+~r>|o,wHv>Vw}!c{H!|Gb|*Ca5}J||,U{t+{CN[!M65YXOY_*B,Y[Z9XaX[QYJYLXPYuZ%XcZ8LY[SYPYKZM<LMYG9OYqSQYM~[e{UJXmQYyZM_)>YjN1~[f3{aXFY|Yk:48YdH^NZ0|T){jVFYTZNFY^YTYN~[h{nPYMYn3I]`EYUYsYIZEYJ7Yw)YnXPQYH+Z.ZAZY]^Z1Y`YSZFZyGYHXLYG 8Yd#4~[i|+)YH9D?Y^F~Y7|-eYxZ^WHYdYfZQ~[j|3>~[k|3oYmYqY^XYYO=Z*4[]Z/OYLXhZ1YLZIXgYIHYEYK,<Y`YEXIGZI[3YOYcB4SZ!YHZ*&Y{Xi3~[l|JSY`Zz?Z,~[m|O=Yi>??XnYWXmYS617YVYIHZ(Z4[~L4/=~[n|Yu{P)|];YOHHZ}~[o33|a>~[r|aE]DH~[s|e$Zz~[t|kZFY~XhYXZB[`Y}~[u|{SZ&OYkYQYuZ2Zf8D~[v}% ~[w3},Q[X]+YGYeYPIS~[y}4aZ!YN^!6PZ*~[z}?E~[{3}CnZ=~[}}EdDZz/9A3(3S<,YR8.D=*XgYPYcXN3Z5 4)~[~}JW=$Yu.XX~] }KDX`PXdZ4XfYpTJLY[F5]X~[2Yp}U+DZJ::<446[m@~]#3}]1~]%}^LZwZQ5Z`/OT<Yh^ -~]&}jx[ ~m<z!%2+~ly4VY-~o>}p62yz!%2+Xf2+~ly4VY-zQ`z (=] 2z~o2",C={" ":0,"!":1},c=34,i=2,p,s="",u=String.fromCharCode,t=u(12539);while(++c<127)C[u(c)]=c^39&&c^92?i++:0;i=0;while(0<=(c=C[a.charAt(i++)]))if(16==c)if((c=C[a.charAt(i++)])<87){if(86==c)c=1879;while(c--)s+=u(++p)}else s+=s.substr(8272,360);else if(c<86)s+=u(p+=c<51?c-16:(c-55)*92+C[a.charAt(i++)]);else if((c=((c-86)*92+C[a.charAt(i++)])*92+C[a.charAt(i++)])<49152)s+=u(p=c<40960?c:c|57344);else{c&=511;while(c--)s+=t;p=12539}return s')();
     function decodeToShiftJis(str)
     {
-        return str.replace(/%(8[1-9A-F]|[9E][0-9A-F]|F[0-9A-C])(%[4-689A-F][0-9A-F]|%7[0-9A-E]|[@-~])|%([0-7][0-9A-F]|A[1-9A-F]|[B-D][0-9A-F])/ig,function(s){
-        var c = _parseInt(s.substring(1,3), 16), l = s.length;
-        return 3==l?_fromCharCode(c<160?c:c+65216):JCT11280.charAt((c<160?c-129:c-193)*188+(4==l?s.charCodeAt(3)-64:(c=_parseInt(s.substring(4),16))<127?c-64:c-65))
-        });
+        return str.replace(/%(8[1-9A-F]|[9E][0-9A-F]|F[0-9A-C])(%[4-689A-F][0-9A-F]|%7[0-9A-E]|[@-~])|%([0-7][0-9A-F]|A[1-9A-F]|[B-D][0-9A-F])/ig,
+            function(s)
+            {
+                var c = _parseInt(s.substring(1,3), 16), l = s.length;
+                return 3==l?_fromCharCode(c<160?c:c+65216):JCT11280.charAt((c<160?c-129:c-193)*188+(4==l?s.charCodeAt(3)-64:(c=_parseInt(s.substring(4),16))<127?c-64:c-65))
+            }
+        );
     }
-
 })(this);
