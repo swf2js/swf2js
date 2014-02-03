@@ -754,7 +754,6 @@
             }
 
             // セット
-            console.log(layer[0]);
             player.layer = layer[0];
             var _layer = player.layer;
             _layer._width = player.Xmax - player.Xmin;
