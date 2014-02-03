@@ -17,7 +17,7 @@ html
     <body>  
     <div id="swf2js"></div>  
     <script type="text/javascript">  
-        swf2js.load('SET SWF PATH');  
+        swf2js.load('SET SWF PATH', 'width(null = 100%)', 'height(null = 100%)');  
         swf2js.play();  
     </script>  
     </body>  
@@ -25,6 +25,7 @@ html
 
 TODO
 -------
+DefineBits  
 cache  
 
 ActionScript  
@@ -42,6 +43,13 @@ ActionScript
 
 Release Notes  
 -------
+--[ swf2js 0.0.3 ] Release Date: 03 Feb 2014  
+* [BUGFIX] ColorTransform  
+* [BUGFIX] touchEvent  
+* [BUGFIX] '_width', '_height'  
+* [NEW] load option 'width' and 'height'
+
+
 --[ swf2js 0.0.2 ] Release Date: 21 Jan 2014  
 * [BUGFIX] ActionScript 'CloneSprite', 'RemoveSprite'  
 * [BUGFIX] parseDefineBitsLossLess  

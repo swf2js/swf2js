@@ -52,6 +52,7 @@
     var _getAnimationClassVariable = getAnimationClassVariable;
     var _isSwfHeader = isSwfHeader;
     var _setMovieHeader = setMovieHeader;
+    var _resetObj = resetObj;
 
     // canvas
     var _renderCanvas = renderCanvas;
@@ -85,6 +86,9 @@
 
 
     // params
+    var intervalId = 0;
+    var setWidth = 0;
+    var setHeight = 0;
     var baseCanvas, context, preContext;
     var messageName = "zero-timeout-message";
     var canvasArray = [];
@@ -142,8 +146,19 @@
         var style = div.style;
         _setStyle(style, 'position', 'relative');
         var minSize = _min(_window.innerWidth, _window.innerHeight);
-        _setStyle(style, 'width', minSize + 'px');
-        _setStyle(style, 'height', minSize + 'px');
+        var screenWidth  = (setWidth > 0) ? setWidth : minSize;
+        var screenHeight = (setHeight > 0) ? setHeight : minSize;
+        _setStyle(style, 'width', screenWidth + 'px');
+        _setStyle(style, 'height', screenHeight + 'px');
+
+        // 子要素を削除
+        var childNodes = div.childNodes;
+        var len = childNodes.length;
+        if (len) {
+            for (var i = len; i--;) {
+                div.removeChild(childNodes[i]);
+            }
+        }
 
         // main canvasをセット
         var canvas = baseCanvas.cloneNode(false);
@@ -192,8 +207,8 @@
      */
     function changeScreenSize()
     {
-        var screenWidth  = _window.innerWidth;
-        var screenHeight = _window.innerHeight;
+        var screenWidth  = (setWidth > 0) ? setWidth : _window.innerWidth;
+        var screenHeight = (setHeight > 0) ? setHeight : _window.innerHeight;
         var canvasWidth  = player.Xmax;
         var canvasHeight = player.Ymax;
         var minSize = _min(screenWidth, screenHeight);
@@ -212,15 +227,18 @@
                 screenWidth / canvasWidth * devicePixelRatio,
                 screenHeight / canvasHeight * devicePixelRatio
             );
-            width  = canvasWidth  * scale;
+            width  = canvasWidth * scale;
             height = canvasHeight * scale;
         }
+
+        width = (setWidth > 0) ? setWidth : width;
+        height = (setHeight > 0) ? setHeight : height;
 
         // divの設定
         var div = _document.getElementById('swf2js');
         var style = div.style;
-        _setStyle(style, 'width', minSize);
-        _setStyle(style, 'height', minSize);
+        _setStyle(style, 'width', width / devicePixelRatio + 'px');
+        _setStyle(style, 'height', height / devicePixelRatio + 'px');
 
         // main
         var canvas = context.canvas;
@@ -731,13 +749,12 @@
                 // 終了処理
                 if (!tagType) {
                     bitio = _void;
-                    currentPosition = _void;
-                    tagType = _void;
                     break;
                 }
             }
 
             // セット
+            console.log(layer[0]);
             player.layer = layer[0];
             var _layer = player.layer;
             _layer._width = player.Xmax - player.Xmin;
@@ -752,7 +769,7 @@
             _setBuffer();
 
             // reset
-            layer = _void;
+            layer = [];
         },
 
         /**
@@ -1903,7 +1920,8 @@
                             var objArray = obj.fArray;
                             if (obj.isGradient) {
                                 // Matrix
-                                var Matrix = obj.ColorObj.gradientMatrix;
+                                var ColorObj = obj.ColorObj;
+                                var Matrix = ColorObj.gradientMatrix;
                                 var gradientLogic = _getGradientLogic(obj, undefined);
                                 var len = gradientLogic.length;
                                 for (var i = len; i--;) {
@@ -1923,6 +1941,7 @@
                                 );
 
                                 objArray = _setFill(objArray);
+                                objArray = _setClosePath(objArray);
                                 objArray = _setRestore(objArray);
                             } else if (obj.BitMapObj != null) {
                                 var bitMapObj = obj.BitMapObj;
@@ -2110,10 +2129,11 @@
                                 }
 
                                 // lineがあればマージ
+                                var depth = copy.Depth;
                                 if (lineLength > 0
-                                    && lineArray[copy.Depth] != undefined
+                                    && lineArray[depth] != undefined
                                 ) {
-                                    var lObj = lineArray[copy.Depth];
+                                    var lObj = lineArray[depth];
                                     lObj.merge = true;
 
                                     var lineCArray = lObj.cArray;
@@ -2157,10 +2177,11 @@
                                 }
 
                                 // lineがあればマージ
+                                var depth = copy.Depth;
                                 if (lineLength > 0
-                                    && lineArray[copy.Depth] != undefined
+                                    && lineArray[depth] != undefined
                                 ) {
-                                    var lObj = lineArray[copy.Depth];
+                                    var lObj = lineArray[depth];
                                     lObj.merge = true;
                                     _this.fillReverse(lObj);
 
@@ -3434,7 +3455,7 @@
             // 開始
             while (abitio.byte_offset < actions_len) {
                 var actionCode = abitio.getUI8();
-                if (actionCode & 0x80) {
+                if (actionCode >= 0x80) {
                     var actionLength = abitio.getUI16();
                     actionData = abitio.getData(actionLength);
                 }
@@ -3448,17 +3469,20 @@
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
-                        var n = _floor(newBitio.getUI16()) + 1;
-
-                        if (n == obj.getFrame()) {
+                        var frame = _floor(newBitio.getUI16()) + 1;
+                        if (frame == obj.getFrame()) {
                             break;
                         }
 
-                        if (n <= 0 || obj.frameCount < n) {
-                            n = 1;
+                        if (frame <= 0 || obj.frameCount < frame) {
+                            frame = 1;
                         }
 
-                        obj.setFrame(n);
+                        if (obj.getFrame() > frame) {
+                            _resetObj(obj);
+                        }
+
+                        obj.setFrame(frame);
                         obj.actionStart();
 
                         break;
@@ -3527,6 +3551,10 @@
                         if (frame == undefined) {
                             break;
                         }
+
+                        if (obj.getFrame() > frame) {
+                            _resetObj(obj);
+                        }
                         obj.setFrame(frame);
                         obj.actionStart();
 
@@ -3569,7 +3597,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = (a+b);
+                        stack[stack.length] = _parseFloat(a+b);
 
                         break;
                     // Subtract
@@ -3584,7 +3612,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = (b-a);
+                        stack[stack.length] = _parseFloat(b-a);
 
                         break;
                     // Multiply
@@ -3599,7 +3627,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = (a*b);
+                        stack[stack.length] = _parseFloat(a*b);
 
                         break;
                     // Divide
@@ -3614,7 +3642,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = (b/a);
+                        stack[stack.length] = _parseFloat(b/a);
 
                         break;
 
@@ -4405,10 +4433,10 @@
         this._totalframes = 1;
 
         // width height用
-        this.Xmax = null;
-        this.Xmin = null;
-        this.Ymax = null;
-        this.Ymin = null;
+        this.Xmax = 0;
+        this.Xmin = 0;
+        this.Ymax = 0;
+        this.Ymin = 0;
     };
 
     AnimationClass.prototype = {
@@ -4668,34 +4696,21 @@
 
             // width & height
             if (frame == 1) {
-                if (_this.Xmax == null) {
-                    _this.Xmax = cloneData.Xmax;
-                    _this.Xmin = cloneData.Xmin;
-                    _this.Ymax = cloneData.Ymax;
-                    _this.Ymin = cloneData.Ymin;
-                } else {
-                    _this.Xmax = _max(_this.Xmax, cloneData.Xmax);
-                    _this.Xmin = _min(_this.Xmin, cloneData.Xmin);
-                    _this.Ymax = _max(_this.Ymax, cloneData.Ymax);
-                    _this.Ymin = _min(_this.Ymin, cloneData.Ymin);
-                }
+                _this.Xmin = _min(_this.Xmin, cloneData.Xmin);
+                _this.Ymin = _min(_this.Ymin, cloneData.Ymin);
+
+                var addX = (cloneData.Xmin < 0) ? cloneData.Xmin * -1 : cloneData.Xmin;
+                var addY = (cloneData.Ymin < 0) ? cloneData.Ymin * -1 : cloneData.Ymin;
 
                 if (cloneData instanceof AnimationClass) {
-                    if(cloneData._width == null) {
-                        cloneData._width = _this.Xmax - _this.Xmin;
-                        cloneData._height = _this.Ymax - _this.Ymin
-                    } else {
-                        cloneData._width = _max(
-                            cloneData._width,
-                            (_this.Xmax - _this.Xmin)
-                        );
-
-                        cloneData._height = _max(
-                            cloneData._height,
-                            (_this.Ymax - _this.Ymin)
-                        );
-                    }
+                    addX += cloneData._x;
+                    addY += cloneData._y;
                 }
+
+                _this.Xmax = _max(_this.Xmax, (cloneData.Xmin + cloneData.Xmax + addX));
+                _this.Ymax = _max(_this.Ymax, (cloneData.Ymin + cloneData.Ymax + addY));
+                _this._width = (_this.Xmax - _this.Xmin);
+                _this._height = (_this.Ymax - _this.Ymin);
             }
 
             // 0 = player
@@ -4858,7 +4873,7 @@
                     if (aTag == undefined) {
                         continue;
                     }
-                    ctx = _renderBtn(aClass, aTag, transform, btnTransform);
+                    _renderBtn(aClass, aTag, transform, btnTransform);
                 }
             }
         } else {
@@ -4886,32 +4901,40 @@
 
         // transform
         var len = transform.length;
+        var dx = 0;
+        var dy = 0;
         for (var i = 0; i < len; i++) {
             var transformObj = transform[i];
-            x = x * transformObj.ScaleX
+            dx = x * transformObj.ScaleX
                 + y * transformObj.RotateSkew1
                 + transformObj.TranslateX;
 
-            y = x * transformObj.RotateSkew0
+            dy = x * transformObj.RotateSkew0
                 + y * transformObj.ScaleY
                 + transformObj.TranslateY;
+
+            x = dx;
+            y = dy;
         }
 
         // btnTransform
         var len = btnTransform.length;
         for (var i = 0; i < len; i++) {
             var transformObj = btnTransform[i];
-            x = x * transformObj.ScaleX
+            dx = x * transformObj.ScaleX
                 + y * transformObj.RotateSkew1
                 + transformObj.TranslateX;
 
-            y = x * transformObj.RotateSkew0
+            dy = x * transformObj.RotateSkew0
                 + y * transformObj.ScaleY
                 + transformObj.TranslateY;
+
+            x = dx;
+            y = dy;
         }
 
-        x = x * scale + y * 0 + 0;
-        y = x * 0 + y * scale + 0;
+        dx = x * scale;
+        dy = y * scale;
 
         // 無色の四角
         var Xmax = aData.Xmax * scale;
@@ -4919,15 +4942,14 @@
         var Xmin = aData.Xmin * scale;
         var Ymin = aData.Ymin * scale;
 
-        //context.fillStyle = 'red';
-        //context.rect(Xmin + x, Ymin + y, (Xmax - Xmin), (Ymax - Ymin));
-        //context.fill();
+        var addX = (Xmin < 0) ? Xmin * -1 : Xmin;
+        var addY = (Ymin < 0) ? Ymin * -1 : Ymin;
 
         return {
-            Xmax: x + (Xmax - Xmin),
-            Xmin: x + Xmin,
-            Ymax: y + (Ymax - Ymin),
-            Ymin: y + Ymin
+            Xmin: (dx + Xmin),
+            Xmax: ((dx + Xmin) + Xmax + addX),
+            Ymin: (dy + Ymin),
+            Ymax: ((dy + Ymin) + Ymax + addY)
         };
     }
 
@@ -4943,10 +4965,10 @@
         var data = aData.data;
 
         var dLen = data.length;
-        for (var i = 0; i < dLen; i++) {
+        for (var i = dLen; i--;) {
             var stack = data[i];
             var sLen = stack.length;
-            for (var s = 0; s < sLen; s++) {
+            for (var s = sLen; s--;) {
                 var array  = stack[s];
                 if (array == undefined) {
                     continue;
@@ -4974,15 +4996,15 @@
                         }
                         var objArray = obj.fArray;
                         var gradientLogic = _getGradientLogic(obj, colors);
-                        var s = 1;
-                        var cLen = 6 + (gLen * 6);
+                        var spCnt = 1;
+                        var cLen = gradientLogic.length;
                         for (var c = cLen; c--;) {
-                            objArray.splice(s, 1, gradientLogic[(s-1)]);
-                            s++;
+                            objArray.splice(spCnt, 1, gradientLogic[(spCnt-1)]);
+                            spCnt++;
                         }
                     } else {
                         var ColorObj = obj.ColorObj;
-                        var color  = ColorObj.Color;
+                        var color  = _generateRGBA(ColorObj.Color);
                         var colorObj = _generateColor(ct, color);
                         var fArray = obj.fArray;
                         if (obj.Width == undefined) {
@@ -5071,10 +5093,10 @@
     {
         var data = aData.data;
         var dLen = data.length;
-        for (var i = 0; i < dLen; i++) {
+        for (var i = dLen; i--;) {
             var stack = data[i];
             var sLen = stack.length;
-            for (var s = 0; s < sLen; s++) {
+            for (var s = sLen; s--;) {
                 var array  = stack[s];
                 if (array == undefined) {
                     continue;
@@ -5090,19 +5112,14 @@
 
                     // グラデーション対応
                     if (obj.isGradient) {
-                        var ColorObj = obj.ColorObj;
-                        var gradient = ColorObj.gradient;
-                        var gradientRecords = gradient.GradientRecords;
-                        var gLen = gradientRecords.length;
                         var objArray = obj.fArray;
                         var gradientLogic = _getGradientLogic(obj, undefined);
-                        var s = 1;
-                        var cLen = 6 + (gLen * 6);
+                        var spCnt = 1;
+                        var cLen = gradientLogic.length;
                         for (var c = cLen; c--;) {
-                            objArray.splice(s, 1, gradientLogic[(s-1)]);
-                            s++;
+                            objArray.splice(spCnt, 1, gradientLogic[(spCnt-1)]);
+                            spCnt++;
                         }
-
                     } else {
                         var fArray = obj.fArray;
                         var ColorObj = obj.ColorObj;
@@ -5275,8 +5292,10 @@
     /**
      * load
      * @param path
+     * @param width
+     * @param height
      */
-    _swf2js.load = function(path)
+    _swf2js.load = function(path, width, height)
     {
         if (init()) {
             // TODO 消す
@@ -5298,9 +5317,9 @@
             {
                 if (request.readyState == 4) {
                     if (request.status == 200) {
+                        setWidth = (width) ? width : 0;
+                        setHeight = (height) ? height : 0;
                         _parse(request.responseText);
-                        _parse = _void;
-                        request = _void;
                     } else {
                         alert('unknown swf data');
                     }
@@ -5318,11 +5337,34 @@
     }
 
     /**
-     * play
+     * stop
      */
     _swf2js.stop = function()
     {
         player.playStartFlag = false;
+    }
+
+    /**
+     * clear
+     */
+    _swf2js.clear = function()
+    {
+        player.playStartFlag = false;
+        swftag = new SwfTag();
+        bitio = new BitIO();
+        isLoad = false;
+        clearInterval(intervalId);
+    }
+
+    /**
+     * reLoad
+     * @param path
+     */
+    _swf2js.reLoad = function(path)
+    {
+        this.clear();
+        this.load(path);
+        this.play();
     }
 
     /**
@@ -5345,18 +5387,15 @@
                 '\nand not supported by compress data');
             return 0;
         }
-        _isSwfHeader = _void;
 
         // 動画情報をプレイヤーにセット
         _setMovieHeader();
-        _setMovieHeader = _void;
 
         // swfを分解
         swftag.parse();
 
         // reset
         swftag = _void;
-        SwfTag = _void;
         isLoad = true;
     }
 
@@ -5405,7 +5444,7 @@
         player.fps = _floor(1000 / player.frameRate);
 
         // 描画開始
-        setInterval(_onEnterFrame, player.fps);
+        intervalId = setInterval(_onEnterFrame, player.fps);
     }
 
     /**
@@ -5440,31 +5479,32 @@
     function buffer()
     {
         var _layer = player.layer;
+        if (_layer instanceof AnimationClass) {
+            // btn 初期化
+            touchCtx = [];
 
-        // btn 初期化
-        touchCtx = [];
+            // action script
+            _action(_layer);
 
-        // action script
-        _action(_layer);
+            // pre clear
+            _clearPre();
 
-        // pre clear
-        _clearPre();
-
-        // render
-        var frame = _layer.getFrame();
-        var _frameTags = _layer.frameTags[frame];
-        var len = _frameTags.length;
-        for (var i = 1; i < len; i++) {
-            var tag = _frameTags[i];
-            if (tag == undefined) {
-                continue;
+            // render
+            var frame = _layer.getFrame();
+            var _frameTags = _layer.frameTags[frame];
+            var len = _frameTags.length;
+            for (var i = 1; i < len; i++) {
+                var tag = _frameTags[i];
+                if (tag == undefined) {
+                    continue;
+                }
+                _render(_layer, tag, [], []);
             }
-            _render(_layer, tag, [], []);
-        }
-        _renderCanvas();
+            _renderCanvas();
 
-        // next animation
-        _putFrame(_layer);
+            // next animation
+            _putFrame(_layer);
+        }
     }
 
     /**
@@ -5475,41 +5515,40 @@
     {
         if (aClass instanceof AnimationClass) {
             aClass.action();
-        }
+            var tags = aClass.frameTags[aClass.getFrame()];
+            if (tags instanceof Array) {
+                var len = tags.length;
+                for (var i = 0; i < len; i++) {
+                    var tag = tags[i];
+                    if (tag == undefined) {
+                        continue;
+                    }
 
-        var tags = aClass.frameTags[aClass.getFrame()];
-        if (tags instanceof Array) {
-            var len = tags.length;
-            for (var i = 0; i < len; i++) {
-                var tag = tags[i];
-                if (tag == undefined) {
-                    continue;
-                }
+                    var data = tag.CloneData;
+                    if (!(data instanceof AnimationClass)) {
+                        continue;
+                    }
 
-                var data = tag.CloneData;
-                if (!(data instanceof AnimationClass)) {
-                    continue;
-                }
-
-                if (data.isButton && data.ButtonId == touchId) {
-                    var btnCharacters = data.ButtonCharacters;
-                    var bLen = btnCharacters.length;
-                    if (bLen) {
-                        var bool = touchFlag;
-                        for (var b = 0; b < bLen; b++) {
-                            var bClass = btnCharacters[b];
-                            var bTag = bClass.frameTags[1];
-                            if (bTag.ButtonStateDown) {
-                                var bData = bTag.CloneData;
-                                if (!(bData instanceof AnimationClass) || !bool) {
-                                    continue;
+                    if (data.isButton && data.ButtonId == touchId) {
+                        var btnCharacters = data.ButtonCharacters;
+                        var bLen = btnCharacters.length;
+                        if (bLen) {
+                            var bool = touchFlag;
+                            for (var b = 0; b < bLen; b++) {
+                                var bClass = btnCharacters[b];
+                                var bTag = bClass.frameTags[1];
+                                if (bTag.ButtonStateDown) {
+                                    var bData = bTag.CloneData;
+                                    if (!(bData instanceof AnimationClass) || !bool) {
+                                        continue;
+                                    }
+                                    _action(bData);
                                 }
-                                _action(bData);
                             }
                         }
                     }
+                    _action(data);
                 }
-                _action(data);
             }
         }
     }
@@ -5661,6 +5700,10 @@
                                 bClass, bTag, transform, []
                             );
 
+                            if (ctx == undefined) {
+                                continue;
+                            }
+
                             // set
                             var tCtx = _touchCtx.pop();
                             var btnData = tCtx.data;
@@ -5735,26 +5778,37 @@
     }
 
     /**
+     * resetObj
+     * @param aClass
+     */
+    function resetObj(aClass)
+    {
+        var tags =  aClass.frameTags;
+        if (tags instanceof Array) {
+            var len = tags.length;
+            for (var i = len; i--;) {
+                var tag = tags[i];
+                if (tag == undefined
+                    || !(tag instanceof AnimationClass)
+                ) {
+                    continue;
+                }
+
+                _resetObj(tag);
+            }
+        }
+
+        aClass.setFrame(1);
+        aClass.play();
+    }
+
+    /**
      * putFrame
      * @param aClass
      */
     function putFrame(aClass)
     {
         var frame = aClass.getFrame();
-
-        // 削除の場合はフレームを最初に戻す
-        var removeArray = aClass.getRemoveMap(frame);
-        if (removeArray instanceof Array) {
-            var len = removeArray.length;
-            for (var i = len; i--;) {
-                var removeClass = removeArray[i];
-                if (removeClass == undefined) {
-                    continue;
-                }
-                removeClass.setFrame(1);
-                removeClass.play();
-            }
-        }
 
         var tags = aClass.frameTags[frame];
         if (tags instanceof Array) {
@@ -5796,6 +5850,19 @@
                     }
                 }
                 _putFrame(data);
+            }
+        }
+
+        // 削除の場合はフレームを最初に戻す
+        var removeArray = aClass.getRemoveMap(frame);
+        if (removeArray instanceof Array) {
+            var len = removeArray.length;
+            for (var i = len; i--;) {
+                var removeClass = removeArray[i];
+                if (removeClass == undefined) {
+                    continue;
+                }
+                _resetObj(removeClass);
             }
         }
 
@@ -6355,6 +6422,8 @@
                         canvasArray[i++]
                     );
                     break;
+                default:
+                    break;
             }
 
             if (i == len) {
@@ -6372,9 +6441,6 @@
      */
     function touchStart(event)
     {
-        // フリックによるスクロールを禁止
-        //event.preventDefault();
-
         var div = _document.getElementById('swf2js');
         var bounds = div.getBoundingClientRect();
         var x = bounds.left;
@@ -6426,9 +6492,6 @@
      */
     function touchMove(event)
     {
-        // フリックによるスクロールを禁止
-        //event.preventDefault();
-
         if (!isBtnAction && (isTouch || touchFlag)) {
             touchStart(event);
         }
@@ -6440,9 +6503,6 @@
      */
     function touchEnd(event)
     {
-        // フリックによるスクロールを禁止
-        //event.preventDefault();
-
         if (touchFlag) {
             touchEvent(event);
         }
@@ -6459,6 +6519,9 @@
      */
     function touchEvent(event)
     {
+        // 操作を無効にする
+        event.preventDefault();
+
         var aClass = btnLayer[touchId];
         if (!isBtnAction && aClass instanceof AnimationClass) {
             aClass.btnAction(touchClass);
@@ -6654,7 +6717,7 @@
             var x = (obj.Bound.Xmax - obj.Bound.Xmin) / 20 / 2;
         }
 
-        var inText = (text == undefined) ? obj.InitialText: text;
+        var inText = (text == undefined) ? obj.InitialText : text;
         var splitData = inText.split('@LFCR');
         var len = splitData.length;
         for (var i = 0; i < len; i++) {
