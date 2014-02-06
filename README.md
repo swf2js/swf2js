@@ -1,6 +1,6 @@
 swf2js
 ======
-swfをJavaScriptに変換。  
+swfをJavaScriptでcanvasに出力。  
 ※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。  
 output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
 
@@ -41,12 +41,25 @@ ActionScript
 ⇒ToggleQuality  
 
 
+MEMO
+-------
+動作しないswfのファイルを送って頂ければバグ改修にもなるので助かります。  
+Please send the file of swf which does not operate. A bug is fixed.  
+
+
 Release Notes  
 -------
+-- swf2js 0.0.4 ] Release Date: 06 Feb 2014  
+* [BUGFIX] ActionScript 'change the order of something'  
+* [BUGFIX] DefineEditText '_x', '_y'  
+* [BUGFIX] Button render  
+* [NEWS] published(02/05) - http://www.moongift.jp/2014/02/swf2js-swf%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E3%82%92javascript%E3%81%A7%E8%A7%A3%E6%9E%90%E5%A4%89%E6%8F%9B/  
+
+
 --[ swf2js 0.0.3 ] Release Date: 03 Feb 2014  
 * [BUGFIX] ColorTransform  
 * [BUGFIX] touchEvent  
-* [BUGFIX] '_width', '_height'  
+* [BUGFIX] Property '_width', '_height'  
 * [NEW] load option 'width' and 'height'
 
 

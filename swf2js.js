@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.2)
+ * swf2js (version 0.0.4)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -26,6 +26,7 @@
     var request = new XMLHttpRequest();
 
     // local function cache
+    var _init = init;
     var _changeColor = changeColor;
     var _drawVector = drawVector;
     var _mask = mask;
@@ -53,6 +54,7 @@
     var _isSwfHeader = isSwfHeader;
     var _setMovieHeader = setMovieHeader;
     var _resetObj = resetObj;
+    var _generateText = generateText;
 
     // canvas
     var _renderCanvas = renderCanvas;
@@ -145,11 +147,11 @@
         var div = _document.getElementById('swf2js');
         var style = div.style;
         _setStyle(style, 'position', 'relative');
-        var minSize = _min(_window.innerWidth, _window.innerHeight);
-        var screenWidth  = (setWidth > 0) ? setWidth : minSize;
-        var screenHeight = (setHeight > 0) ? setHeight : minSize;
-        _setStyle(style, 'width', screenWidth + 'px');
-        _setStyle(style, 'height', screenHeight + 'px');
+        width  = (setWidth > 0) ? setWidth : _window.innerWidth;
+        height = (setHeight > 0) ? setHeight : _window.innerHeight;
+        var minSize = _min(width, height);
+        _setStyle(style, 'width', minSize + 'px');
+        _setStyle(style, 'height', minSize + 'px');
 
         // 子要素を削除
         var childNodes = div.childNodes;
@@ -162,11 +164,13 @@
 
         // main canvasをセット
         var canvas = baseCanvas.cloneNode(false);
-        var style = canvas.style;
+        style = canvas.style;
         _setStyle(style, 'zIndex', 0);
         _setStyle(style, 'zoom', 100 / devicePixelRatio + '%');
         _setStyle(style, 'position', 'absolute');
         _setStyle(style, 'top', 0);
+        _setStyle(canvas, 'width', width * devicePixelRatio);
+        _setStyle(canvas, 'height', height * devicePixelRatio);
 
         // タッチイベントの登録
         canvas.addEventListener(startEvent, touchStart, false);
@@ -178,11 +182,16 @@
 
         // main canvas
         context = canvas.getContext('2d');
-        setTimeout(_onEnterFrame, 1);
+        context.fillStyle = '#000';
+        context.font = "bold 20px 'sans-serif'";
+        context.textAlign = 'center';
 
         // pre canvas
         var preCanvas = baseCanvas.cloneNode(false);
         preContext = preCanvas.getContext('2d');
+
+        // 非同期
+        setTimeout(_onEnterFrame, 0);
 
         return true;
     };
@@ -239,17 +248,17 @@
         var style = div.style;
         _setStyle(style, 'width', width / devicePixelRatio + 'px');
         _setStyle(style, 'height', height / devicePixelRatio + 'px');
+        _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
 
         // main
         var canvas = context.canvas;
         _setStyle(canvas, 'width', width);
         _setStyle(canvas, 'height', height);
-        _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
 
         // pre
-        var canvas = preContext.canvas;
-        _setStyle(canvas, 'width', width);
-        _setStyle(canvas, 'height', height);
+        var preCanvas = preContext.canvas;
+        _setStyle(preCanvas, 'width', width);
+        _setStyle(preCanvas, 'height', height);
     };
 
     /**
@@ -2474,7 +2483,12 @@
 
                 obj.FontNameLen = bitio.getUI8();
                 if (obj.FontNameLen) {
-                    obj.FontName = _decodeToShiftJis(bitio.getData(obj.FontNameLen));
+                    obj.FontName = _decodeToShiftJis(bitio.getData(obj.FontNameLen-1));
+                    bitio.incrementOffset(1 , 0);
+                    var fontFirst = obj.FontName.substr(0, 1);
+                    if (fontFirst == '_') {
+                        obj.FontName = 'sans-serif';
+                    }
                 }
 
                 var numGlyphs = bitio.getUI16();
@@ -2805,8 +2819,8 @@
 
             if (obj.HasFont) {
                 obj.FontID = bitio.getUI16();
-                if (obj.HasFontClass) { // can't be true if hasFont is true
-                    obj.FontClass = bitio.getDataUntil("\0"); // STRING
+                if (obj.HasFontClass) {
+                    obj.FontClass = bitio.getDataUntil("\0");
                 }
                 obj.FontHeight = bitio.getUI16() / 20;
             }
@@ -2828,11 +2842,11 @@
             }
 
             var font = FontData[obj.FontID];
-            obj.VariableName = bitio.getDataUntil("\0"); // STRING
+            obj.VariableName = bitio.getDataUntil("\0");
 
             obj.InitialText = '';
             if (obj.HasText) {
-                obj.InitialText = bitio.getDataUntil("\0"); // STRING
+                obj.InitialText = bitio.getDataUntil("\0");
             }
 
             layer[obj.CharacterId] = {
@@ -2842,7 +2856,7 @@
                     FontName: font.FontName,
                     isGradient: false,
                     ColorObj: obj.TextColor,
-                    fArray: generateText(obj, font.FontName, undefined)
+                    fArray: _generateText(obj, font.FontName, undefined)
                 },
                 Xmax: obj.Bound.Xmax / 20,
                 Xmin: obj.Bound.Xmin / 20,
@@ -2951,18 +2965,29 @@
                 tag.PlaceFlagHasRatio = 0;
                 tag.PlaceFlagHasClipDepth = 0;
                 tag.CloneData = _clone(layer[tag.CharacterId]);
-
-                if (aClass.Xmax == null) {
-                    aClass.Xmax = tag.CloneData.Xmax;
-                    aClass.Xmin = tag.CloneData.Xmin;
-                    aClass.Ymax = tag.CloneData.Ymax;
-                    aClass.Ymin = tag.CloneData.Ymin;
-                } else {
-                    aClass.Xmax = _max(aClass.Xmax, tag.CloneData.Xmax);
-                    aClass.Xmin = _max(aClass.Xmin, tag.CloneData.Xmin);
-                    aClass.Ymax = _max(aClass.Ymax, tag.CloneData.Ymax);
-                    aClass.Ymin = _max(aClass.Ymin, tag.CloneData.Ymin);
+                var cloneData = tag.CloneData;
+                if (cloneData instanceof AnimationClass) {
+                    cloneData._x = tag.Matrix.TranslateX;
+                    cloneData._y = tag.Matrix.TranslateY;
+                    tag.Matrix.TranslateX = 0;
+                    tag.Matrix.TranslateY = 0;
                 }
+
+                aClass.Xmin = _min(aClass.Xmin, cloneData.Xmin);
+                aClass.Ymin = _min(aClass.Ymin, cloneData.Ymin);
+
+                var addX = (cloneData.Xmin < 0) ? cloneData.Xmin * -1 : cloneData.Xmin;
+                var addY = (cloneData.Ymin < 0) ? cloneData.Ymin * -1 : cloneData.Ymin;
+
+                if (cloneData instanceof AnimationClass) {
+                    addX += cloneData._x;
+                    addY += cloneData._y;
+                }
+
+                aClass.Xmax = _max(aClass.Xmax, (cloneData.Xmin + cloneData.Xmax + addX));
+                aClass.Ymax = _max(aClass.Ymax, (cloneData.Ymin + cloneData.Ymax + addY));
+                aClass._width = (aClass.Xmax - aClass.Xmin);
+                aClass._height = (aClass.Ymax - aClass.Ymin);
 
                 // push
                 array[array.length] = aClass;
@@ -3482,20 +3507,19 @@
                         }
 
                         obj.setFrame(frame);
+                        //obj.isActionWait = true;
                         obj.actionStart();
 
                         break;
                     // NextFrame
                     case 0x04:
                         obj.nextFrame();
-                        obj.actionStart();
-                        //_action(obj);
+                        obj.isActionWait = true;
                         break;
                     // PreviousFrame
                     case 0x05:
                         obj.previousFrame();
-                        obj.actionStart();
-                        //_action(obj);
+                        obj.isActionWait = true;
                         break;
                     // Play
                     case 0x06:
@@ -3555,7 +3579,7 @@
                             _resetObj(obj);
                         }
                         obj.setFrame(frame);
-                        obj.actionStart();
+                        obj.isActionWait = true;
 
                         break;
                     // GetUrl
@@ -3970,8 +3994,21 @@
                         var urlString = stack.pop();
 
                         if (LoadTargetFlag == 0) {
+                            // 分解してチェック
+                            var urls = urlString.split('?');
+                            var uLen = urls.length;
+                            if (uLen > 2) {
+                                url = urls[0] + '?';
+                                for (var u = 1; u < uLen; u++) {
+                                    var params = urls[u];
+                                    url = url +'&'+ params
+                                }
+                            } else {
+                                url = urlString;
+                            }
+
                             func = new Function(
-                                "location.href = '"+ urlString +"';"
+                                "location.href = '"+ url +"';"
                             );
                             func();
                         } else {
@@ -4091,7 +4128,7 @@
                                 if (aClass instanceof AnimationClass) {
                                     frame = aClass.getLabel(splitData[1]);
                                     aClass.setFrame(frame);
-                                    aClass.actionStart();
+                                    aClass.isActionWait = true;
 
                                     if (PlayFlag) {
                                         aClass.play();
@@ -4102,7 +4139,7 @@
                             } else {
                                 frame = obj.getLabel(splitData[0]);
                                 obj.setFrame(frame);
-                                obj.actionStart();
+                                obj.isActionWait = true;
                                 if (PlayFlag) {
                                     obj.play();
                                 } else {
@@ -4111,7 +4148,7 @@
                             }
                         } else {
                             obj.setFrame(frame);
-                            obj.actionStart();
+                            obj.isActionWait = true;
                             if (PlayFlag) {
                                 obj.play();
                             } else {
@@ -4411,6 +4448,7 @@
         this.playFlag = true;
         this.isButton = false;
         this.viewFlag = true;
+        this.isActionWait = false;
 
         // Property
         this._x = 0;
@@ -4483,7 +4521,10 @@
         putFrame: function()
         {
             var _this = this;
-            if (!_this.viewFlag || !_this.playFlag) {
+            if (!_this.viewFlag
+                || !_this.playFlag
+                || _this.isActionWait
+            ) {
                 return;
             }
 
@@ -4567,6 +4608,15 @@
         setFrame: function(frame)
         {
             this.frame = frame;
+        },
+
+        /**
+         * isFrame
+         * @returns {*}
+         */
+        isFrame: function()
+        {
+            return this.isActionWait;
         },
 
         /**
@@ -4767,6 +4817,7 @@
         action: function()
         {
             var _this = this;
+            _this.isActionWait = false;
             if (!_this.playFlag) {
                 return;
             }
@@ -4845,10 +4896,12 @@
      * @param btnTransform
      * @returns {Array}
      */
-    function renderBtn(aClass, tag, transform, btnTransform)
+    function renderBtn(aClass, tag, transform, btnTransform, x, y)
     {
         var ctx;
         var aData = tag.CloneData;
+        x += aClass._x;
+        y += aClass._y;
 
         // Matrix
         if (tag.PlaceFlagHasMatrix) {
@@ -4860,7 +4913,7 @@
                 ScaleY: Matrix.ScaleY,
                 TranslateX: Matrix.TranslateX,
                 TranslateY: Matrix.TranslateY
-            }
+            };
         }
 
         if (aData instanceof AnimationClass) {
@@ -4872,11 +4925,11 @@
                     if (aTag == undefined) {
                         continue;
                     }
-                    _renderBtn(aClass, aTag, transform, btnTransform);
+                    _renderBtn(aClass, aTag, transform, btnTransform, x, y);
                 }
             }
         } else {
-            ctx = _drawBtn(aData, transform, btnTransform);
+            ctx = _drawBtn(aData, transform, btnTransform, x, y);
         }
 
         if (tag.PlaceFlagHasMatrix) {
@@ -4893,47 +4946,47 @@
      * @param btnTransform
      * @returns {*}
      */
-    function drawBtn(aData, transform, btnTransform)
+    function drawBtn(aData, transform, btnTransform, x, y)
     {
-        var x = 0;
-        var y = 0;
+        var sx = x;
+        var sy = y;
+        var dx = 0;
+        var dy = 0;
 
         // transform
         var len = transform.length;
-        var dx = 0;
-        var dy = 0;
         for (var i = 0; i < len; i++) {
             var transformObj = transform[i];
-            dx = x * transformObj.ScaleX
-                + y * transformObj.RotateSkew1
+            dx = sx * transformObj.ScaleX
+                + sy * transformObj.RotateSkew1
                 + transformObj.TranslateX;
 
-            dy = x * transformObj.RotateSkew0
-                + y * transformObj.ScaleY
+            dy = sx * transformObj.RotateSkew0
+                + sy * transformObj.ScaleY
                 + transformObj.TranslateY;
 
-            x = dx;
-            y = dy;
+            sx = dx;
+            sy = dy;
         }
 
         // btnTransform
         var len = btnTransform.length;
         for (var i = 0; i < len; i++) {
             var transformObj = btnTransform[i];
-            dx = x * transformObj.ScaleX
-                + y * transformObj.RotateSkew1
+            dx = sx * transformObj.ScaleX
+                + sy * transformObj.RotateSkew1
                 + transformObj.TranslateX;
 
-            dy = x * transformObj.RotateSkew0
-                + y * transformObj.ScaleY
+            dy = sx * transformObj.RotateSkew0
+                + sy * transformObj.ScaleY
                 + transformObj.TranslateY;
 
-            x = dx;
-            y = dy;
+            sx = dx;
+            sy = dy;
         }
 
-        dx = x * scale;
-        dy = y * scale;
+        dx = sx * scale;
+        dy = sy * scale;
 
         // 無色の四角
         var Xmax = aData.Xmax * scale;
@@ -5193,7 +5246,25 @@
             endDepth = tag.ClipDepth;
             _mask(data);
         } else {
-            _draw(data, aClass);
+            if (data.isText) {
+                var obj = data.obj;
+                var fArray = data.fArray;
+                var name = obj.VariableName;
+                var text = undefined;
+                if (name != '') {
+                    text = _getAnimationClassVariable(name, aClass);
+                    if (text != null) {
+                        fArray = _generateText(obj, data.FontName, text)
+                    }
+                }
+
+                var fLen = fArray.length;
+                for (var f = 0; f < fLen; f++) {
+                    _setCanvasArray(fArray[f]);
+                }
+            } else {
+                _draw(data, aClass);
+            }
         }
 
         if (!isClipDepth) {
@@ -5240,41 +5311,22 @@
     function draw(data, aClass)
     {
         var dLen = data.length;
-
-        if (data.isText) {
-            var obj = data.obj;
-            var fArray = data.fArray;
-            var name = obj.VariableName;
-            var text = null;
-            if (name != '') {
-                text = _getAnimationClassVariable(name, aClass);
-                if (text != null) {
-                    fArray = generateText(obj, data.FontName, text)
+        for (var i = 0; i < dLen; i++) {
+            var stack = data[i];
+            var sLen = stack.length;
+            for (var s = 0; s < sLen; s++) {
+                var array  = stack[s];
+                if (array == undefined) {
+                    continue;
                 }
-            }
 
-            var fLen = fArray.length;
-            for (var f = 0; f < fLen; f++) {
-                _setCanvasArray(fArray[f]);
-            }
-        } else {
-            for (var i = 0; i < dLen; i++) {
-                var stack = data[i];
-                var sLen = stack.length;
-                for (var s = 0; s < sLen; s++) {
-                    var array  = stack[s];
-                    if (array == undefined) {
-                        continue;
-                    }
-
-                    var aLen = array.length;
-                    for (var a = 0; a < aLen; a++) {
-                        var obj = array[a];
-                        var fArray = obj.fArray;
-                        var length = fArray.length;
-                        for (var c = 0; c < length; c++) {
-                            _setCanvasArray(fArray[c]);
-                        }
+                var aLen = array.length;
+                for (var a = 0; a < aLen; a++) {
+                    var obj = array[a];
+                    var fArray = obj.fArray;
+                    var length = fArray.length;
+                    for (var c = 0; c < length; c++) {
+                        _setCanvasArray(fArray[c]);
                     }
                 }
             }
@@ -5296,7 +5348,7 @@
      */
     _swf2js.load = function(path, width, height)
     {
-        if (init()) {
+        if (_init()) {
             // TODO 消す
             if (path == undefined) {
                 path = location.search.substr(1).split('&')[0];
@@ -5459,15 +5511,16 @@
             _setBuffer();
         } else {
             // loading
-            setTimeout(_onEnterFrame, 100);
-
-            context.fillStyle = '#000';
-            context.font = (25 * devicePixelRatio) +"px";
-            context.fillText(loadingText[loading], 50, 50);
+            context.setTransform(1, 0, 0, 1, width/2, height/2);
+            context.fillText(loadingText[loading], 0, 0);
 
             loading++;
-            if (loading === 4) {
+            if (loading <= 4) {
                 loading = 0;
+            }
+
+            if (!isLoad) {
+                setTimeout(_onEnterFrame, 100);
             }
         }
     }
@@ -5696,7 +5749,7 @@
                             }
 
                             var ctx = _renderBtn(
-                                bClass, bTag, transform, []
+                                bClass, bTag, transform, [], 0, 0
                             );
 
                             if (ctx == undefined) {
@@ -5718,7 +5771,8 @@
 
                 // 描画
                 if (bLen) {
-                    for (var b = 0; b < bLen; b++) {
+                    var renderArray = [];
+                    for (var b = bLen; b--;) {
                         var bClass = btnCharacters[b];
                         var bTag = bClass.frameTags[1];
 
@@ -5727,12 +5781,27 @@
                             if (!bTag.ButtonStateDown) {
                                 continue;
                             }
+                            renderArray[bTag.Depth] = bClass;
                         } else {
                             if (!bTag.ButtonStateUp) {
                                 continue;
                             }
+                            renderArray[bTag.Depth] = bClass;
                         }
-                        _render(bClass, bTag, transform, colorTransform);
+                    }
+
+                    var rLen = renderArray.length;
+                    if (rLen > 0) {
+                        renderArray.reverse();
+                        for (var r = rLen; r--;) {
+                            var bClass = renderArray[r];
+                            if (bClass == undefined) {
+                                continue;
+                            }
+
+                            var bTag = bClass.frameTags[1];
+                            _render(bClass, bTag, transform, colorTransform);
+                        }
                     }
                 }
             }
@@ -5741,12 +5810,14 @@
             var tags = aData.frameTags[aData.getFrame()];
             if (tags instanceof Array) {
                 var len = tags.length;
-                for (var i = 0; i < len; i++) {
-                    var aTag = tags[i];
-                    if (aTag == undefined) {
-                        continue;
+                if (len) {
+                    for (var i = 0; i < len; i++) {
+                        var aTag = tags[i];
+                        if (aTag == undefined) {
+                            continue;
+                        }
+                        _render(aData, aTag, transform, colorTransform);
                     }
-                    _render(aData, aTag, transform, colorTransform);
                 }
             }
         } else {
@@ -5792,11 +5863,9 @@
                 ) {
                     continue;
                 }
-
                 _resetObj(tag);
             }
         }
-
         aClass.setFrame(1);
         aClass.play();
     }
@@ -5807,8 +5876,11 @@
      */
     function putFrame(aClass)
     {
+        if (aClass.isFrame()) {
+            return false;
+        }
+        
         var frame = aClass.getFrame();
-
         var tags = aClass.frameTags[frame];
         if (tags instanceof Array) {
             var len = tags.length;
@@ -6696,8 +6768,8 @@
      */
     function generateText(obj, FontName, text)
     {
-        var x = obj.RightMargin + obj.Indent;
-        var y = obj.FontHeight;
+        var x = obj.RightMargin + obj.Indent - obj.Leading;
+        var y = obj.FontHeight - obj.Leading;
         var fArray = [];
         var _preContext = preContext;
 
@@ -6708,24 +6780,26 @@
         );
         fArray = _setFont(fArray, obj.FontHeight, FontName);
 
+        var bound = obj.Bound;
+        var Xmin = (bound.Xmin > 0) ? bound.Xmin : bound.Xmin * -1;
         if (obj.Align == 1) {
             fArray = _setTextAlign(fArray, 'end');
-            var x = (obj.Bound.Xmax - obj.Bound.Xmin) / 20;
+            x += (bound.Xmax + Xmin) / 20;
         } else if (obj.Align == 2) {
             fArray = _setTextAlign(fArray, 'center');
-            var x = (obj.Bound.Xmax - obj.Bound.Xmin) / 20 / 2;
+            x += ((bound.Xmax + Xmin) / 20) / 2;
         }
 
         var inText = (text == undefined) ? obj.InitialText : text;
         var splitData = inText.split('@LFCR');
         var len = splitData.length;
+
+        var lineHeight = _preContext.measureText("あ").width * 2;
         for (var i = 0; i < len; i++) {
-            var lineHeight = _preContext.measureText("あ").width * 2;
-            var Leading = (i > 0) ? obj.Leading : 0;
             fArray = _setFillText(
                 fArray, splitData[i],
                 x,
-                ((y + lineHeight * i) + Leading)
+                (y + (lineHeight + obj.Leading) * i)
             );
         }
 
