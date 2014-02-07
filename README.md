@@ -4,6 +4,7 @@ swfをJavaScriptでcanvasに出力。
 ※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。  
 output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
 
+
 html
 ------
     <!DOCTYPE html>  
@@ -22,6 +23,7 @@ html
     </script>  
     </body>  
     </html>  
+
 
 TODO
 -------
@@ -50,8 +52,8 @@ Please send the file of swf which does not operate. A bug is fixed.
 Release Notes  
 -------
 --[ swf2js 0.0.5 ] Release Date: 07 Feb 2014  
-* [BUGFIX] render 'alpha'  
-
+* [BUGFIX] render '_alpha'  
+* [NEW] loading css  
 
 --[ swf2js 0.0.4 ] Release Date: 06 Feb 2014  
 * [BUGFIX] ActionScript 'change the order of something'  
@@ -64,7 +66,7 @@ Release Notes
 * [BUGFIX] ColorTransform  
 * [BUGFIX] touchEvent  
 * [BUGFIX] Property '_width', '_height'  
-* [NEW] load option 'width' and 'height'
+* [NEW] load option 'width' and 'height'  
 
 
 --[ swf2js 0.0.2 ] Release Date: 21 Jan 2014  

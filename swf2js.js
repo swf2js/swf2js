@@ -89,7 +89,6 @@
 
     // params
     var intervalId = 0;
-    var timeOutId = 0;
     var setWidth = 0;
     var setHeight = 0;
     var baseCanvas, context, preContext;
@@ -100,7 +99,6 @@
     var btnLayer = [];
     var touchCtx = [];
     var FontData = [];
-    var loadingText = ['NOW LOADING', 'NOW LOADING.', 'NOW LOADING..', 'NOW LOADING...'];
     var timeouts = 0;
     var devicePixelRatio = _window.devicePixelRatio || 1;
     var scale = 1;
@@ -108,7 +106,6 @@
     var height = 0;
     var tagType = 0;
     var touchId = 0;
-    var loading = 0;
     var touchClass = {};
     var currentPosition = {x:0, y:0};
     var startDate = new Date();
@@ -146,11 +143,13 @@
 
         // div
         var div = _document.getElementById('swf2js');
-        var style = div.style;
-        _setStyle(style, 'position', 'relative');
         width  = (setWidth > 0) ? setWidth : _window.innerWidth;
         height = (setHeight > 0) ? setHeight : _window.innerHeight;
         var minSize = _min(width, height);
+        var style = div.style;
+        _setStyle(style, 'position', 'relative');
+        _setStyle(style, 'top', 50 - ((minSize/height) * 100) + '%');
+        _setStyle(style, 'left', ((width - minSize) / 2)  +'px');
         _setStyle(style, 'width', minSize + 'px');
         _setStyle(style, 'height', minSize + 'px');
         _setStyle(style, '-webkit-user-select', 'none');
@@ -164,8 +163,35 @@
             }
         }
 
+        // css loading
+        var loadingDiv = _document.createElement('div');
+        loadingDiv.id = 'loading';
+        var css = '<style>';
+        css += '#loading {\n';
+        css += 'position: absolute;\n';
+        css += 'top: '+ (48 - _floor((30/height) * 100)) +'%;\n';
+        css += 'left: '+ (52 - _floor((30/width) * 100)) +'%;\n';
+        css += 'width: 30px;\n';
+        css += 'height: 30px;\n';
+        css += 'border-radius: 30px;\n';
+        css += 'border: 8px solid #dcdcdc;\n';
+        css += 'border-right-color: transparent;\n';
+        css += '-webkit-animation: spin 1s infinite linear;\n';
+        css += '} \n';
+
+        css += '@-webkit-keyframes spin {\n';
+        css += '0% { -webkit-transform: rotate(0deg); opacity: 0.4; }\n';
+        css += '50% { -webkit-transform: rotate(180deg); opacity: 1;}\n';
+        css += '100% { -webkit-transform: rotate(360deg); opacity: 0.4; }\n';
+        css += '} \n';
+
+        css += '</style>';
+        div.innerHTML = css;
+        div.appendChild(loadingDiv);
+
         // main canvasをセット
         var canvas = baseCanvas.cloneNode(false);
+        context = canvas.getContext('2d');
         style = canvas.style;
         _setStyle(style, 'zIndex', 0);
         _setStyle(style, 'zoom', 100 / devicePixelRatio + '%');
@@ -182,18 +208,9 @@
         // divに設置
         div.appendChild(canvas);
 
-        // main canvas
-        context = canvas.getContext('2d');
-        context.fillStyle = '#000';
-        context.font = "bold 20px 'sans-serif'";
-        context.textAlign = 'center';
-
         // pre canvas
         var preCanvas = baseCanvas.cloneNode(false);
         preContext = preCanvas.getContext('2d');
-
-        // now loading
-        timeOutId = setTimeout(_onEnterFrame, 0);
 
         return true;
     }
@@ -203,9 +220,6 @@
      */
     _window.onresize = function()
     {
-        // clear
-        enterBtn = {};
-
         // リサイズ開始
         _changeScreenSize();
 
@@ -250,6 +264,7 @@
         var style = div.style;
         _setStyle(style, 'width', width / devicePixelRatio + 'px');
         _setStyle(style, 'height', height / devicePixelRatio + 'px');
+        _setStyle(style, 'top', '0');
         _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
 
         // main
@@ -5474,6 +5489,16 @@
         // reset
         swftag = _void;
         isLoad = true;
+
+        // loading 削除
+        var div = _document.getElementById('loading');
+        var node = div.parentNode;
+        node.removeChild(div);
+
+        // css 削除
+        var div = _document.getElementById('swf2js');
+        var childNodes = div.childNodes;
+        div.removeChild(childNodes[0]);
     }
 
     /**
@@ -5521,7 +5546,6 @@
         player.fps = _floor(1000 / player.frameRate);
 
         // 描画開始
-        clearTimeout(timeOutId);
         intervalId = setInterval(_onEnterFrame, player.fps);
     }
 
@@ -5530,25 +5554,12 @@
      */
     function onEnterFrame()
     {
-        _clearMain();
         if (isLoad && player.playStartFlag) {
+            _clearMain();
             // main
             var canvas = preContext.canvas;
             context.drawImage(canvas, 0, 0);
             _setBuffer();
-        } else {
-            // loading
-            context.setTransform(1, 0, 0, 1, width/2, height/2);
-            context.fillText(loadingText[loading], 0, 0);
-
-            loading++;
-            if (loading <= 4) {
-                loading = 0;
-            }
-
-            if (!isLoad) {
-                timeOutId = setTimeout(_onEnterFrame, 100);
-            }
         }
     }
 
