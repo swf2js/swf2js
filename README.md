@@ -49,6 +49,10 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.5 ] Release Date: 07 Feb 2014  
+* [BUGFIX] render 'alpha'  
+
+
 --[ swf2js 0.0.4 ] Release Date: 06 Feb 2014  
 * [BUGFIX] ActionScript 'change the order of something'  
 * [BUGFIX] DefineEditText '_x', '_y'  

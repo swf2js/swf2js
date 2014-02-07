@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.4)
+ * swf2js (version 0.0.5)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -23,7 +23,7 @@
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
     var _isNaN = isNaN;
-    var request = new XMLHttpRequest();
+    var _xmlHttpRequest = new XMLHttpRequest();
 
     // local function cache
     var _init = init;
@@ -89,6 +89,7 @@
 
     // params
     var intervalId = 0;
+    var timeOutId = 0;
     var setWidth = 0;
     var setHeight = 0;
     var baseCanvas, context, preContext;
@@ -152,6 +153,7 @@
         var minSize = _min(width, height);
         _setStyle(style, 'width', minSize + 'px');
         _setStyle(style, 'height', minSize + 'px');
+        _setStyle(style, '-webkit-user-select', 'none');
 
         // 子要素を削除
         var childNodes = div.childNodes;
@@ -190,11 +192,11 @@
         var preCanvas = baseCanvas.cloneNode(false);
         preContext = preCanvas.getContext('2d');
 
-        // 非同期
-        setTimeout(_onEnterFrame, 0);
+        // now loading
+        timeOutId = setTimeout(_onEnterFrame, 0);
 
         return true;
-    };
+    }
 
     /**
      * onresize
@@ -209,7 +211,7 @@
 
         // buffer
         _setBuffer();
-    };
+    }
 
     /**
      * changeScreenSize
@@ -259,7 +261,7 @@
         var preCanvas = preContext.canvas;
         _setStyle(preCanvas, 'width', width);
         _setStyle(preCanvas, 'height', height);
-    };
+    }
 
     /**
      * setBuffer
@@ -268,7 +270,7 @@
     {
         timeouts++;
         _window.postMessage(messageName, '*');
-    };
+    }
 
     /**
      * handleMessage
@@ -283,7 +285,7 @@
                 _buffer();
             }
         }
-    };
+    }
     // handleMessage
     _window.addEventListener('message', _handleMessage, true);
 
@@ -312,7 +314,7 @@
     var BitIO = function(){};
 
     /**
-     * 変数
+     * prototype
      */
     BitIO.prototype = {
         // params
@@ -344,7 +346,7 @@
          * バージョン情報
          * @returns {number}
          */
-        getVersion: function ()
+        getVersion: function()
         {
             return this.data.charCodeAt(3) & 0xff;
         },
@@ -386,16 +388,18 @@
             var _this = this;
             _this.byteAlign();
             var bo = _this.byte_offset;
+            var offset = 0;
             if (!value || value == null) {
-                var offset = -1;
+                offset = -1;
             } else {
-                var offset = _this.data.indexOf(value, bo);
+                offset = _this.data.indexOf(value, bo);
             }
 
+            var n = 0;
             if (offset == -1) {
-                var n = _this.data.length - bo;
+                n = _this.data.length - bo;
             } else {
-                var n = offset - bo;
+                n = offset - bo;
             }
 
             _this.byte_offset = bo + n;
@@ -405,9 +409,9 @@
             }
 
             var ret = _this.data.substr(bo, n);
-            var len = ret.length;
+            var rLen = ret.length;
             var array = [];
-            for (var i = 0; i < len; i++) {
+            for (var i = 0; i < rLen; i++) {
                 var code = ret.charCodeAt(i) & 0xff;
                 if (code == 10 || code == 13) {
                     array[array.length] = '@LFCR';
@@ -574,19 +578,6 @@
         },
 
         /**
-         * fromUI32
-         * @param value
-         * @returns {string}
-         */
-        fromUI32: function(value)
-        {
-            return _fromCharCode(value >> 24)
-                + _fromCharCode((value >> 16) & 0xff)
-                + _fromCharCode((value >> 8) & 0xff)
-                + _fromCharCode(value & 0xff);
-        },
-
-        /**
          * readUB
          * @param n
          * @returns {number}
@@ -629,6 +620,10 @@
      * SwfTag
      */
     var SwfTag = function(){};
+
+    /**
+     * prototype
+     */
     SwfTag.prototype = {
         parse: function()
         {
@@ -746,6 +741,11 @@
                         break;
                     case 8: // JPEGTables
                         _this.parseJPEGTables(length);
+                        break;
+                    case 56: // ExportAssets
+                        _this.parseExportAssets(length);
+                        break;
+                    case 24: //Protect
                         break;
                     default:
                         console.log('未対応tagType -> ' + tagType);
@@ -2440,6 +2440,26 @@
         },
 
         /**
+         * parseExportAssets
+         * @param length
+         * @returns {{}}
+         */
+        parseExportAssets: function(length)
+        {
+            var obj = {};
+            obj.Count = bitio.getUI16();
+            obj.Tag1 = bitio.getUI16();
+
+            obj.Name = [];
+            for (var i = obj.Count; i--;) {
+                obj.Name[obj.Name.length] = bitio.getDataUntil("\0");
+            }
+            obj.TagN = bitio.getUI16();
+            obj.NameN = bitio.getDataUntil("\0");
+            return obj;
+        },
+
+        /**
          * parseDefineBits
          * @param length
          */
@@ -2580,8 +2600,8 @@
         parseDefineFontName: function()
         {
             var FontId = bitio.getUI16();
-            var FontName = bitio.getDataUntil("\0"); // STRING
-            var FontCopyright = bitio.getDataUntil("\0"); // STRING
+            var FontName = bitio.getDataUntil("\0");
+            var FontCopyright = bitio.getDataUntil("\0");
         },
 
         /**
@@ -3266,8 +3286,8 @@
 
                 if (type) {
                     if (type == 1) {
-                        var distTable = fixedDistTable;
-                        var litTable = fixedLitTable;
+                        distTable = fixedDistTable;
+                        litTable = fixedLitTable;
 
                         if (!distTable) {
                             var bitLengths = [];
@@ -3455,6 +3475,9 @@
         _this.condActionSize = condActionSize;
     };
 
+    /**
+     * prototype
+     */
     ActionScript.prototype = {
         /**
          * start
@@ -3999,7 +4022,8 @@
                             var uLen = urls.length;
                             if (uLen > 2) {
                                 url = urls[0] + '?';
-                                for (var u = 1; u < uLen; u++) {
+                                url = url + urls[1];
+                                for (var u = 2; u < uLen; u++) {
                                     var params = urls[u];
                                     url = url +'&'+ params
                                 }
@@ -4201,7 +4225,7 @@
                                 targetObj._totalframes = _parseFloat(value);
                                 break;
                             case 6:
-                                targetObj._alpha = _parseFloat(value);
+                                targetObj._alpha = _parseFloat(value) / 100;
                                 break;
                             case 7:
                                 targetObj._visible = _parseFloat(value);
@@ -4817,11 +4841,12 @@
         action: function()
         {
             var _this = this;
-            _this.isActionWait = false;
-            if (!_this.playFlag) {
-                return;
+            if (_this.isActionWait || _this.playFlag) {
+                _this.actionStart();
+                _this.isActionWait = false;
+            } else {
+                return false;
             }
-            _this.actionStart();
         },
 
         /**
@@ -5034,17 +5059,17 @@
                         continue;
                     }
 
+                    var ColorObj = obj.ColorObj;
                     if (obj.isGradient) {
-                        var ColorObj = obj.ColorObj;
                         var gradient = ColorObj.gradient;
                         var gradientRecords = gradient.GradientRecords;
                         var colors = [];
                         var gLen = gradientRecords.length;
                         for (var g = 0; g < gLen; g++) {
-                            var colorObj = gradientRecords[g];
+                            var record = gradientRecords[g];
                             colors[g] = {};
-                            colors[g].Ratio = colorObj.Ratio;
-                            colors[g].Color = _generateColor(ct, colorObj.Color);
+                            colors[g].Ratio = record.Ratio;
+                            colors[g].Color = _generateColor(ct, record.Color);
                         }
                         var objArray = obj.fArray;
                         var gradientLogic = _getGradientLogic(obj, colors);
@@ -5055,7 +5080,6 @@
                             spCnt++;
                         }
                     } else {
-                        var ColorObj = obj.ColorObj;
                         var color  = _generateRGBA(ColorObj.Color);
                         var colorObj = _generateColor(ct, color);
                         var fArray = obj.fArray;
@@ -5076,7 +5100,7 @@
                 }
             }
         }
-    };
+    }
 
     /**
      * generateColor
@@ -5355,22 +5379,24 @@
             }
 
             if (path) {
-                request.open('GET', path);
-                request.overrideMimeType(
+                _xmlHttpRequest.open('GET', path);
+                _xmlHttpRequest.overrideMimeType(
                     'text/plain; charset=x-user-defined'
                 );
-                request.send(null);
+                _xmlHttpRequest.send(null);
             } else {
                 alert('please set swf path');
             }
 
-            request.onreadystatechange = function()
+            _xmlHttpRequest.onreadystatechange = function()
             {
-                if (request.readyState == 4) {
-                    if (request.status == 200) {
+                var readyState = _xmlHttpRequest.readyState;
+                if (readyState == 4) {
+                    var status = _xmlHttpRequest.status;
+                    if (status == 200) {
                         setWidth = (width) ? width : 0;
                         setHeight = (height) ? height : 0;
-                        _parse(request.responseText);
+                        _parse(_xmlHttpRequest.responseText);
                     } else {
                         alert('unknown swf data');
                     }
@@ -5495,6 +5521,7 @@
         player.fps = _floor(1000 / player.frameRate);
 
         // 描画開始
+        clearTimeout(timeOutId);
         intervalId = setInterval(_onEnterFrame, player.fps);
     }
 
@@ -5520,7 +5547,7 @@
             }
 
             if (!isLoad) {
-                setTimeout(_onEnterFrame, 100);
+                timeOutId = setTimeout(_onEnterFrame, 100);
             }
         }
     }
@@ -5644,6 +5671,7 @@
         var yScale = null;
         var isRotation = false;
         var angle = 0;
+        var alpha = 1;
         if (aData instanceof AnimationClass && aData.cid) {
             if (!aData._visible) {
                 return false;
@@ -5662,6 +5690,8 @@
 
             ScaleX = (xScale == null) ? 1 : xScale;
             ScaleY = (yScale == null) ? 1 : yScale;
+
+            alpha = aData._alpha;
         }
 
         // Matrix
@@ -5696,6 +5726,20 @@
                 ScaleX: ScaleX,
                 ScaleY: ScaleY
             }
+        }
+
+        // alpha
+        if (1 > alpha) {
+            colorTransform.unshift(
+                {
+                    HasAddTerms: 0,
+                    HasMultiTerms: 1,
+                    RedMultiTerm: 256,
+                    GreenMultiTerm: 256,
+                    BlueMultiTerm: 256,
+                    AlphaMultiTerm: 256 * alpha
+                }
+            );
         }
 
         // 実行
@@ -5845,6 +5889,10 @@
         if (tag.PlaceFlagHasColorTransform) {
             colorTransform.shift();
         }
+
+        if (1 > alpha) {
+            colorTransform.shift();
+        }
     }
 
     /**
@@ -5879,7 +5927,7 @@
         if (aClass.isFrame()) {
             return false;
         }
-        
+
         var frame = aClass.getFrame();
         var tags = aClass.frameTags[frame];
         if (tags instanceof Array) {
@@ -6564,6 +6612,9 @@
     function touchMove(event)
     {
         if (!isBtnAction && (isTouch || touchFlag)) {
+            if (isTouch && touchFlag) {
+                event.preventDefault();
+            }
             touchStart(event);
         }
     }
