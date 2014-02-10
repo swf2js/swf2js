@@ -45,7 +45,7 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
---[ swf2js 0.0.6 ] Release Date: 09 Feb 2014  
+--[ swf2js 0.0.6 ] Release Date: 10 Feb 2014  
 * [BUGFIX] ActionScript 'change the order of something'  
 * [BUGFIX] '_currentframe'  
 * [NEW] DefineBits  
