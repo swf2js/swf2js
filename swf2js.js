@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.5)
+ * swf2js (version 0.0.6)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -24,6 +24,7 @@
     var _parseFloat = parseFloat;
     var _isNaN = isNaN;
     var _xmlHttpRequest = new XMLHttpRequest();
+    var _Image = Image;
 
     // local function cache
     var _init = init;
@@ -55,6 +56,11 @@
     var _setMovieHeader = setMovieHeader;
     var _resetObj = resetObj;
     var _generateText = generateText;
+    var _base64encode = base64encode;
+    var _unzip = unzip;
+    var _buildHuffTable = buildHuffTable;
+    var _decodeSymbol = decodeSymbol;
+    var _deleteCss = deleteCss;
 
     // canvas
     var _renderCanvas = renderCanvas;
@@ -99,6 +105,8 @@
     var btnLayer = [];
     var touchCtx = [];
     var FontData = [];
+    var imgLoadCount = 0;
+    var isImgLoadCompCount = 0;
     var timeouts = 0;
     var devicePixelRatio = _window.devicePixelRatio || 1;
     var scale = 1;
@@ -168,6 +176,7 @@
         loadingDiv.id = 'loading';
         var css = '<style>';
         css += '#loading {\n';
+        css += 'z-index: 9999;\n';
         css += 'position: absolute;\n';
         css += 'top: '+ (48 - _floor((30/height) * 100)) +'%;\n';
         css += 'left: '+ (52 - _floor((30/width) * 100)) +'%;\n';
@@ -262,10 +271,14 @@
         // divの設定
         var div = _document.getElementById('swf2js');
         var style = div.style;
-        _setStyle(style, 'width', width / devicePixelRatio + 'px');
-        _setStyle(style, 'height', height / devicePixelRatio + 'px');
+        var setWidthPx = width / devicePixelRatio;
+        var setHeightPx = height / devicePixelRatio;
+        _setStyle(style, 'width', setWidthPx + 'px');
+        _setStyle(style, 'height', setHeightPx + 'px');
         _setStyle(style, 'top', '0');
-        _setStyle(style, 'left', (screenWidth / 2) - (width / devicePixelRatio / 2) + 'px');
+        _setStyle(style, 'left',
+            ((screenWidth / 2) - (setWidthPx / 2)) + 'px'
+        );
 
         // main
         var canvas = context.canvas;
@@ -296,8 +309,10 @@
         if (event.source == _window && event.data == messageName) {
             event.stopPropagation();
             if (timeouts) {
-                timeouts--;
-                _buffer();
+                if (isLoad) {
+                    timeouts--;
+                    _buffer();
+                }
             }
         }
     }
@@ -335,7 +350,7 @@
         // params
         data: null,
         bit_offset: 0,
-        byte_offset: 4,
+        byte_offset: 0,
         bit_buffer: null,
 
         /**
@@ -354,6 +369,7 @@
          */
         getHeaderSignature: function()
         {
+            this.byte_offset++;
             return this.data.charCodeAt(0) & 0xff;
         },
 
@@ -363,6 +379,7 @@
          */
         getVersion: function()
         {
+            this.byte_offset += 3;
             return this.data.charCodeAt(3) & 0xff;
         },
 
@@ -418,25 +435,32 @@
             }
 
             _this.byte_offset = bo + n;
-            var len = value.length;
-            if ((offset != -1) && len) {
-                _this.byte_offset += len;
+            if (value != null) {
+                var len = value.length;
+                if ((offset != -1) && len) {
+                    _this.byte_offset += len;
+                }
             }
 
             var ret = _this.data.substr(bo, n);
-            var rLen = ret.length;
-            var array = [];
-            for (var i = 0; i < rLen; i++) {
-                var code = ret.charCodeAt(i) & 0xff;
-                if (code == 10 || code == 13) {
-                    array[array.length] = '@LFCR';
-                } else if (code < 32) {
-                    continue;
-                } else {
-                    array[array.length] = '%' + code.toString(16);
+            if (value != null) {
+                var rLen = ret.length;
+                var array = [];
+                for (var i = 0; i < rLen; i++) {
+                    var code = ret.charCodeAt(i) & 0xff;
+                    if (code == 10 || code == 13) {
+                        array[array.length] = '@LFCR';
+                    } else if (code < 32) {
+                        continue;
+                    } else {
+                        array[array.length] = '%' + code.toString(16);
+                    }
                 }
             }
-            return _decodeToShiftJis(array.join(''));
+
+            return (value == null)
+                ? ret
+                : _decodeToShiftJis(array.join(''));
         },
 
         /**
@@ -526,6 +550,20 @@
         },
 
         /**
+         *
+         * @returns {number}
+         */
+        getUI16BE: function()
+        {
+            var _this = this;
+            _this.byteAlign();
+            var data = _this.data;
+            return (((data.charCodeAt(_this.byte_offset++) & 0xff) << 8) |
+                    (data.charCodeAt(_this.byte_offset++) & 0xff));
+        },
+
+
+        /**
          * 符号無し 32-bit 整数
          * @returns {number}
          */
@@ -606,7 +644,9 @@
                     _this.bit_buffer = _this.readNumber();
                     _this.bit_offset = 0;
                 }
-                value |= (_this.bit_buffer & (0x01 << _this.bit_offset++) ? 1 : 0) << i;
+
+                value |= (_this.bit_buffer
+                    & (0x01 << _this.bit_offset++) ? 1 : 0) << i;
             }
             return value;
         },
@@ -626,8 +666,26 @@
             }
             _this.byte_offset++;
             return value;
-        }
+        },
 
+        /**
+         * 圧縮swf対応
+         * @returns {*}
+         */
+        deCompress: function()
+        {
+            var _this = this;
+            var compressed = _this.data;
+            var bo = _this.byte_offset;
+            var data = _unzip(compressed, true);
+
+            // set
+            _this.length = data.length;
+            _this.byte_offset = bo;
+            _this.data = data;
+
+            return _this;
+        }
     };
     var bitio = new BitIO();
 
@@ -734,7 +792,8 @@
                         break;
                     case 5:  // RemoveObject
                     case 28: // RemoveObject2
-                        removeObj[removeObj.length] = _this.parseRemoveObject();
+                        removeObj[removeObj.length] =
+                            _this.parseRemoveObject();
                         break;
                     case 34: // DefineButton2
                         _this.parseDefineButton(length);
@@ -858,7 +917,8 @@
                     // name map
                     var name = cTag.Name;
                     if (name != undefined) {
-                        var cloneData = aClass.frameTags[frame][depth].CloneData;
+                        var cloneData =
+                            aClass.frameTags[frame][depth].CloneData;
                         aClass.nameMap[name] = cloneData;
                     }
                 }
@@ -1243,7 +1303,8 @@
                     }
                 } else if (first6Bits) {
                     // ChangeStyle (0XXXXX)
-                    shape = _this.styleChangeRecord(first6Bits, currentNumBits);
+                    shape =
+                        _this.styleChangeRecord(first6Bits, currentNumBits);
                 }
 
                 shapeRecords[shapeRecords.length] = shape;
@@ -1531,7 +1592,10 @@
                                 ColorObj: f0ColorObj,
                                 ColorIdx: f0Idx,
                                 BitMapObj: bitmapObj,
-                                isGradient: (fillStyleType == 0x10 || fillStyleType == 0x12),
+                                isGradient:
+                                    (fillStyleType == 0x10
+                                        || fillStyleType == 0x12
+                                    ),
                                 cArray: [],
                                 fArray: []
                             };
@@ -1574,7 +1638,10 @@
                                 ColorObj: f1ColorObj,
                                 ColorIdx: f1Idx,
                                 BitMapObj: bitmapObj,
-                                isGradient: (fillStyleType == 0x10 || fillStyleType == 0x12),
+                                isGradient:
+                                    (fillStyleType == 0x10
+                                        || fillStyleType == 0x12
+                                    ),
                                 cArray: [],
                                 fArray: []
                             };
@@ -1589,7 +1656,10 @@
 
                     // line
                     lineFlag  = ((StateLineStyle > 0 && LineStyle > 0)
-                        || (lineFlag && StateLineStyle == 0 && LineStyle == undefined)
+                        || (lineFlag
+                            && StateLineStyle == 0
+                            && LineStyle == undefined
+                        )
                     );
                     if (lineFlag) {
                         if (LineStyle) {
@@ -1945,7 +2015,8 @@
                                 // Matrix
                                 var ColorObj = obj.ColorObj;
                                 var Matrix = ColorObj.gradientMatrix;
-                                var gradientLogic = _getGradientLogic(obj, undefined);
+                                var gradientLogic =
+                                    _getGradientLogic(obj, undefined);
                                 var len = gradientLogic.length;
                                 for (var i = len; i--;) {
                                     objArray.unshift(gradientLogic[i]);
@@ -1984,7 +2055,8 @@
                                     bitMapObj.bitmapId
                                 );
                             } else {
-                                var color = _generateRGBA(obj.ColorObj.Color);
+                                var color =
+                                    _generateRGBA(obj.ColorObj.Color);
                                 objArray = _setFillStyle(
                                     objArray,
                                     color.R, color.G, color.B, color.A,
@@ -2069,8 +2141,11 @@
                     var aLen = array.length;
                     for (var key = 0; key < aLen; key++) {
                         var obj = array[key];
-                        if (obj == undefined || obj == null || obj.cArray == null
-                            || (obj.StartX == obj.EndX && obj.StartY == obj.EndY)
+                        if (obj == undefined
+                            || obj == null
+                            || obj.cArray == null
+                            || (obj.StartX == obj.EndX
+                                && obj.StartY == obj.EndY)
                         ) {
                            continue;
                         }
@@ -2168,7 +2243,8 @@
                                     var lineFArray = lObj.fArray;
                                     var len = lineFArray.length;
                                     for (var i = 0; i < len; i++) {
-                                        cflArray[cflArray.length] = lineFArray[i];
+                                        cflArray[cflArray.length] =
+                                            lineFArray[i];
                                     }
                                 }
 
@@ -2217,7 +2293,8 @@
                                     var lineFArray = lObj.fArray;
                                     var len = lineFArray.length;
                                     for (var i = 0; i < len; i++) {
-                                        cflArray[cflArray.length] = lineFArray[i];
+                                        cflArray[cflArray.length] =
+                                            lineFArray[i];
                                     }
                                 }
 
@@ -2399,7 +2476,7 @@
 
             // unCompress
             var compressed = bitio.getData(length);
-            var data = _this.unzip(compressed);
+            var data = _unzip(compressed, false);
 
             // canvas
             var imageCanvas = baseCanvas.cloneNode(false);
@@ -2480,17 +2557,69 @@
          */
         parseDefineBits: function(length)
         {
-            var obj = {};
-            obj.characterID = bitio.getUI16();
-            if  (tagType == 35) {
-                obj.AlphaDataOffset = bitio.getUI32();
+            var cid = bitio.getUI16();
+            var ImageDataLen = length - 2;
+            if (tagType === 35) {
+                ImageDataLen = bitio.getUI32();
             }
-            obj.JPEGData = bitio.getData(length);
 
-            if (tagType == 35) {
-                var len = obj.JPEGData.length;
-                obj.BitmapAlphaData = bitio.getData(length);
+            var JPEGData = bitio.getData(ImageDataLen);
+            if (tagType === 35) {
+                var BitmapAlphaData =
+                    bitio.getData(length - 2 - ImageDataLen);
             }
+
+            // 分解
+            for(var i = 0; JPEGData[i]; i++){
+                var word = ((JPEGData.charCodeAt(i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                if(0xffd9 == word){
+                    word = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                    if(word == 0xffd8){
+                        JPEGData = JPEGData.substr(0, i - 4) + JPEGData.substr(i);
+                        i -= 4;
+                    }
+                }else if(0xffc0 == word){
+                    i += 3;
+                    var imgHeight = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                    var imgWidth = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                    break;
+                }
+            }
+
+            // clone
+            var imageCanvas = baseCanvas.cloneNode(false);
+            var imageContext = imageCanvas.getContext('2d');
+
+            // render
+            imgLoadCount++;
+            var imgObj = new _Image();
+            imgObj.onload = function()
+            {
+                imageCanvas.width = imgWidth;
+                imageCanvas.height = imgHeight;
+                imageContext.drawImage(imgObj, 0, 0);
+
+                // 半透明対応
+                if (BitmapAlphaData) {
+                    var data = _unzip(BitmapAlphaData);
+                    var imgData = imageContext.getImageData(0, 0, imgWidth, imgHeight);
+                    var pxData = imgData.data;
+                    var pxIdx = 0;
+                    var len = imgWidth * imgHeight;
+                    for (var i = 0; i < len; i++) {
+                        pxData[pxIdx + 3] = data[i];
+                        pxIdx += 4;
+                    }
+                    imageContext.putImageData(imgData, 0, 0);
+                }
+
+                bitMapData[cid] = imageContext.canvas;
+
+                // 読み完了カウントアップ
+                isImgLoadCompCount++;
+            }
+            imgObj.src = "data:image/jpeg;base64,"
+                + _base64encode(JPEGData);
         },
 
         /**
@@ -2518,7 +2647,8 @@
 
                 obj.FontNameLen = bitio.getUI8();
                 if (obj.FontNameLen) {
-                    obj.FontName = _decodeToShiftJis(bitio.getData(obj.FontNameLen-1));
+                    obj.FontName =
+                        _decodeToShiftJis(bitio.getData(obj.FontNameLen-1));
                     bitio.incrementOffset(1 , 0);
                     var fontFirst = obj.FontName.substr(0, 1);
                     if (fontFirst == '_') {
@@ -3011,16 +3141,26 @@
                 aClass.Xmin = _min(aClass.Xmin, cloneData.Xmin);
                 aClass.Ymin = _min(aClass.Ymin, cloneData.Ymin);
 
-                var addX = (cloneData.Xmin < 0) ? cloneData.Xmin * -1 : cloneData.Xmin;
-                var addY = (cloneData.Ymin < 0) ? cloneData.Ymin * -1 : cloneData.Ymin;
+                var addX = (cloneData.Xmin < 0)
+                    ? cloneData.Xmin * -1
+                    : cloneData.Xmin;
+                var addY = (cloneData.Ymin < 0)
+                    ? cloneData.Ymin * -1
+                    : cloneData.Ymin;
 
                 if (cloneData instanceof AnimationClass) {
                     addX += cloneData._x;
                     addY += cloneData._y;
                 }
 
-                aClass.Xmax = _max(aClass.Xmax, (cloneData.Xmin + cloneData.Xmax + addX));
-                aClass.Ymax = _max(aClass.Ymax, (cloneData.Ymin + cloneData.Ymax + addY));
+                aClass.Xmax = _max(
+                    aClass.Xmax,
+                    (cloneData.Xmin + cloneData.Xmax + addX)
+                );
+                aClass.Ymax = _max(
+                    aClass.Ymax,
+                    (cloneData.Ymin + cloneData.Ymax + addY)
+                );
                 aClass._width = (aClass.Xmax - aClass.Xmin);
                 aClass._height = (aClass.Ymax - aClass.Ymin);
 
@@ -3232,7 +3372,8 @@
                         break;
                     case 5:  // RemoveObject
                     case 28: // RemoveObject2
-                        removeObj[removeObj.length] = _this.parseRemoveObject();
+                        removeObj[removeObj.length] =
+                            _this.parseRemoveObject();
                         break
                     case 43: // FrameLabel
                         label[label.length] = _this.parseFrameLabel(frame);
@@ -3265,212 +3406,6 @@
                 : condActionSize;
 
             return new ActionScript(data, endFlag, condActionSize);
-        },
-
-        /**
-         * unzip
-         * @param compressed
-         * @returns {Array}
-         */
-        unzip: function(compressed)
-        {
-            var newBitio = new BitIO();
-            newBitio.setData(compressed);
-            newBitio.setOffset(2, 8);
-
-            var buff = [];
-            var DEFLATE_CODE_LENGTH_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
-            var DEFLATE_CODE_LENGTH_MAP = [
-                [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [1, 11], [1, 13], [1, 15], [1, 17],
-                [2, 19], [2, 23], [2, 27], [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83], [4, 99],
-                [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
-            ];
-            var DEFLATE_DISTANCE_MAP = [
-                [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13], [3, 17], [3, 25], [4, 33], [4, 49],
-                [5, 65], [5, 97], [6, 129], [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025], [9, 1537],
-                [10, 2049], [10, 3073], [11, 4097], [11, 6145], [12, 8193], [12, 12289], [13, 16385], [13, 24577]
-            ];
-
-            while (!done) {
-                var done = newBitio.readUB(1);
-                var type = newBitio.readUB(2);
-                var distTable = {};
-                var litTable = {};
-                var fixedDistTable = false;
-                var fixedLitTable = false;
-
-                if (type) {
-                    if (type == 1) {
-                        distTable = fixedDistTable;
-                        litTable = fixedLitTable;
-
-                        if (!distTable) {
-                            var bitLengths = [];
-                            for(var i = 32; i--;){
-                                bitLengths[bitLengths.length] = 5;
-                            }
-                            distTable = fixedDistTable =
-                                this.buildHuffTable(bitLengths);
-                        }
-
-                        if (!litTable) {
-                            var bitLengths = [];
-                            var i = 0;
-
-                            for(; i < 144; i++){
-                                bitLengths[bitLengths.length] = 8;
-                            }
-
-                            for(; i < 256; i++){
-                                bitLengths[bitLengths.length] = 9;
-                            }
-
-                            for(; i < 280; i++){
-                                bitLengths[bitLengths.length] = 7;
-                            }
-
-                            for(; i < 288; i++){
-                                bitLengths[bitLengths.length] = 8;
-                            }
-
-                            litTable = fixedLitTable =
-                                this.buildHuffTable(bitLengths);
-                        }
-                    } else {
-                        var numLitLengths = newBitio.readUB(5) + 257;
-                        var numDistLengths = newBitio.readUB(5) + 1;
-                        var numCodeLengths = newBitio.readUB(4) + 4;
-                        var codeLengths = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-                        for(var i = 0; i < numCodeLengths; i++){
-                            codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] = newBitio.readUB(3);
-                        }
-
-                        var codeTable = this.buildHuffTable(codeLengths);
-                        var litLengths = [];
-                        var prevCodeLen = 0;
-                        var maxLengths = numLitLengths + numDistLengths;
-                        while (litLengths.length < maxLengths) {
-                            var sym = this.decodeSymbol(newBitio, codeTable);
-                            switch (sym) {
-                                case 16:
-                                    var i = newBitio.readUB(2) + 3;
-                                    while (i--) {
-                                        litLengths[litLengths.length] = prevCodeLen;
-                                    }
-                                    break;
-                                case 17:
-                                    var i = newBitio.readUB(3) + 3;
-                                    while (i--) {
-                                        litLengths[litLengths.length] = 0;
-                                    }
-                                    break;
-                                case 18:
-                                    var i = newBitio.readUB(7) + 11;
-                                    while (i--) {
-                                        litLengths[litLengths.length] = 0;
-                                    }
-                                    break;
-                                default:
-                                    if(sym <= 15){
-                                        litLengths[litLengths.length] = sym;
-                                        prevCodeLen = sym;
-                                    }
-                                    break;
-                            }
-                        }
-                        distTable = this.buildHuffTable(
-                            litLengths.splice(numLitLengths, numDistLengths)
-                        );
-                        litTable = this.buildHuffTable(litLengths);
-                    }
-
-                    while (sym != 256) {
-                        var sym = this.decodeSymbol(newBitio, litTable);
-                        if (sym < 256) {
-                            buff[buff.length] = sym;
-                        } else if(sym > 256){
-                            var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
-                            var len = lengthMap[1] + newBitio.readUB(lengthMap[0]);
-                            var distMap = DEFLATE_DISTANCE_MAP[this.decodeSymbol(newBitio, distTable)];
-                            var dist = distMap[1] + newBitio.readUB(distMap[0]);
-                            var i = buff.length - dist;
-                            while (len--) {
-                                buff[buff.length] = buff[i++];
-                            }
-                        }
-                    }
-                } else {
-                    var len = newBitio.getUI16();
-                    var nlen = newBitio.getUI16();
-                    while (len--) {
-                        buff[buff.length] = newBitio.getUI8();
-                    }
-                }
-            }
-
-            return buff;
-        },
-
-        /**
-         * buildHuffTable
-         * @param bitLengths
-         * @returns {{}}
-         */
-        buildHuffTable: function(bitLengths)
-        {
-            var numLengths = bitLengths.length;
-            var blCount = [];
-            var maxBits = _max.apply(Math, bitLengths) + 1;
-            var nextCode = [];
-            var code = 0;
-            var table = {};
-            var i = numLengths;
-
-            while (i--) {
-                var len = bitLengths[i];
-                blCount[len] = (blCount[len] || 0) + (len > 0);
-            }
-
-            for (var i = 1; i < maxBits; i++) {
-                var len = i - 1;
-                if (blCount[len] == undefined) {
-                    blCount[len] = 0;
-                }
-
-                code = (code + blCount[len]) << 1;
-                nextCode[i] = code;
-            }
-
-            for (var i = 0; i < numLengths; i++) {
-                var len = bitLengths[i];
-                if (len) {
-                    table[nextCode[len]] = {
-                        length: len,
-                        symbol: i
-                    };
-                    nextCode[len]++;
-                }
-            }
-            return table;
-        },
-
-        /**
-         * decodeSymbol
-         * @param table
-         * @returns {*}
-         */
-        decodeSymbol: function(b, table)
-        {
-            var code = 0;
-            var len = 0;
-            while (true) {
-                code = (code << 1) | b.readUB(1);
-                len++;
-                var entry = table[code];
-                if (entry != undefined && entry.length == len) {
-                    return entry.symbol;
-                }
-            }
         }
     };
     var swftag = new SwfTag();
@@ -3508,10 +3443,10 @@
             var actionData = null;
             var origin = obj;
             var newBitio = new BitIO();
+            var condActionSize = _this.condActionSize;
 
             // BitIO
             var abitio = new BitIO();
-            abitio.setOffset(0, 0);
             abitio.setData(binary);
 
             // 開始
@@ -3545,7 +3480,6 @@
                         }
 
                         obj.setFrame(frame);
-                        //obj.isActionWait = true;
                         obj.actionStart();
 
                         break;
@@ -3553,11 +3487,13 @@
                     case 0x04:
                         obj.nextFrame();
                         obj.isActionWait = true;
+                        obj.actionStart();
                         break;
                     // PreviousFrame
                     case 0x05:
                         obj.previousFrame();
                         obj.isActionWait = true;
+                        obj.actionStart();
                         break;
                     // Play
                     case 0x06:
@@ -3569,8 +3505,7 @@
                         break;
                     // ToggleQuality
                     case 0x08:
-                        // TODO 未実装
-                        console.log('ToggleQuality');
+                        // JavaScriptなので使わない
                         break;
                     // StopSounds
                     case 0x09:
@@ -3578,17 +3513,18 @@
                         console.log('StopSounds');
                         break;
                     // WaitForFrame
-                    case 0x8A:
                         // TODO 未実装
                         console.log('WaitForFrame');
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
+
                         var frame = newBitio.getUI16();
                         var skipCount = newBitio.getUI8();
                         break;
                     case 0x8B: // SetTarget
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
+
                         var targetName = newBitio.getDataUntil("\0");
 
                         if (targetName != '') {
@@ -3897,24 +3833,18 @@
                     // 型変換 ***********************************
                     // AsciiToChar
                     case 0x33:
-                        // TODO 未実装
-                        console.log('AsciiToChar');
                         var value = stack.pop();
-                        stack[stack.length] = value;
+                        stack[stack.length] = _fromCharCode(value);
                         break;
                     // MBCharToAscii
                     case 0x36:
-                        // TODO 未実装
-                        console.log('MBCharToAscii');
-                        var value = stack.pop();
-                        stack[stack.length] = value;
+                        var value = stack.pop() + "";
+                        stack[stack.length] = value.charCodeAt(0);
                         break;
                     // MBAsciiToChar
                     case 0x37:
-                        // TODO 未実装
-                        console.log('MBAsciiToChar');
                         var value = stack.pop();
-                        stack[stack.length] = value;
+                        stack[stack.length] = _fromCharCode(value);;
                         break;
                     // ToInteger
                     case 0x18:
@@ -3923,10 +3853,8 @@
                         break;
                     // CharToAscii
                     case 0x32:
-                        // TODO 未実装
-                        console.log('CharToAscii');
-                        var value = stack.pop();
-                        stack[stack.length] = value;
+                        var value = stack.pop() + "";
+                        stack[stack.length] = value.charCodeAt(0);
                         break;
 
                     // フロー制御 ***********************************
@@ -3935,7 +3863,8 @@
                         var value = stack.pop() + '';
                         var splitData = value.split(':');
                         if (splitData.length > 1) {
-                            var aClass = _this.getAnimationClass(splitData[0], origin);
+                            var aClass =
+                                _this.getAnimationClass(splitData[0], origin);
                             if (aClass instanceof AnimationClass) {
                                 if (typeof splitData[1] == 'number') {
                                     var frame = splitData[1];
@@ -3990,7 +3919,8 @@
                         var splitData = name.split(':');
                         var value = '';
                         if (splitData.length > 1) {
-                            var aClass = _this.getAnimationClass(splitData[0], origin);
+                            var aClass =
+                                _this.getAnimationClass(splitData[0], origin);
                             if (aClass instanceof AnimationClass) {
                                 value = aClass.getVariable(splitData[1]);
                             }
@@ -4007,7 +3937,8 @@
                         var splitData = name.split(':');
 
                         if (splitData.length > 1) {
-                            var aClass = _this.getAnimationClass(splitData[0], origin);
+                            var aClass =
+                                _this.getAnimationClass(splitData[0], origin);
                             if (aClass instanceof AnimationClass) {
                                 aClass.setVariable(splitData[1], value);
                             }
@@ -4024,7 +3955,7 @@
                         newBitio.setOffset(0, 0);
 
                         var SendVarsMethod = newBitio.getUIBits(2);//0=NONE, 1=GET, 2=POST
-                        var Reserved = newBitio.getUIBits(4);// Always 0
+                        var Reserved = newBitio.getUIBits(4);
                         var LoadTargetFlag = newBitio.getUIBits(1);//0=web, 1=スプライト
                         var LoadVariablesFlag = newBitio.getUIBits(1);
 
@@ -4051,6 +3982,7 @@
                             );
                             func();
                         } else {
+                            // TODO
                             console.log('未実装 GetURL2');
                             var aClass = _this.getAnimationClass(target, origin);
                             console.log(target);
@@ -4087,7 +4019,7 @@
                                 value = targetObj._yscale;
                                 break;
                             case 4:
-                                value = targetObj._currentframe;
+                                value = targetObj.getFrame();
                                 break;
                             case 5:
                                 value = targetObj._totalframes;
@@ -4163,7 +4095,8 @@
                         if (typeof frame != 'number') {
                             var splitData = frame.split(':');
                             if (splitData.length > 1) {
-                                var aClass = _this.getAnimationClass(splitData[0], origin);
+                                var aClass =
+                                    _this.getAnimationClass(splitData[0], origin);
                                 if (aClass instanceof AnimationClass) {
                                     frame = aClass.getLabel(splitData[1]);
                                     aClass.setFrame(frame);
@@ -4186,8 +4119,21 @@
                                 }
                             }
                         } else {
+                            if (frame == obj.getFrame()) {
+                                break;
+                            }
+
+                            if (frame <= 0 || obj.frameCount < frame) {
+                                frame = 1;
+                            }
+
+                            if (obj.getFrame() > frame) {
+                                _resetObj(obj);
+                            }
+
                             obj.setFrame(frame);
-                            obj.isActionWait = true;
+                            obj.actionStart();
+
                             if (PlayFlag) {
                                 obj.play();
                             } else {
@@ -4234,7 +4180,7 @@
                                 targetObj._yscale = _parseFloat(value) / 100;
                                 break;
                             case 4:
-                                targetObj._currentframe = _parseFloat(value);
+                                targetObj.setFrame(_parseFloat(value));
                                 break;
                             case 5:
                                 targetObj._totalframes = _parseFloat(value);
@@ -4315,9 +4261,14 @@
                     case 0x8D:
                         // TODO 未実装
                         console.log('WaitForFrame2');
+                        var frame = stack.pop();
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
+
                         var skipCount = newBitio.getUI8();
+                        if (obj.getFrame() == frame) {
+
+                        }
 
                         break;
                     // CloneSprite
@@ -4439,11 +4390,16 @@
                 var len = splitData.length;
                 for (var i = 0; i < len; i++) {
                     var name = splitData[i];
-                    if (name == '' || name == '..') {
+                    if (name == '') {
                         continue;
                     }
 
-                    var obj = (i == 0 && name != '')
+                    if (name == '..') {
+                        aClass = origin;
+                        continue;
+                    }
+
+                    var obj = (i == 0)
                         ? origin
                         : aClass;
 
@@ -4487,6 +4443,7 @@
         this.playFlag = true;
         this.isButton = false;
         this.viewFlag = true;
+        this.isAction = true;
         this.isActionWait = false;
 
         // Property
@@ -4494,7 +4451,6 @@
         this._y = 0;
         this._xscale = null;
         this._yscale = null;
-        this._currentframe = 0;
         this._alpha = 1;
         this._visible = 1;
         this._width = null;
@@ -4535,7 +4491,9 @@
          */
         play: function()
         {
-            this.playFlag = true;
+            if (!this.playFlag) {
+                this.playFlag = true;
+            }
         },
 
         /**
@@ -4614,6 +4572,11 @@
                 frame = 1;
             }
 
+            _this.isAction = true;
+            if (_this.getFrame() == frame) {
+                _this.isAction = false;
+            }
+
             _this.setFrame(frame);
         },
 
@@ -4628,6 +4591,12 @@
             if (frame <= 0) {
                 frame = 1;
             }
+
+            _this.isAction = true;
+            if (_this.getFrame() == frame) {
+                _this.isAction = false;
+            }
+
             _this.setFrame(frame);
         },
 
@@ -4737,15 +4706,21 @@
                 }
 
                 // ColorTransform
-                if (!cTag.PlaceFlagHasColorTransform && obj.PlaceFlagHasColorTransform) {
+                if (!cTag.PlaceFlagHasColorTransform
+                    && obj.PlaceFlagHasColorTransform
+                ) {
                     cTag.ColorTransform = obj.ColorTransform;
-                    cTag.PlaceFlagHasColorTransform = obj.PlaceFlagHasColorTransform;
+                    cTag.PlaceFlagHasColorTransform =
+                        obj.PlaceFlagHasColorTransform;
                 }
 
                 // Mask
-                if (!cTag.PlaceFlagHasClipDepth && obj.PlaceFlagHasClipDepth) {
+                if (!cTag.PlaceFlagHasClipDepth
+                    && obj.PlaceFlagHasClipDepth
+                ) {
                     cTag.ClipDepth = obj.ClipDepth;
-                    cTag.PlaceFlagHasClipDepth = obj.PlaceFlagHasClipDepth;
+                    cTag.PlaceFlagHasClipDepth =
+                        obj.PlaceFlagHasClipDepth;
                 }
 
                 // Ratio
@@ -4787,16 +4762,26 @@
                 _this.Xmin = _min(_this.Xmin, cloneData.Xmin);
                 _this.Ymin = _min(_this.Ymin, cloneData.Ymin);
 
-                var addX = (cloneData.Xmin < 0) ? cloneData.Xmin * -1 : cloneData.Xmin;
-                var addY = (cloneData.Ymin < 0) ? cloneData.Ymin * -1 : cloneData.Ymin;
+                var addX = (cloneData.Xmin < 0)
+                    ? cloneData.Xmin * -1
+                    : cloneData.Xmin;
+                var addY = (cloneData.Ymin < 0)
+                    ? cloneData.Ymin * -1
+                    : cloneData.Ymin;
 
                 if (cloneData instanceof AnimationClass) {
                     addX += cloneData._x;
                     addY += cloneData._y;
                 }
 
-                _this.Xmax = _max(_this.Xmax, (cloneData.Xmin + cloneData.Xmax + addX));
-                _this.Ymax = _max(_this.Ymax, (cloneData.Ymin + cloneData.Ymax + addY));
+                _this.Xmax = _max(
+                    _this.Xmax,
+                    (cloneData.Xmin + cloneData.Xmax + addX)
+                );
+                _this.Ymax = _max(
+                    _this.Ymax,
+                    (cloneData.Ymin + cloneData.Ymax + addY)
+                );
                 _this._width = (_this.Xmax - _this.Xmin);
                 _this._height = (_this.Ymax - _this.Ymin);
             }
@@ -4823,7 +4808,8 @@
                 PlaceFlagHasMatrix: cTag.PlaceFlagHasMatrix,
                 Matrix: cTag.Matrix,
                 // ColorTransform
-                PlaceFlagHasColorTransform: cTag.PlaceFlagHasColorTransform,
+                PlaceFlagHasColorTransform:
+                    cTag.PlaceFlagHasColorTransform,
                 ColorTransform: cTag.ColorTransform,
                 // mask
                 PlaceFlagHasClipDepth: cTag.PlaceFlagHasClipDepth,
@@ -4856,11 +4842,13 @@
         action: function()
         {
             var _this = this;
+            if (!_this.isAction) {
+                return false;
+            }
+
             if (_this.isActionWait || _this.playFlag) {
                 _this.actionStart();
                 _this.isActionWait = false;
-            } else {
-                return false;
             }
         },
 
@@ -5149,10 +5137,14 @@
             var AlphaAddTerm = ct.AlphaAddTerm;
 
             if (HasAddTerms && HasMultiTerms) {
-                R = _max(0, _min(((R * RedMultiTerm) / 256) + RedAddTerm, 255));
-                G = _max(0, _min(((G * GreenMultiTerm) / 256) + GreenAddTerm, 255));
-                B = _max(0, _min(((B * BlueMultiTerm) / 256) + BlueAddTerm, 255));
-                A = _max(0, _min(((A * AlphaMultiTerm) / 256) + AlphaAddTerm, 255));
+                R = _max(0,
+                    _min(((R * RedMultiTerm) / 256) + RedAddTerm, 255));
+                G = _max(0,
+                    _min(((G * GreenMultiTerm) / 256) + GreenAddTerm, 255));
+                B = _max(0,
+                    _min(((B * BlueMultiTerm) / 256) + BlueAddTerm, 255));
+                A = _max(0,
+                    _min(((A * AlphaMultiTerm) / 256) + AlphaAddTerm, 255));
             } else if (HasAddTerms && !HasMultiTerms) {
                 R = _max(0, _min(R + RedAddTerm, 255));
                 G = _max(0, _min(G + GreenAddTerm, 255));
@@ -5487,18 +5479,13 @@
         swftag.parse();
 
         // reset
-        swftag = _void;
-        isLoad = true;
+        if (imgLoadCount == isImgLoadCompCount) {
+            isLoad = true;
+        }
 
-        // loading 削除
-        var div = _document.getElementById('loading');
-        var node = div.parentNode;
-        node.removeChild(div);
-
-        // css 削除
-        var div = _document.getElementById('swf2js');
-        var childNodes = div.childNodes;
-        div.removeChild(childNodes[0]);
+        if (isLoad) {
+            _deleteCss();
+        }
     }
 
     /**
@@ -5510,6 +5497,7 @@
         // 無圧縮か確認※無圧縮のみ対応
         var signature = bitio.getHeaderSignature();
         if (signature != 70) {
+            //bitio = bitio.deCompress();
             return false;
         }
 
@@ -5561,6 +5549,12 @@
             context.drawImage(canvas, 0, 0);
             _setBuffer();
         }
+
+        // loading 削除
+        if (!isLoad && imgLoadCount == isImgLoadCompCount) {
+            isLoad = true;
+            _deleteCss();
+        }
     }
 
     /**
@@ -5582,15 +5576,17 @@
             // render
             var frame = _layer.getFrame();
             var _frameTags = _layer.frameTags[frame];
-            var len = _frameTags.length;
-            for (var i = 1; i < len; i++) {
-                var tag = _frameTags[i];
-                if (tag == undefined) {
-                    continue;
+            if (_frameTags != undefined) {
+                var len = _frameTags.length;
+                for (var i = 1; i < len; i++) {
+                    var tag = _frameTags[i];
+                    if (tag == undefined) {
+                        continue;
+                    }
+                    _render(_layer, tag, [], []);
                 }
-                _render(_layer, tag, [], []);
+                _renderCanvas();
             }
-            _renderCanvas();
 
             // next animation
             _putFrame(_layer);
@@ -5629,7 +5625,9 @@
                                 var bTag = bClass.frameTags[1];
                                 if (bTag.ButtonStateDown) {
                                     var bData = bTag.CloneData;
-                                    if (!(bData instanceof AnimationClass) || !bool) {
+                                    if (!(bData instanceof AnimationClass)
+                                        || !bool
+                                    ) {
                                         continue;
                                     }
                                     _action(bData);
@@ -6853,6 +6851,7 @@
         }
 
         var inText = (text == undefined) ? obj.InitialText : text;
+        inText = inText + "";
         var splitData = inText.split('@LFCR');
         var len = splitData.length;
 
@@ -6867,6 +6866,288 @@
 
         return fArray;
     }
+    /**
+     * unzip
+     * @param compressed
+     * @param isDeCompress
+     * @returns {Array}
+     */
+    function unzip(compressed, isDeCompress)
+    {
+        var newBitio = new BitIO();
+        newBitio.setData(compressed);
+        newBitio.setOffset(2, 8);
+
+        var buff = [];
+        var DEFLATE_CODE_LENGTH_ORDER =
+            [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+        var DEFLATE_CODE_LENGTH_MAP = [
+            [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [1, 11], [1, 13], [1, 15], [1, 17],
+            [2, 19], [2, 23], [2, 27], [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83], [4, 99],
+            [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
+        ];
+        var DEFLATE_DISTANCE_MAP = [
+            [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13], [3, 17], [3, 25], [4, 33], [4, 49],
+            [5, 65], [5, 97], [6, 129], [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025], [9, 1537],
+            [10, 2049], [10, 3073], [11, 4097], [11, 6145], [12, 8193], [12, 12289], [13, 16385], [13, 24577]
+        ];
+
+        while (!done) {
+            var done = newBitio.readUB(1);
+            var type = newBitio.readUB(2);
+            var distTable = {};
+            var litTable = {};
+            var fixedDistTable = false;
+            var fixedLitTable = false;
+
+            if (type) {
+                if (type == 1) {
+                    distTable = fixedDistTable;
+                    litTable = fixedLitTable;
+
+                    if (!distTable) {
+                        var bitLengths = [];
+                        for(var i = 32; i--;){
+                            bitLengths[bitLengths.length] = 5;
+                        }
+                        distTable = fixedDistTable =
+                            _buildHuffTable(bitLengths);
+                    }
+
+                    if (!litTable) {
+                        var bitLengths = [];
+                        var i = 0;
+
+                        for(; i < 144; i++){
+                            bitLengths[bitLengths.length] = 8;
+                        }
+
+                        for(; i < 256; i++){
+                            bitLengths[bitLengths.length] = 9;
+                        }
+
+                        for(; i < 280; i++){
+                            bitLengths[bitLengths.length] = 7;
+                        }
+
+                        for(; i < 288; i++){
+                            bitLengths[bitLengths.length] = 8;
+                        }
+
+                        litTable = fixedLitTable =
+                            _buildHuffTable(bitLengths);
+                    }
+                } else {
+                    var numLitLengths = newBitio.readUB(5) + 257;
+                    var numDistLengths = newBitio.readUB(5) + 1;
+                    var numCodeLengths = newBitio.readUB(4) + 4;
+                    var codeLengths =
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    for(var i = 0; i < numCodeLengths; i++){
+                        codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] =
+                            newBitio.readUB(3);
+                    }
+
+                    var codeTable = _buildHuffTable(codeLengths);
+                    var litLengths = [];
+                    var prevCodeLen = 0;
+                    var maxLengths = numLitLengths + numDistLengths;
+                    while (litLengths.length < maxLengths) {
+                        var sym = _decodeSymbol(newBitio, codeTable);
+
+                        switch (sym) {
+                            case 16:
+                                var i = newBitio.readUB(2) + 3;
+                                while (i--) {
+                                    litLengths[litLengths.length] =
+                                        prevCodeLen;
+                                }
+                                break;
+                            case 17:
+                                var i = newBitio.readUB(3) + 3;
+                                while (i--) {
+                                    litLengths[litLengths.length] = 0;
+                                }
+                                break;
+                            case 18:
+                                var i = newBitio.readUB(7) + 11;
+                                while (i--) {
+                                    litLengths[litLengths.length] = 0;
+                                }
+                                break;
+                            default:
+                                if(sym <= 15){
+                                    litLengths[litLengths.length] = sym;
+                                    prevCodeLen = sym;
+                                }
+                                break;
+                        }
+                    }
+                    distTable = _buildHuffTable(
+                        litLengths.splice(numLitLengths, numDistLengths)
+                    );
+                    litTable = _buildHuffTable(litLengths);
+                }
+
+                while (sym != 256) {
+                    var sym = _decodeSymbol(newBitio, litTable);
+                    if (sym < 256) {
+                        buff[buff.length] = isDeCompress ? _fromCharCode(sym) : sym;
+                    } else if(sym > 256){
+                        var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
+                        var len = lengthMap[1]
+                            + newBitio.readUB(lengthMap[0]);
+                        var distMap =
+                            DEFLATE_DISTANCE_MAP[
+                                _decodeSymbol(newBitio, distTable)
+                            ];
+                        var dist = distMap[1]
+                            + newBitio.readUB(distMap[0]);
+                        var i = buff.length - dist;
+                        while (len--) {
+                            buff[buff.length] = buff[i++];
+                        }
+                    }
+                }
+            } else {
+                var len = newBitio.getUI16();
+                var nlen = newBitio.getUI16();
+                if (isDeCompress) {
+                    buff[buff.length] = newBitio.getData(len);
+                } else {
+                    while (len--) {
+                        buff[buff.length] = newBitio.getUI8();
+                    }
+                }
+            }
+        }
+
+        return (isDeCompress)
+            ? buff.join('')
+            : buff;
+    }
+
+    /**
+     * buildHuffTable
+     * @param bitLengths
+     * @returns {{}}
+     */
+    function buildHuffTable(bitLengths)
+    {
+        var numLengths = bitLengths.length;
+        var blCount = [];
+        var maxBits = _max.apply(Math, bitLengths) + 1;
+        var nextCode = [];
+        var code = 0;
+        var table = {};
+        var i = numLengths;
+
+        while (i--) {
+            var len = bitLengths[i];
+            blCount[len] = (blCount[len] || 0) + (len > 0);
+        }
+
+        for (var i = 1; i < maxBits; i++) {
+            var len = i - 1;
+            if (blCount[len] == undefined) {
+                blCount[len] = 0;
+            }
+
+            code = (code + blCount[len]) << 1;
+            nextCode[i] = code;
+        }
+
+        for (var i = 0; i < numLengths; i++) {
+            var len = bitLengths[i];
+            if (len) {
+                table[nextCode[len]] = {
+                    length: len,
+                    symbol: i
+                };
+                nextCode[len]++;
+            }
+        }
+        return table;
+    }
+
+    /**
+     * decodeSymbol
+     * @param b
+     * @param table
+     * @returns {*}
+     */
+    function decodeSymbol(b, table)
+    {
+        var code = 0;
+        var len = 0;
+        while (true) {
+            code = (code << 1) | b.readUB(1);
+            len++;
+            var entry = table[code];
+            if (entry != undefined && entry.length == len) {
+                return entry.symbol;
+            }
+        }
+    }
+
+    /**
+     * deleteCss
+     */
+    function deleteCss()
+    {
+        swftag = _void;
+
+        // loading 削除
+        var div = _document.getElementById('loading');
+        var node = div.parentNode;
+        node.removeChild(div);
+
+        // css 削除
+        var div = _document.getElementById('swf2js');
+        var childNodes = div.childNodes;
+        div.removeChild(childNodes[0]);
+    }
+
+    /**
+     * base64encode
+     * @param str
+     * @returns {string}
+     */
+    function base64encode(str)
+    {
+        var base64EncodeChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var out = [];
+        var i = 0;
+        var len = str.length;
+
+        while (i < len) {
+            var c1 = str.charCodeAt(i++) & 0xff;
+            if (i == len) {
+                out[out.length] = base64EncodeChars.charAt(c1 >> 2);
+                out[out.length] = base64EncodeChars.charAt((c1 & 0x3) << 4);
+                out[out.length] = '==';
+                break;
+            }
+
+            var c2 = str.charCodeAt(i++);
+            if (i == len) {
+                out[out.length] = base64EncodeChars.charAt(c1 >> 2);
+                out[out.length] = base64EncodeChars.charAt(((c1 & 0x3)<< 4) | ((c2 & 0xF0) >> 4));
+                out[out.length] = base64EncodeChars.charAt((c2 & 0xF) << 2);
+                out[out.length] = '=';
+                break;
+            }
+
+            var c3 = str.charCodeAt(i++);
+            out[out.length] = base64EncodeChars.charAt(c1 >> 2);
+            out[out.length] = base64EncodeChars.charAt(((c1 & 0x3)<< 4) | ((c2 & 0xF0) >> 4));
+            out[out.length] = base64EncodeChars.charAt(((c2 & 0xF) << 2) | ((c3 & 0xC0) >>6));
+            out[out.length] = base64EncodeChars.charAt(c3 & 0x3F);
+        }
+
+        return out.join('');
+    }
+
 
     /**
      * setStyle

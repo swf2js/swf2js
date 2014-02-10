@@ -27,20 +27,14 @@ html
 
 TODO
 -------
-DefineBits  
 cache  
 
 ActionScript  
-⇒EndDrag  
-⇒WaitForFrame2  
-⇒StartDrag  
-⇒CharToAscii  
-⇒MBAsciiToChar  
-⇒MBCharToAscii  
-⇒AsciiToChar  
-⇒WaitForFrame  
 ⇒StopSounds  
-⇒ToggleQuality  
+⇒StartDrag  
+⇒EndDrag  
+⇒WaitForFrame  
+⇒WaitForFrame2  
 
 
 MEMO
@@ -51,6 +45,16 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.6 ] Release Date: 09 Feb 2014  
+* [BUGFIX] ActionScript 'change the order of something'  
+* [BUGFIX] '_currentframe'  
+* [NEW] DefineBits  
+* [NEW] AsciiToChar  
+* [NEW] CharToAscii  
+* [NEW] MBAsciiToChar  
+* [NEW] MBCharToAscii  
+
+
 --[ swf2js 0.0.5 ] Release Date: 07 Feb 2014  
 * [BUGFIX] render '_alpha'  
 * [NEW] loading css  
