@@ -28,8 +28,9 @@ html
 TODO
 -------
 cache  
+Sound  
 
-ActionScript  
+ActionScript
 ⇒StopSounds  
 ⇒StartDrag  
 ⇒EndDrag  
@@ -45,6 +46,10 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.7 ] Release Date: 12 Feb 2014  
+* [BUGFIX] Button render  
+
+
 --[ swf2js 0.0.6 ] Release Date: 10 Feb 2014  
 * [BUGFIX] ActionScript 'change the order of something'  
 * [BUGFIX] '_currentframe'  
@@ -58,6 +63,7 @@ Release Notes
 --[ swf2js 0.0.5 ] Release Date: 07 Feb 2014  
 * [BUGFIX] render '_alpha'  
 * [NEW] loading css  
+
 
 --[ swf2js 0.0.4 ] Release Date: 06 Feb 2014  
 * [BUGFIX] ActionScript 'change the order of something'  

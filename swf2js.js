@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.6)
+ * swf2js (version 0.0.7)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -243,10 +243,14 @@
     {
         var screenWidth  = (setWidth > 0) ? setWidth : _window.innerWidth;
         var screenHeight = (setHeight > 0) ? setHeight : _window.innerHeight;
-        var canvasWidth  = player.Xmax;
-        var canvasHeight = player.Ymax;
-        var minSize = _min(screenWidth, screenHeight);
+        var _layer = player.layer;
+        if (!(_layer instanceof AnimationClass)) {
+            return false;
+        }
 
+        var canvasWidth  = _layer._width;
+        var canvasHeight = _layer._height;
+        var minSize = _min(screenWidth, screenHeight);
         // 条件に合わせてリサイズ
         if(canvasWidth > canvasHeight){
             scale = screenWidth / canvasWidth * devicePixelRatio;
@@ -258,8 +262,8 @@
             height = canvasHeight * scale;
         } else {
             scale = _min(
-                screenWidth / canvasWidth * devicePixelRatio,
-                screenHeight / canvasHeight * devicePixelRatio
+                (screenWidth / canvasWidth) * devicePixelRatio,
+                (screenHeight / canvasHeight) * devicePixelRatio
             );
             width  = canvasWidth * scale;
             height = canvasHeight * scale;
@@ -369,8 +373,13 @@
          */
         getHeaderSignature: function()
         {
-            this.byte_offset++;
-            return this.data.charCodeAt(0) & 0xff;
+            var _this = this;
+            var Signature = [];
+            for (var i = 3; i--;) {
+                Signature[Signature.length] =
+                    _fromCharCode(_this.getUI8());
+            }
+            return Signature.join('');
         },
 
         /**
@@ -379,8 +388,7 @@
          */
         getVersion: function()
         {
-            this.byte_offset += 3;
-            return this.data.charCodeAt(3) & 0xff;
+            return this.getUI8();
         },
 
         /**
@@ -837,15 +845,23 @@
             }
 
             // セット
-            player.layer = layer[0];
-            var _layer = player.layer;
-            _layer._width = player.Xmax - player.Xmin;
-            _layer._height = player.Ymax - player.Ymin;
+            var _layer = layer[0];
+            var Xmax = player.Xmax;
+            var Xmin = (player.Xmin > 0) ? player.Xmin : player.Xmin * -1;
+            var Ymax = player.Ymax;
+            var Ymin = (player.Ymin > 0) ? player.Ymin : player.Ymin * -1;
+            _layer._width = Xmax - Xmin;
+            _layer._height = Ymax - Ymin;
 
             delete _layer.Xmax;
             delete _layer.Xmin;
             delete _layer.Ymax;
             delete _layer.Ymin;
+
+            player.layer = _layer;
+
+            // Canvasの画面サイズを調整
+            _changeScreenSize();
 
             // buffer
             _setBuffer();
@@ -1449,10 +1465,10 @@
             // フレームをセット
             layer[characterId] = {
                 data: result.data,
-                Xmax: result.Xmax,
-                Xmin: result.Xmin,
-                Ymax: result.Ymax,
-                Ymin: result.Ymin
+                Xmax: shapeBounds.Xmax / 20,
+                Xmin: shapeBounds.Xmin / 20,
+                Ymax: shapeBounds.Ymax / 20,
+                Ymin: shapeBounds.Ymin / 20
             };
         },
 
@@ -2617,6 +2633,10 @@
 
                 // 読み完了カウントアップ
                 isImgLoadCompCount++;
+                if (imgLoadCount == isImgLoadCompCount) {
+                    isLoad = true;
+                    _deleteCss();
+                }
             }
             imgObj.src = "data:image/jpeg;base64,"
                 + _base64encode(JPEGData);
@@ -4255,7 +4275,18 @@
                         console.log('StartDrag');
                         var target = stack.pop();
                         var lockcenter = stack.pop();
+                        if (lockcenter) {
+
+                        }
+
                         var constrain = stack.pop();
+                        if (constrain) {
+                            var y2 = stack.pop();
+                            var x2 = stack.pop();
+                            var y1 = stack.pop();
+                            var x1 = stack.pop();
+                        }
+
                         break;
                     // WaitForFrame2
                     case 0x8D:
@@ -4786,11 +4817,6 @@
                 _this._height = (_this.Ymax - _this.Ymin);
             }
 
-            // 0 = player
-            if (_this.cid == 0) {
-                _this.Xmax = null;
-            }
-
             // キャッシュ判定
             if (_this.isCache
                 && cloneData instanceof AnimationClass
@@ -4953,7 +4979,7 @@
                     if (aTag == undefined) {
                         continue;
                     }
-                    _renderBtn(aClass, aTag, transform, btnTransform, x, y);
+                    _renderBtn(aData, aTag, transform, btnTransform, x, y);
                 }
             }
         } else {
@@ -4997,39 +5023,46 @@
             sy = dy;
         }
 
+        var sXmax = aData.Xmax * scale;
+        var sYmax = aData.Ymax * scale;
+        var sXmin = aData.Xmin * scale;
+        var sYmin = aData.Ymin * scale;
+
         // btnTransform
         var len = btnTransform.length;
         for (var i = 0; i < len; i++) {
             var transformObj = btnTransform[i];
-            dx = sx * transformObj.ScaleX
-                + sy * transformObj.RotateSkew1
+            dx = sXmax * transformObj.ScaleX
+                + sYmax * transformObj.RotateSkew1
                 + transformObj.TranslateX;
 
-            dy = sx * transformObj.RotateSkew0
-                + sy * transformObj.ScaleY
+            dy = sXmax * transformObj.RotateSkew0
+                + sYmax * transformObj.ScaleY
                 + transformObj.TranslateY;
 
-            sx = dx;
-            sy = dy;
+            sXmax = dx;
+            sYmax = dy;
+
+            dx = sXmin * transformObj.ScaleX
+                + sYmin * transformObj.RotateSkew1
+                + transformObj.TranslateX;
+
+            dy = sXmin * transformObj.RotateSkew0
+                + sYmin * transformObj.ScaleY
+                + transformObj.TranslateY;
+
+            sXmin = dx;
+            sYmin = dy;
         }
 
         dx = sx * scale;
         dy = sy * scale;
 
-        // 無色の四角
-        var Xmax = aData.Xmax * scale;
-        var Ymax = aData.Ymax * scale;
-        var Xmin = aData.Xmin * scale;
-        var Ymin = aData.Ymin * scale;
-
-        var addX = (Xmin < 0) ? Xmin * -1 : Xmin;
-        var addY = (Ymin < 0) ? Ymin * -1 : Ymin;
-
         return {
-            Xmin: (dx + Xmin),
-            Xmax: ((dx + Xmin) + Xmax + addX),
-            Ymin: (dy + Ymin),
-            Ymax: ((dy + Ymin) + Ymax + addY)
+            Xmin: (dx + sXmin),
+            Xmax: (dx + sXmax),
+            Ymin: (dy + sYmin),
+            Ymax: (dy + sYmax)
         };
     }
 
@@ -5496,7 +5529,7 @@
     {
         // 無圧縮か確認※無圧縮のみ対応
         var signature = bitio.getHeaderSignature();
-        if (signature != 70) {
+        if (signature != 'FWS') {
             //bitio = bitio.deCompress();
             return false;
         }
@@ -5519,14 +5552,11 @@
         player.fileLength = bitio.getUI32();
 
         // フレームサイズ
-        var NBits = bitio.getUIBits(5);
-        player.Xmin = bitio.getSIBits(NBits) / 20;
-        player.Xmax = bitio.getSIBits(NBits) / 20;
-        player.Ymin = bitio.getSIBits(NBits) / 20;
-        player.Ymax = bitio.getSIBits(NBits) / 20;
-
-        // Canvasの画面サイズを調整
-        _changeScreenSize();
+        var FrameSize = swftag.rect();
+        player.Xmin = FrameSize.Xmin / 20;
+        player.Xmax = FrameSize.Xmax / 20;
+        player.Ymin = FrameSize.Ymin / 20;
+        player.Ymax = FrameSize.Ymax / 20;
 
         // フレーム
         player.frameRate  = bitio.getUI16() / 0x100;
@@ -5544,16 +5574,12 @@
     {
         if (isLoad && player.playStartFlag) {
             _clearMain();
+
             // main
             var canvas = preContext.canvas;
             context.drawImage(canvas, 0, 0);
-            _setBuffer();
-        }
 
-        // loading 削除
-        if (!isLoad && imgLoadCount == isImgLoadCompCount) {
-            isLoad = true;
-            _deleteCss();
+            _setBuffer();
         }
     }
 
@@ -5601,6 +5627,7 @@
     {
         if (aClass instanceof AnimationClass) {
             aClass.action();
+
             var tags = aClass.frameTags[aClass.getFrame()];
             if (tags instanceof Array) {
                 var len = tags.length;
@@ -5802,7 +5829,7 @@
                             }
 
                             var ctx = _renderBtn(
-                                bClass, bTag, transform, [], 0, 0
+                                bClass, bTag, transform, [],0 ,0
                             );
 
                             if (ctx == undefined) {
@@ -5997,13 +6024,13 @@
         aClass.putFrame();
     }
 
-
     /**
      * main canvas clear
      */
     function clearMain()
     {
-        context.clearRect(0, 0, width, height);
+        var canvas = context.canvas;
+        canvas.width = canvas.width;
     }
 
     /*
@@ -6011,7 +6038,8 @@
      */
     function clearPre()
     {
-        preContext.clearRect(0, 0, width, height);
+        var canvas = preContext.canvas;
+        canvas.width = canvas.width;
     }
 
     /**
