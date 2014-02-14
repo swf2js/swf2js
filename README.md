@@ -1,8 +1,15 @@
 swf2js
 ======
-swfをJavaScriptでcanvasに出力。  
-※swf(flash lite1.1)をJavaScriptでバイナリ分解してcanvasで出力。  
+swfをJavaScriptでバイナリ分解してcanvasで出力。  
 output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
+  
+対応バージョン：Flash Lite 1.1以下  
+Supports Flash Lite 1.1 or lower.  
+
+
+Demonstration Site
+------
+http://ienaga.github.io/swf2js/  
 
 
 html
@@ -27,15 +34,13 @@ html
 
 TODO
 -------
-cache  
-Sound  
-
 ActionScript
 ⇒StopSounds  
 ⇒StartDrag  
 ⇒EndDrag  
-⇒WaitForFrame  
-⇒WaitForFrame2  
+
+Sound  
+cache  
 
 
 MEMO
