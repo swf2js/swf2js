@@ -34,7 +34,9 @@ html
 
 TODO
 -------
-ActionScript
+ActionScript  
+⇒WaitForFrame  
+⇒WaitForFrame2  
 ⇒StopSounds  
 ⇒StartDrag  
 ⇒EndDrag  
