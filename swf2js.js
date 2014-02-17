@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.7)
+ * swf2js (version 0.0.8)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -25,6 +25,8 @@
     var _isNaN = isNaN;
     var _xmlHttpRequest = new XMLHttpRequest();
     var _Image = Image;
+    var _setInterval = setInterval;
+    var _clearInterval = clearInterval
 
     // local function cache
     var _init = init;
@@ -40,6 +42,7 @@
     var _setBuffer = setBuffer;
     var _handleMessage = handleMessage;
     var _clearPre = clearPre;
+    var _clearCache = clearCache;
     var _setStyle = setStyle;
     var _action = action;
     var _putFrame = putFrame;
@@ -64,6 +67,9 @@
 
     // canvas
     var _renderCanvas = renderCanvas;
+    var _setCacheCanvasArray = setCacheCanvasArray;
+    var _getCacheCanvasArray = getCacheCanvasArray;
+    var _clearCacheCanvasArray = clearCacheCanvasArray;
     var _setCanvasArray = setCanvasArray;
     var _getCanvasArray = getCanvasArray;
     var _generateRGBA = generateRGBA;
@@ -97,9 +103,10 @@
     var intervalId = 0;
     var setWidth = 0;
     var setHeight = 0;
-    var baseCanvas, context, preContext;
+    var baseCanvas, context, preContext, cacheContext;
     var messageName = "zero-timeout-message";
     var canvasArray = [];
+    var cacheCanvasArray = [];
     var bitMapData = [];
     var layer = [];
     var btnLayer = [];
@@ -221,6 +228,10 @@
         var preCanvas = baseCanvas.cloneNode(false);
         preContext = preCanvas.getContext('2d');
 
+        // cache canvas
+        var cacheCanvas = baseCanvas.cloneNode(false);
+        cacheContext = cacheCanvas.getContext('2d');
+
         return true;
     }
 
@@ -293,6 +304,11 @@
         var preCanvas = preContext.canvas;
         _setStyle(preCanvas, 'width', width);
         _setStyle(preCanvas, 'height', height);
+
+        // cache
+        var cacheCanvas = cacheContext.canvas;
+        _setStyle(cacheCanvas, 'width', width);
+        _setStyle(cacheCanvas, 'height', height);
     }
 
     /**
@@ -313,8 +329,8 @@
         if (event.source == _window && event.data == messageName) {
             event.stopPropagation();
             if (timeouts) {
+                timeouts--;
                 if (isLoad) {
-                    timeouts--;
                     _buffer();
                 }
             }
@@ -716,6 +732,7 @@
             var cTags = [];
             var removeObj = [];
             var label = [];
+            var jpegTables = null;
 
             while(true){
                 var tagStartOffset = bitio.byte_offset;
@@ -819,10 +836,10 @@
                     case 6: // DefineBits
                     case 21: // DefineBitsJPEG2
                     case 35: // DefineBitsJPEG3
-                        _this.parseDefineBits(length);
+                        _this.parseDefineBits(length, jpegTables);
                         break;
                     case 8: // JPEGTables
-                        _this.parseJPEGTables(length);
+                        jpegTables = _this.parseJPEGTables(length);
                         break;
                     case 56: // ExportAssets
                         _this.parseExportAssets(length);
@@ -1459,12 +1476,10 @@
          */
         appendShapeTag: function(characterId, shapeBounds, shapes)
         {
-            var _this = this;
-            var result = _this.vectorToCanvas(shapes);
-
             // フレームをセット
+            var _this = this;
             layer[characterId] = {
-                data: result.data,
+                data: _this.vectorToCanvas(shapes),
                 Xmax: shapeBounds.Xmax / 20,
                 Xmin: shapeBounds.Xmin / 20,
                 Ymax: shapeBounds.Ymax / 20,
@@ -1504,11 +1519,6 @@
 
             var StartX = 0;
             var StartY = 0;
-
-            var Xmax = 0;
-            var Xmin = 0;
-            var Ymax = 0;
-            var Ymin = 0;
 
             // 重なり番号
             var stack = 0;
@@ -1710,11 +1720,6 @@
                     ControlX = record.ControlX / 20;
                     ControlY = record.ControlY / 20;
 
-                    Xmax = _max(Xmax, AnchorX);
-                    Xmin = _min(Xmin, AnchorX);
-                    Ymax = _max(Ymax, AnchorY);
-                    Ymin = _min(Ymin, AnchorY);
-
                     // 描画データ
                     var isCurved = record.isCurved;
 
@@ -1898,13 +1903,7 @@
                 }
             }
 
-            return {
-                data: canvasArray,
-                Xmax: Xmax,
-                Xmin: Xmin,
-                Ymax: Ymax,
-                Ymin: Ymin
-            };
+            return canvasArray;
         },
 
         /**
@@ -2034,11 +2033,12 @@
                                 var gradientLogic =
                                     _getGradientLogic(obj, undefined);
                                 var len = gradientLogic.length;
+
                                 for (var i = len; i--;) {
                                     objArray.unshift(gradientLogic[i]);
                                 }
+
                                 objArray = _setBeginPath(objArray, true);
-                                objArray = _setClosePath(objArray);
                                 objArray = _setSave(objArray);
                                 objArray = _setTransform(
                                     objArray,
@@ -2050,13 +2050,14 @@
                                     Matrix.TranslateY
                                 );
 
-                                objArray = _setFill(objArray);
                                 objArray = _setClosePath(objArray);
+                                objArray = _setFill(objArray);
                                 objArray = _setRestore(objArray);
                             } else if (obj.BitMapObj != null) {
                                 var bitMapObj = obj.BitMapObj;
                                 var Matrix = bitMapObj.bitmapMatrix;
                                 objArray = _setBeginPath(objArray);
+                                objArray = _setSave(objArray);
                                 objArray = _setTransform(
                                     objArray,
                                     (Matrix.ScaleX / 20),
@@ -2070,6 +2071,9 @@
                                     objArray,
                                     bitMapObj.bitmapId
                                 );
+                                objArray = _setRestore(objArray);
+
+                                obj.bitMapData = bitMapData[bitMapObj.bitmapId];
                             } else {
                                 var color =
                                     _generateRGBA(obj.ColorObj.Color);
@@ -2081,6 +2085,8 @@
                                 objArray = _setClosePath(objArray);
                                 objArray = _setFill(objArray);
                             }
+
+                            obj.fArray = objArray;
 
                             var len = results[s][obj.Depth].length;
                             results[s][obj.Depth][len] = obj;
@@ -2534,17 +2540,7 @@
             imageCanvas.width = width;
             imageCanvas.height = height;
             imageContext.putImageData(imgData, 0, 0);
-            bitMapData[cid] = imageContext.canvas;
-        },
-
-        /**
-         * parseJPEGTables
-         * @param length
-         */
-        parseJPEGTables: function(length)
-        {
-            var obj = {};
-            obj.JPEGData = bitio.getData(length);
+            bitMapData[cid] = imageContext;
         },
 
         /**
@@ -2568,10 +2564,21 @@
         },
 
         /**
+         * parseJPEGTables
+         * @param length
+         * @returns {string}
+         */
+        parseJPEGTables: function(length)
+        {
+            return  bitio.getData(length);
+        },
+
+        /**
          * parseDefineBits
          * @param length
+         * @param jpegTables
          */
-        parseDefineBits: function(length)
+        parseDefineBits: function(length, jpegTables)
         {
             var cid = bitio.getUI16();
             var ImageDataLen = length - 2;
@@ -2604,6 +2611,8 @@
 
             // clone
             var imageCanvas = baseCanvas.cloneNode(false);
+            imageCanvas.width = imgWidth;
+            imageCanvas.height = imgHeight;
             var imageContext = imageCanvas.getContext('2d');
 
             // render
@@ -2628,16 +2637,15 @@
                     }
                     imageContext.putImageData(imgData, 0, 0);
                 }
-
-                bitMapData[cid] = imageContext.canvas;
+                bitMapData[cid] = imageContext;
 
                 // 読み完了カウントアップ
                 isImgLoadCompCount++;
-                if (imgLoadCount == isImgLoadCompCount) {
-                    isLoad = true;
-                    _deleteCss();
-                }
             }
+
+            JPEGData = (jpegTables)
+                ? jpegTables.substr(0, jpegTables.length - 2) + JPEGData.substr(2)
+                : JPEGData;
             imgObj.src = "data:image/jpeg;base64,"
                 + _base64encode(JPEGData);
         },
@@ -2787,10 +2795,22 @@
             // AnimationClass
             var aClass = new AnimationClass();
             aClass.init(characterId, 1);
+
             aClass.Xmax = Bounds.Xmax / 20;
             aClass.Ymax = Bounds.Ymax / 20;
             aClass.Xmin = Bounds.Xmin / 20;
             aClass.Ymin = Bounds.Ymin / 20;
+
+            var Xmax = aClass.Xmax;
+            var Xmin = (aClass.Xmin > 0) ? aClass.Xmin : aClass.Xmin * -1;
+            var Ymax = aClass.Ymax;
+            var Ymin = (aClass.Ymin > 0) ? aClass.Ymin : aClass.Ymin * -1;
+            aClass._width = Xmax - Xmin;
+            aClass._height = Ymax - Ymin;
+
+            aClass._x = Matrix.TranslateX;
+            aClass._y = Matrix.TranslateY;
+
             aClass.frameTags[1] = [];
             var frameTags = aClass.frameTags[1];
 
@@ -2865,13 +2885,13 @@
                     var result = _this.vectorToCanvas(shapes);
                     var tag = {
                         CharacterId: characterId,
-                        Depth: 0,
+                        Depth: g,
                         CloneData: {
-                            data: result.data,
-                            Xmax: 0,
-                            Xmin: 0,
-                            Ymax: 0,
-                            Ymin: 0
+                            data: result,
+                            Xmax: Bounds.Xmax / 20,
+                            Xmin: Bounds.Ymax / 20,
+                            Ymax: Bounds.Xmin / 20,
+                            Ymin: Bounds.Ymin / 20
                         },
                         PlaceFlagHasMatrix: 1,
                         Matrix: mtx,
@@ -4818,9 +4838,11 @@
             }
 
             // キャッシュ判定
+            var actions = _this.actions;
             if (_this.isCache
                 && cloneData instanceof AnimationClass
                 && _this.cid > 0
+                && actions.length == 0
             ) {
                 _this.isCache = cloneData.isCache;
             }
@@ -5092,6 +5114,28 @@
                     var obj = array[a];
 
                     if (obj.BitMapObj != null) {
+                        var ctx = obj.bitMapData;
+                        var canvas = ctx.canvas;
+                        var w = canvas.width;
+                        var h = canvas.height;
+                        var imgData = ctx.getImageData(0, 0, w, h);
+                        var pxData = imgData.data;
+
+                        var colorObj = _generateColor(ct, {R: 0, G: 0, B: 0, A: 1});
+                        colorObj.A = _floor(colorObj.A * 255);
+
+                        var pxIdx = 0;
+                        for (var psCount = (w * h); psCount--;) {
+                            pxData[pxIdx] += colorObj.R;
+                            pxData[pxIdx + 1] += colorObj.G;
+                            pxData[pxIdx + 2] += colorObj.B;
+                            if (pxData[pxIdx + 3] > colorObj.A) {
+                                pxData[pxIdx + 3] = colorObj.A;
+                            }
+                            pxIdx += 4;
+                        }
+
+                        ctx.putImageData(imgData, 0, 0);
                         continue;
                     }
 
@@ -5267,22 +5311,30 @@
      */
     function drawVector(aData, transform, tag, aClass)
     {
-        var array = _getCanvasArray();
-
+        var isCache = aClass.isCache;
         if (!isClipDepth) {
-            array = _setSave(array);
+            _setSave(_getCanvasArray());
+            if (isCache) {
+                _setSave(_getCacheCanvasArray());
+            }
         }
 
         // transform
         var len = transform.length;
         _setSetTransform(_getCanvasArray(), scale, 0, 0, scale, 0, 0);
+        if (isCache) {
+            _setSetTransform(
+                _getCacheCanvasArray(), scale, 0, 0, scale, 0, 0
+            );
+        }
+
         for (var i = 0; i < len; i++) {
             var transformObj = transform[i];
             var type = transformObj.type;
             switch (type) {
                 case 0:
-                    array = _setTransform(
-                        array,
+                    _setTransform(
+                        _getCanvasArray(),
                         transformObj.ScaleX,
                         transformObj.RotateSkew0,
                         transformObj.RotateSkew1,
@@ -5290,16 +5342,39 @@
                         transformObj.TranslateX,
                         transformObj.TranslateY
                     );
+
+                    if (isCache) {
+                        _setTransform(
+                            _getCacheCanvasArray(),
+                            transformObj.ScaleX,
+                            transformObj.RotateSkew0,
+                            transformObj.RotateSkew1,
+                            transformObj.ScaleY,
+                            transformObj.TranslateX,
+                            transformObj.TranslateY
+                        );
+                    }
                     break;
                 case 1:
-                    array = _setRotate(array, transformObj.angle);
+                    _setRotate(_getCanvasArray(), transformObj.angle);
+                    if (isCache) {
+                        _setRotate(_getCacheCanvasArray(), transformObj.angle);
+                    }
                     break;
                 case 2:
-                    array = _setScale(
-                        array,
+                    _setScale(
+                        _getCanvasArray(),
                         transformObj.ScaleX,
                         transformObj.ScaleY
                     );
+
+                    if (isCache) {
+                        _setScale(
+                            _getCacheCanvasArray(),
+                            transformObj.ScaleX,
+                            transformObj.ScaleY
+                        );
+                    }
                     break;
             }
         }
@@ -5308,7 +5383,7 @@
         if (tag.PlaceFlagHasClipDepth) {
             isClipDepth = true;
             endDepth = tag.ClipDepth;
-            _mask(data);
+            _mask(data, aClass);
         } else {
             if (data.isText) {
                 var obj = data.obj;
@@ -5325,6 +5400,9 @@
                 var fLen = fArray.length;
                 for (var f = 0; f < fLen; f++) {
                     _setCanvasArray(fArray[f]);
+                    if (isCache) {
+                        _setCacheCanvasArray(fArray[f]);
+                    }
                 }
             } else {
                 _draw(data, aClass);
@@ -5332,18 +5410,27 @@
         }
 
         if (!isClipDepth) {
-            _setRestore(array);
+            _setRestore(_getCanvasArray());
+            if (isCache) {
+                _setRestore(_getCacheCanvasArray());
+            }
         }
     }
 
     /**
      * mask
      * @param data
+     * @param aClass
      */
-    function mask(data)
+    function mask(data, aClass)
     {
+        var isCache = aClass.isCache;
         var dLen = data.length;
         _setBeginPath(_getCanvasArray());
+        if (isCache) {
+            _setBeginPath(_getCacheCanvasArray());
+        }
+
         for (var i = 0; i < dLen; i++) {
             var stack = data[i];
             var sLen = stack.length;
@@ -5358,13 +5445,20 @@
                     var obj = array[a];
                     var fArray = obj.fArray;
                     var length = fArray.length - 2;
-                    for (var c = 7; c < length; c++) {
+                    for (var c = 6; c < length; c++) {
                         _setCanvasArray(fArray[c]);
+                        if (isCache) {
+                            _setCacheCanvasArray(fArray[c]);
+                        }
                     }
                 }
             }
         }
+
         _setClip(_getCanvasArray());
+        if (isCache) {
+            _setClip(_getCacheCanvasArray());
+        }
     }
 
     /**
@@ -5374,6 +5468,7 @@
      */
     function draw(data, aClass)
     {
+        var isCache = aClass.isCache;
         var dLen = data.length;
         for (var i = 0; i < dLen; i++) {
             var stack = data[i];
@@ -5391,6 +5486,9 @@
                     var length = fArray.length;
                     for (var c = 0; c < length; c++) {
                         _setCanvasArray(fArray[c]);
+                        if (isCache) {
+                            _setCacheCanvasArray(fArray[c]);
+                        }
                     }
                 }
             }
@@ -5467,10 +5565,10 @@
     _swf2js.clear = function()
     {
         player.playStartFlag = false;
+        isLoad = false;
         swftag = new SwfTag();
         bitio = new BitIO();
-        isLoad = false;
-        clearInterval(intervalId);
+        _clearInterval(intervalId);
     }
 
     /**
@@ -5480,7 +5578,7 @@
     _swf2js.reLoad = function(path)
     {
         this.clear();
-        this.load(path);
+        this.load(path, setWidth, setHeight);
         this.play();
     }
 
@@ -5519,6 +5617,9 @@
         if (isLoad) {
             _deleteCss();
         }
+
+        // 描画開始
+        intervalId = _setInterval(_onEnterFrame, player.fps);
     }
 
     /**
@@ -5562,9 +5663,6 @@
         player.frameRate  = bitio.getUI16() / 0x100;
         player.frameCount = bitio.getUI16();
         player.fps = _floor(1000 / player.frameRate);
-
-        // 描画開始
-        intervalId = setInterval(_onEnterFrame, player.fps);
     }
 
     /**
@@ -5580,6 +5678,12 @@
             context.drawImage(canvas, 0, 0);
 
             _setBuffer();
+        }
+
+        if (imgLoadCount == isImgLoadCompCount && !isLoad) {
+            isLoad = true;
+            _setBuffer();
+            _deleteCss();
         }
     }
 
@@ -5886,6 +5990,10 @@
                 }
             }
 
+            if (aData.cache != null) {
+                //_setDrawImage(_getCanvasArray(), aData.cache);
+            }
+
             // 指定フレーム
             var tags = aData.frameTags[aData.getFrame()];
             if (tags instanceof Array) {
@@ -5899,6 +6007,19 @@
                         _render(aData, aTag, transform, colorTransform);
                     }
                 }
+            }
+
+            if (aData.isCache) {
+//                _clearCache();
+//                _renderCanvas(true);
+//                var cloneCanvas = baseCanvas.cloneNode(false);
+//                cloneCanvas.width = width;
+//                cloneCanvas.height = height;
+//                var cloneContext = cloneCanvas.getContext('2d');
+//                cloneContext.drawImage(cacheContext.canvas, 0, 0);
+//                aData.cache = cloneContext.canvas;
+                aData.isCache = false;
+                _clearCacheCanvasArray();
             }
         } else {
             // ColorTransform
@@ -6039,6 +6160,15 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
+        canvas.width = canvas.width;
+    }
+
+    /*
+     * cache canvas clear
+     */
+    function clearCache()
+    {
+        var canvas = cacheContext.canvas;
         canvas.width = canvas.width;
     }
 
@@ -6424,6 +6554,31 @@
     }
 
     /**
+     * setCacheCanvasArray
+     * @param value
+     */
+    function setCacheCanvasArray(value)
+    {
+        cacheCanvasArray[cacheCanvasArray.length] = value;
+    }
+
+    /**
+     * getCacheCanvasArray
+     */
+    function getCacheCanvasArray()
+    {
+        return cacheCanvasArray;
+    }
+
+    /**
+     * clearCacheCanvasArray
+     */
+    function clearCacheCanvasArray()
+    {
+        cacheCanvasArray = [];
+    }
+
+    /**
      * setCanvasArray
      * @param value
      */
@@ -6443,139 +6598,143 @@
 
     /**
      * renderCanvas
+     * @param isCache
      */
-    function renderCanvas()
+    function renderCanvas(isCache)
     {
-        var len = canvasArray.length;
+        var array = (isCache) ? cacheCanvasArray : canvasArray;
+        var len = array.length;
         var i = 0;
-        var _preContext = preContext;
+        var _context = (isCache) ? cacheContext : preContext;
         var grad = null;
 
         while (len) {
-            var type = canvasArray[i++];
+            var type = array[i++];
             switch (type) {
                 case 'quadraticCurveTo':
-                    _preContext.quadraticCurveTo(
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++]
+                    _context.quadraticCurveTo(
+                        array[i++], array[i++],
+                        array[i++], array[i++]
                     );
                     break;
                 case 'lineTo':
-                    _preContext.lineTo(canvasArray[i++], canvasArray[i++]);
+                    _context.lineTo(array[i++], array[i++]);
                     break;
                 case 'moveTo':
-                    _preContext.moveTo(canvasArray[i++], canvasArray[i++]);
+                    _context.moveTo(array[i++], array[i++]);
                     break;
                 case 'save':
-                    _preContext.save();
+                    _context.save();
                     break;
                 case 'restore':
-                    _preContext.restore();
+                    _context.restore();
                     break;
                 case 'beginPath':
-                    _preContext.beginPath();
+                    _context.beginPath();
                     break;
                 case 'closePath':
-                    _preContext.closePath();
+                    _context.closePath();
                     break;
                 case 'fillStyle':
-                    _preContext.fillStyle = "rgba("
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +")";
+                    _context.fillStyle = "rgba("
+                        + array[i++] +", "
+                        + array[i++] +", "
+                        + array[i++] +", "
+                        + array[i++] +")";
                     break;
                 case 'fill':
-                    _preContext.fill();
+                    _context.fill();
                     break;
                 case 'strokeStyle':
-                    _preContext.strokeStyle = "rgba("
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +", "
-                        + canvasArray[i++] +")";
+                    _context.strokeStyle = "rgba("
+                        + array[i++] +", "
+                        + array[i++] +", "
+                        + array[i++] +", "
+                        + array[i++] +")";
                     break;
                 case 'lineWidth':
-                    _preContext.lineWidth = canvasArray[i++];
+                    _context.lineWidth = array[i++];
                     break;
                 case 'lineCap':
-                    _preContext.lineCap = 'round';
+                    _context.lineCap = 'round';
                     break;
                 case 'lineJoin':
-                    _preContext.lineJoin = 'round';
+                    _context.lineJoin = 'round';
                     break;
                 case 'stroke':
-                    _preContext.stroke();
+                    _context.stroke();
                     break;
                 case 'clip':
-                    _preContext.clip();
+                    _context.clip();
                     break;
                 case 'setTransform':
-                    _preContext.setTransform(
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++]
+                    _context.setTransform(
+                        array[i++], array[i++],
+                        array[i++], array[i++],
+                        array[i++], array[i++]
                     );
                     break;
                 case 'transform':
-                    _preContext.transform(
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++]
+                    _context.transform(
+                        array[i++], array[i++],
+                        array[i++], array[i++],
+                        array[i++], array[i++]
                     );
                     break;
                 case 'rotate':
-                    _preContext.rotate(canvasArray[i++]);
+                    _context.rotate(array[i++]);
                     break;
                 case 'drawImage':
-                    _preContext.drawImage(canvasArray[i++],0,0);
+                    _context.drawImage(array[i++],0,0);
                     break;
                 case 'scale':
-                    _preContext.scale(canvasArray[i++], canvasArray[i++]);
+                    _context.scale(array[i++], array[i++]);
                     break;
                 case 'createRadialGradient':
-                    grad = _preContext.createRadialGradient(
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++]
+                    grad = _context.createRadialGradient(
+                        array[i++], array[i++],
+                        array[i++], array[i++],
+                        array[i++], array[i++]
                     );
                     break;
                 case 'createLinearGradient':
-                    grad = _preContext.createLinearGradient(
-                        canvasArray[i++], canvasArray[i++],
-                        canvasArray[i++], canvasArray[i++]
+                    grad = _context.createLinearGradient(
+                        array[i++], array[i++],
+                        array[i++], array[i++]
                     );
                     break;
                 case 'addColorStop':
                     grad.addColorStop(
-                        canvasArray[i++], "rgba("
-                           + canvasArray[i++] +", "
-                           + canvasArray[i++] +", "
-                           + canvasArray[i++] +", "
-                           + canvasArray[i++] +")"
+                        array[i++], "rgba("
+                           + array[i++] +", "
+                           + array[i++] +", "
+                           + array[i++] +", "
+                           + array[i++] +")"
                     );
                     break;
                 case 'setFillGradient':
-                    _preContext.fillStyle = grad;
+                    _context.fillStyle = grad;
+                    grad = null;
                     break;
                 case 'setLineGradient':
-                    _preContext.strokeStyle = grad;
+                    _context.strokeStyle = grad;
+                    grad = null;
                     break;
                 case 'image':
-                    _preContext.drawImage(bitMapData[canvasArray[i++]],0,0);
+                    _context.drawImage(bitMapData[array[i++]].canvas,0,0);
                     break;
                 case 'font':
-                    _preContext.font =
-                        canvasArray[i++] +"px '"+ canvasArray[i++] +"'";
+                    _context.font =
+                        array[i++] +"px '"+ array[i++] +"'";
                     break;
                 case 'textAlign':
-                    _preContext.textAlign = canvasArray[i++];
+                    _context.textAlign = array[i++];
                     break;
                 case 'fillText':
-                    _preContext.fillText(
-                        canvasArray[i++],
-                        canvasArray[i++],
-                        canvasArray[i++]
+                    _context.fillText(
+                        array[i++],
+                        array[i++],
+                        array[i++]
                     );
                     break;
                 default:
@@ -6588,7 +6747,11 @@
         }
 
         // 初期化
-        canvasArray = [];
+        if (isCache) {
+            cacheCanvasArray = [];
+        } else {
+            canvasArray = [];
+        }
     }
 
     /**
@@ -6755,7 +6918,7 @@
             logic[logic.length] = average;
         } else if (type == 16) {
             logic[logic.length] = 'createLinearGradient';
-            logic[logic.length] = (average*-1);
+            logic[logic.length] = average * -1;
             logic[logic.length] = 0;
             logic[logic.length] = average;
             logic[logic.length] = 0;

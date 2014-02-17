@@ -53,6 +53,11 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.8 ] Release Date: 17 Feb 2014  
+* [BUGFIX] DefineBits ColorTransform  
+* [BUGFIX] DefineBits render  
+
+
 --[ swf2js 0.0.7 ] Release Date: 12 Feb 2014  
 * [BUGFIX] Button render  
 
