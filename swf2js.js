@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.9)
+ * swf2js (version 0.0.10)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -3540,20 +3540,23 @@
                         }
 
                         obj.setFrame(frame);
-                        obj.actionStart();
-
+                        var ActionScript = obj.actions[frame];
+                        if (ActionScript != undefined) {
+                            obj.isActionWait = true;
+                        }
                         break;
                     // NextFrame
                     case 0x04:
                         obj.nextFrame();
-                        //obj.isActionWait = true;
-                        obj.actionStart();
+                        var ActionScript = obj.actions[obj.getFrame()];
+                        if (ActionScript != undefined) {
+                            obj.isActionWait = true;
+                        }
                         break;
                     // PreviousFrame
                     case 0x05:
                         obj.previousFrame();
-                        //obj.isActionWait = true;
-                        obj.actionStart();
+                        obj.isActionWait = true;
                         break;
                     // Play
                     case 0x06:
@@ -3613,7 +3616,10 @@
                             _resetObj(obj);
                         }
                         obj.setFrame(frame);
-                        obj.isActionWait = true;
+                        var ActionScript = obj.actions[frame];
+                        if (ActionScript != undefined) {
+                            obj.isActionWait = true;
+                        }
 
                         break;
                     // GetUrl
@@ -4162,22 +4168,27 @@
                                 if (aClass instanceof AnimationClass) {
                                     frame = aClass.getLabel(splitData[1]);
                                     aClass.setFrame(frame);
-                                    aClass.isActionWait = true;
-
                                     if (PlayFlag) {
                                         aClass.play();
                                     } else {
                                         aClass.stop();
                                     }
+                                    var ActionScript = aClass.actions[frame];
+                                    if (ActionScript != undefined) {
+                                        aClass.isActionWait = true;
+                                    }
                                 }
                             } else {
                                 frame = obj.getLabel(splitData[0]);
                                 obj.setFrame(frame);
-                                obj.isActionWait = true;
                                 if (PlayFlag) {
                                     obj.play();
                                 } else {
                                     obj.stop();
+                                }
+                                var ActionScript = obj.actions[frame];
+                                if (ActionScript != undefined) {
+                                    obj.isActionWait = true;
                                 }
                             }
                         } else {
@@ -4194,12 +4205,15 @@
                             }
 
                             obj.setFrame(frame);
-                            obj.actionStart();
 
                             if (PlayFlag) {
                                 obj.play();
                             } else {
                                 obj.stop();
+                            }
+                            var ActionScript = obj.actions[frame];
+                            if (ActionScript != undefined) {
+                                obj.isActionWait = true;
                             }
                         }
 
@@ -4468,7 +4482,7 @@
                     }
 
                     if (name == '..') {
-                        aClass = origin;
+                        aClass = origin.parent;
                         continue;
                     }
 
@@ -4516,7 +4530,6 @@
         this.playFlag = true;
         this.isButton = false;
         this.viewFlag = true;
-        this.isAction = true;
         this.isActionWait = false;
         this.isClipDepth = false;
         this.endDepth = 0;
@@ -4595,7 +4608,6 @@
             var _this = this;
             if (!_this.viewFlag
                 || !_this.playFlag
-                || _this.isActionWait
             ) {
                 return;
             }
@@ -4647,11 +4659,6 @@
                 frame = 1;
             }
 
-            _this.isAction = true;
-            if (_this.getFrame() == frame) {
-                _this.isAction = false;
-            }
-
             _this.setFrame(frame);
         },
 
@@ -4666,12 +4673,6 @@
             if (frame <= 0) {
                 frame = 1;
             }
-
-            _this.isAction = true;
-            if (_this.getFrame() == frame) {
-                _this.isAction = false;
-            }
-
             _this.setFrame(frame);
         },
 
@@ -4691,15 +4692,6 @@
         setFrame: function(frame)
         {
             this.frame = frame;
-        },
-
-        /**
-         * isFrame
-         * @returns {*}
-         */
-        isFrame: function()
-        {
-            return this.isActionWait;
         },
 
         /**
@@ -4819,6 +4811,7 @@
                     cTag.Matrix.TranslateX = 0;
                     cTag.Matrix.TranslateY = 0;
                 }
+                cloneData.parent = _this;
             } else {
                 // clone data
                 var cloneData = obj.CloneData;
@@ -4914,13 +4907,9 @@
         action: function()
         {
             var _this = this;
-            if (!_this.isAction) {
-                return false;
-            }
-
-            if (_this.isActionWait || _this.playFlag) {
+            _this.isActionWait = false;
+            if (_this.playFlag) {
                 _this.actionStart();
-                _this.isActionWait = false;
             }
         },
 
@@ -6155,8 +6144,8 @@
      */
     function putFrame(aClass)
     {
-        if (aClass.isFrame()) {
-            return false;
+        if (aClass.isActionWait) {
+            aClass.actionStart();
         }
 
         var frame = aClass.getFrame();
@@ -6193,7 +6182,6 @@
                                     _putFrame(bData);
                                 } else {
                                     bData.setFrame(1);
-                                    bData.play();
                                 }
                             }
                         }

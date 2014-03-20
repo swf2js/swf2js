@@ -1,6 +1,6 @@
 swf2js
 ======
-swfをJavaScriptでバイナリ分解してcanvasで出力。  
+swfをJavaScriptでバイナリ分解してcanvasで出力(FlashをHTML5として変換)  
 output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
   
 対応バージョン：Flash Lite 1.1以下  
@@ -53,6 +53,10 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.10 ] Release Date: 21 Mar 2014  
+* [BUGFIX] ActionScript 'change the order of something'  
+
+
 --[ swf2js 0.0.9 ] Release Date: 05 Mar 2014  
 * [BUGFIX] parse - StateNewStyles  
 * [BUGFIX] render - mask  
