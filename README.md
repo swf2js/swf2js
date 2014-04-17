@@ -14,22 +14,12 @@ http://ienaga.github.io/swf2js/
 
 html
 ------
-    <!DOCTYPE html>  
-    <html lang="ja">  
-    <head>  
-    <meta charset="UTF-8"/>  
-    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />  
-    <title>swf2js</title>  
     <script type="text/javascript" src="swf2js.js"></script>  
-    </head>  
-    <body>  
     <div id="swf2js"></div>  
     <script type="text/javascript">  
         swf2js.load('SET SWF PATH', 'width(null = 100%)', 'height(null = 100%)');  
         swf2js.play();  
     </script>  
-    </body>  
-    </html>  
 
 
 TODO
@@ -57,6 +47,7 @@ Release Notes
 * [BUGFIX] DefineBits  
 * [BUGFIX] ActionScript 'CloneSprite'  
 * [BUGFIX] DefineEditText  
+* [UPDATE] Demonstration Site [SAMPLE SWF UPDATE] -> model.swf by http://msto.jp/
 
 
 --[ swf2js 0.0.10 ] Release Date: 21 Mar 2014  
