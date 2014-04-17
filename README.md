@@ -53,6 +53,12 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.11 ] Release Date: 18 Apr 2014  
+* [BUGFIX] DefineBits  
+* [BUGFIX] ActionScript 'CloneSprite'  
+* [BUGFIX] DefineEditText  
+
+
 --[ swf2js 0.0.10 ] Release Date: 21 Mar 2014  
 * [BUGFIX] ActionScript 'change the order of something'  
 

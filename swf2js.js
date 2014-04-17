@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.10)
+ * swf2js (version 0.0.11)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -174,19 +174,18 @@
         }
 
         // css loading
-        var loadingDiv = _document.createElement('div');
-        loadingDiv.id = 'loading';
         var css = '<style>';
-        css += '#loading {\n';
-        css += 'z-index: 9999;\n';
+        css += '#swf2js_loading {\n';
+        css += 'z-index: 999;\n';
         css += 'position: absolute;\n';
         css += 'top: '+ (48 - _floor((30/height) * 100)) +'%;\n';
         css += 'left: '+ (52 - _floor((30/width) * 100)) +'%;\n';
-        css += 'width: 30px;\n';
-        css += 'height: 30px;\n';
-        css += 'border-radius: 30px;\n';
+        css += 'width: 50px;\n';
+        css += 'height: 50px;\n';
+        css += 'border-radius: 50px;\n';
         css += 'border: 8px solid #dcdcdc;\n';
         css += 'border-right-color: transparent;\n';
+        css += 'box-sizing: border-box;\n';
         css += '-webkit-animation: spin 1s infinite linear;\n';
         css += '} \n';
 
@@ -196,8 +195,12 @@
         css += '100% { -webkit-transform: rotate(360deg); opacity: 0.4; }\n';
         css += '} \n';
 
+        
         css += '</style>';
         div.innerHTML = css;
+
+        var loadingDiv = _document.createElement('div');
+        loadingDiv.id = 'swf2js_loading';
         div.appendChild(loadingDiv);
 
         // main canvasをセット
@@ -2831,6 +2834,7 @@
             var defineFont = {};
             var textColor = {};
             var textHeight = 0;
+
             for (var i = 0; i < len; i++) {
                 var textRecord = TextRecords[i];
 
@@ -2888,8 +2892,8 @@
                         HasScale: Matrix.HasScale,
                         RotateSkew0: Matrix.RotateSkew0,
                         RotateSkew1: Matrix.RotateSkew1,
-                        ScaleX: textHeight / 50,
-                        ScaleY: textHeight / 50,
+                        ScaleX: textHeight / 51,
+                        ScaleY: textHeight / 51,
                         TranslateX: Matrix.TranslateX + gAdvance + XOffset,
                         TranslateY: Matrix.TranslateY + YOffset
                     };
@@ -3005,7 +3009,6 @@
 
         /**
          * parseDefineEditText
-         * @returns {{}}
          */
         parseDefineEditText: function()
         {
@@ -3067,6 +3070,7 @@
                 obj.InitialText = bitio.getDataUntil("\0");
             }
 
+            var Bound = obj.Bound;
             layer[obj.CharacterId] = {
                 data: {
                     isText: true,
@@ -3074,15 +3078,13 @@
                     FontName: font.FontName,
                     isGradient: false,
                     ColorObj: obj.TextColor,
-                    fArray: _generateText(obj, font.FontName, undefined)
+                    fArray: _generateText(obj, font.FontName, obj.InitialText)
                 },
-                Xmax: obj.Bound.Xmax / 20,
-                Xmin: obj.Bound.Xmin / 20,
-                Ymax: obj.Bound.Ymax / 20,
-                Ymin: obj.Bound.Ymin / 20
+                Xmax: Bound.Xmax / 20,
+                Xmin: Bound.Xmin / 20,
+                Ymax: Bound.Ymax / 20,
+                Ymin: Bound.Ymin / 20
             };
-
-            return obj;
         },
 
         /**
@@ -4370,7 +4372,6 @@
                         // 初期化
                         cloneClass._visible = 1;
                         cloneClass.frame = 1;
-                        cloneClass.Depth = depth;
 
                         // set
                         obj.nameMap[target] = cloneClass;
@@ -4389,12 +4390,24 @@
                                     continue;
                                 }
 
+                                if (cTag.CloneData.cid != aClass.cid) {
+                                    continue;
+                                }
+
+                                // clone
                                 var func = function () {};
                                 func.prototype = cTag;
                                 var tag = new func();
                                 tag.CloneData = cloneClass;
                                 tag.Depth = depth;
-                                tag.PlaceFlagHasColorTransform = 0;
+                                tag.CharacterId = cTag.CharacterId;
+                                tag.Matrix = cTag.Matrix;
+                                tag.ColorTransform = cTag.ColorTransform;
+                                tag.PlaceFlagHasClipDepth = cTag.PlaceFlagHasClipDepth;
+                                tag.PlaceFlagHasColorTransform = cTag.PlaceFlagHasColorTransform;
+                                tag.PlaceFlagHasMatrix = cTag.PlaceFlagHasMatrix;
+                                tag.PlaceFlagHasRatio = cTag.PlaceFlagHasRatio;
+                                tag.Ratio = cTag.Ratio;
                                 array[depth] = tag;
                             }
                         }
@@ -5687,8 +5700,8 @@
         // 無圧縮か確認※無圧縮のみ対応
         var signature = bitio.getHeaderSignature();
         if (signature != 'FWS') {
-            //bitio = bitio.deCompress();
             return false;
+            //bitio = bitio.deCompress();
         }
 
         // バージョン確認※バージョン4のみ対応
@@ -6776,11 +6789,9 @@
                     break;
                 case 'setFillGradient':
                     _context.fillStyle = grad;
-                    grad = null;
                     break;
                 case 'setLineGradient':
                     _context.strokeStyle = grad;
-                    grad = null;
                     break;
                 case 'image':
                     _context.drawImage(bitMapData[array[i++]].canvas,0,0);
@@ -7081,44 +7092,69 @@
      */
     function generateText(obj, FontName, text)
     {
-        var x = obj.RightMargin + obj.Indent - obj.Leading;
-        var y = obj.FontHeight - obj.Leading;
         var fArray = [];
-        var _preContext = preContext;
+        var bound = obj.Bound;
+        var tx = 0;
+        var ty = obj.FontHeight;
+
+        var fontType = '';
+        if (obj.HasFont) {
+            var fonData = FontData[obj.FontID];
+            if (obj.HasFontClass) {
+                ty = fonData.FontLeading / 20;
+            }
+
+            if (fonData.FontFlagsItalic) {
+                fontType += 'italic ';
+            }
+
+            if (fonData.FontFlagsBold) {
+                fontType += 'bold ';
+            }
+        }
+
+        if (obj.HasLayout) {
+            tx += obj.LeftMargin + obj.RightMargin + obj.Indent;
+            ty -= obj.Leading;
+        }
+
+        var Xmin = (bound.Xmin > 0) ? bound.Xmin : bound.Xmin * -1;
+        if (obj.Align == 1) {
+            fArray = _setTextAlign(fArray, 'end');
+            tx += (bound.Xmax + Xmin) / 20;
+        } else if (obj.Align == 2) {
+            fArray = _setTextAlign(fArray, 'center');
+            tx += ((bound.Xmax + Xmin) / 20) / 2;
+        }
+
+        fArray = _setTransform(
+            fArray,
+            1, 0, 0, 1, tx, ty
+        );
 
         fArray = _setBeginPath(fArray);
         var color = _generateRGBA(obj.TextColor);
         fArray = _setFillStyle(
             fArray, color.R, color.G, color.B, color.A
         );
-        fArray = _setFont(fArray, obj.FontHeight, FontName);
 
-        var bound = obj.Bound;
-        var Xmin = (bound.Xmin > 0) ? bound.Xmin : bound.Xmin * -1;
-        if (obj.Align == 1) {
-            fArray = _setTextAlign(fArray, 'end');
-            x += (bound.Xmax + Xmin) / 20;
-        } else if (obj.Align == 2) {
-            fArray = _setTextAlign(fArray, 'center');
-            x += ((bound.Xmax + Xmin) / 20) / 2;
-        }
+        fArray = _setFont(fArray, fontType +''+ obj.FontHeight, FontName);
 
         var inText = (text == undefined) ? obj.InitialText : text;
         inText = inText + "";
         var splitData = inText.split('@LFCR');
         var len = splitData.length;
-
-        var lineHeight = _preContext.measureText("あ").width * 2;
         for (var i = 0; i < len; i++) {
             fArray = _setFillText(
                 fArray, splitData[i],
-                x,
-                (y + (lineHeight + obj.Leading) * i)
+                0,
+                (ty * i)
             );
         }
 
         return fArray;
     }
+
     /**
      * unzip
      * @param compressed
@@ -7351,7 +7387,7 @@
         swftag = _void;
 
         // loading 削除
-        var div = _document.getElementById('loading');
+        var div = _document.getElementById('swf2js_loading');
         var node = div.parentNode;
         node.removeChild(div);
 
