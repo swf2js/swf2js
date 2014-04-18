@@ -18,7 +18,6 @@ html
     <div id="swf2js"></div>  
     <script type="text/javascript">  
         swf2js.load('SET SWF PATH', 'width(null = 100%)', 'height(null = 100%)');  
-        swf2js.play();  
     </script>  
 
 

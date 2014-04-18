@@ -5535,7 +5535,7 @@
      * @param width
      * @param height
      */
-    _swf2js.load = function(path, idName, width, height)
+    _swf2js.load = function(path, width, height)
     {
         if (_init()) {
             // TODO 消す
@@ -5687,6 +5687,7 @@
         }
 
         // 描画開始
+        _swf2js.play();
         intervalId = _setInterval(_onEnterFrame, player.fps);
     }
 
