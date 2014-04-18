@@ -60,6 +60,7 @@
     var _resetObj = resetObj;
     var _generateText = generateText;
     var _base64encode = base64encode;
+    var _parseJpegData = parseJpegData;
     var _unzip = unzip;
     var _buildHuffTable = buildHuffTable;
     var _decodeSymbol = decodeSymbol;
@@ -195,7 +196,7 @@
         css += '100% { -webkit-transform: rotate(360deg); opacity: 0.4; }\n';
         css += '} \n';
 
-        
+
         css += '</style>';
         div.innerHTML = css;
 
@@ -2607,19 +2608,21 @@
                     bitio.getData(length - 2 - ImageDataLen);
             }
 
+            var copyData = JPEGData;
+
             // 分解
-            for (var i = 0; JPEGData[i]; i++) {
-                var word = ((JPEGData.charCodeAt(i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+            for (var i = 0; copyData[i]; i++) {
+                var word = ((copyData.charCodeAt(i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
                 if (0xffd9 == word) {
-                    word = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                    word = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
                     if (word == 0xffd8) {
-                        JPEGData = JPEGData.substr(0, i - 4) + JPEGData.substr(i);
+                        copyData = copyData.substr(0, i - 4) + copyData.substr(i);
                         i -= 4;
                     }
                 } else if(0xffc0 == word) {
                     i += 3;
-                    var imgHeight = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
-                    var imgWidth = ((JPEGData.charCodeAt(++i) & 0xff) << 8) | (JPEGData.charCodeAt(++i) & 0xff);
+                    var imgHeight = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
+                    var imgWidth = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
                     break;
                 }
             }
@@ -2658,12 +2661,8 @@
                 isImgLoadCompCount++;
             }
 
-            JPEGData = (jpegTables != null)
-                ? jpegTables.substr(0, jpegTables.length - 2) + JPEGData.substr(2)
-                : JPEGData;
-            var base64 = "data:image/jpeg;base64,"
-                + _base64encode(JPEGData);
-            imgObj.src = base64;
+            imgObj.src = "data:image/jpeg;base64,"
+                + _base64encode(_parseJpegData(JPEGData, jpegTables));
         },
 
         /**
@@ -5536,7 +5535,7 @@
      * @param width
      * @param height
      */
-    _swf2js.load = function(path, width, height)
+    _swf2js.load = function(path, idName, width, height)
     {
         if (_init()) {
             // TODO 消す
@@ -7437,6 +7436,59 @@
         return out.join('');
     }
 
+    /**
+     * parseJpegData
+     * @param JPEGData
+     * @param jpegTables
+     * @returns {string}
+     */
+    function parseJpegData(JPEGData, jpegTables)
+    {
+        var newBitio = new BitIO();
+        newBitio.setData(JPEGData);
+
+        var marker;
+        var dqt = '';
+        var dht = '';
+        var len = 0;
+        while (marker = newBitio.getUI16BE()) {
+            switch (marker) {
+                case 0xFFD8: // SOI
+                case 0xFFD9: // EOI
+                    break;
+                default:
+                    len = newBitio.getUI16BE();
+                    newBitio.incrementOffset(len - 2, 0);
+                    break;
+                case 0xFFC0: // SOF0
+                case 0xFFC2: // SOF2
+                    len = newBitio.getUI16BE();
+                    newBitio.incrementOffset(-4, 0);
+                    var sof = newBitio.getData(len + 2);
+                    break;
+                case 0xFFDB: // DQT
+                    len = newBitio.getUI16BE();
+                    newBitio.incrementOffset(-4, 0);
+                    dqt += newBitio.getData(len + 2);
+                    break;
+                case 0xFFC4: // DHT
+                    len = newBitio.getUI16BE();
+                    newBitio.incrementOffset(-4, 0);
+                    dht += newBitio.getData(len + 2);
+                    break;
+                case 0xFFDA: // SOS
+                    newBitio.incrementOffset(-2, 0);
+                    var sos_eoi = newBitio.getDataUntil(null);
+                    break;
+            }
+        }
+
+        var dqt_dht = (typeof dqt === '')
+            ? jpegTables
+            : dqt + dht;
+
+        return "\xFF\xD8" + sof + dqt_dht + sos_eoi;
+    }
 
     /**
      * setStyle
