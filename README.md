@@ -42,6 +42,13 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.0.12 ] Release Date: 21 Apr 2014  
+* [BUGFIX] ActionScript 'play'  
+* [BUGFIX] ActionScript 'stop'  
+* [BUGFIX] ActionScript 'PlaceObject'  
+* [BUGFIX] ActionScript 'DefineBitsLossless'  
+
+
 --[ swf2js 0.0.11 ] Release Date: 18 Apr 2014  
 * [BUGFIX] DefineBits  
 * [BUGFIX] ActionScript 'CloneSprite'  

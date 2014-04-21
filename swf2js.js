@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.0.11)
+ * swf2js (version 0.0.12)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -818,7 +818,8 @@
                     case 33: // DefineText2
                         _parseDefineText();
                         break;
-                    case 26:// PlaceObject
+                    case 4:// PlaceObject
+                    case 26:// PlaceObject2
                         cTags[cTags.length] = _parsePlaceObject();
                         break;
                     case 37: // DefineEditText
@@ -2543,11 +2544,18 @@
                         idx++;
                         pxData[pxIdx++] = 255;
                     } else {
-                        var alpha = data[idx++];
+                        var alpha = (format == 3)
+                            ? data[idx+3]
+                            : data[idx++];
+
                         pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
                         pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
                         pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
                         pxData[pxIdx++] = alpha;
+
+                        if (format == 3) {
+                            idx++;
+                        }
                     }
                 }
                 cmIdx += pad;
@@ -3300,37 +3308,44 @@
             var _this = swftag;
             var obj = {};
             obj.tagType = tagType;
-            var placeFlag = bitio.getUI8();
-            obj.PlaceFlagHasClipActions    = (placeFlag >> 7) & 0x01
-            obj.PlaceFlagHasClipDepth      = (placeFlag >> 6) & 0x01
-            obj.PlaceFlagHasName           = (placeFlag >> 5) & 0x01
-            obj.PlaceFlagHasRatio          = (placeFlag >> 4) & 0x01
-            obj.PlaceFlagHasColorTransform = (placeFlag >> 3) & 0x01
-            obj.PlaceFlagHasMatrix         = (placeFlag >> 2) & 0x01
-            obj.PlaceFlagHasCharacter      = (placeFlag >> 1) & 0x01;
-            obj.PlaceFlagMove              =  placeFlag       & 0x01;
-            obj.Depth = bitio.getUI16();
-            if (obj.PlaceFlagHasCharacter) {
+            if (tagType == 4) {
                 obj.CharacterId = bitio.getUI16();
-            }
-            if (obj.PlaceFlagHasMatrix) {
+                obj.Depth = bitio.getUI16();
                 obj.Matrix = _this.matrix();
-            }
-            if (obj.PlaceFlagHasColorTransform) {
                 obj.ColorTransform = _this.colorTransform();
-            }
-            if (obj.PlaceFlagHasRatio) {
-                obj.Ratio = bitio.getUI16();
-            }
-            if (obj.PlaceFlagHasName) {
-                obj.Name = bitio.getDataUntil("\0");
-            }
-            if (obj.PlaceFlagHasClipDepth) {
-                obj.ClipDepth = bitio.getUI16();
-            }
-            // swf5以降なので未実装
-            if (obj.PlaceFlagHasClipActions) {
-                obj.ClipActions = 0;
+            } else {
+                var placeFlag = bitio.getUI8();
+                obj.PlaceFlagHasClipActions    = (placeFlag >> 7) & 0x01
+                obj.PlaceFlagHasClipDepth      = (placeFlag >> 6) & 0x01
+                obj.PlaceFlagHasName           = (placeFlag >> 5) & 0x01
+                obj.PlaceFlagHasRatio          = (placeFlag >> 4) & 0x01
+                obj.PlaceFlagHasColorTransform = (placeFlag >> 3) & 0x01
+                obj.PlaceFlagHasMatrix         = (placeFlag >> 2) & 0x01
+                obj.PlaceFlagHasCharacter      = (placeFlag >> 1) & 0x01;
+                obj.PlaceFlagMove              =  placeFlag       & 0x01;
+                obj.Depth = bitio.getUI16();
+                if (obj.PlaceFlagHasCharacter) {
+                    obj.CharacterId = bitio.getUI16();
+                }
+                if (obj.PlaceFlagHasMatrix) {
+                    obj.Matrix = _this.matrix();
+                }
+                if (obj.PlaceFlagHasColorTransform) {
+                    obj.ColorTransform = _this.colorTransform();
+                }
+                if (obj.PlaceFlagHasRatio) {
+                    obj.Ratio = bitio.getUI16();
+                }
+                if (obj.PlaceFlagHasName) {
+                    obj.Name = bitio.getDataUntil("\0");
+                }
+                if (obj.PlaceFlagHasClipDepth) {
+                    obj.ClipDepth = bitio.getUI16();
+                }
+                // swf5以降なので未実装
+                if (obj.PlaceFlagHasClipActions) {
+                    obj.ClipActions = 0;
+                }
             }
 
             return obj;
@@ -3493,6 +3508,7 @@
         /**
          * start
          * @param obj
+         * @param isBtn
          */
         start: function(obj)
         {
@@ -3505,6 +3521,8 @@
             var origin = obj;
             var newBitio = new BitIO();
             var condActionSize = _this.condActionSize;
+            var targets = [];
+            targets[0] = origin;
 
             // BitIO
             var abitio = new BitIO();
@@ -3590,15 +3608,18 @@
                         newBitio.setOffset(0, 0);
 
                         var targetName = newBitio.getDataUntil("\0");
-
                         if (targetName != '') {
                             obj = _this.getAnimationClass(targetName, origin);
                             if (obj == null) {
-                                obj = origin;
-                                break;
+                                obj = targets.pop();
+                            } else {
+                                targets[targets.length] = obj;
                             }
                         } else {
-                            obj = origin;
+                            targets.pop();
+                            obj = (targets.length > 0)
+                                ? targets[targets.length-1]
+                                : origin;
                         }
 
                         break;
@@ -4540,6 +4561,7 @@
 
         // 判定用
         this.playFlag = true;
+        this.stopFrame = 1;
         this.isButton = false;
         this.viewFlag = true;
         this.isActionWait = false;
@@ -4591,8 +4613,13 @@
          */
         play: function()
         {
-            if (!this.playFlag) {
-                this.playFlag = true;
+            var _this = this;
+            if (!_this.playFlag) {
+                _this.playFlag = true;
+
+                if (_this.stopFrame == _this.getFrame()) {
+                    _this.nextFrame();
+                }
             }
         },
 
@@ -4601,7 +4628,9 @@
          */
         stop: function()
         {
-            this.playFlag = false;
+            var _this = this;
+            _this.playFlag = false;
+            _this.stopFrame = _this.getFrame();
         },
 
         /**
@@ -4958,7 +4987,7 @@
         {
             var ActionScript = this.btnActions;
             if (ActionScript != undefined) {
-                ActionScript.start(obj);
+                ActionScript.start(obj, true);
             }
         },
 
@@ -5153,13 +5182,13 @@
 
                         var pxIdx = 0;
                         for (var psCount = (w * h); psCount--;) {
-                            pxData[pxIdx] += colorObj.R;
-                            pxData[pxIdx + 1] += colorObj.G;
-                            pxData[pxIdx + 2] += colorObj.B;
-                            if (pxData[pxIdx + 3] > colorObj.A) {
-                                pxData[pxIdx + 3] = colorObj.A;
+                            pxData[pxIdx++] += colorObj.R;
+                            pxData[pxIdx++] += colorObj.G;
+                            pxData[pxIdx++] += colorObj.B;
+                            if (pxData[pxIdx] > colorObj.A) {
+                                pxData[pxIdx] = colorObj.A;
                             }
-                            pxIdx += 4;
+                            pxIdx++;
                         }
 
                         ctx.putImageData(imgData, 0, 0);
@@ -5706,7 +5735,7 @@
 
         // バージョン確認※バージョン4のみ対応
         var version = bitio.getVersion();
-        if (version != 4) {
+        if (version > 4) {
             return false;
         }
 
