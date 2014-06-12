@@ -12,6 +12,13 @@ Demonstration Site
 http://ienaga.github.io/swf2js/  
 
 
+Game using swf2js
+------
+[覇者もん]  
+http://jp.apps.gree.net/ja/60428  
+
+
+
 html
 ------
     <script type="text/javascript" src="swf2js.js"></script>  
@@ -42,6 +49,12 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.1.0 ] Release Date: 12 Jun 2014  
+* [NEWS] (06/01) Game using swf2js [覇者もん] http://jp.apps.gree.net/ja/60428  
+* [BUGFIX] parse - DefineEditText  
+* [NEW] parse & render speed up  
+
+
 --[ swf2js 0.0.12 ] Release Date: 21 Apr 2014  
 * [BUGFIX] ActionScript 'play'  
 * [BUGFIX] ActionScript 'stop'  
