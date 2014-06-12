@@ -1,10 +1,10 @@
 swf2js
 ======
 swfをJavaScriptでバイナリ分解してcanvasで出力(FlashをHTML5として変換)  
-output in the canvas with swf(flash lite1.1) binary decomposition in JavaScript.  
-  
 対応バージョン：Flash Lite 1.1以下  
-Supports Flash Lite 1.1 or lower.  
+  
+output in the canvas with swf binary decomposition in JavaScript.  
+※Supports Flash Lite 1.1 or lower.  
 
 
 Demonstration Site
