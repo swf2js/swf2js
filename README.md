@@ -14,9 +14,11 @@ http://ienaga.github.io/swf2js/
 
 Game using swf2js
 ------
-[覇者もん]  
+[覇者もん for GREE]  
 http://jp.apps.gree.net/ja/60428  
 
+[覇者もん for Mobage]  
+http://www.mbga.jp/_game_intro?game_id=12017896  
 
 
 html
@@ -49,8 +51,12 @@ Please send the file of swf which does not operate. A bug is fixed.
 
 Release Notes  
 -------
+--[ swf2js 0.1.0 ] Release Date: 28 Jul 2014  
+* [NEWS] Game using swf2js [覇者もん for Mobage] http://www.mbga.jp/_game_intro?game_id=12017896  
+
+
 --[ swf2js 0.1.0 ] Release Date: 12 Jun 2014  
-* [NEWS] Game using swf2js [覇者もん] http://jp.apps.gree.net/ja/60428  
+* [NEWS] Game using swf2js [覇者もん for GREE] http://jp.apps.gree.net/ja/60428  
 * [BUGFIX] parse - DefineEditText  
 * [NEW] parse & render speed up  
 
