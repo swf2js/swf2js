@@ -1,10 +1,12 @@
-swf2js
+FlashをiPhoneで再生可能にする「swf2js」
 ======
-swfをJavaScriptでバイナリ分解してcanvasで出力(FlashをHTML5として変換)  
-対応バージョン：Flash Lite 1.1以下  
+
+swfをJavaScriptでバイナリ分解してcanvasで出力してiPhoneでswfを再生  
+対応バージョン：Flash Lite 1.1(swf4)以下  
   
 output in the canvas with swf binary decomposition in JavaScript.  
-※Supports Flash Lite 1.1 or lower.  
+play the swf on the iPhone.  
+※Supports Flash Lite 1.1(swf4) or lower.  
 
 
 Demonstration Site
@@ -30,27 +32,91 @@ html
     </script>  
 
 
-TODO
--------
-ActionScript  
-⇒WaitForFrame  
-⇒WaitForFrame2  
-⇒StopSounds  
-⇒StartDrag  
-⇒EndDrag  
-
-Sound  
-cache  
-
-
 MEMO
 -------
 動作しないswfのファイルを送って頂ければバグ改修にもなるので助かります。  
 Please send the file of swf which does not operate. A bug is fixed.  
 
 
+TODO
+-------
+▼ActionScript  
+SWF 4  
+SWF 5  
+SWF 6  
+SWF 7  
+SWF 8  
+SWF 9  
+SWF 10  
+
+
+▼TAG  
+FreeCharacter  
+DefineFontInfo  
+DefineSound  
+StartSound  
+StopSound  
+DefineButtonSound  
+SoundStreamHead  
+SoundStreamBlock  
+DefineButtonCxform  
+PathsArePostScript  
+SyncFrame  
+FreeAll  
+DefineVideo  
+ProductInfo  
+DefineTextFormat  
+DefineBehavior  
+SoundStreamHead2  
+FrameTag  
+GenCommand  
+DefineCommandObj  
+CharacterSet  
+FontRef  
+DefineFunction  
+PlaceFunction  
+GenTagObject  
+ImportAssets  
+EnableDebugger  
+DoInitAction  
+DefineVideoStream  
+VideoFrame  
+DefineFontInfo2  
+DebugID  
+ScriptLimits  
+SetTabIndex  
+DefineShape4_hmm  
+FileAttributes  
+PlaceObject3  
+ImportAssets2  
+DoABC  
+DefineFontAlignZones  
+CSMTextSettings  
+DefineFont3  
+SymbolClass  
+MetaData  
+DefineScalingGrid  
+DoABC2  
+DefineShape4  
+DefineSceneAndFrameLabelData  
+DefineBinaryData  
+StartSound2  
+DefineFont4  
+EnableTelemetry  
+
+
+▼UN ZIP TYPE
+ZLIB  
+LZMA  
+
+
 Release Notes  
 -------
+--[ swf2js 0.1.1 ] Release Date: 25 Aug 2014  
+* [BUGFIX] Tag 'PlaceObject'  
+* [BUGFIX] Tag 'parseDefineSprite'  
+
+
 --[ swf2js 0.1.0 ] Release Date: 28 Jul 2014  
 * [NEWS] Game using swf2js [覇者もん for Mobage] http://www.mbga.jp/_game_intro?game_id=12017896  
 
@@ -62,10 +128,10 @@ Release Notes
 
 
 --[ swf2js 0.0.12 ] Release Date: 21 Apr 2014  
-* [BUGFIX] ActionScript 'play'  
+* [BUGFIX] function 'play'  
 * [BUGFIX] ActionScript 'stop'  
-* [BUGFIX] ActionScript 'PlaceObject'  
-* [BUGFIX] ActionScript 'DefineBitsLossless'  
+* [BUGFIX] Tag 'PlaceObject'  
+* [BUGFIX] Tag 'DefineBitsLossless'  
 
 
 --[ swf2js 0.0.11 ] Release Date: 18 Apr 2014  
