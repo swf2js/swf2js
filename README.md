@@ -105,7 +105,7 @@ DefineFont4
 EnableTelemetry  
 
 
-▼UN ZIP TYPE
+▼UN ZIP TYPE  
 ZLIB  
 LZMA  
 
