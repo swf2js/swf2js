@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.1)
+ * swf2js (version 0.1.2)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -414,7 +414,7 @@
         {
             var _this = this;
             if (_this.bit_offset) {
-                _this.byte_offset += ((_this.bit_offset+7)/8) | 0;
+                _this.byte_offset += ((_this.bit_offset + 7) / 8) | 0;
                 _this.bit_offset = 0;
             }
         },
@@ -494,7 +494,7 @@
         {
             var _this = this;
             if (_this.bit_offset > 7) {
-                _this.byte_offset += ((_this.bit_offset+7)/8) | 0;
+                _this.byte_offset += ((_this.bit_offset + 7) / 8) | 0;
                 _this.bit_offset &= 0x07;
             } else {
                 while (_this.bit_offset < 0) {
@@ -730,12 +730,10 @@
 
             // parse tag
             var tags = _this.parseTags(dataLength, frameCount, 0);
-            console.log(tags);
 
             // build
             layer[0] = undefined;
             _this.build(tags);
-            console.log(layer[0]);
 
             // set
             var _layer = layer[0];
@@ -766,7 +764,7 @@
             _setBuffer();
 
             // reset
-            layer = [];
+            //layer = [];
         },
 
         /**
@@ -880,10 +878,10 @@
 
                 var tagLength = bitio.getUI16();
                 tagType = tagLength >> 6;
-                console.log('------------------------- ' + tagStartOffset);
-                var length = tagLength & 0x3f;
+                //console.log('------------------------- ' + tagStartOffset);
 
                 // long形式
+                var length = tagLength & 0x3f;
                 if (length == 0x3f) {
                     if (tagStartOffset + 6 > dataLength) {
                         bitio.byte_offset = tagStartOffset;
@@ -925,76 +923,6 @@
         },
 
         /**
-         * parseSpriteTags
-         * @param dataLength
-         * @param frameCount
-         * @param spriteID
-         * @returns {Array}
-         */
-        parseSpriteTags: function (dataLength, frameCount, spriteID)
-        {
-            var _this = swftag;
-            var _parseTag = _this.parseTag;
-            var _addTag = _this.addTag;
-            var _generateDefaultTagObj = _this.generateDefaultTagObj;
-            var frame = 1;
-            var tags = [];
-
-            // default set
-            tags[frame] = _generateDefaultTagObj(
-                frame,
-                frameCount,
-                spriteID
-            );
-
-            while (true) {
-                var tagStartOffset = bitio.byte_offset;
-                var tagLength = bitio.getUI16();
-                var tagType = tagLength >> 6;
-                var length = tagLength & 0x3f;
-
-                // long形式
-                if (length == 0x3f) {
-                    length = bitio.getUI32();
-                }
-
-                var tagDataStartOffset = bitio.byte_offset;
-                if (tagType == 1 && frame < frameCount) {
-                    frame++;
-                    tags[frame] = _generateDefaultTagObj(
-                        frame,
-                        frameCount,
-                        spriteID
-                    );
-                }
-
-                var tag = _parseTag(tagType, length);
-                var o = bitio.byte_offset - tagDataStartOffset;
-                var eat = 0;
-                if (o != length) {
-                    if (o < length) {
-                        eat = (length - o);
-                    }
-                }
-
-                //bitio.byte_offset = tagDataStartOffset +length;
-                if (eat > 0) {
-                    //bitio.byte_offset += (length - o);
-                }
-
-                if (tag != null) {
-                    tags = _addTag(tagType, tags, tag, frame);
-                }
-
-                //bitio.bit_offset = 0;
-                if (tagType == 0) {
-                    break;
-                }
-            }
-            return tags;
-        },
-
-        /**
          * parseTag
          * @param tagType
          * @param dataLength
@@ -1013,7 +941,11 @@
                 case 2:  // DefineShape
                 case 22: // DefineShape2
                 case 32: // DefineShape3
-                    _this.parseDefineShape(tagType);
+                    if (dataLength < 10) {
+                        bitio.byte_offset + dataLength;
+                    } else {
+                        _this.parseDefineShape(tagType);
+                    }
                     break;
                 case 9:  // BackgroundColor
                     setBackgroundColor();
@@ -1028,7 +960,7 @@
                     break;
                 case 4: // PlaceObject
                 case 26: // PlaceObject2
-                    obj = _this.parsePlaceObject(tagType);
+                    obj = _this.parsePlaceObject(tagType, dataLength);
                     break;
                 case 37: // DefineEditText
                     _this.parseDefineEditText();
@@ -1063,6 +995,7 @@
                 case 21: // DefineBitsJPEG2
                 case 35: // DefineBitsJPEG3
                     _this.parseDefineBits(tagType, dataLength, jpegTables);
+                    jpegTables = null;
                     break;
                 case 8: // JPEGTables
                     jpegTables = _this.parseJPEGTables(dataLength);
@@ -1071,12 +1004,12 @@
                     _this.parseExportAssets(dataLength);
                     break;
                 case 46: // DefineMorphShape
-                case 84: // DefineMorphShape3
+                case 84: // DefineMorphShape2
                     _this.parseDefineMorphShape(tagType);
                     break;
                 case 27: // 27 (invalid)
                 case 30: // 30 (invalid)
-                case 68: // 68 (invalid)[DefineMorphShape2 ???]
+                case 68: // 68 (invalid)
                 case 79: // 79 (invalid)
                 case 80: // 80 (invalid)
                 case 81: // 81 (invalid)
@@ -1368,6 +1301,7 @@
         shapeWithStyle: function(tagType)
         {
             var _this = this;
+
             if (tagType == 46 || tagType == 84) {
                 var fillStyles = null;
                 var lineStyles = null;
@@ -1383,7 +1317,6 @@
                 FillBits: NumFillBits,
                 LineBits: NumLineBits
             });
-            bitio.byteAlign();
 
             return {
                 fillStyles: fillStyles,
@@ -1472,6 +1405,7 @@
                 // スムーズでないクリッピングビットマップ塗り
                 case 0x43:
                     obj.bitmapId = bitio.getUI16();
+                    obj.cache = false;
                     if (tagType == 46) {
                         obj.startBitmapMatrix = _this.matrix();
                         obj.endBitmapMatrix = _this.matrix();
@@ -1726,9 +1660,12 @@
 
                 shapeRecords[shapeRecords.length] = shape;
                 if (!shape) {
+                    bitio.byteAlign();
                     break;
                 }
             }
+
+
             return shapeRecords;
         },
 
@@ -1863,7 +1800,6 @@
         {
             // フレームをセット
             var _this = this;
-            console.log('CHARACTER_ID >>>>> ' + characterId);
             layer[characterId] = {
                 data: _this.vectorToCanvas(shapes),
                 Xmax: shapeBounds.Xmax / 20,
@@ -2872,6 +2808,7 @@
          */
         parseDefineBitsLossLess: function(tagType, length)
         {
+            var startOffset = bitio.byte_offset;
             var cid = bitio.getUI16();
             var format = bitio.getUI8();
             var width = bitio.getUI16();
@@ -2884,7 +2821,8 @@
             }
 
             // unCompress
-            var compressed = bitio.getData(length);
+            var sub = bitio.byte_offset - startOffset;
+            var compressed = bitio.getData(length - sub);
             var data = _unzip(compressed, false);
 
             // canvas
@@ -2893,48 +2831,62 @@
             var imgData = imageContext.createImageData(width, height);
             var pxData = imgData.data;
 
-            // params
-            var bpp = (isAlpha) ? 4 : 3;
-            var pxIdx = 0;
-            var cmIdx = colorTableSize * bpp;
-            var pad = (colorTableSize)
-                ? ((width + 3) & ~3) - width
-                : 0;
-
-            for (var y = height; y--;) {
-                for (var x = width; x--;) {
-                    var idx = (colorTableSize)
-                        ? data[cmIdx++] * bpp
-                        : cmIdx++ * bpp;
-
-                    if(!isAlpha){
-                        pxData[pxIdx++] = data[idx++];
-                        pxData[pxIdx++] = data[idx++];
-                        pxData[pxIdx++] = data[idx++];
+            if (format == 5 && !isAlpha) {
+                var idx = 0;
+                var pxIdx = 0;
+                for (var y = height; y--;) {
+                    for (var x = width; x--;) {
                         idx++;
+                        pxData[pxIdx++] = data[idx++];
+                        pxData[pxIdx++] = data[idx++];
+                        pxData[pxIdx++] = data[idx++];
                         pxData[pxIdx++] = 255;
-                    } else {
-                        var alpha = (format == 3)
-                            ? data[idx+3]
-                            : data[idx++];
-
-                        pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
-                        pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
-                        pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
-                        pxData[pxIdx++] = alpha;
-
-                        if (format == 3) {
-                            idx++;
-                        }
                     }
                 }
-                cmIdx += pad;
+            } else {
+                var bpp = (isAlpha) ? 4 : 3;
+                var pxIdx = 0;
+                var cmIdx = colorTableSize * bpp;
+                var pad = (colorTableSize)
+                    ? ((width + 3) & ~3) - width
+                    : 0;
+
+                for (var y = height; y--;) {
+                    for (var x = width; x--;) {
+                        var idx = (colorTableSize)
+                            ? data[cmIdx++] * bpp
+                            : cmIdx++ * bpp;
+
+                        if(!isAlpha){
+                            pxData[pxIdx++] = data[idx++];
+                            pxData[pxIdx++] = data[idx++];
+                            pxData[pxIdx++] = data[idx++];
+                            idx++;
+                            pxData[pxIdx++] = 255;
+                        } else {
+                            var alpha = (format == 3)
+                                ? data[idx+3]
+                                : data[idx++];
+
+                            pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
+                            pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
+                            pxData[pxIdx++] = data[idx++] * 255 / alpha | 0;
+                            pxData[pxIdx++] = alpha;
+
+                            if (format == 3) {
+                                idx++;
+                            }
+                        }
+                    }
+                    cmIdx += pad;
+                }
             }
 
             imageCanvas.width = width;
             imageCanvas.height = height;
             imageContext.putImageData(imgData, 0, 0);
             bitMapData[cid] = imageContext;
+            layer[cid] = imageContext;
         },
 
         /**
@@ -2969,13 +2921,17 @@
 
         /**
          * parseDefineBits
+         * @param tagType
          * @param length
          * @param jpegTables
          */
         parseDefineBits: function(tagType, length, jpegTables)
         {
+            var startOffset = bitio.byte_offset;
             var cid = bitio.getUI16();
-            var ImageDataLen = length - 2;
+            var sub = bitio.byte_offset - startOffset;
+
+            var ImageDataLen = length - sub;
             if (tagType == 35) {
                 ImageDataLen = bitio.getUI32();
             }
@@ -2983,12 +2939,12 @@
             var JPEGData = bitio.getData(ImageDataLen);
             if (tagType == 35) {
                 var BitmapAlphaData =
-                    bitio.getData(length - 2 - ImageDataLen);
+                    bitio.getData(length - sub - ImageDataLen);
             }
-
-            var copyData = JPEGData;
+            bitio.byte_offset = startOffset + length;
 
             // 分解
+            var copyData = JPEGData;
             for (var i = 0; copyData[i]; i++) {
                 var word = ((copyData.charCodeAt(i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
                 if (0xffd9 == word) {
@@ -3034,6 +2990,7 @@
                     imageContext.putImageData(imgData, 0, 0);
                 }
                 bitMapData[cid] = imageContext;
+                layer[cid] = imageContext;
 
                 // 読み完了カウントアップ
                 isImgLoadCompCount++;
@@ -3481,8 +3438,12 @@
             obj.MorphFillStyles = _this.fillStyleArray(tagType);
             obj.MorphLineStyles = _this.lineStyleArray(tagType);
             obj.StartEdges = _this.shapeWithStyle(tagType);
-            obj.EndEdges = _this.shapeWithStyle(tagType);
-            bitio.byteAlign();
+            if (obj.Offset != 0) {
+                obj.EndEdges = _this.shapeWithStyle(tagType);
+            }
+
+            console.log(obj.CharacterId);
+            console.log(obj);
         },
 
         /**
@@ -3726,16 +3687,19 @@
          * @param tagType
          * @returns {{}}
          */
-        parsePlaceObject: function(tagType)
+        parsePlaceObject: function(tagType, length)
         {
             var _this = swftag;
             var obj = {};
             obj.tagType = tagType;
+
             if (tagType == 4) {
+                var startOffset = bitio.byte_offset;
                 obj.CharacterId = bitio.getUI16();
                 obj.Depth = bitio.getUI16();
                 obj.Matrix = _this.matrix();
                 obj.ColorTransform = _this.colorTransform();
+                bitio.byte_offset = startOffset + length;
             } else {
                 var placeFlag = bitio.getUI8();
                 if (version != 4) {
@@ -3774,9 +3738,6 @@
                     obj.ClipActions = 0;
                 }
             }
-            bitio.byteAlign();
-
-            console.log(obj);
 
             return obj;
         },
@@ -3818,12 +3779,15 @@
             var _this = swftag;
             var SpriteID = bitio.getUI16();
             var FrameCount = bitio.getUI16();
-            var tags = _this.parseSpriteTags(dataLength, FrameCount, SpriteID);
+
+            var tags = _this.parseTags(dataLength, FrameCount, SpriteID);
 
             // AnimationClass
-            var aClass = new AnimationClass();
-            aClass.init(SpriteID, FrameCount);
-            layer[SpriteID] = aClass;
+            if (layer[SpriteID] == undefined) {
+                var aClass = new AnimationClass();
+                aClass.init(SpriteID, FrameCount);
+                layer[SpriteID] = aClass;
+            }
 
             return tags;
         },
@@ -4406,9 +4370,9 @@
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
-                        var SendVarsMethod = newBitio.getUIBits(2);//0=NONE, 1=GET, 2=POST
+                        var SendVarsMethod = newBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
                         var Reserved = newBitio.getUIBits(4);
-                        var LoadTargetFlag = newBitio.getUIBits(1);//0=web, 1=スプライト
+                        var LoadTargetFlag = newBitio.getUIBits(1);// 0=web, 1=スプライト
                         var LoadVariablesFlag = newBitio.getUIBits(1);
 
                         var target = stack.pop();
@@ -4428,10 +4392,34 @@
                                 } else {
                                     url = urlString;
                                 }
-                                func = new Function(
-                                    "location.href = '"+ url +"';"
-                                );
-                                func();
+
+                                if (SendVarsMethod == 2) {
+                                    // form
+                                    var form = _document.createElement('form');
+                                    form.action = url;
+                                    form.method = 'post';
+                                    _document.body.appendChild(form);
+
+                                    var urls = urlString.split('?');
+                                    if (urls.length > 1) {
+                                        var params = urls[1].split('=');
+                                        for(var key in params) {
+                                            var input = _document.createElement('input');
+                                            input.type = 'hidden';
+                                            input.name = key;
+                                            input.value = encodeURI(params[key]||'');
+                                        }
+                                        form.appendChild(input);
+                                    }
+
+                                    form.submit();
+                                } else {
+                                    func = new Function(
+                                        "location.href = '"+ url +"';"
+                                    );
+                                    func();
+                                }
+
                             } else {
                                 // TODO
                                 console.log('未実装 GetURL2');
@@ -5553,30 +5541,38 @@
                     var obj = array[a];
 
                     if (obj.BitMapObj != null) {
+                        var colorObj = _generateColor(
+                            ct, {R: 255, G: 255, B: 255, A: 1});
+
                         var bitMapObj = obj.BitMapObj;
                         var cid = bitMapObj.bitmapId;
-                        var ctx = bitMapData[cid];
-                        var canvas = ctx.canvas;
-                        var w = canvas.width;
-                        var h = canvas.height;
-                        var imgData = ctx.getImageData(0, 0, w, h);
-                        var pxData = imgData.data;
 
-                        var colorObj = _generateColor(ct, {R: 0, G: 0, B: 0, A: 1});
-                        colorObj.A = _floor(colorObj.A * 255);
+                        var bitMapCtx = layer[cid];
+                        var bitMapCanvas = bitMapCtx.canvas;
+                        var w = bitMapCanvas.width;
+                        var h = bitMapCanvas.height;
 
-                        var pxIdx = 0;
-                        for (var psCount = (w * h); psCount--;) {
-                            pxData[pxIdx++] += colorObj.R;
-                            pxData[pxIdx++] += colorObj.G;
-                            pxData[pxIdx++] += colorObj.B;
-                            if (pxData[pxIdx] > colorObj.A) {
-                                pxData[pxIdx] = colorObj.A;
-                            }
-                            pxIdx++;
+                        if (colorObj.R != 255
+                            || colorObj.G != 255
+                            || colorObj.B != 255
+                        ) {
+                            bitMapCtx.globalCompositeOperation = "lighter";
+                            bitMapCtx.fillStyle = "rgb("
+                                + colorObj.R + ", "
+                                + colorObj.G + ", "
+                                + colorObj.B + ")";
+                            bitMapCtx.fillRect(0, 0, w, h);
                         }
 
-                        ctx.putImageData(imgData, 0, 0);
+                        var imageCanvas = baseCanvas.cloneNode(false);
+                        var ctx = imageCanvas.getContext('2d');
+                        ctx.canvas.width = w;
+                        ctx.canvas.height = h;
+                        ctx.globalAlpha = colorObj.A;
+                        ctx.drawImage(bitMapCanvas, 0, 0);
+
+                        bitMapData[cid] = ctx;
+
                         continue;
                     }
 
@@ -7208,7 +7204,8 @@
                     _context.strokeStyle = grad;
                     break;
                 case 'image':
-                    _context.drawImage(bitMapData[array[i++]].canvas,0,0);
+                    var image = bitMapData[array[i++]].canvas;
+                    _context.drawImage(image,0,0);
                     break;
                 case 'font':
                     _context.font =
