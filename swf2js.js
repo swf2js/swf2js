@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.3)
+ * swf2js (version 0.1.4)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -66,6 +66,7 @@
     var _decodeSymbol = decodeSymbol;
     var _deleteCss = deleteCss;
     var _getTextByte = getTextByte;
+    var _isFontInstalled = isFontInstalled;
 
     // canvas
     var _renderCanvas = renderCanvas;
@@ -3031,10 +3032,18 @@
                     var startOffset = bitio.byte_offset;
                     obj.FontName =
                         _decodeToShiftJis(bitio.getData(obj.FontNameLen));
-                    bitio.incrementOffset(1 , 0);
+
                     var fontFirst = obj.FontName.substr(0, 1);
                     if (fontFirst == '_') {
                         obj.FontName = 'sans-serif';
+                    } else if (isTouch && !_isFontInstalled(obj.FontName)) {
+                        if (obj.FontFlagsBold) {
+                            obj.FontName = 'Futura-CondensedExtraBold';
+                        } else  if (obj.FontFlagsItalic) {
+                            obj.FontName = 'Futura-MediumItalic';
+                        } else {
+                            obj.FontName = 'Futura-Medium';
+                        }
                     }
                     bitio.byte_offset = startOffset + obj.FontNameLen;
                 }
@@ -3174,12 +3183,16 @@
             var defineFont = {};
             var textColor = {};
             var textHeight = 0;
+            var YOffset = 0;
+            var XOffset = 0;
+            var gAdvance = 0;
 
             for (var i = 0; i < len; i++) {
                 var textRecord = TextRecords[i];
 
                 // font master
                 if (textRecord.FontId != undefined) {
+                    gAdvance = 0;
                     defineFont = FontData[textRecord.FontId];
                 }
 
@@ -3196,21 +3209,19 @@
                 var glyphEntries = textRecord.GlyphEntries;
                 var count = textRecord.GlyphCount;
                 var shapes = {};
-                var gAdvance = 0;
-                var XOffset = 0;
-                var YOffset = 0;
+
+                if (textRecord.StyleFlagsHasXOffset) {
+                    XOffset = textRecord.XOffset;
+                    gAdvance = XOffset;
+                }
+
+                if (textRecord.StyleFlagsHasYOffset) {
+                    YOffset = textRecord.YOffset;
+                }
 
                 for (var g = 0; g < count; g++) {
                     var glyphEntry = glyphEntries[g];
                     var idx = glyphEntry.GlyphIndex;
-
-                    if (textRecord.StyleFlagsHasXOffset) {
-                        XOffset = textRecord.XOffset;
-                    }
-
-                    if (textRecord.StyleFlagsHasYOffset) {
-                        YOffset = textRecord.YOffset;
-                    }
 
                     shapes.ShapeRecords = defineFont.GlyphShapeTable[idx];
                     shapes.lineStyles = {
@@ -7522,8 +7533,8 @@
         fArray = _setSave(fArray);
         fArray = _setBeginPath(fArray);
         fArray = _setMoveTo(fArray, Xmin, Ymin);
-        fArray = _setLineTo(fArray, Xmin, Ymax - obj.Leading);
-        fArray = _setLineTo(fArray, Xmax, Ymax - obj.Leading);
+        fArray = _setLineTo(fArray, Xmin, Ymax);
+        fArray = _setLineTo(fArray, Xmax, Ymax);
         fArray = _setLineTo(fArray, Xmax, Ymin);
         fArray = _setClosePath(fArray);
         fArray = _setClip(fArray);
@@ -7585,7 +7596,8 @@
         for (var i = 0; i < len; i++) {
             var txt = splitData[i];
             if (wordWrap && multiLine) {
-                var areaWidth = Xmax - Xmin;
+                var mobaileMargin = (isTouch) ? 20 : 0;
+                var areaWidth = Xmax - Xmin - mobaileMargin;
                 var textByte = _getTextByte(txt) / 2;
                 var txtTotalWidth = fontHeight * textByte;
                 if (txtTotalWidth > areaWidth) {
@@ -8003,6 +8015,37 @@
             : dqt + dht;
 
         return "\xFF\xD8" + sof + dqt_dht + sos_eoi;
+    }
+
+    /**
+     * isFontInstalled
+     * @param fontName
+     * @returns {boolean}
+     */
+    function isFontInstalled(fontName)
+    {
+        var div = _document.getElementById('swf2js');
+
+        // 初期値
+        var node = _document.createElement('span');
+        div.appendChild(node);
+
+        node.innerHTML = 'あ';
+        var defaultWidth = node.offsetWidth;
+        var defaultHeight = node.offsetHeight;
+        div.removeChild(node);
+
+        // font セット
+        node = _document.createElement('span');
+        div.appendChild(node);
+
+        node.innerHTML = 'あ';
+        node.style.fontFamily = "'" + fontName + "'";
+        var fontWidth = node.offsetWidth;
+        var fontHeight = node.offsetHeight;
+        div.removeChild(node);
+
+        return (defaultWidth != fontWidth || defaultHeight != fontHeight);
     }
 
     /**
