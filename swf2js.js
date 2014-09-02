@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.2)
+ * swf2js (version 0.1.3)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -65,6 +65,7 @@
     var _buildHuffTable = buildHuffTable;
     var _decodeSymbol = decodeSymbol;
     var _deleteCss = deleteCss;
+    var _getTextByte = getTextByte;
 
     // canvas
     var _renderCanvas = renderCanvas;
@@ -480,11 +481,13 @@
                         array[array.length] = '%' + code.toString(16);
                     }
                 }
+                ret = _decodeToShiftJis(array.join(''));
+                if (ret.substr(-5) == '@LFCR') {
+                    ret.slice(0, -5);
+                }
             }
 
-            return (value == null)
-                ? ret
-                : _decodeToShiftJis(array.join(''));
+            return ret;
         },
 
         /**
@@ -3025,13 +3028,15 @@
 
                 obj.FontNameLen = bitio.getUI8();
                 if (obj.FontNameLen) {
+                    var startOffset = bitio.byte_offset;
                     obj.FontName =
-                        _decodeToShiftJis(bitio.getData(obj.FontNameLen-1));
+                        _decodeToShiftJis(bitio.getData(obj.FontNameLen));
                     bitio.incrementOffset(1 , 0);
                     var fontFirst = obj.FontName.substr(0, 1);
                     if (fontFirst == '_') {
                         obj.FontName = 'sans-serif';
                     }
+                    bitio.byte_offset = startOffset + obj.FontNameLen;
                 }
 
                 var numGlyphs = bitio.getUI16();
@@ -7208,8 +7213,9 @@
                     _context.drawImage(image,0,0);
                     break;
                 case 'font':
+                    _context.textBaseline = 'top';
                     _context.font =
-                        array[i++] +"pt '"+ array[i++] +"'";
+                        array[i++] +"px '"+ array[i++] +"'";
                     break;
                 case 'textAlign':
                     _context.textAlign = array[i++];
@@ -7505,18 +7511,27 @@
     {
         var fArray = [];
         var bound = obj.Bound;
-        var tx = 0;
-        var ty = obj.FontHeight;
+        var fontHeight = obj.FontHeight;
 
-        var Xmax = bound.Xmax;
+        var Xmin = (bound.Xmin / 20) + obj.LeftMargin;
+        var Xmax = (bound.Xmax / 20) - obj.RightMargin;
+        var Ymin = bound.Ymin / 20;
+        var Ymax = bound.Ymax / 20;
 
+        // セット
+        fArray = _setSave(fArray);
+        fArray = _setBeginPath(fArray);
+        fArray = _setMoveTo(fArray, Xmin, Ymin);
+        fArray = _setLineTo(fArray, Xmin, Ymax - obj.Leading);
+        fArray = _setLineTo(fArray, Xmax, Ymax - obj.Leading);
+        fArray = _setLineTo(fArray, Xmax, Ymin);
+        fArray = _setClosePath(fArray);
+        fArray = _setClip(fArray);
+
+        // FONT
         var fontType = '';
         if (obj.HasFont) {
             var fonData = FontData[obj.FontID];
-            if (obj.HasFontClass) {
-                ty = fonData.FontLeading / 20;
-            }
-
             if (fonData.FontFlagsItalic) {
                 fontType += 'italic ';
             }
@@ -7526,81 +7541,132 @@
             }
         }
 
-        if (obj.HasLayout) {
-            tx += obj.LeftMargin + obj.RightMargin + obj.Indent;
-            ty -= obj.Leading;
-        }
-
-        var Xmin = (bound.Xmin > 0) ? bound.Xmin : bound.Xmin * -1;
+        // 座標
+        var dx = 0;
+        var dy = 0;
         if (obj.Align == 1) {
             fArray = _setTextAlign(fArray, 'end');
-            tx += (Xmax + Xmin) / 20;
+            dx = Xmax - 4;
+            dy = Ymin + 2;
         } else if (obj.Align == 2) {
             fArray = _setTextAlign(fArray, 'center');
-            tx += ((Xmax + Xmin) / 20) / 2;
+            dx = (Xmin + Xmax) / 2 + 2;
+            dy = Ymin + 2;
+        } else {
+            dx = Xmin + 2;
+            dy = Ymin + 2;
         }
 
-        fArray = _setTransform(
-            fArray,
-            1, 0, 0, 1, tx, ty
-        );
-
-        fArray = _setBeginPath(fArray);
+        // 文字色
         var color = _generateRGBA(obj.TextColor);
         fArray = _setFillStyle(
             fArray, color.R, color.G, color.B, color.A
         );
 
-        fArray = _setFont(fArray, fontType +''+ (ty - 1.2), FontName);
+        // 文字情報
+        fArray = _setFont(
+            fArray,
+            fontType +''+ fontHeight,
+            FontName
+        );
 
-        var inText = (text == undefined) ? obj.InitialText : text;
+        var inText = (text == undefined)
+            ? obj.InitialText
+            : text;
+
         inText = inText + "";
         var splitData = inText.split('@LFCR');
-
         var len = splitData.length;
-        var areaWidth = ((Xmax - Xmin) / 20 * scale);
-        var isMultiline = obj.Multiline;
-        var fontWidth = ((ty + 2.4) * scale);
+        var wordWrap = obj.WordWrap;
+        var newLineHeight = fontHeight + obj.Leading;
+        var multiLine = obj.Multiline;
+
+        // 複数行
         for (var i = 0; i < len; i++) {
             var txt = splitData[i];
-            var txtLength = txt.length;
-            var txtTotalWidth = fontWidth * txtLength;
-            if (txtTotalWidth > areaWidth && isMultiline) {
-                var count = (areaWidth / fontWidth);
-                var txtArray = [];
-                var joinTxt = '';
-                var joinCount = 0;
-                for (var t = 0; t < txtLength; t++) {
-                    joinCount++;
-                    joinTxt += txt[t];
-                    if (joinCount > count) {
-                        txtArray[txtArray.length] = joinTxt;
-                        joinCount = 0;
-                        joinTxt = '';
+            if (wordWrap && multiLine) {
+                var areaWidth = Xmax - Xmin;
+                var textByte = _getTextByte(txt) / 2;
+                var txtTotalWidth = fontHeight * textByte;
+                if (txtTotalWidth > areaWidth) {
+                    var txtLength = txt.length;
+                    var count = (areaWidth / fontHeight);
+                    var txtArray = [];
+                    var joinTxt = '';
+                    var joinCount = 0;
+                    for (var t = 0; t < txtLength; t++) {
+                        joinCount += _getTextByte(txt[t]) / 2;
+                        joinTxt += txt[t];
+                        if (joinCount > count) {
+                            txtArray[txtArray.length] = joinTxt;
+                            joinCount = 0;
+                            joinTxt = '';
+                        }
                     }
-                }
 
-                txtArray[txtArray.length] = joinTxt;
-                var tLen = txtArray.length;
-                for (t = 0; t < tLen; t++) {
+                    txtArray[txtArray.length] = joinTxt;
+                    var tLen = txtArray.length;
+                    for (t = 0; t < tLen; t++) {
+                        fArray = _setFillText(
+                            fArray,
+                            txtArray[t],
+                            dx,
+                            dy
+                        );
+                        dy += newLineHeight;
+                    }
+                } else {
                     fArray = _setFillText(
                         fArray,
-                        txtArray[t],
-                        0,
-                        ((ty / 1.2) * i) + ((ty + 2.4) * t)
+                        txt,
+                        dx,
+                        dy
                     );
                 }
             } else {
+                if (obj.HasMaxLength) {
+                    if (txt.length > obj.MaxLength) {
+                        txt = txt.substr(0, obj.MaxLength);
+                    }
+                }
+
                 fArray = _setFillText(
                     fArray,
-                    splitData[i],
-                    0,
-                    ((ty / 1.2) * i)
+                    txt,
+                    dx,
+                    dy
                 );
+            }
+
+            dy += newLineHeight;
+        }
+        fArray = _setRestore(fArray);
+
+        return fArray;
+    }
+
+    /**
+     * getTextByte
+     * @param str
+     * @returns {number}
+     */
+    function getTextByte(str)
+    {
+        var byte = 0;
+        for (var i = str.length; i--;) {
+            var c = str.charCodeAt(i);
+            if ((c >= 0x0 && c < 0x81)
+                || (c == 0xf8f0)
+                || (c >= 0xff61 && c < 0xffa0)
+                || (c >= 0xf8f1 && c < 0xf8f4)
+            ) {
+                byte += 1;
+            } else {
+                byte += 2;
             }
         }
 
-        return fArray;
+        return byte;
     }
 
     /**
