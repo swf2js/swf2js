@@ -114,6 +114,7 @@ Release Notes
 --[ swf2js 0.1.3 ] Release Date: 02 Sep 2014  
 * [BUGFIX] Tag 'DefineEditText'  
 * [BUGFIX] Tag 'DefineText'  
+* [NEW] ActionScript 'fscommand2'  
 
 
 --[ swf2js 0.1.2 ] Release Date: 28 Aug 2014  

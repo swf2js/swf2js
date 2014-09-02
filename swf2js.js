@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.4)
+ * swf2js (version 0.1.3)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -27,6 +27,7 @@
     var _Image = Image;
     var _setInterval = setInterval;
     var _clearInterval = clearInterval;
+    var _Date = Date;
 
     // local function cache
     var _init = init;
@@ -124,7 +125,7 @@
     var touchId = 0;
     var touchClass = {};
     var currentPosition = {x:0, y:0};
-    var startDate = new Date();
+    var startDate = new _Date();
     var isTouch = false;
     var touchFlag = false;
     var isBtnAction = false;
@@ -3030,20 +3031,33 @@
                 obj.FontNameLen = bitio.getUI8();
                 if (obj.FontNameLen) {
                     var startOffset = bitio.byte_offset;
-                    obj.FontName =
+                    var fontName =
                         _decodeToShiftJis(bitio.getData(obj.FontNameLen));
+                    var switchName = fontName.substr(0, fontName.length - 1);
 
-                    var fontFirst = obj.FontName.substr(0, 1);
-                    if (fontFirst == '_') {
-                        obj.FontName = 'sans-serif';
-                    } else if (isTouch && !_isFontInstalled(obj.FontName)) {
-                        if (obj.FontFlagsBold) {
-                            obj.FontName = 'Futura-CondensedExtraBold';
-                        } else  if (obj.FontFlagsItalic) {
-                            obj.FontName = 'Futura-MediumItalic';
-                        } else {
-                            obj.FontName = 'Futura-Medium';
-                        }
+                    switch (switchName) {
+                        case '_sans':
+                            obj.FontName = 'Arial, Helvetica, sans-serif';
+                            break;
+                        case '_serif':
+                            obj.FontName = 'Times, serif';
+                            break;
+                        case '_typewriter':
+                            obj.FontName = 'monospace';
+                            break;
+                        default:
+                            if (isTouch && !_isFontInstalled(fontName)) {
+                                if (obj.FontFlagsBold) {
+                                    obj.FontName = 'Futura-CondensedExtraBold';
+                                } else  if (obj.FontFlagsItalic) {
+                                    obj.FontName = 'Futura-MediumItalic';
+                                } else {
+                                    obj.FontName = 'Futura-Medium';
+                                }
+                            } else {
+                                obj.FontName = fontName;
+                            }
+                            break;
                     }
                     bitio.byte_offset = startOffset + obj.FontNameLen;
                 }
@@ -3212,7 +3226,7 @@
 
                 if (textRecord.StyleFlagsHasXOffset) {
                     XOffset = textRecord.XOffset;
-                    gAdvance = XOffset;
+                    gAdvance = 0;
                 }
 
                 if (textRecord.StyleFlagsHasYOffset) {
@@ -3250,12 +3264,11 @@
                     };
 
                     // tag
-                    var result = _this.vectorToCanvas(shapes);
                     var tag = {
                         CharacterId: characterId,
                         Depth: g,
                         CloneData: {
-                            data: result,
+                            data: _this.vectorToCanvas(shapes),
                             Xmax: Bounds.Xmax / 20,
                             Xmin: Bounds.Ymax / 20,
                             Ymax: Bounds.Xmin / 20,
@@ -3859,7 +3872,7 @@
             var binary = _this.data;
             var actions_len = binary.length;
             var stack = [];
-            var actionData = null;
+
             var origin = obj;
             var newBitio = new BitIO();
             var condActionSize = _this.condActionSize;
@@ -3875,8 +3888,12 @@
             // 開始
             while (abitio.byte_offset < actions_len) {
                 var actionCode = abitio.getUI8();
+                var actionData = null;
+
+                var startOffset = abitio.byte_offset;
                 if (actionCode >= 0x80) {
                     var actionLength = abitio.getUI16();
+                    startOffset = abitio.byte_offset;
                     actionData = abitio.getData(actionLength);
                 }
 
@@ -4341,6 +4358,7 @@
                     // Jump
                     case 0x99:
                         var offset = abitio.toSI16LE(actionData);
+                        abitio.bit_offset = 0;
                         abitio.incrementOffset(offset, 0);
                         break;
 
@@ -4350,6 +4368,7 @@
                         var name = stack.pop() + '';
                         var splitData = name.split(':');
                         var value = '';
+
                         if (splitData.length > 1) {
                             var aClass =
                                 _this.getAnimationClass(splitData[0], origin);
@@ -4828,11 +4847,9 @@
                     // ユーティリティ ***********************************
                     // GetTime
                     case 0x34:
-                        var now = new Date();
-                        stack[stack.length] = now.getTime() - startDate.getTime();
-
-                        // clear
-                        now = true;
+                        var now = new _Date();
+                        stack[stack.length] =
+                            now.getTime() - startDate.getTime();
 
                         break;
                     // RandomNumber
@@ -4849,7 +4866,82 @@
                     case 0x00:
                         isEnd = true;
                         break;
+                    case 0x2d: // fscommand2
+                        var count = stack.pop();
+                        var method = stack.pop();
+
+                        var now = new _Date();
+                        while (true) {
+                            switch (method) {
+                                case 'GetDateYear':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getFullYear()
+                                    );
+                                    break;
+                                case 'GetDateMonth':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getMonth() + 1
+                                    );
+                                    break;
+                                case 'GetDateDay':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getDate()
+                                    );
+                                    break;
+                                case 'GetDateWeekday':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getDay()
+                                    );
+                                    break;
+                                case 'GetTimeHours':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getHours()
+                                    );
+                                    break;
+                                case 'GetTimeMinutes':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getMinutes()
+                                    );
+                                    break;
+                                case 'GetTimeSeconds':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        now.getSeconds()
+                                    );
+                                    break;
+                                case 'GetPowerSource':
+                                case 'GetBatteryLevel':
+                                case 'GetMaxBatteryLevel':
+                                case 'GetSignalLevel':
+                                case 'GetMaxSignalLevel':
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        -1
+                                    );
+                                    break;
+                                default:
+                                    console.log(method)
+                                    obj.setVariable(
+                                        stack.pop(),
+                                        -1
+                                    );
+                                    break;
+                            }
+
+                            count--;
+                            if (count == 0) {
+                                break;
+                            }
+                        }
+                        break;
                     default:
+                        console.log('[actionScript] '+actionCode);
                         break;
                 }
 
