@@ -1,6 +1,5 @@
 FlashをiPhoneで再生可能にする「swf2js」
 ======
-
 swfをJavaScriptでバイナリ分解してcanvasで出力してiPhoneでswfを再生  
 対応バージョン：Flash Lite 1.1(swf4)以下  
   
@@ -19,6 +18,7 @@ Game using swf2js
 [覇者もん for GREE]  
 http://jp.apps.gree.net/ja/60428  
 
+
 [覇者もん for Mobage]  
 http://www.mbga.jp/_game_intro?game_id=12017896  
 
@@ -28,8 +28,16 @@ html
     <script type="text/javascript" src="swf2js.js"></script>  
     <div id="swf2js"></div>  
     <script type="text/javascript">  
-        swf2js.load('SET SWF PATH', 'width(null = 100%)', 'height(null = 100%)');  
+        swf2js.load('SET SWF PATH', {※OPTIONS});  
     </script>  
+
+
+※OPTIONS  
+{  
+    'width': int,  // default 100%  
+    'height': int, // default 100%  
+    'mode': string // default canvas 'webgl' or 'canvas'  
+}  
 
 
 MEMO
@@ -85,7 +93,6 @@ DebugID
 ScriptLimits  
 SetTabIndex  
 DefineShape4_hmm  
-FileAttributes  
 PlaceObject3  
 ImportAssets2  
 DoABC  
@@ -105,12 +112,25 @@ EnableTelemetry
 
 
 ▼UN ZIP TYPE  
-ZLIB  
 LZMA  
+
+
+▼MODE  
+WebGL  
+
 
 
 Release Notes  
 -------
+--[ swf2js 0.1.4 ] Release Date: 22 Oct 2014  
+* [BUGFIX] Tag 'DefineBits'  
+* [BUGFIX] Tag 'PlaceObject2'  
+* [NEW] Tag 'DefineMorphShape'  
+* [NEW] Tag 'DefineMorphShape2'  
+* [NEW] UN ZIP TYPE 'ZLIB'  
+* [NEW] Tag 'FileAttributes'  
+
+
 --[ swf2js 0.1.3 ] Release Date: 02 Sep 2014  
 * [BUGFIX] Tag 'DefineEditText'  
 * [BUGFIX] Tag 'DefineText'  

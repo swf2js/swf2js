@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.3)
+ * swf2js (version 0.1.4)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -56,8 +56,7 @@
     var _parse = parse;
     var _decodeToShiftJis = decodeToShiftJis;
     var _getAnimationClassVariable = getAnimationClassVariable;
-    var _isSwfHeader = isSwfHeader;
-    var _setMovieHeader = setMovieHeader;
+    var _setSwfHeader = setSwfHeader;
     var _resetObj = resetObj;
     var _generateText = generateText;
     var _base64encode = base64encode;
@@ -106,6 +105,7 @@
     var intervalId = 0;
     var setWidth = 0;
     var setHeight = 0;
+    var renderMode = 'canvas';
     var baseCanvas, context, preContext, cacheContext;
     var messageName = "zero-timeout-message";
     var canvasArray = [];
@@ -284,9 +284,6 @@
             height = canvasHeight * scale;
         }
 
-        width = (setWidth > 0) ? setWidth : width;
-        height = (setHeight > 0) ? setHeight : height;
-
         // divの設定
         var div = _document.getElementById('swf2js');
         var style = div.style;
@@ -383,7 +380,12 @@
          */
         setData: function(swf)
         {
-            this.data = swf;
+            var buff = [];
+            var bo = 0;
+            for (var i = swf.length; i--;) {
+                buff[buff.length] = _fromCharCode(swf.charCodeAt(bo++) & 0xff);
+            }
+            this.data = buff.join('');
         },
 
         /**
@@ -393,12 +395,12 @@
         getHeaderSignature: function()
         {
             var _this = this;
-            var Signature = [];
+            var buff = [];
             for (var i = 3; i--;) {
-                Signature[Signature.length] =
+                buff[buff.length] =
                     _fromCharCode(_this.getUI8());
             }
-            return Signature.join('');
+            return buff.join('');
         },
 
         /**
@@ -670,13 +672,14 @@
             var value = 0;
             for (var i = 0; i < n; i++) {
                 if(_this.bit_offset == 8){
-                    _this.bit_buffer = _this.readNumber();
+                    _this.bit_buffer = _this.readNumber(1);
                     _this.bit_offset = 0;
                 }
 
                 value |= (_this.bit_buffer
                     & (0x01 << _this.bit_offset++) ? 1 : 0) << i;
             }
+
             return value;
         },
 
@@ -684,17 +687,42 @@
          * readNumber
          * @returns {number}
          */
-        readNumber: function()
+        readNumber: function(n)
         {
             var _this = this;
             var value = 0;
             var o = _this.byte_offset;
-            var i = o + 1;
+            var i = o + n;
             while(i > o){
                 value = (value << 8) | _this.data.charCodeAt(--i);
             }
-            _this.byte_offset++;
+
+            _this.byte_offset += n;
             return value;
+        },
+
+        /**
+         * readString
+         * @param n
+         * @returns {string}
+         */
+        readString: function(n)
+        {
+            var _this = this;
+            var chars = [];
+            var data = _this.data;
+            var bo = _this.byte_offset;
+            var i = (n != undefined)
+                ? n
+                : data.length - bo;
+
+            while (i--) {
+                chars[chars.length] =
+                    _fromCharCode(data.charCodeAt(bo++) & 0xff);
+            }
+
+            _this.byte_offset = bo;
+            return chars.join('');
         },
 
         /**
@@ -703,17 +731,13 @@
          */
         deCompress: function()
         {
-            var _this = this;
+            var _this = bitio;
             var compressed = _this.data;
             var bo = _this.byte_offset;
-            var data = _unzip(compressed, true);
+            _this.data = compressed.substr(0, bo)
+                + _unzip(compressed, true);
 
-            // set
-            _this.length = data.length;
             _this.byte_offset = bo;
-            _this.data = data;
-
-            return _this;
         }
     };
     var bitio = new BitIO();
@@ -897,13 +921,15 @@
                 }
 
                 var tagDataStartOffset = bitio.byte_offset;
-                if (tagType == 1 && frame < frameCount) {
+                if (tagType == 1) {
                     frame++;
-                    tags[frame] = _generateDefaultTagObj(
-                        frame,
-                        frameCount,
-                        spriteID
-                    );
+                    if (dataLength > tagDataStartOffset + 2) {
+                        tags[frame] = _generateDefaultTagObj(
+                            frame,
+                            frameCount,
+                            spriteID
+                        );
+                    }
                 }
 
                 var tag = _parseTag(tagType, length);
@@ -920,7 +946,6 @@
                 if (tag != null) {
                     tags = _addTag(tagType, tags, tag, frame);
                 }
-
                 bitio.bit_offset = 0;
             }
 
@@ -1032,6 +1057,16 @@
                     var Reserved = bitio.getUI16(); // Always 0
                     var Password = bitio.getDataUntil('\0');
                     break;
+                case 69: // FileAttributes
+                    var Reserved = bitio.getUIBit(); // Must be 0
+                    var UseDirectBlit = bitio.getUIBit();
+                    var UseGPU = bitio.getUIBit();
+                    var HasMetadata = bitio.getUIBit();
+                    var ActionScropt3 = bitio.getUIBit();
+                    var Reserved2 = bitio.getUIBits(3); // Must be 0
+                    var UseNetwork = bitio.getUIBit();
+                    var Reserved3 = bitio.getUIBits(24); // Must be 0
+                    break;
                 // TODO
                 case 3:  // FreeCharacter
                 case 13: // DefineFontInfo
@@ -1068,7 +1103,6 @@
                 case 65: // ScriptLimits
                 case 66: // SetTabIndex
                 case 67: // DefineShape4_hmm
-                case 69: // FileAttributes
                 case 70: // PlaceObject3
                 case 71: // ImportAssets2
                 case 72: // DoABC
@@ -1164,7 +1198,8 @@
                 if (aClass instanceof AnimationClass
                     && frame > aClass.frameCount
                 ) {
-                    aClass.setFrameCount(frame);
+                    aClass._totalframes = frame;
+                    aClass.frameCount = frame;
                 }
             }
 
@@ -1172,27 +1207,32 @@
                 // remove
                 var len = removeObj.length;
                 if (len) {
-                    for (var i = len; i--;) {
-                        var rObj = removeObj[i];
-                        if (rObj == undefined) {
-                            continue;
-                        }
+                    var removeFrame = frame-1;
+                    var frameTags = aClass.frameTags[removeFrame];
+                    if (frameTags != undefined) {
+                        for (var i = len; i--;) {
+                            var rObj = removeObj[i];
+                            if (rObj == undefined) {
+                                continue;
+                            }
 
-                        var frameTags = aClass.frameTags[frame-1];
-                        if (frameTags == undefined) {
-                            continue;
-                        }
+                            var depth = rObj.Depth;
+                            var removeTags = frameTags[depth];
+                            if (removeTags == undefined) {
+                                continue;
+                            }
 
-                        var depth = rObj.Depth;
-                        var removeTags = frameTags[depth];
-                        if (removeTags == undefined) {
-                            continue;
-                        }
+                            if (rObj.CharacterId != undefined
+                                && removeTags.CharacterId != rObj.CharacterId
+                            ) {
+                                continue;
+                            }
 
-                        depthArray[depth] = true;
-                        var removeClass = removeTags.CloneData;
-                        if (removeClass instanceof AnimationClass) {
-                            aClass.setRemoveMap(frame, depth, removeClass);
+                            depthArray[depth] = true;
+                            var removeClass = removeTags.CloneData;
+                            if (removeClass instanceof AnimationClass) {
+                                aClass.setRemoveMap(frame, depth, removeClass);
+                            }
                         }
                     }
                 }
@@ -1206,11 +1246,10 @@
                             continue;
                         }
 
-                        var depth = cTag.Depth;
-
                         // add
+                        var depth = cTag.Depth;
                         depthArray[depth] = true;
-                        var result = aClass.addFrameTag(frame, cTag, false);
+                        aClass.addFrameTag(frame, cTag, false);
 
                         // name map
                         var name = cTag.Name;
@@ -1652,10 +1691,10 @@
                     var numBits = first6Bits & 0x0f;
                     if (first6Bits & 0x10) {
                         // StraigtEdge (11XXXX)
-                        shape = _this.straightEdgeRecord(numBits);
+                        shape = _this.straightEdgeRecord(tagType, numBits);
                     } else {
                         // CurvedEdge (10XXXX)
-                        shape = _this.curvedEdgeRecord(numBits);
+                        shape = _this.curvedEdgeRecord(tagType, numBits);
                     }
                 } else if (first6Bits) {
                     // ChangeStyle (0XXXXX)
@@ -1676,39 +1715,39 @@
 
         /**
          * straightEdgeRecord
+         * @param tagType
          * @param numBits
-         * @returns {{TypeFlag: number, StraightFlag: number, NumBits: *, GeneralLineFlag: number, VertLineFlag: number, ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
+         * @returns {{ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
          */
-        straightEdgeRecord: function(numBits)
+        straightEdgeRecord: function(tagType, numBits)
         {
             var deltaX = 0;
             var deltaY = 0;
             var GeneralLineFlag = bitio.getUIBit();
-            var NumBits = numBits;
             if (GeneralLineFlag) {
-                deltaX = bitio.getSIBits(NumBits + 2);
-                deltaY = bitio.getSIBits(NumBits + 2);
+                deltaX = bitio.getSIBits(numBits + 2);
+                deltaY = bitio.getSIBits(numBits + 2);
             } else {
                 var VertLineFlag = bitio.getUIBit();
                 if (VertLineFlag) {
                     deltaX = 0;
-                    deltaY = bitio.getSIBits(NumBits + 2);
+                    deltaY = bitio.getSIBits(numBits + 2);
                 } else {
-                    deltaX = bitio.getSIBits(NumBits + 2);
+                    deltaX = bitio.getSIBits(numBits + 2);
                     deltaY = 0;
                 }
             }
-            var AnchorX = currentPosition.x + deltaX;
-            var AnchorY = currentPosition.y + deltaY;
-            currentPosition.x = AnchorX;
-            currentPosition.y = AnchorY;
+
+            var AnchorX = deltaX;
+            var AnchorY = deltaY;
+            if (tagType != 46 && tagType != 84) {
+                AnchorX = currentPosition.x + deltaX;
+                AnchorY = currentPosition.y + deltaY;
+                currentPosition.x = AnchorX;
+                currentPosition.y = AnchorY;
+            }
 
             return {
-                TypeFlag: 1,
-                StraightFlag: 1,
-                NumBits: NumBits,
-                GeneralLineFlag: GeneralLineFlag,
-                VertLineFlag: VertLineFlag,
                 ControlX: 0,
                 ControlY: 0,
                 AnchorX: AnchorX,
@@ -1720,27 +1759,32 @@
 
         /**
          * curvedEdgeRecord
+         * @param tagType
          * @param numBits
-         * @returns {{TypeFlag: number, StraightFlag: number, NumBits: *, ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
+         * @returns {{ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
          */
-        curvedEdgeRecord: function(numBits)
+        curvedEdgeRecord: function(tagType, numBits)
         {
-            var NumBits = numBits;
-            var controlDeltaX = bitio.getSIBits(NumBits + 2);
-            var controlDeltaY = bitio.getSIBits(NumBits + 2);
-            var anchorDeltaX = bitio.getSIBits(NumBits + 2);
-            var anchorDeltaY = bitio.getSIBits(NumBits + 2);
-            var ControlX  = currentPosition.x + controlDeltaX;
-            var ControlY = currentPosition.y + controlDeltaY;
-            var AnchorX = ControlX + anchorDeltaX;
-            var AnchorY = ControlY + anchorDeltaY;
-            currentPosition.x = AnchorX;
-            currentPosition.y = AnchorY;
+            var controlDeltaX = bitio.getSIBits(numBits + 2);
+            var controlDeltaY = bitio.getSIBits(numBits + 2);
+            var anchorDeltaX = bitio.getSIBits(numBits + 2);
+            var anchorDeltaY = bitio.getSIBits(numBits + 2);
+
+            var ControlX  = controlDeltaX;
+            var ControlY = controlDeltaY;
+            var AnchorX = anchorDeltaX;
+            var AnchorY = anchorDeltaY;
+            if (tagType != 46 && tagType != 84) {
+                ControlX  = currentPosition.x + controlDeltaX;
+                ControlY = currentPosition.y + controlDeltaY;
+                AnchorX = ControlX + anchorDeltaX;
+                AnchorY = ControlY + anchorDeltaY;
+
+                currentPosition.x = AnchorX;
+                currentPosition.y = AnchorY;
+            }
 
             return {
-                TypeFlag: 1,
-                StraightFlag: 0,
-                NumBits: NumBits,
                 ControlX: ControlX,
                 ControlY: ControlY,
                 AnchorX: AnchorX,
@@ -1768,7 +1812,6 @@
             obj.StateMoveTo =  changeFlag & 1;
             if (obj.StateMoveTo) {
                 var moveBits = bitio.getUIBits(5);
-                obj.MoveBits  = moveBits;
                 obj.MoveX = bitio.getSIBits(moveBits);
                 obj.MoveY = bitio.getSIBits(moveBits);
                 currentPosition.x = obj.MoveX;
@@ -1822,7 +1865,6 @@
         vectorToCanvas: function(shapes)
         {
             var _this = this;
-
             var i = 0;
             var depth = 0;
             var lineStyle = shapes.lineStyles.lineStyles;
@@ -1956,11 +1998,9 @@
                                 fArray: []
                             };
 
-                            if (bitmapObj == null) {
-                                var f0cArray = f0Base[depth].fArray;
-                                f0Base[depth].fArray =
-                                    _setMoveTo(f0cArray, StartX, StartY);
-                            }
+                            var f0cArray = f0Base[depth].fArray;
+                            f0Base[depth].fArray =
+                                _setMoveTo(f0cArray, StartX, StartY);
                         }
                     }
 
@@ -2002,11 +2042,9 @@
                                 fArray: []
                             };
 
-                            if (bitmapObj == null) {
-                                var f1cArray = f1Base[depth].fArray;
-                                f1Base[depth].fArray =
-                                    _setMoveTo(f1cArray, StartX, StartY);
-                            }
+                            var f1cArray = f1Base[depth].fArray;
+                            f1Base[depth].fArray =
+                                _setMoveTo(f1cArray, StartX, StartY);
                         }
                     }
 
@@ -2025,23 +2063,27 @@
                         }
 
                         // 初期設定
-                        var lBase = canvasLArray[stack];
-                        if (lBase[depth] == undefined) {
-                            lBase[depth] = {
-                                StartX: StartX,
-                                StartY: StartY,
-                                Depth: depth,
-                                Width:  Width,
-                                merge: false,
-                                ColorObj: colorObj,
-                                BitMapObj: null,
-                                cArray: [],
-                                fArray: []
-                            };
+                        if (Width > 0) {
+                            var lBase = canvasLArray[stack];
+                            if (lBase[depth] == undefined) {
+                                lBase[depth] = {
+                                    StartX: StartX,
+                                    StartY: StartY,
+                                    Depth: depth,
+                                    Width:  Width,
+                                    merge: false,
+                                    ColorObj: colorObj,
+                                    BitMapObj: null,
+                                    cArray: [],
+                                    fArray: []
+                                };
 
-                            var lcArray = lBase[depth].fArray;
-                            lBase[depth].fArray =
-                                _setMoveTo(lcArray, StartX, StartY);
+                                var lcArray = lBase[depth].fArray;
+                                lBase[depth].fArray =
+                                    _setMoveTo(lcArray, StartX, StartY);
+                            }
+                        } else {
+                            lineFlag = false;
                         }
                     }
                 } else {
@@ -2056,78 +2098,72 @@
                     // fill0
                     if (fillFlag0) {
                         var obj = canvasF0Array[stack][depth];
-                        if (obj.BitMapObj == null) {
-                            obj.EndX = AnchorX;
-                            obj.EndY = AnchorY;
-                            obj.cArray[obj.cArray.length] = {
-                                isCurved: record.isCurved,
-                                AnchorX:  AnchorX,
-                                AnchorY:  AnchorY,
-                                ControlX: ControlX,
-                                ControlY: ControlY
-                            };
+                        obj.EndX = AnchorX;
+                        obj.EndY = AnchorY;
+                        obj.cArray[obj.cArray.length] = {
+                            isCurved: record.isCurved,
+                            AnchorX:  AnchorX,
+                            AnchorY:  AnchorY,
+                            ControlX: ControlX,
+                            ControlY: ControlY
+                        };
 
-                            var fArray = obj.fArray;
-                            if (isCurved) {
-                                fArray = _setQuadraticCurveTo(fArray,
-                                    ControlX, ControlY,
-                                    AnchorX, AnchorY
-                                );
-                            } else {
-                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
-                            }
+                        var fArray = obj.fArray;
+                        if (isCurved) {
+                            fArray = _setQuadraticCurveTo(fArray,
+                                ControlX, ControlY,
+                                AnchorX, AnchorY
+                            );
+                        } else {
+                            fArray = _setLineTo(fArray, AnchorX, AnchorY);
                         }
                     }
 
                     // fill1
                     if (fillFlag1) {
                         var obj = canvasF1Array[stack][depth];
-                        if (obj.BitMapObj == null) {
-                            obj.EndX = AnchorX;
-                            obj.EndY = AnchorY;
-                            obj.cArray[obj.cArray.length] = {
-                                isCurved: record.isCurved,
-                                AnchorX:  AnchorX,
-                                AnchorY:  AnchorY,
-                                ControlX: ControlX,
-                                ControlY: ControlY
-                            };
+                        obj.EndX = AnchorX;
+                        obj.EndY = AnchorY;
+                        obj.cArray[obj.cArray.length] = {
+                            isCurved: record.isCurved,
+                            AnchorX:  AnchorX,
+                            AnchorY:  AnchorY,
+                            ControlX: ControlX,
+                            ControlY: ControlY
+                        };
 
-                            var fArray = obj.fArray;
-                            if (isCurved) {
-                                fArray = _setQuadraticCurveTo(fArray,
-                                    ControlX, ControlY,
-                                    AnchorX, AnchorY
-                                );
-                            } else {
-                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
-                            }
+                        var fArray = obj.fArray;
+                        if (isCurved) {
+                            fArray = _setQuadraticCurveTo(fArray,
+                                ControlX, ControlY,
+                                AnchorX, AnchorY
+                            );
+                        } else {
+                            fArray = _setLineTo(fArray, AnchorX, AnchorY);
                         }
                     }
 
                     // line
                     if (lineFlag) {
                         var obj = canvasLArray[stack][depth];
-                        if (obj.BitMapObj == null) {
-                            obj.EndX = AnchorX;
-                            obj.EndY = AnchorY;
-                            obj.cArray[obj.cArray.length] = {
-                                isCurved: record.isCurved,
-                                AnchorX:  AnchorX,
-                                AnchorY:  AnchorY,
-                                ControlX: ControlX,
-                                ControlY: ControlY
-                            };
+                        obj.EndX = AnchorX;
+                        obj.EndY = AnchorY;
+                        obj.cArray[obj.cArray.length] = {
+                            isCurved: record.isCurved,
+                            AnchorX:  AnchorX,
+                            AnchorY:  AnchorY,
+                            ControlX: ControlX,
+                            ControlY: ControlY
+                        };
 
-                            var fArray = obj.fArray;
-                            if (isCurved) {
-                                fArray = _setQuadraticCurveTo(fArray,
-                                    ControlX, ControlY,
-                                    AnchorX, AnchorY
-                                );
-                            } else {
-                                fArray = _setLineTo(fArray, AnchorX, AnchorY);
-                            }
+                        var fArray = obj.fArray;
+                        if (isCurved) {
+                            fArray = _setQuadraticCurveTo(fArray,
+                                ControlX, ControlY,
+                                AnchorX, AnchorY
+                            );
+                        } else {
+                            fArray = _setLineTo(fArray, AnchorX, AnchorY);
                         }
                     }
                 }
@@ -2387,7 +2423,12 @@
                                 var bitMapObj = obj.BitMapObj;
                                 var Matrix = bitMapObj.bitmapMatrix;
                                 var cid = bitMapObj.bitmapId;
-                                objArray = _setBeginPath(objArray);
+
+                                objArray = _setImage(
+                                    objArray, cid
+                                );
+                                objArray = _setBeginPath(objArray, true);
+
                                 objArray = _setSave(objArray);
                                 objArray = _setTransform(
                                     objArray,
@@ -2398,9 +2439,8 @@
                                     Matrix.TranslateX,
                                     Matrix.TranslateY
                                 );
-                                objArray = _setImage(
-                                    objArray, cid
-                                );
+                                objArray = _setClosePath(objArray);
+                                objArray = _setFill(objArray);
                                 objArray = _setRestore(objArray);
                             } else {
                                 var color =
@@ -2942,52 +2982,57 @@
             }
 
             var JPEGData = bitio.getData(ImageDataLen);
+            var BitmapAlphaData = false;
             if (tagType == 35) {
-                var BitmapAlphaData =
+                BitmapAlphaData =
                     bitio.getData(length - sub - ImageDataLen);
             }
             bitio.byte_offset = startOffset + length;
 
-            // 分解
-            var copyData = JPEGData;
-            for (var i = 0; copyData[i]; i++) {
-                var word = ((copyData.charCodeAt(i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
+            // clone
+            var imageCanvas = baseCanvas.cloneNode(false);
+            var imageContext = imageCanvas.getContext('2d');
+
+            for (var i = 0; JPEGData[i]; i++) {
+                var word = ((JPEGData.charCodeAt(i) & 0xff) << 8)
+                    | (JPEGData.charCodeAt(++i) & 0xff);
                 if (0xffd9 == word) {
-                    word = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
-                    if (word == 0xffd8) {
-                        copyData = copyData.substr(0, i - 4) + copyData.substr(i);
+                    word = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
+                        | (JPEGData.charCodeAt(++i) & 0xff);
+                    if(word == 0xffd8){
+                        JPEGData = JPEGData.substr(0, i - 4) + JPEGData.substr(i);
                         i -= 4;
                     }
-                } else if(0xffc0 == word) {
+                } else if (0xffc0 == word) {
                     i += 3;
-                    var imgHeight = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
-                    var imgWidth = ((copyData.charCodeAt(++i) & 0xff) << 8) | (copyData.charCodeAt(++i) & 0xff);
+                    var height = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
+                        | (JPEGData.charCodeAt(++i) & 0xff);
+                    var width = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
+                        | (JPEGData.charCodeAt(++i) & 0xff);
                     break;
                 }
             }
-
-            // clone
-            var imageCanvas = baseCanvas.cloneNode(false);
-            imageCanvas.width = imgWidth;
-            imageCanvas.height = imgHeight;
-            var imageContext = imageCanvas.getContext('2d');
 
             // render
             imgLoadCount++;
             var imgObj = new _Image();
             imgObj.onload = function()
             {
-                imageCanvas.width = imgWidth;
-                imageCanvas.height = imgHeight;
-                imageContext.drawImage(imgObj, 0, 0);
+                var _this = this;
+                var width = _this.width;
+                var height = _this.height;
+
+                imageCanvas.width = width;
+                imageCanvas.height = height;
+                imageContext.drawImage(_this, 0, 0);
 
                 // 半透明対応
                 if (BitmapAlphaData) {
-                    var data = _unzip(BitmapAlphaData);
-                    var imgData = imageContext.getImageData(0, 0, imgWidth, imgHeight);
+                    var data = _unzip(BitmapAlphaData, false);
+                    var imgData = imageContext.getImageData(0, 0, width, height);
                     var pxData = imgData.data;
                     var pxIdx = 0;
-                    var len = imgWidth * imgHeight;
+                    var len = width * height * 4;
                     for (var i = 0; i < len; i++) {
                         pxData[pxIdx + 3] = data[i];
                         pxIdx += 4;
@@ -3292,6 +3337,7 @@
                 }
             }
 
+
             // set
             layer[characterId] = aClass;
         },
@@ -3431,7 +3477,13 @@
 
             obj.InitialText = '';
             if (obj.HasText) {
-                obj.InitialText = bitio.getDataUntil("\0");
+                var text = bitio.getDataUntil("\0");
+                if (obj.HTML) {
+                    console.log(text)
+                } else {
+                    obj.InitialText = text;
+                }
+
             }
 
             var Bound = obj.Bound;
@@ -3459,7 +3511,7 @@
         {
             var _this = swftag;
             var obj = {};
-
+            obj.isMorphShape = true;
             obj.CharacterId = bitio.getUI16();
             obj.StartBounds = _this.rect();
             obj.EndBounds = _this.rect();
@@ -3467,12 +3519,308 @@
             obj.MorphFillStyles = _this.fillStyleArray(tagType);
             obj.MorphLineStyles = _this.lineStyleArray(tagType);
             obj.StartEdges = _this.shapeWithStyle(tagType);
+
             if (obj.Offset != 0) {
                 obj.EndEdges = _this.shapeWithStyle(tagType);
+
+                // 差分を調整
+                var startShapeRecords = obj.StartEdges.ShapeRecords;
+                var endShapeRecords = obj.EndEdges.ShapeRecords;
+                var fixStartRecords = [];
+                var fixEndRecords = [];
+
+                var len = _max(
+                    startShapeRecords.length,
+                    endShapeRecords.length
+                );
+
+                var startPosition = {x: 0, y: 0, dx: 0, dy: 0};
+                var endPosition = {x: 0, y: 0, dx: 0, dy: 0};
+
+                for (var i = 0; i < len; i++) {
+                    var startRecord = startShapeRecords[i];
+                    var endRecord = endShapeRecords[i];
+
+                    if (endRecord != undefined) {
+                        if (endRecord.StateMoveTo) {
+                            endPosition.x = endRecord.MoveX;
+                            endPosition.y = endRecord.MoveY;
+                        } else if (!endRecord.isChange) {
+                            endPosition.dx = endPosition.x + endRecord.AnchorX;
+                            endPosition.dx = endPosition.x + endRecord.AnchorY;
+                        }
+                        fixEndRecords[fixEndRecords.length] = endRecord;
+                    }
+
+                    if (startRecord != undefined) {
+                        if (startRecord.StateMoveTo) {
+                            startPosition.x = startRecord.MoveX;
+                            startPosition.y = startRecord.MoveY;
+                        } else if (!startRecord.isChange) {
+                            startPosition.dx = startPosition.x + startPosition.AnchorX;
+                            startPosition.dy = startPosition.y + startPosition.AnchorY;
+                        }
+                        fixStartRecords[fixStartRecords.length] = startRecord;
+                    }
+
+                    if (startRecord == undefined) {
+                        startRecord = {
+                            isChange: false
+                        };
+                    }
+
+                    if (endRecord == undefined) {
+                        endRecord = {
+                            isChange: false
+                        };
+                    }
+
+                    switch (true) {
+                        case (startRecord.StateMoveTo && !endRecord.StateMoveTo):
+                            fixEndRecords.splice(
+                                fixEndRecords.length - 1, 0, {
+                                    MoveX: endPosition.dx,
+                                    MoveY: endPosition.dy,
+                                    StateMoveTo: 1,
+                                    isChange: true
+                                });
+                            break;
+                        case (!startRecord.StateMoveTo && endRecord.StateMoveTo):
+                            fixStartRecords.splice(
+                                fixStartRecords.length - 1, 0, {
+                                    MoveX: startPosition.dx,
+                                    MoveY: startPosition.dy,
+                                    StateMoveTo: 1,
+                                    isChange: true
+                                });
+                            break;
+                        case (startRecord.isChange && !endRecord.isChange):
+                            fixEndRecords.splice(
+                                fixEndRecords.length - 2, 0, startRecord);
+                            break;
+                        case (!startRecord.isChange && endRecord.isChange):
+
+                            break;
+                    }
+                }
+
+                obj.StartEdges.ShapeRecords = fixStartRecords;
+                obj.EndEdges.ShapeRecords = fixEndRecords;
             }
 
-            console.log(obj.CharacterId);
+            layer[obj.CharacterId] = obj;
             console.log(obj);
+        },
+
+        /**
+         * generateMorphShape
+         * @param cid
+         * @param ratio
+         * @returns {{data: *, Xmax: number, Xmin: number, Ymax: number, Ymin: number}}
+         */
+        generateMorphShape: function(cid, ratio)
+        {
+            var per = ratio / 65535;
+            var newShapeRecords = [];
+
+            var _this = swftag;
+            var origin = layer[cid];
+            var position = {x:0, y:0};
+
+            var morphLineStyles = origin.MorphLineStyles;
+            var lineStyles = morphLineStyles.lineStyles;
+            var lineStyleCount = morphLineStyles.lineStyleCount;
+
+            var morphFillStyles = origin.MorphFillStyles;
+            var fillStyles = morphFillStyles.fillStyles;
+            var fillStyleCount = morphFillStyles.fillStyleCount;
+
+            var StartEdges = origin.StartEdges;
+            var StartShapeRecords = StartEdges.ShapeRecords;
+
+            var EndEdges = origin.EndEdges;
+            var EndShapeRecords = EndEdges.ShapeRecords;
+
+            // 型
+            var shapes = {
+                NumFillBits: StartEdges.NumFillBits,
+                NumLineBits: StartEdges.NumLineBits,
+                ShapeRecords: [],
+                lineStyles: {
+                    lineStyleCount: lineStyleCount,
+                    lineStyles: []
+                },
+                fillStyles: {
+                    fillStyleCount: fillStyleCount,
+                    fillStyles: []
+                }
+            };
+
+            var len = StartShapeRecords.length;
+            for (var i = 0; i < len; i++) {
+                var newRecord = {};
+                var StartRecord = StartShapeRecords[i];
+                var EndRecord = EndShapeRecords[i];
+
+                if ((i+1) == len) {
+                    newShapeRecords[i] = 0;
+                    continue;
+                }
+
+                if (StartRecord.isChange) {
+                    var MoveX = 0;
+                    var MoveY = 0;
+                    if (StartRecord.StateMoveTo == 1) {
+                        if (EndRecord.MoveX == undefined) {
+                            console.log(i)
+                        }
+                        MoveX = StartRecord.MoveX
+                            + ((EndRecord.MoveX - StartRecord.MoveX)
+                                * per);
+                        MoveY = StartRecord.MoveY
+                            + ((EndRecord.MoveY - StartRecord.MoveY)
+                                * per);
+                        position.x = MoveX;
+                        position.y = MoveY;
+                    }
+
+                    newRecord = {
+                        FillStyle0: StartRecord.FillStyle0,
+                        FillStyle1: StartRecord.FillStyle1,
+                        LineStyle: StartRecord.LineStyle,
+                        MoveX: MoveX,
+                        MoveY: MoveY,
+                        StateFillStyle0: StartRecord.StateFillStyle0,
+                        StateFillStyle1: StartRecord.StateFillStyle1,
+                        StateLineStyle: StartRecord.StateLineStyle,
+                        StateMoveTo: StartRecord.StateMoveTo,
+                        StateNewStyles: StartRecord.StateNewStyles,
+                        isChange: true
+                    };
+                } else {
+                    var AnchorX = 0;
+                    var AnchorY = 0;
+                    var ControlX = 0;
+                    var ControlY = 0;
+
+                    var startAnchorX = StartRecord.AnchorX;
+                    var startAnchorY = StartRecord.AnchorY;
+                    var endAnchorX = EndRecord.AnchorX;
+                    var endAnchorY = EndRecord.AnchorY;
+
+                    var startControlX = StartRecord.ControlX;
+                    var startControlY = StartRecord.ControlY;
+                    var endControlX = EndRecord.ControlX;
+                    var endControlY = EndRecord.ControlY;
+
+                    if (per > 0 && per < 1
+                        && StartRecord.isCurved != EndRecord.isCurved
+                    ) {
+                        if (!StartRecord.isCurved) {
+                            startAnchorX = StartRecord.AnchorX / 2;
+                            startAnchorY = StartRecord.AnchorY / 2;
+                            startControlX = startAnchorX;
+                            startControlY = startAnchorY;
+                        }
+
+                        if (!EndRecord.isCurved) {
+                            endAnchorX = EndRecord.AnchorX / 2;
+                            endAnchorY = EndRecord.AnchorY / 2;
+                            endControlX = endAnchorX;
+                            endControlY = endAnchorY;
+                        }
+                    }
+
+                    ControlX = (startControlX + ((endControlX - startControlX)
+                        * per)) + position.x;
+                    ControlY = (startControlY + ((endControlY - startControlY)
+                        * per)) + position.y;
+                    AnchorX = (startAnchorX + ((endAnchorX - startAnchorX)
+                        * per)) + ControlX;
+                    AnchorY = (startAnchorY + ((endAnchorY - startAnchorY)
+                        * per)) + ControlY;
+
+                    position.x = AnchorX;
+                    position.y = AnchorY;
+
+                    newRecord = {
+                        AnchorX: AnchorX,
+                        AnchorY: AnchorY,
+                        ControlX: ControlX,
+                        ControlY: ControlY,
+                        isChange: false,
+                        isCurved: (StartRecord.isCurved || EndRecord.isCurved)
+                    };
+                }
+
+                newShapeRecords[i] = newRecord;
+            }
+            shapes.ShapeRecords = newShapeRecords;
+
+            for (var i = 0; i < lineStyleCount; i++) {
+                var EndColor = lineStyles[i].EndColor;
+                var StartColor = lineStyles[i].StartColor;
+                var color = {
+                    R: StartColor.R
+                        + _floor((EndColor.R - StartColor.R) * per),
+                    G: StartColor.G
+                        + _floor((EndColor.G - StartColor.G) * per),
+                    B: StartColor.B
+                        + _floor((EndColor.B - StartColor.B) * per),
+                    A: StartColor.A
+                        + _floor((EndColor.A - StartColor.A) * per)
+                };
+
+                var EndWidth = lineStyles[i].EndWidth;
+                var StartWidth = lineStyles[i].StartWidth;
+                shapes.lineStyles.lineStyles[i] = {
+                    Width: StartWidth
+                        + _floor((EndWidth - StartWidth) * per),
+                    Color: color
+                };
+            }
+
+            for (var i = 0; i < fillStyleCount; i++) {
+                var EndColor = fillStyles[i].EndColor;
+                var StartColor = fillStyles[i].StartColor;
+                var color = {
+                    R: StartColor.R
+                        + _floor((EndColor.R - StartColor.R) * per),
+                    G: StartColor.G
+                        + _floor((EndColor.G - StartColor.G) * per),
+                    B: StartColor.B
+                        + _floor((EndColor.B - StartColor.B) * per),
+                    A: StartColor.A
+                        + _floor((EndColor.A - StartColor.A) * per)
+                };
+
+                shapes.fillStyles.fillStyles[i] = {
+                    Color: color,
+                    fillStyleType: fillStyles[i].fillStyleType
+                }
+            }
+
+            var EndBounds = origin.EndBounds;
+            var StartBounds = origin.StartBounds;
+            var bounds = {
+                Xmax: StartBounds.Xmax
+                    + ((EndBounds.Xmax - StartBounds.Xmax) * per),
+                Xmin: StartBounds.Xmin
+                    + ((EndBounds.Xmin - StartBounds.Xmin) * per),
+                Ymax: StartBounds.Ymax
+                    + ((EndBounds.Ymax - StartBounds.Ymax) * per),
+                Ymin: StartBounds.Ymin
+                    + ((EndBounds.Ymin - StartBounds.Ymin) * per)
+            };
+
+            return {
+                data: _this.vectorToCanvas(shapes),
+                Xmax: bounds.Xmax / 20,
+                Xmin: bounds.Ymax / 20,
+                Ymax: bounds.Xmin / 20,
+                Ymin: bounds.Ymin / 20,
+                isMorphShape: true
+            };
         },
 
         /**
@@ -3762,8 +4110,10 @@
                 if (obj.PlaceFlagHasClipDepth) {
                     obj.ClipDepth = bitio.getUI16();
                 }
+
                 // swf5以降なので未実装
                 if (obj.PlaceFlagHasClipActions) {
+
                     obj.ClipActions = 0;
                 }
             }
@@ -3805,6 +4155,7 @@
          */
         parseDefineSprite: function(dataLength)
         {
+            var test = 0;
             var _this = swftag;
             var SpriteID = bitio.getUI16();
             var FrameCount = bitio.getUI16();
@@ -3872,6 +4223,7 @@
             var binary = _this.data;
             var actions_len = binary.length;
             var stack = [];
+            var constantPool = '';
 
             var origin = obj;
             var newBitio = new BitIO();
@@ -3883,7 +4235,6 @@
             // BitIO
             var abitio = new BitIO();
             abitio.setData(binary);
-            //abitio.incrementOffset(actionOffset, 0);
 
             // 開始
             while (abitio.byte_offset < actions_len) {
@@ -4599,16 +4950,16 @@
                                 }
                             }
                         } else {
-                            if (frame == obj.getFrame()) {
-                                break;
-                            }
-
                             if (frame <= 0 || obj.frameCount < frame) {
                                 frame = 1;
                             }
 
                             if (obj.getFrame() > frame) {
                                 _resetObj(obj);
+                            }
+
+                            if (frame == obj.getFrame()) {
+                                break;
                             }
 
                             obj.setFrame(frame);
@@ -4850,7 +5201,6 @@
                         var now = new _Date();
                         stack[stack.length] =
                             now.getTime() - startDate.getTime();
-
                         break;
                     // RandomNumber
                     case 0x30:
@@ -4869,77 +5219,160 @@
                     case 0x2d: // fscommand2
                         var count = stack.pop();
                         var method = stack.pop();
+                        var params = [];
 
                         var now = new _Date();
                         while (true) {
-                            switch (method) {
-                                case 'GetDateYear':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getFullYear()
-                                    );
-                                    break;
-                                case 'GetDateMonth':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getMonth() + 1
-                                    );
-                                    break;
-                                case 'GetDateDay':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getDate()
-                                    );
-                                    break;
-                                case 'GetDateWeekday':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getDay()
-                                    );
-                                    break;
-                                case 'GetTimeHours':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getHours()
-                                    );
-                                    break;
-                                case 'GetTimeMinutes':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getMinutes()
-                                    );
-                                    break;
-                                case 'GetTimeSeconds':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        now.getSeconds()
-                                    );
-                                    break;
-                                case 'GetPowerSource':
-                                case 'GetBatteryLevel':
-                                case 'GetMaxBatteryLevel':
-                                case 'GetSignalLevel':
-                                case 'GetMaxSignalLevel':
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        -1
-                                    );
-                                    break;
-                                default:
-                                    console.log(method)
-                                    obj.setVariable(
-                                        stack.pop(),
-                                        -1
-                                    );
-                                    break;
-                            }
-
                             count--;
+                            params[count] = stack.pop();
                             if (count == 0) {
                                 break;
                             }
                         }
+
+                        switch (method) {
+                            case 'GetDateYear':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getFullYear()
+                                    );
+                                }
+                                break;
+                            case 'GetDateMonth':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getMonth() + 1
+                                    );
+                                }
+                                break;
+                            case 'GetDateDay':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getDate()
+                                    );
+                                }
+                                break;
+                            case 'GetDateWeekday':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getDay()
+                                    );
+                                }
+                                break;
+                            case 'GetTimeHours':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getHours()
+                                    );
+                                }
+                                break;
+                            case 'GetTimeMinutes':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getMinutes()
+                                    );
+                                }
+                                break;
+                            case 'GetTimeSeconds':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        now.getSeconds()
+                                    );
+                                }
+                                break;
+                            case 'SetQuality':
+                                var quality = params.pop();
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        quality
+                                    );
+                                }
+                                break;
+                            case 'GetPowerSource':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        0
+                                    );
+                                }
+                                break;
+                            case 'GetBatteryLevel':
+                            case 'GetMaxBatteryLevel':
+                            case 'GetSignalLevel':
+                            case 'GetMaxSignalLevel':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        3
+                                    );
+                                }
+                                break;
+                            case 'StopVibrate':
+                                var value = params.pop();
+                                if (value != undefined) {
+                                    obj.setVariable(
+                                        value,
+                                        -1
+                                    );
+                                }
+                                break;
+                            default:
+                                console.log('fscommand2');
+                                console.log(method);
+                                obj.setVariable(
+                                    params.pop(),
+                                    -1
+                                );
+                                break;
+                        }
                         break;
+
+                    // TODO SWF5
+                    // SWF 5 ***********************************
+                    // CallMethod
+                    case 0x52:
+                        console.log('------------ > CallMethod');
+
+                        console.log(stack);
+
+                        break;
+                    case 0x88:
+                        console.log('------------ > ConstantPool');
+                        newBitio.setData(actionData);
+                        newBitio.setOffset(0, 0);
+
+                        var count = newBitio.getUI16();
+                        for (var i = 0; i < count; i++) {
+                            constantPool += newBitio.readString(i);
+                        }
+                        console.log(constantPool)
+                        break;
+
+
+
+
+
+
+
+
                     default:
                         console.log('[actionScript] '+actionCode);
                         break;
@@ -5064,17 +5497,6 @@
             _this.frameCount = frameCount;
             _this._totalframes = frameCount;
             _this.isCache = (frameCount == 1 && cid > 0);
-        },
-
-        /**
-         * setFrameCount
-         * @param frame
-         */
-        setFrameCount: function (frame)
-        {
-            var _this = this;
-            _this.frameCount = frame;
-            _this._totalframes = frame;
         },
 
         /**
@@ -5272,7 +5694,11 @@
 
             // error
             if (layer[cTag.CharacterId] == undefined) {
-                console.log('Error addFrame CHARACTER_ID: ' + cTag.CharacterId);
+                console.log('ERROR ADD FRAME >>> CHARACTER_ID: '
+                    + cTag.CharacterId
+                    + ' FRAME: '+ frame
+                    + ' DEPTH: '+ cTag.Depth
+                );
                 return false;
             }
 
@@ -5286,6 +5712,15 @@
                 // Matrix
                 if (!cTag.PlaceFlagHasMatrix && obj.PlaceFlagHasMatrix) {
                     cTag.Matrix = _clone(obj.Matrix);
+
+                    // 補正
+                    if (cTag.Matrix.TranslateX == 0 && obj.CloneData._x != 0) {
+                        cTag.Matrix.TranslateX = obj.CloneData._x;
+                    }
+                    if (cTag.Matrix.TranslateY == 0 && obj.CloneData._y != 0) {
+                        cTag.Matrix.TranslateY = obj.CloneData._y;
+                    }
+
                     cTag.PlaceFlagHasMatrix = obj.PlaceFlagHasMatrix;
                     isCopyMatrix = true;
                 }
@@ -5323,6 +5758,12 @@
             // 新規ならclone
             if (obj == undefined || cTag.PlaceFlagHasCharacter) {
                 var cloneData = _clone(layer[cTag.CharacterId]);
+                if (cloneData.isMorphShape) {
+                    cloneData = swftag.generateMorphShape(
+                        cTag.CharacterId, cTag.Ratio
+                    );
+                }
+
                 if (cloneData instanceof AnimationClass
                     && cTag.PlaceFlagHasMatrix
                 ) {
@@ -5336,6 +5777,11 @@
             } else {
                 // clone data
                 var cloneData = obj.CloneData;
+                if (cloneData.isMorphShape) {
+                    cloneData = swftag.generateMorphShape(
+                        cTag.CharacterId, cTag.Ratio
+                    );
+                }
 
                 // Matrix調整
                 if (cloneData instanceof AnimationClass
@@ -5664,7 +6110,7 @@
                             || colorObj.G != 255
                             || colorObj.B != 255
                         ) {
-                            bitMapCtx.globalCompositeOperation = "lighter";
+                            bitMapCtx.globalCompositeOperation = "destination-in";
                             bitMapCtx.fillStyle = "rgb("
                                 + colorObj.R + ", "
                                 + colorObj.G + ", "
@@ -5674,13 +6120,13 @@
 
                         var imageCanvas = baseCanvas.cloneNode(false);
                         var ctx = imageCanvas.getContext('2d');
+
                         ctx.canvas.width = w;
                         ctx.canvas.height = h;
                         ctx.globalAlpha = colorObj.A;
                         ctx.drawImage(bitMapCanvas, 0, 0);
 
                         bitMapData[cid] = ctx;
-
                         continue;
                     }
 
@@ -6050,10 +6496,9 @@
     /**
      * load
      * @param path
-     * @param width
-     * @param height
+     * @param options
      */
-    _swf2js.load = function(path, width, height)
+    _swf2js.load = function(path, options)
     {
         if (_init()) {
             // TODO いつか消す
@@ -6077,8 +6522,11 @@
                 if (readyState == 4) {
                     var status = _xmlHttpRequest.status;
                     if (status == 200) {
-                        setWidth = (width) ? width : 0;
-                        setHeight = (height) ? height : 0;
+                        if (options instanceof Object) {
+                            setWidth = options.width | 0;
+                            setHeight = options.height | 0;
+                            renderMode = options.mode | 'canvas';
+                        }
                         _parse(_xmlHttpRequest.responseText);
                     } else {
                         alert('unknown swf data');
@@ -6124,7 +6572,7 @@
     {
         var _this = this;
         _this.clear();
-        _this.load(path, setWidth, setHeight);
+        _this.load(path, {'width': setWidth, 'height': setHeight});
         _this.play();
     }
 
@@ -6174,23 +6622,11 @@
      */
     function parse(swf)
     {
-        if (swf.length < 16) {
-            alert('flash lite1.1 data only');
-            return 0;
-        }
-
         // swfデータをセット
         bitio.setData(swf);
 
-        // 再生可能か判定
-        if (!_isSwfHeader()) {
-            alert('flash lite1.1 data only' +
-                '\nand not supported by compress data');
-            return 0;
-        }
-
-        // 動画情報をプレイヤーにセット
-        _setMovieHeader();
+        // Header
+        _setSwfHeader();
 
         // swfを分解
         swftag.parse();
@@ -6210,34 +6646,31 @@
     }
 
     /**
-     * isSwfHeader
-     * @returns {boolean}
-     */
-    function isSwfHeader()
-    {
-        // 無圧縮か確認※無圧縮のみ対応
-        signature = bitio.getHeaderSignature();
-        if (signature != 'FWS') {
-            return false;
-            //bitio = bitio.deCompress();
-        }
-
-        // バージョン確認※バージョン4のみ対応
-        version = bitio.getVersion();
-        if (version > 4) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * setMovieHeader
      */
-    function setMovieHeader()
+    function setSwfHeader()
     {
+        // signature
+        signature = bitio.getHeaderSignature();
+
+        // version
+        version = bitio.getVersion();
+        if (version > 4) {
+            //alert('flash version 4 data only');
+            //return false;
+        }
+
         // ファイルサイズ
         player.fileLength = bitio.getUI32();
+
+        // 解凍
+        if (signature == 'CWS') {
+            // ZLIB
+            bitio.deCompress();
+        } else if (signature == 'ZWS') {
+            alert('not supported by LZMA');
+            return 0;
+        }
 
         // フレームサイズ
         var FrameSize = swftag.rect();
@@ -6676,6 +7109,7 @@
     function putFrame(aClass)
     {
         if (aClass.isActionWait) {
+            aClass.isActionWait = false;
             aClass.actionStart();
         }
 
@@ -6822,9 +7256,13 @@
      * @param base
      * @returns {*}
      */
-    function setSave(base)
+    function setSave(base, isUnShift)
     {
-        base[base.length] = 'save';
+        if (isUnShift) {
+            base.unshift('save');
+        } else {
+            base[base.length] = 'save';
+        }
         return base;
     }
 
@@ -6848,7 +7286,7 @@
     function setBeginPath(base, isUnShift)
     {
         if (isUnShift) {
-            base.unshift('beginPath')
+            base.unshift('beginPath');
         } else {
             base[base.length] = 'beginPath';
         }
@@ -7092,9 +7530,12 @@
      */
     function setImage(base, id)
     {
-        var len = base.length;
-        base[len++] = 'image';
-        base[len] = id;
+        //var len = base.length;
+        base.unshift(id);
+        base.unshift('image');
+
+        //base[len++] = 'image';
+        //base[len] = id;
         return base;
     }
 
@@ -7312,8 +7753,11 @@
                     _context.strokeStyle = grad;
                     break;
                 case 'image':
-                    var image = bitMapData[array[i++]].canvas;
-                    _context.drawImage(image,0,0);
+                    _context.fillStyle =
+                        _context.createPattern(
+                            bitMapData[array[i++]].canvas,
+                            'repeat'
+                        );
                     break;
                 case 'font':
                     _context.textBaseline = 'top';
@@ -7621,16 +8065,6 @@
         var Ymin = bound.Ymin / 20;
         var Ymax = bound.Ymax / 20;
 
-        // セット
-        fArray = _setSave(fArray);
-        fArray = _setBeginPath(fArray);
-        fArray = _setMoveTo(fArray, Xmin, Ymin);
-        fArray = _setLineTo(fArray, Xmin, Ymax);
-        fArray = _setLineTo(fArray, Xmax, Ymax);
-        fArray = _setLineTo(fArray, Xmax, Ymin);
-        fArray = _setClosePath(fArray);
-        fArray = _setClip(fArray);
-
         // FONT
         var fontType = '';
         if (obj.HasFont) {
@@ -7685,7 +8119,12 @@
         var multiLine = obj.Multiline;
 
         // 複数行
+        var textFiledHeight = Ymax - Ymin;
         for (var i = 0; i < len; i++) {
+            if ((dy + newLineHeight) > textFiledHeight) {
+                continue;
+            }
+
             var txt = splitData[i];
             if (wordWrap && multiLine) {
                 var mobaileMargin = (isTouch) ? 20 : 0;
@@ -7711,6 +8150,10 @@
                     txtArray[txtArray.length] = joinTxt;
                     var tLen = txtArray.length;
                     for (t = 0; t < tLen; t++) {
+                        if ((dy + newLineHeight) > textFiledHeight) {
+                            continue;
+                        }
+
                         fArray = _setFillText(
                             fArray,
                             txtArray[t],
@@ -7769,7 +8212,6 @@
                 byte += 2;
             }
         }
-
         return byte;
     }
 
@@ -7783,25 +8225,34 @@
     {
         var newBitio = new BitIO();
         newBitio.setData(compressed);
-        newBitio.setOffset(2, 8);
+
+        if (isDeCompress) {
+            newBitio.setOffset(10, 8);
+        } else {
+            newBitio.setOffset(2, 8);
+        }
 
         var buff = [];
         var DEFLATE_CODE_LENGTH_ORDER =
             [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
         var DEFLATE_CODE_LENGTH_MAP = [
-            [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [1, 11], [1, 13], [1, 15], [1, 17],
-            [2, 19], [2, 23], [2, 27], [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83], [4, 99],
-            [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
+            [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10],
+            [1, 11], [1, 13], [1, 15], [1, 17], [2, 19], [2, 23], [2, 27],
+            [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83],
+            [4, 99], [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
         ];
         var DEFLATE_DISTANCE_MAP = [
-            [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13], [3, 17], [3, 25], [4, 33], [4, 49],
-            [5, 65], [5, 97], [6, 129], [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025], [9, 1537],
-            [10, 2049], [10, 3073], [11, 4097], [11, 6145], [12, 8193], [12, 12289], [13, 16385], [13, 24577]
+            [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13],
+            [3, 17], [3, 25], [4, 33], [4, 49], [5, 65], [5, 97], [6, 129],
+            [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025],
+            [9, 1537], [10, 2049], [10, 3073], [11, 4097], [11, 6145],
+            [12, 8193], [12, 12289], [13, 16385], [13, 24577]
         ];
 
         while (!done) {
             var done = newBitio.readUB(1);
             var type = newBitio.readUB(2);
+
             var distTable = {};
             var litTable = {};
             var fixedDistTable = false;
@@ -7849,19 +8300,18 @@
                     var numDistLengths = newBitio.readUB(5) + 1;
                     var numCodeLengths = newBitio.readUB(4) + 4;
                     var codeLengths =
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                     for(var i = 0; i < numCodeLengths; i++){
                         codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] =
                             newBitio.readUB(3);
                     }
-
                     var codeTable = _buildHuffTable(codeLengths);
                     var litLengths = [];
                     var prevCodeLen = 0;
                     var maxLengths = numLitLengths + numDistLengths;
                     while (litLengths.length < maxLengths) {
                         var sym = _decodeSymbol(newBitio, codeTable);
-
                         switch (sym) {
                             case 16:
                                 var i = newBitio.readUB(2) + 3;
@@ -7899,7 +8349,9 @@
                 while (sym != 256) {
                     var sym = _decodeSymbol(newBitio, litTable);
                     if (sym < 256) {
-                        buff[buff.length] = isDeCompress ? _fromCharCode(sym) : sym;
+                        buff[buff.length] = (isDeCompress)
+                            ? _fromCharCode(sym)
+                            : sym;
                     } else if(sym > 256){
                         var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
                         var len = lengthMap[1]
@@ -7917,13 +8369,16 @@
                     }
                 }
             } else {
-                var len = newBitio.getUI16();
-                var nlen = newBitio.getUI16();
+                newBitio.bit_offset = 8;
+                var len = newBitio.readNumber(2);
+                var nlen = newBitio.readNumber(2);
+
                 if (isDeCompress) {
-                    buff[buff.length] = newBitio.getData(len);
+                    var string = newBitio.readString(len);
+                    buff[buff.length] = string;
                 } else {
                     while (len--) {
-                        buff[buff.length] = newBitio.getUI8();
+                        buff[buff.length] = newBitio.readNumber(1);
                     }
                 }
             }
@@ -8070,6 +8525,7 @@
         var dqt = '';
         var dht = '';
         var len = 0;
+
         while (marker = newBitio.getUI16BE()) {
             switch (marker) {
                 case 0xFFD8: // SOI
