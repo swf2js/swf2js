@@ -122,6 +122,10 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.1.5 ] Release Date: 23 Oct 2014  
+* [BUGFIX] Tag 'PlaceObject2'  
+
+
 --[ swf2js 0.1.4 ] Release Date: 22 Oct 2014  
 * [BUGFIX] Tag 'DefineBits'  
 * [BUGFIX] Tag 'PlaceObject2'  

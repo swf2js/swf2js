@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.4)
+ * swf2js (version 0.1.5)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -5714,11 +5714,17 @@
                     cTag.Matrix = _clone(obj.Matrix);
 
                     // 補正
-                    if (cTag.Matrix.TranslateX == 0 && obj.CloneData._x != 0) {
-                        cTag.Matrix.TranslateX = obj.CloneData._x;
-                    }
-                    if (cTag.Matrix.TranslateY == 0 && obj.CloneData._y != 0) {
-                        cTag.Matrix.TranslateY = obj.CloneData._y;
+                    if (cTag.PlaceFlagHasCharacter) {
+                        if (cTag.Matrix.TranslateX == 0
+                            && obj.CloneData._x != 0
+                            ) {
+                            cTag.Matrix.TranslateX = obj.CloneData._x;
+                        }
+                        if (cTag.Matrix.TranslateY == 0
+                            && obj.CloneData._y != 0
+                            ) {
+                            cTag.Matrix.TranslateY = obj.CloneData._y;
+                        }
                     }
 
                     cTag.PlaceFlagHasMatrix = obj.PlaceFlagHasMatrix;
