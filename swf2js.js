@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.5)
+ * swf2js (version 0.1.6)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -43,7 +43,6 @@
     var _setBuffer = setBuffer;
     var _handleMessage = handleMessage;
     var _clearPre = clearPre;
-    var _clearCache = clearCache;
     var _setStyle = setStyle;
     var _action = action;
     var _putFrame = putFrame;
@@ -70,9 +69,6 @@
 
     // canvas
     var _renderCanvas = renderCanvas;
-    var _setCacheCanvasArray = setCacheCanvasArray;
-    var _getCacheCanvasArray = getCacheCanvasArray;
-    var _clearCacheCanvasArray = clearCacheCanvasArray;
     var _setCanvasArray = setCanvasArray;
     var _getCanvasArray = getCanvasArray;
     var _generateRGBA = generateRGBA;
@@ -106,17 +102,17 @@
     var setWidth = 0;
     var setHeight = 0;
     var renderMode = 'canvas';
-    var baseCanvas, context, preContext, cacheContext;
+    var baseCanvas, context, preContext;
     var messageName = "zero-timeout-message";
     var canvasArray = [];
-    var cacheCanvasArray = [];
+    var cacheArray = [];
     var bitMapData = [];
     var layer = [];
     var btnLayer = [];
     var touchCtx = [];
     var FontData = [];
     var imgLoadCount = 0;
-    var isImgLoadCompCount = 0;
+    var imgLoadCompCount = 0;
     var timeouts = 0;
     var devicePixelRatio = _window.devicePixelRatio || 1;
     var scale = 1;
@@ -133,6 +129,10 @@
     var jpegTables = null;
     var signature = '';
     var version = 0;
+    var isSpriteSheet = false;
+    var base64Array = [];
+    var spriteArray = [];
+    var totalFrame = 0;
 
     /**
      * init
@@ -140,10 +140,10 @@
     function init()
     {
         // PCで確認する用
-        // スマフォ=true, PC=false
+        // SP=true, PC=false
         isTouch = ('ontouchstart' in _window);
         if (isTouch) {
-            // スマートフォン
+            // SP
             var startEvent = 'touchstart';
             var moveEvent  = 'touchmove';
             var endEvent   = 'touchend';
@@ -164,8 +164,8 @@
         var minSize = _min(width, height);
         var style = div.style;
         _setStyle(style, 'position', 'relative');
-        _setStyle(style, 'top', 50 - ((minSize/height) * 100) + '%');
-        _setStyle(style, 'left', ((width - minSize) / 2)  +'px');
+        _setStyle(style, 'top', '0');
+        _setStyle(style, 'left', (width / 2) - (minSize / 2) +'px');
         _setStyle(style, 'width', minSize + 'px');
         _setStyle(style, 'height', minSize + 'px');
         _setStyle(style, '-webkit-user-select', 'none');
@@ -232,10 +232,6 @@
         var preCanvas = baseCanvas.cloneNode(false);
         preContext = preCanvas.getContext('2d');
 
-        // cache canvas
-        var cacheCanvas = baseCanvas.cloneNode(false);
-        cacheContext = cacheCanvas.getContext('2d');
-
         return true;
     }
 
@@ -244,11 +240,13 @@
      */
     _window.onresize = function()
     {
-        // リサイズ開始
-        _changeScreenSize();
+        if (!isSpriteSheet) {
+            // リサイズ開始
+            _changeScreenSize();
 
-        // buffer
-        _setBuffer();
+            // buffer
+            _setBuffer();
+        }
     }
 
     /**
@@ -256,16 +254,18 @@
      */
     function changeScreenSize()
     {
-        var screenWidth  = (setWidth > 0) ? setWidth : _window.innerWidth;
-        var screenHeight = (setHeight > 0) ? setHeight : _window.innerHeight;
         var _layer = player.layer;
         if (!(_layer instanceof AnimationClass)) {
             return false;
         }
 
+        var screenWidth  = (setWidth > 0) ? setWidth : _window.innerWidth;
+        var screenHeight = (setHeight > 0) ? setHeight : _window.innerHeight;
+
         var canvasWidth  = _layer._width;
         var canvasHeight = _layer._height;
         var minSize = _min(screenWidth, screenHeight);
+
         // 条件に合わせてリサイズ
         if(canvasWidth > canvasHeight){
             scale = screenWidth / canvasWidth * devicePixelRatio;
@@ -305,11 +305,6 @@
         var preCanvas = preContext.canvas;
         _setStyle(preCanvas, 'width', width);
         _setStyle(preCanvas, 'height', height);
-
-        // cache
-        var cacheCanvas = cacheContext.canvas;
-        _setStyle(cacheCanvas, 'width', width);
-        _setStyle(cacheCanvas, 'height', height);
     }
 
     /**
@@ -331,9 +326,7 @@
             event.stopPropagation();
             if (timeouts) {
                 timeouts--;
-                if (isLoad) {
-                    _buffer();
-                }
+                _buffer();
             }
         }
     }
@@ -762,45 +755,20 @@
 
             // build
             layer[0] = undefined;
-            _this.build(tags);
+            _this.build(tags, true);
 
-            // set
-            var _layer = layer[0];
-            var Xmax = player.Xmax;
-            var Xmin = (player.Xmin > 0)
-                ? player.Xmin
-                : player.Xmin * -1;
+            console.log(layer[0]);
 
-            var Ymax = player.Ymax;
-            var Ymin = (player.Ymin > 0)
-                ? player.Ymin
-                : player.Ymin * -1;
 
-            _layer._width = Xmax - Xmin;
-            _layer._height = Ymax - Ymin;
-
-            delete _layer.Xmax;
-            delete _layer.Xmin;
-            delete _layer.Ymax;
-            delete _layer.Ymin;
-
-            player.layer = _layer;
-
-            // Canvasの画面サイズを調整
-            _changeScreenSize();
-
-            // buffer
-            _setBuffer();
-
-            // reset
             //layer = [];
         },
 
         /**
          * build
          * @param tags
+         * @param isFirst
          */
-        build: function(tags)
+        build: function(tags, isFirst)
         {
             var _this = swftag;
             var _build = _this.build;
@@ -822,7 +790,7 @@
                         if (sTags == undefined) {
                             continue;
                         }
-                        _build(sTags);
+                        _build(sTags, false);
                     }
                 }
 
@@ -849,6 +817,51 @@
                         var btnClass = layer[ButtonId];
                         _buttonBuild(btnClass.ButtonCharacters);
                     }
+                }
+
+                if (isFirst && tag.spriteID == 0 && frame == 1) {
+                    // set
+                    var _layer = layer[0];
+                    var Xmax = player.Xmax;
+                    var Xmin = (player.Xmin > 0)
+                        ? player.Xmin
+                        : player.Xmin * -1;
+
+                    var Ymax = player.Ymax;
+                    var Ymin = (player.Ymin > 0)
+                        ? player.Ymin
+                        : player.Ymin * -1;
+
+                    _layer._width = Xmax - Xmin;
+                    _layer._height = Ymax - Ymin;
+
+                    delete _layer.Xmax;
+                    delete _layer.Xmin;
+                    delete _layer.Ymax;
+                    delete _layer.Ymin;
+
+                    player.layer = _layer;
+
+                    // Canvasの画面サイズを調整
+                    _changeScreenSize();
+
+                    // reset
+                    if (imgLoadCount == 0
+                        || imgLoadCount == imgLoadCompCount
+                    ) {
+                        isLoad = true;
+                    }
+
+                    if (isLoad) {
+                        isLoad = false;
+                        _buffer();
+                        _deleteCss();
+                        isLoad = true;
+                    }
+
+                    // 描画開始
+                    _swf2js.play();
+                    intervalId = _setInterval(_onEnterFrame, player.fps);
                 }
             }
         },
@@ -907,7 +920,6 @@
 
                 var tagLength = bitio.getUI16();
                 tagType = tagLength >> 6;
-                //console.log('------------------------- ' + tagStartOffset);
 
                 // long形式
                 var length = tagLength & 0x3f;
@@ -1067,6 +1079,9 @@
                     var UseNetwork = bitio.getUIBit();
                     var Reserved3 = bitio.getUIBits(24); // Must be 0
                     break;
+                case 77: // MetaData
+                    var MetaData = bitio.getDataUntil('\0');
+                    break;
                 // TODO
                 case 3:  // FreeCharacter
                 case 13: // DefineFontInfo
@@ -1110,7 +1125,6 @@
                 case 74: // CSMTextSettings
                 case 75: // DefineFont3
                 case 76: // SymbolClass
-                case 77: // MetaData
                 case 78: // DefineScalingGrid
                 case 82: // DoABC2
                 case 83: // DefineShape4
@@ -1185,6 +1199,11 @@
         showFrame: function(
             frame, FrameCount, SpriteID, cTags, removeObj, actionScript, label)
         {
+            // SpriteSheet用
+            if (isSpriteSheet && frame > totalFrame) {
+                totalFrame = frame;
+            }
+
             // コピー対象外の配列
             var depthArray = [];
 
@@ -2993,26 +3012,6 @@
             var imageCanvas = baseCanvas.cloneNode(false);
             var imageContext = imageCanvas.getContext('2d');
 
-            for (var i = 0; JPEGData[i]; i++) {
-                var word = ((JPEGData.charCodeAt(i) & 0xff) << 8)
-                    | (JPEGData.charCodeAt(++i) & 0xff);
-                if (0xffd9 == word) {
-                    word = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
-                        | (JPEGData.charCodeAt(++i) & 0xff);
-                    if(word == 0xffd8){
-                        JPEGData = JPEGData.substr(0, i - 4) + JPEGData.substr(i);
-                        i -= 4;
-                    }
-                } else if (0xffc0 == word) {
-                    i += 3;
-                    var height = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
-                        | (JPEGData.charCodeAt(++i) & 0xff);
-                    var width = ((JPEGData.charCodeAt(++i) & 0xff) << 8)
-                        | (JPEGData.charCodeAt(++i) & 0xff);
-                    break;
-                }
-            }
-
             // render
             imgLoadCount++;
             var imgObj = new _Image();
@@ -3043,11 +3042,12 @@
                 layer[cid] = imageContext;
 
                 // 読み完了カウントアップ
-                isImgLoadCompCount++;
+                imgLoadCompCount++;
             }
 
-            imgObj.src = "data:image/jpeg;base64,"
+            var base64 = "data:image/jpeg;base64,"
                 + _base64encode(_parseJpegData(JPEGData, jpegTables));
+            imgObj.src = base64;
         },
 
         /**
@@ -3082,22 +3082,22 @@
 
                     switch (switchName) {
                         case '_sans':
-                            obj.FontName = 'Arial, Helvetica, sans-serif';
+                            obj.FontName = 'sans-serif, Helvetica';
                             break;
                         case '_serif':
-                            obj.FontName = 'Times, serif';
+                            obj.FontName = 'sans-serif, Times, serif';
                             break;
                         case '_typewriter':
                             obj.FontName = 'monospace';
                             break;
                         default:
-                            if (isTouch && !_isFontInstalled(fontName)) {
+                            if (isTouch || !_isFontInstalled(fontName)) {
                                 if (obj.FontFlagsBold) {
-                                    obj.FontName = 'Futura-CondensedExtraBold';
+                                    obj.FontName = 'sans-serif, Futura-CondensedExtraBold';
                                 } else  if (obj.FontFlagsItalic) {
-                                    obj.FontName = 'Futura-MediumItalic';
+                                    obj.FontName = 'sans-serif, Futura-MediumItalic';
                                 } else {
-                                    obj.FontName = 'Futura-Medium';
+                                    obj.FontName = 'sans-serif, Futura-Medium';
                                 }
                             } else {
                                 obj.FontName = fontName;
@@ -3483,7 +3483,6 @@
                 } else {
                     obj.InitialText = text;
                 }
-
             }
 
             var Bound = obj.Bound;
@@ -4857,10 +4856,16 @@
                                 value = targetObj._visible;
                                 break;
                             case 8:
-                                value = targetObj._width;
+                                var xscale = (targetObj._xscale == null)
+                                    ? 1
+                                    : targetObj._xscale;
+                                value = targetObj._width * xscale;
                                 break;
                             case 9:
-                                value = targetObj._height;
+                                var yscale = (targetObj._yscale == null)
+                                    ? 1
+                                    : targetObj._yscale;
+                                value = targetObj._height * yscale;
                                 break;
                             case 10:
                                 if (_parseFloat(value) > 360) {
@@ -5335,8 +5340,6 @@
                                 }
                                 break;
                             default:
-                                console.log('fscommand2');
-                                console.log(method);
                                 obj.setVariable(
                                     params.pop(),
                                     -1
@@ -5363,7 +5366,7 @@
                         for (var i = 0; i < count; i++) {
                             constantPool += newBitio.readString(i);
                         }
-                        console.log(constantPool)
+                        console.log(constantPool);
                         break;
 
 
@@ -6308,22 +6311,13 @@
      */
     function drawVector(aData, transform, tag, aClass)
     {
-        var isCache = aClass.isCache;
         if (!aClass.isClipDepth) {
             _setSave(_getCanvasArray());
-            if (isCache) {
-                _setSave(_getCacheCanvasArray());
-            }
         }
 
         // transform
         var len = transform.length;
         _setSetTransform(_getCanvasArray(), scale, 0, 0, scale, 0, 0);
-        if (isCache) {
-            _setSetTransform(
-                _getCacheCanvasArray(), scale, 0, 0, scale, 0, 0
-            );
-        }
 
         for (var i = 0; i < len; i++) {
             var transformObj = transform[i];
@@ -6339,24 +6333,9 @@
                         transformObj.TranslateX,
                         transformObj.TranslateY
                     );
-
-                    if (isCache) {
-                        _setTransform(
-                            _getCacheCanvasArray(),
-                            transformObj.ScaleX,
-                            transformObj.RotateSkew0,
-                            transformObj.RotateSkew1,
-                            transformObj.ScaleY,
-                            transformObj.TranslateX,
-                            transformObj.TranslateY
-                        );
-                    }
                     break;
                 case 1:
                     _setRotate(_getCanvasArray(), transformObj.angle);
-                    if (isCache) {
-                        _setRotate(_getCacheCanvasArray(), transformObj.angle);
-                    }
                     break;
                 case 2:
                     _setScale(
@@ -6364,14 +6343,6 @@
                         transformObj.ScaleX,
                         transformObj.ScaleY
                     );
-
-                    if (isCache) {
-                        _setScale(
-                            _getCacheCanvasArray(),
-                            transformObj.ScaleX,
-                            transformObj.ScaleY
-                        );
-                    }
                     break;
             }
         }
@@ -6397,9 +6368,6 @@
                 var fLen = fArray.length;
                 for (var f = 0; f < fLen; f++) {
                     _setCanvasArray(fArray[f]);
-                    if (isCache) {
-                        _setCacheCanvasArray(fArray[f]);
-                    }
                 }
             } else {
                 _draw(data, aClass);
@@ -6408,9 +6376,6 @@
 
         if (!aClass.isClipDepth) {
             _setRestore(_getCanvasArray());
-            if (isCache) {
-                _setRestore(_getCacheCanvasArray());
-            }
         }
     }
 
@@ -6421,12 +6386,8 @@
      */
     function mask(data, aClass)
     {
-        var isCache = aClass.isCache;
         var dLen = data.length;
         _setBeginPath(_getCanvasArray());
-        if (isCache) {
-            _setBeginPath(_getCacheCanvasArray());
-        }
 
         for (var i = 0; i < dLen; i++) {
             var stack = data[i];
@@ -6444,18 +6405,12 @@
                     var length = fArray.length - 2;
                     for (var c = 6; c < length; c++) {
                         _setCanvasArray(fArray[c]);
-                        if (isCache) {
-                            _setCacheCanvasArray(fArray[c]);
-                        }
                     }
                 }
             }
         }
 
         _setClip(_getCanvasArray());
-        if (isCache) {
-            _setClip(_getCacheCanvasArray());
-        }
     }
 
     /**
@@ -6465,7 +6420,6 @@
      */
     function draw(data, aClass)
     {
-        var isCache = aClass.isCache;
         var dLen = data.length;
         for (var i = 0; i < dLen; i++) {
             var stack = data[i];
@@ -6483,9 +6437,6 @@
                     var length = fArray.length;
                     for (var c = 0; c < length; c++) {
                         _setCanvasArray(fArray[c]);
-                        if (isCache) {
-                            _setCacheCanvasArray(fArray[c]);
-                        }
                     }
                 }
             }
@@ -6507,7 +6458,6 @@
     _swf2js.load = function(path, options)
     {
         if (_init()) {
-            // TODO いつか消す
             if (path == undefined) {
                 path = location.search.substr(1).split('&')[0];
             }
@@ -6532,6 +6482,7 @@
                             setWidth = options.width | 0;
                             setHeight = options.height | 0;
                             renderMode = options.mode | 'canvas';
+                            isSpriteSheet = options.isSpriteSheet | false;
                         }
                         _parse(_xmlHttpRequest.responseText);
                     } else {
@@ -6578,8 +6529,7 @@
     {
         var _this = this;
         _this.clear();
-        _this.load(path, {'width': setWidth, 'height': setHeight});
-        _this.play();
+        _this.load(path, {width: setWidth, height: setHeight});
     }
 
     /**
@@ -6638,17 +6588,7 @@
         swftag.parse();
 
         // reset
-        if (imgLoadCount == isImgLoadCompCount) {
-            isLoad = true;
-        }
-
-        if (isLoad) {
-            _deleteCss();
-        }
-
-        // 描画開始
-        _swf2js.play();
-        intervalId = _setInterval(_onEnterFrame, player.fps);
+        swftag = _void;
     }
 
     /**
@@ -6696,20 +6636,27 @@
      */
     function onEnterFrame()
     {
-        if (isLoad && player.playStartFlag) {
-            _clearMain();
-
-            // main
-            var canvas = preContext.canvas;
-            context.drawImage(canvas, 0, 0);
-
-            _setBuffer();
-        }
-
-        if (imgLoadCount == isImgLoadCompCount && !isLoad) {
+        if (!isLoad
+            && imgLoadCount > 0
+            && imgLoadCount == imgLoadCompCount
+        ) {
             isLoad = true;
             _setBuffer();
             _deleteCss();
+        } else if (isLoad && player.playStartFlag) {
+            _clearMain();
+
+            // main
+            if (cacheArray.length > 0) {
+                _setBuffer();
+                var cache = cacheArray.shift();
+                var canvas = cache.canvas;
+                context.drawImage(canvas, 0, 0);
+            } else {
+                var canvas = preContext.canvas;
+                context.drawImage(canvas, 0, 0);
+                _setBuffer();
+            }
         }
     }
 
@@ -6743,6 +6690,55 @@
                 }
 
                 _renderCanvas();
+                var cLen = cacheArray.length;
+                if (!isLoad || cLen > 0) {
+                    var cloneCanvas = baseCanvas.cloneNode(false);
+                    var cache = cloneCanvas.getContext('2d');
+                    _setStyle(cloneCanvas, 'width', width);
+                    _setStyle(cloneCanvas, 'height', height);
+                    var canvas = preContext.canvas;
+                    cache.drawImage(canvas, 0, 0);
+                    cacheArray[cLen] = cache;
+                }
+
+                if (isSpriteSheet && totalFrame > 0) {
+                    var base64 = preContext.canvas.toDataURL();
+//                    if (base64Array[base64] == undefined) {
+//                        base64Array[base64] = totalFrame;
+//                    }
+                    spriteArray[totalFrame] = base64;
+                    totalFrame--;
+                }
+
+                if (isSpriteSheet && totalFrame == 0) {
+                    player.playStartFlag = false;
+
+                    var fLen = spriteArray.length;
+
+                    var canvas = context.canvas;
+                    _setStyle(canvas, 'width', (width * (fLen - 1)));
+
+                    _clearMain();
+                    var cnt = 0;
+                    for (var f = fLen; f--;) {
+                        var src =  spriteArray[f];
+                        if (src != undefined) {
+                            var imgObj = new _Image();
+                            imgObj.w = (cnt * width);
+                            imgObj.onload = function()
+                            {
+                                context.drawImage(this, this.w, 0);
+                            }
+                            imgObj.src = src;
+                            cnt++;
+                        }
+                    }
+
+                    // divの設定
+                    var div = _document.getElementById('swf2js');
+                    var style = div.style;
+                    _setStyle(style, 'left', 0);
+                }
             }
 
             // next animation
@@ -7017,10 +7013,6 @@
                 }
             }
 
-            if (aData.cache != null) {
-                //_setDrawImage(_getCanvasArray(), aData.cache);
-            }
-
             // 指定フレーム
             var tags = aData.frameTags[aData.getFrame()];
             if (tags instanceof Array) {
@@ -7039,20 +7031,6 @@
                     aData.isClipDepth = false;
                     _setRestore(_getCanvasArray());
                 }
-            }
-
-            if (aData.isCache) {
-//                _clearCache();
-//                _renderCanvas(true);
-//                var cloneCanvas = baseCanvas.cloneNode(false);
-//                cloneCanvas.width = width;
-//                cloneCanvas.height = height;
-//                var cloneContext = cloneCanvas.getContext('2d');
-//                cloneContext.drawImage(cacheContext.canvas, 0, 0);
-//                aData.cache = cloneContext.canvas;
-                //aData.cache = _getCacheCanvasArray();
-                aData.isCache = false;
-                _clearCacheCanvasArray();
             }
         } else {
             // ColorTransform
@@ -7193,15 +7171,6 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
-        canvas.width = canvas.width;
-    }
-
-    /*
-     * cache canvas clear
-     */
-    function clearCache()
-    {
-        var canvas = cacheContext.canvas;
         canvas.width = canvas.width;
     }
 
@@ -7594,31 +7563,6 @@
     }
 
     /**
-     * setCacheCanvasArray
-     * @param value
-     */
-    function setCacheCanvasArray(value)
-    {
-        cacheCanvasArray[cacheCanvasArray.length] = value;
-    }
-
-    /**
-     * getCacheCanvasArray
-     */
-    function getCacheCanvasArray()
-    {
-        return cacheCanvasArray;
-    }
-
-    /**
-     * clearCacheCanvasArray
-     */
-    function clearCacheCanvasArray()
-    {
-        cacheCanvasArray = [];
-    }
-
-    /**
      * setCanvasArray
      * @param value
      */
@@ -7638,14 +7582,13 @@
 
     /**
      * renderCanvas
-     * @param isCache
      */
-    function renderCanvas(isCache)
+    function renderCanvas()
     {
-        var array = (isCache) ? cacheCanvasArray : canvasArray;
+        var array = canvasArray;
         var len = array.length;
         var i = 0;
-        var _context = (isCache) ? cacheContext : preContext;
+        var _context = preContext;
         var grad = null;
 
         while (len) {
@@ -7767,8 +7710,9 @@
                     break;
                 case 'font':
                     _context.textBaseline = 'top';
-                    _context.font =
-                        array[i++] +"px '"+ array[i++] +"'";
+                    var font = array[i++] +"px '"+ array[i++] +"'";
+                    _context.font = font;
+
                     break;
                 case 'textAlign':
                     _context.textAlign = array[i++];
@@ -7790,11 +7734,7 @@
         }
 
         // 初期化
-        if (isCache) {
-            cacheCanvasArray = [];
-        } else {
-            canvasArray = [];
-        }
+        canvasArray = [];
     }
 
     /**
@@ -8127,7 +8067,7 @@
         // 複数行
         var textFiledHeight = Ymax - Ymin;
         for (var i = 0; i < len; i++) {
-            if ((dy + newLineHeight) > textFiledHeight) {
+            if (len > 1 && (dy + newLineHeight) > textFiledHeight) {
                 continue;
             }
 
@@ -8463,17 +8403,19 @@
      */
     function deleteCss()
     {
-        swftag = _void;
-
         // loading 削除
         var div = _document.getElementById('swf2js_loading');
-        var node = div.parentNode;
-        node.removeChild(div);
+        if (div) {
+            var node = div.parentNode;
+            node.removeChild(div);
+        }
 
         // css 削除
         var div = _document.getElementById('swf2js');
         var childNodes = div.childNodes;
-        div.removeChild(childNodes[0]);
+        if (childNodes[0]) {
+            div.removeChild(childNodes[0]);
+        }
     }
 
     /**
@@ -8578,28 +8520,20 @@
      */
     function isFontInstalled(fontName)
     {
-        var div = _document.getElementById('swf2js');
+        var text = "this is test text.";
+        var canvasA = baseCanvas.cloneNode(false);
+        var contextA = canvasA.getContext("2d");
+        contextA.font = "30px '"+ fontName +"', serif";
+        var textA = contextA.measureText(text);
 
-        // 初期値
-        var node = _document.createElement('span');
-        div.appendChild(node);
+        var canvasB = baseCanvas.cloneNode(false);
+        var contextB = canvasB.getContext("2d");
+        contextB.font = "30px serif";
+        var textB = contextB.measureText(text);
 
-        node.innerHTML = 'あ';
-        var defaultWidth = node.offsetWidth;
-        var defaultHeight = node.offsetHeight;
-        div.removeChild(node);
-
-        // font セット
-        node = _document.createElement('span');
-        div.appendChild(node);
-
-        node.innerHTML = 'あ';
-        node.style.fontFamily = "'" + fontName + "'";
-        var fontWidth = node.offsetWidth;
-        var fontHeight = node.offsetHeight;
-        div.removeChild(node);
-
-        return (defaultWidth != fontWidth || defaultHeight != fontHeight);
+        contextA = void 0;
+        contextB = void 0;
+        return (textA.width != textB.width);
     }
 
     /**

@@ -1,6 +1,6 @@
 FlashをiPhoneで再生可能にする「swf2js」
 ======
-swfをJavaScriptでバイナリ分解してcanvasで出力してiPhoneでswfを再生  
+swfをJavaScriptでバイナリ分解してcanvas出力!!iPhoneでもswfを再生可能に  
 対応バージョン：Flash Lite 1.1(swf4)以下  
   
 output in the canvas with swf binary decomposition in JavaScript.  
@@ -33,11 +33,14 @@ html
 
 
 ※OPTIONS  
+------
 {  
-    'width': int,  // default 100%  
-    'height': int, // default 100%  
-    'mode': string // default canvas 'webgl' or 'canvas'  
+    width: int,  // default 100%  
+    height: int, // default 100%  
+    isSpriteSheet: bool // default false  
 }  
+
+
 
 
 MEMO
@@ -100,7 +103,6 @@ DefineFontAlignZones
 CSMTextSettings  
 DefineFont3  
 SymbolClass  
-MetaData  
 DefineScalingGrid  
 DoABC2  
 DefineShape4  
@@ -122,6 +124,15 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.1.6 ] Release Date: 24 Oct 2014  
+* [BUGFIX] Tag 'PlaceObject2'  
+* [BUGFIX] Tag 'DefineEditText'  
+* [BUGFIX] Tag 'DefineBits'  
+* [BUGFIX] ActionScript 'GetProperty'  
+* [NEW] OPTION 'isSpriteSheet'  
+* [NEW] Tag 'MetaData'  
+
+
 --[ swf2js 0.1.5 ] Release Date: 23 Oct 2014  
 * [BUGFIX] Tag 'PlaceObject2'  
 
