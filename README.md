@@ -68,11 +68,8 @@ SWF 10
 ▼TAG  
 FreeCharacter  
 DefineFontInfo  
-DefineSound  
-StartSound  
 StopSound  
 DefineButtonSound  
-SoundStreamHead  
 SoundStreamBlock  
 DefineButtonCxform  
 PathsArePostScript  
@@ -82,7 +79,6 @@ DefineVideo
 ProductInfo  
 DefineTextFormat  
 DefineBehavior  
-SoundStreamHead2  
 FrameTag  
 GenCommand  
 DefineCommandObj  
@@ -100,20 +96,13 @@ DefineFontInfo2
 DebugID  
 ScriptLimits  
 SetTabIndex  
-DefineShape4_hmm  
 PlaceObject3  
 ImportAssets2  
-DoABC  
 DefineFontAlignZones  
 CSMTextSettings  
 DefineFont3  
-SymbolClass  
 DefineScalingGrid  
-DoABC2  
-DefineShape4  
-DefineSceneAndFrameLabelData  
 DefineBinaryData  
-StartSound2  
 DefineFont4  
 EnableTelemetry  
 
@@ -126,9 +115,23 @@ LZMA
 WebGL  
 
 
-
 Release Notes  
 -------
+--[ swf2js 0.1.7 ] Release Date: 28 Oct 2014  
+* [BUGFIX] ActionScript 'SetTarget'  
+* [NEW] Tag 'DefineSceneAndFrameLabelData'  
+* [NEW] Tag 'SoundStreamHead'  
+* [NEW] Tag 'SoundStreamHead2'  
+* [NEW] Tag 'DefineShape4'  
+* [NEW] Tag 'DefineBitsJPEG4'  
+* [NEW] Tag 'DoABC'  
+* [NEW] Tag 'DoABC2'  
+* [NEW] Tag 'SymbolClass'  
+* [NEW] Tag 'DefineSound'  
+* [NEW] Tag 'StartSound'  
+* [NEW] Tag 'StartSound2'  
+
+
 --[ swf2js 0.1.6 ] Release Date: 24 Oct 2014  
 * [BUGFIX] Tag 'PlaceObject2'  
 * [BUGFIX] Tag 'DefineEditText'  

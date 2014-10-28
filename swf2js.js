@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.1.6)
+ * swf2js (version 0.1.7)
  * web: https://github.com/ienaga/swf2js/
  * readMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * contact: ienagatoshiyuki@facebook.com
@@ -25,9 +25,11 @@
     var _isNaN = isNaN;
     var _xmlHttpRequest = new XMLHttpRequest();
     var _Image = Image;
+    var _Audio = Audio;
     var _setInterval = setInterval;
     var _clearInterval = clearInterval;
     var _Date = Date;
+    var _decodeURIComponent = decodeURIComponent;
 
     // local function cache
     var _init = init;
@@ -111,6 +113,7 @@
     var btnLayer = [];
     var touchCtx = [];
     var FontData = [];
+    var sounds = [];
     var imgLoadCount = 0;
     var imgLoadCompCount = 0;
     var timeouts = 0;
@@ -435,11 +438,13 @@
         /**
          * DataUntil
          * @param value
+         * @param isJis
          * @returns {string}
          */
-        getDataUntil: function(value)
+        getDataUntil: function(value, isJis)
         {
             var _this = this;
+
             _this.byteAlign();
             var bo = _this.byte_offset;
             var offset = 0;
@@ -464,6 +469,10 @@
                 }
             }
 
+            if (isJis == undefined) {
+                isJis = true;
+            }
+
             var ret = _this.data.substr(bo, n);
             if (value != null) {
                 var rLen = ret.length;
@@ -478,7 +487,11 @@
                         array[array.length] = '%' + code.toString(16);
                     }
                 }
-                ret = _decodeToShiftJis(array.join(''));
+
+                ret = (isJis)
+                    ? _decodeToShiftJis(array.join(''))
+                    : array.join('');
+
                 if (ret.substr(-5) == '@LFCR') {
                     ret.slice(0, -5);
                 }
@@ -655,6 +668,24 @@
         },
 
         /**
+         * getEncodedU32
+         * @returns {number}
+         */
+        getEncodedU32: function()
+        {
+            var _this = this;
+            var value = 0;
+            for (var i = 0; i < 5; i++) {
+                var num = _this.data.charCodeAt(_this.byte_offset++) & 0xff;
+                value = value | ((num & 0x7f) << (7 * i));
+                if (!(num & 0x80)) {
+                    break;
+                }
+            }
+            return value;
+        },
+
+        /**
          * readUB
          * @param n
          * @returns {number}
@@ -753,14 +784,25 @@
             // parse tag
             var tags = _this.parseTags(dataLength, frameCount, 0);
 
+            var sLen = sounds.length;
+            if (sLen) {
+                var canvas = _document.getElementById('swf2js');
+                canvas.addEventListener('click', function ()
+                {
+                    canvas.removeEventListener('click', arguments.callee, false);
+                    for (var i = sLen; i--;) {
+                        var sound = sounds[i];
+                        if (sound == undefined) {
+                            continue;
+                        }
+                        sound.Audio.load();
+                    }
+                }, false);
+            }
+
             // build
             layer[0] = undefined;
             _this.build(tags, true);
-
-            console.log(layer[0]);
-
-
-            //layer = [];
         },
 
         /**
@@ -805,7 +847,8 @@
                     tag.cTags,
                     tag.removeObj,
                     tag.actionScript,
-                    tag.label
+                    tag.label,
+                    tag.soundCtrls
                 );
 
                 // Button Build
@@ -871,7 +914,7 @@
          * @param frame
          * @param frameCount
          * @param spriteID
-         * @returns {{frame: *, frameCount: *, spriteID: *, cTags: Array, removeObj: Array, actionScript: Array, label: Array, sprite: Array, btnLayer: Array}}
+         * @returns {{ }}
          */
         generateDefaultTagObj: function (frame, frameCount, spriteID)
         {
@@ -884,7 +927,8 @@
                 actionScript: [],
                 label: [],
                 sprite: [],
-                btnLayer: []
+                btnLayer: [],
+                soundCtrls: []
             }
         },
 
@@ -923,6 +967,7 @@
 
                 // long形式
                 var length = tagLength & 0x3f;
+
                 if (length == 0x3f) {
                     if (tagStartOffset + 6 > dataLength) {
                         bitio.byte_offset = tagStartOffset;
@@ -931,7 +976,6 @@
                     }
                     length = bitio.getUI32();
                 }
-
                 var tagDataStartOffset = bitio.byte_offset;
                 if (tagType == 1) {
                     frame++;
@@ -983,6 +1027,7 @@
                 case 2:  // DefineShape
                 case 22: // DefineShape2
                 case 32: // DefineShape3
+                case 83: // DefineShape4
                     if (dataLength < 10) {
                         bitio.byte_offset + dataLength;
                     } else {
@@ -1002,6 +1047,7 @@
                     break;
                 case 4: // PlaceObject
                 case 26: // PlaceObject2
+                case 70: //PlaceObject3
                     obj = _this.parsePlaceObject(tagType, dataLength);
                     break;
                 case 37: // DefineEditText
@@ -1013,7 +1059,7 @@
                     );
                     break;
                 case 12: // DoAction
-                    obj = _this.parseDoAction(dataLength, undefined, 0);
+                    obj = _this.parseDoAction(dataLength, undefined);
                     break;
                 case 5: // RemoveObject
                 case 28: // RemoveObject2
@@ -1036,6 +1082,7 @@
                 case 6: // DefineBits
                 case 21: // DefineBitsJPEG2
                 case 35: // DefineBitsJPEG3
+                case 90: // DefineBitsJPEG4
                     _this.parseDefineBits(tagType, dataLength, jpegTables);
                     jpegTables = null;
                     break;
@@ -1048,16 +1095,6 @@
                 case 46: // DefineMorphShape
                 case 84: // DefineMorphShape2
                     _this.parseDefineMorphShape(tagType);
-                    break;
-                case 27: // 27 (invalid)
-                case 30: // 30 (invalid)
-                case 68: // 68 (invalid)
-                case 79: // 79 (invalid)
-                case 80: // 80 (invalid)
-                case 81: // 81 (invalid)
-                case 85: // 85 (invalid)
-                case 90: // 90 (invalid)
-                case 92: // 92 (invalid)
                     break;
                 case 40: // NameCharacter
                     var NameCharacterValue = bitio.getDataUntil("\0");
@@ -1082,14 +1119,32 @@
                 case 77: // MetaData
                     var MetaData = bitio.getDataUntil('\0');
                     break;
+                case 86: // DefineSceneAndFrameLabelData
+                    obj = _this.parseDefineSceneAndFrameLabelData();
+                    break;
+                case 18: // SoundStreamHead
+                case 45: // SoundStreamHead2
+                    obj = _this.parseSoundStreamHead(tagType);
+                    break;
+                case 72: // DoABC
+                case 82: // DoABC2
+                    obj = _this.parseDoABC(tagType, dataLength);
+                    break;
+                case 76: // SymbolClass
+                    obj = _this.parseSymbolClass();
+                    break;
+                case 14: // DefineSound
+                    _this.parseDefineSound(dataLength);
+                    break;
+                case 15: // StartSound
+                case 89: // StartSound2
+                    obj = _this.parseStartSound(tagType);
+                    break;
                 // TODO
                 case 3:  // FreeCharacter
                 case 13: // DefineFontInfo
-                case 14: // DefineSound
-                case 15: // StartSound
                 case 16: // StopSound
                 case 17: // DefineButtonSound
-                case 18: // SoundStreamHead
                 case 19: // SoundStreamBlock
                 case 23: // DefineButtonCxform
                 case 25: // PathsArePostScript
@@ -1099,7 +1154,6 @@
                 case 41: // ProductInfo
                 case 42: // DefineTextFormat
                 case 44: // DefineBehavior
-                case 45: // SoundStreamHead2
                 case 47: // FrameTag
                 case 49: // GenCommand
                 case 50: // DefineCommandObj
@@ -1117,23 +1171,25 @@
                 case 63: // DebugID
                 case 65: // ScriptLimits
                 case 66: // SetTabIndex
-                case 67: // DefineShape4_hmm
-                case 70: // PlaceObject3
                 case 71: // ImportAssets2
-                case 72: // DoABC
                 case 73: // DefineFontAlignZones
                 case 74: // CSMTextSettings
                 case 75: // DefineFont3
-                case 76: // SymbolClass
                 case 78: // DefineScalingGrid
-                case 82: // DoABC2
-                case 83: // DefineShape4
-                case 86: // DefineSceneAndFrameLabelData
                 case 87: // DefineBinaryData
-                case 89: // StartSound2
                 case 91: // DefineFont4
                 case 93: // EnableTelemetry
                     console.log('[base]未対応tagType -> ' + tagType);
+                    break;
+                case 27: // 27 (invalid)
+                case 30: // 30 (invalid)
+                case 67: // 67 (invalid)
+                case 68: // 68 (invalid)
+                case 79: // 79 (invalid)
+                case 80: // 80 (invalid)
+                case 81: // 81 (invalid)
+                case 85: // 85 (invalid)
+                case 92: // 92 (invalid)
                     break;
                 default: // null
                     break;
@@ -1153,8 +1209,9 @@
         addTag: function (tagType, tags, tag, frame) {
             var tagsArray = tags[frame];
             switch (tagType) {
-                case 4: // PlaceObject
-                case 26: // PlaceObject
+                case 4:  // PlaceObject
+                case 26: // PlaceObject2
+                case 70: // PlaceObject3
                     var cTags = tagsArray.cTags;
                     tagsArray.cTags[cTags.length] = tag;
                     break;
@@ -1181,6 +1238,11 @@
                     var btnLayer = tagsArray.btnLayer;
                     tagsArray.btnLayer[btnLayer.length] = tag;
                     break;
+                case 15: // StartSound
+                case 89: // StartSound2
+                    var soundCtrls = tagsArray.soundCtrls;
+                    tagsArray.soundCtrls[soundCtrls.length] = tag;
+                    break;
             }
 
             return tags;
@@ -1195,10 +1257,12 @@
          * @param removeObj
          * @param actionScript
          * @param label
+         * @param soundCtrls
          */
         showFrame: function(
-            frame, FrameCount, SpriteID, cTags, removeObj, actionScript, label)
-        {
+            frame, FrameCount, SpriteID, cTags,
+            removeObj, actionScript, label, soundCtrls
+        ) {
             // SpriteSheet用
             if (isSpriteSheet && frame > totalFrame) {
                 totalFrame = frame;
@@ -1302,8 +1366,15 @@
                 var len = actionScript.length;
                 if (len) {
                     for (var i = len; i--;) {
-                        var as = actionScript[i];
                         aClass.setActions(frame, actionScript[i]);
+                    }
+                }
+
+                // soundCtrls
+                var len = soundCtrls.length;
+                if (len) {
+                    for (var i = len; i--;) {
+                        aClass.setSoundCtrls(frame, soundCtrls[i]);
                     }
                 }
 
@@ -1336,6 +1407,14 @@
             var _this = swftag;
             var characterId = bitio.getUI16();
             var shapeBounds = _this.rect();
+            if (tagType == 83) {
+                var EdgeBounds = _this.rect();
+                var Reserved = bitio.getUIBits(5);
+                var UsesFillWindingRule = bitio.getUIBit();
+                var UsesNonScalingStrokes = bitio.getUIBit(1);
+                var UsesScalingStrokes = bitio.getUIBit(1);
+            }
+
             var shapes = _this.shapeWithStyle(tagType);
             _this.appendShapeTag(characterId, shapeBounds, shapes);
         },
@@ -1366,6 +1445,7 @@
             var _this = this;
 
             if (tagType == 46 || tagType == 84) {
+                // MorphShape
                 var fillStyles = null;
                 var lineStyles = null;
             } else {
@@ -1429,10 +1509,10 @@
             switch (bitType) {
                 // 単色塗り
                 case 0x00:
-                    if (tagType == 32) {
+                    if (tagType == 32 || tagType == 83) {
                         // DefineShape3
                         obj.Color = _this.rgba();
-                    } else if (tagType == 46) {
+                    } else if (tagType == 46 || tagType == 84) {
                         // DefineMorphShape
                         obj.StartColor = _this.rgba();
                         obj.EndColor = _this.rgba();
@@ -1445,7 +1525,7 @@
                 case 0x10:
                 // 円形グラデーション塗り
                 case 0x12:
-                    if (tagType == 46) {
+                    if (tagType == 46 || tagType == 84) {
                         obj.startGradientMatrix = _this.matrix();
                         obj.endGradientMatrix = _this.matrix();
                         obj.gradient = _this.gradient(tagType);
@@ -1469,7 +1549,7 @@
                 case 0x43:
                     obj.bitmapId = bitio.getUI16();
                     obj.cache = false;
-                    if (tagType == 46) {
+                    if (tagType == 46 || tagType == 84) {
                         obj.startBitmapMatrix = _this.matrix();
                         obj.endBitmapMatrix = _this.matrix();
                     } else {
@@ -1589,7 +1669,7 @@
                 // DefineShape1or2
                 var Color = _this.rgb();
             } else {
-                // DefineShape3
+                // DefineShape3or4
                 var Color = _this.rgba();
             }
 
@@ -1661,7 +1741,7 @@
         {
             var _this = this;
             var obj = {};
-            if (tagType == 46) {
+            if (tagType == 46 || tagType == 84) {
                 obj = {
                     StartWidth: bitio.getUI16(),
                     EndWidth: bitio.getUI16(),
@@ -1669,21 +1749,34 @@
                     EndColor: _this.rgba()
                 };
             } else {
+                obj.Width = bitio.getUI16();
+                if (tagType == 83) {
+                    // DefineShape4
+                    obj.StartCapStyle = bitio.getUIBits(2);
+                    obj.JoinStyle = bitio.getUIBits(2);
+                    obj.HasFillFlag = bitio.getUIBit();
+                    obj.NoHScaleFlag = bitio.getUIBit();
+                    obj.NoVScaleFlag = bitio.getUIBit();
+                    obj.PixelHintingFlag = bitio.getUIBit();
+                    obj.Reserved = bitio.getUIBits(5);
+                    obj.NoClose = bitio.getUIBit();
+                    obj.EndCapStyle = bitio.getUIBits(2);
+                    if (obj.JoinStyle == 2) {
+                        obj.MiterLimitFactor = bitio.getUI16();
+                    }
 
-                var Width = bitio.getUI16();
-                if (tagType == 32) {
+                    obj.Color = _this.rgba();
+                    if (obj.HasFillFlag == 1) {
+                        obj.FillType = _this.fillStyle(tagType);
+                    }
+                } else if (tagType == 32) {
                     // DefineShape3
-                    var Color = _this.rgba();
+                    obj.Color = _this.rgba();
                 } else {
                     // DefineShape1or2
-                    var Color = _this.rgb();
+                    obj.Color = _this.rgb();
 
                 }
-
-                obj = {
-                    Width: Width,
-                    Color: Color
-                };
             }
 
             return obj;
@@ -2996,13 +3089,17 @@
             var sub = bitio.byte_offset - startOffset;
 
             var ImageDataLen = length - sub;
-            if (tagType == 35) {
+            if (tagType == 35 || tagType == 90) {
                 ImageDataLen = bitio.getUI32();
+            }
+
+            if (tagType == 90) {
+                var DeblockParam = bitio.getUI16();
             }
 
             var JPEGData = bitio.getData(ImageDataLen);
             var BitmapAlphaData = false;
-            if (tagType == 35) {
+            if (tagType == 35 || tagType == 90) {
                 BitmapAlphaData =
                     bitio.getData(length - sub - ImageDataLen);
             }
@@ -3608,7 +3705,6 @@
             }
 
             layer[obj.CharacterId] = obj;
-            console.log(obj);
         },
 
         /**
@@ -3850,7 +3946,7 @@
             }
 
             // RemoveObject2
-            return { Depth: bitio.getUI16() }
+            return {Depth: bitio.getUI16()}
         },
 
         /**
@@ -3882,13 +3978,11 @@
             // actionScript
             if (tagType == 7) {
                 aClass.setBtnActions(
-                    _this.parseDoAction(
-                        length, undefined, ActionOffset
-                    )
+                    _this.parseDoAction(length, undefined)
                 );
                 btnLayer[ButtonId] = aClass;
             } else if (ActionOffset > 0) {
-                var btnActions = _this.buttonActions(length, ActionOffset);
+                var btnActions = _this.buttonActions(length);
 
                 // action scriptをセット
                 aClass.setBtnActions(btnActions.ActionScript);
@@ -4027,16 +4121,14 @@
         /**
          * buttonActions
          * @param length
-         * @param ActionOffset
          * @returns {{}}
          */
-        buttonActions: function(length, ActionOffset)
+        buttonActions: function(length)
         {
             var _this = this;
             var obj = {};
 
             obj.CondActionSize = bitio.getUI16();
-
             obj.CondIdleToOverDown = bitio.getUIBits(1);
             obj.CondOutDownToIdle = bitio.getUIBits(1);
             obj.CondOutDownToOverDown = bitio.getUIBits(1);
@@ -4052,7 +4144,7 @@
             // ActionScript
             obj.ActionScript =
                 _this.parseDoAction(
-                    length, obj.CondActionSize, ActionOffset
+                    length, obj.CondActionSize
                 );
 
             return obj;
@@ -4068,29 +4160,40 @@
             var _this = swftag;
             var obj = {};
             obj.tagType = tagType;
+            var startOffset = bitio.byte_offset;
 
             if (tagType == 4) {
-                var startOffset = bitio.byte_offset;
                 obj.CharacterId = bitio.getUI16();
                 obj.Depth = bitio.getUI16();
                 obj.Matrix = _this.matrix();
                 obj.ColorTransform = _this.colorTransform();
-                bitio.byte_offset = startOffset + length;
             } else {
                 var placeFlag = bitio.getUI8();
-                if (version != 4) {
-                    obj.PlaceFlagHasClipActions = (placeFlag >> 7) & 0x01;
-                }
-                obj.PlaceFlagHasClipDepth      = (placeFlag >> 6) & 0x01;
-                obj.PlaceFlagHasName           = (placeFlag >> 5) & 0x01;
-                obj.PlaceFlagHasRatio          = (placeFlag >> 4) & 0x01;
+                obj.PlaceFlagHasClipActions = (placeFlag >> 7) & 0x01;
+                obj.PlaceFlagHasClipDepth = (placeFlag >> 6) & 0x01;
+                obj.PlaceFlagHasName = (placeFlag >> 5) & 0x01;
+                obj.PlaceFlagHasRatio = (placeFlag >> 4) & 0x01;
                 obj.PlaceFlagHasColorTransform = (placeFlag >> 3) & 0x01;
-                obj.PlaceFlagHasMatrix         = (placeFlag >> 2) & 0x01;
-                obj.PlaceFlagHasCharacter      = (placeFlag >> 1) & 0x01;
-                obj.PlaceFlagMove              =  placeFlag       & 0x01;
-                obj.Depth = bitio.getUI16();
-                obj.PlaceFlag = placeFlag;
+                obj.PlaceFlagHasMatrix = (placeFlag >> 2) & 0x01;
+                obj.PlaceFlagHasCharacter = (placeFlag >> 1) & 0x01;
+                obj.PlaceFlagMove =  placeFlag & 0x01;
 
+                // PlaceObject3
+                if (tagType == 70) {
+                    placeFlag = bitio.getUI8();
+                    obj.Reserved = 0;
+                    obj.PlaceFlagHasImage = (placeFlag >> 4) & 0x01;
+                    obj.PlaceFlagHasClassName = (placeFlag >> 3) & 0x01;
+                    obj.PlaceFlagHasCacheAsBitmap = (placeFlag >> 2) & 0x01;
+                    obj.PlaceFlagHasBlendMode = (placeFlag >> 1) & 0x01;
+                    obj.PlaceFlagHasFilterList = placeFlag & 0x01;
+                }
+
+                obj.Depth = bitio.getUI16();
+
+                if (obj.PlaceFlagHasClassName) {
+                    obj.ClassName = bitio.getDataUntil("\0");
+                }
                 if (obj.PlaceFlagHasCharacter) {
                     obj.CharacterId = bitio.getUI16();
                 }
@@ -4109,14 +4212,56 @@
                 if (obj.PlaceFlagHasClipDepth) {
                     obj.ClipDepth = bitio.getUI16();
                 }
-
-                // swf5以降なので未実装
+                if (tagType == 70) {
+                    if (obj.PlaceFlagHasFilterList) {
+                        obj.SurfaceFilterList = _this.getFilterList();
+                    }
+                    if (obj.PlaceFlagHasBlendMode) {
+                        obj.BlendMode = bitio.getUI8();
+                    }
+                    if (obj.PlaceFlagHasCacheAsBitmap) {
+                        obj.BitmapCache = bitio.getUI8();
+                    }
+                }
                 if (obj.PlaceFlagHasClipActions) {
-
+                    // TODO
+                    console.log('ClipActions');
                     obj.ClipActions = 0;
                 }
             }
 
+            bitio.byte_offset = startOffset + length;
+            return obj;
+        },
+
+        /**
+         * getFilterList
+         * @returns {Array}
+         */
+        getFilterList : function()
+        {
+            var _this = this;
+            var result = [];
+            var _getFilter = _this.getFilter;
+            var NumberOfFilters = bitio.getUI8();
+            for (var i = 0; i < NumberOfFilters; i++) {
+                result[result.length] = _getFilter();
+            }
+            return result;
+        },
+
+        /**
+         * getFilter TODO
+         */
+        getFilter: function()
+        {
+            var type = bitio.getUI8();
+            var obj = {Type: type};
+            switch (type) {
+                case 2:
+
+                    break;
+            }
             return obj;
         },
 
@@ -4154,7 +4299,6 @@
          */
         parseDefineSprite: function(dataLength)
         {
-            var test = 0;
             var _this = swftag;
             var SpriteID = bitio.getUI16();
             var FrameCount = bitio.getUI16();
@@ -4177,7 +4321,7 @@
          * @param condActionSize
          * @returns {ActionScript}
          */
-        parseDoAction: function(length, condActionSize, ActionOffset)
+        parseDoAction: function(length, condActionSize)
         {
             var data = bitio.getData(length - 1);
             var endFlag = bitio.getUI8();
@@ -4185,7 +4329,244 @@
                 ? 0
                 : condActionSize;
 
-            return new ActionScript(data, endFlag, condActionSize, ActionOffset);
+            return new ActionScript(data, endFlag, condActionSize);
+        },
+
+        /**
+         * parseDefineSceneAndFrameLabelData
+         * @returns {{}}
+         */
+        parseDefineSceneAndFrameLabelData: function ()
+        {
+            var obj = {};
+            obj.SceneCount = bitio.getEncodedU32();
+
+            obj.sceneInfo = [];
+            for (var i = 0; i < obj.SceneCount; i++) {
+                obj.sceneInfo[i] = {
+                    offset: bitio.getEncodedU32(),
+                    name: _decodeURIComponent(bitio.getDataUntil('\0', false))
+                };
+            }
+
+            obj.FrameLabelCount = bitio.getEncodedU32();
+
+            obj.frameInfo = [];
+            for (var i = 0; i < obj.FrameLabelCount; i++) {
+                obj.frameInfo[i] = {
+                    num: bitio.getEncodedU32(),
+                    label: _decodeURIComponent(bitio.getDataUntil('\0', false))
+                };
+            }
+
+            return obj;
+        },
+
+        /**
+         * parseSoundStreamHead
+         * @param tagType
+         * @returns {{}}
+         */
+        parseSoundStreamHead: function(tagType)
+        {
+            var obj = {};
+            obj.Reserved = bitio.getUIBits(4); // Always 0
+
+            // 0 = 5.5kHz, 1 = 11kHz, 2 = 22kHz, 3 = 44kHz
+            obj.PlaybackSoundRate = bitio.getUIBits(2);
+
+            // 0 = 8-bit, 1 = 16-bit
+            obj.PlaybackSoundSize = bitio.getUIBits(1);
+
+            // 0 = Mono, 1 = Stereo
+            obj.PlaybackSoundType = bitio.getUIBits(1);
+
+            // 0 = Uncompressed(native-endian)
+            // 1 = ADPCM
+            // 2 = MP3
+            // 3 = Uncompressed(little-endian)
+            // 4 = Nellymoser 16 kHz
+            // 5 = Nellymoser 8 kHz
+            // 6 = Nellymoser
+            // 11 = Speex
+            obj.StreamSoundCompression = bitio.getUIBits(4);
+
+            // 0 = 5.5kHz, 1 = 11kHz, 2 = 22kHz, 3 = 44kHz
+            obj.StreamSoundRate = bitio.getUIBits(2);
+
+            // 0 = 8-bit, 1 = 16-bit
+            obj.StreamSoundSize = bitio.getUIBits(1);
+
+            // 0 = Mono, 1 = Stereo
+            obj.StreamSoundType = bitio.getUIBits(1);
+
+            obj.StreamSoundSampleCount = bitio.getUI16();
+
+            if (obj.StreamSoundCompression == 2) {
+                obj.LatencySeek = bitio.getSIBits(2);
+            }
+
+            return obj;
+        },
+
+        /**
+         * parseDoABC
+         * @param tagType
+         * @param length
+         * @returns {{}}
+         */
+        parseDoABC: function(tagType, length)
+        {
+            var obj = {};
+            obj.Flags = bitio.getUI32();
+            obj.Name = bitio.getDataUntil('\0');
+            obj.ABCData = null; // TODO
+            return obj;
+        },
+
+        /**
+         * parseSymbolClass
+         * @returns {{}}
+         */
+        parseSymbolClass: function()
+        {
+            var obj = {};
+            obj.NumSymbols = bitio.getUI16();
+
+            obj.class2tag = {
+                symbols: []
+            };
+            for (var i = 0; i < obj.NumSymbols; i++) {
+                var tagId = bitio.getUI16();
+                var name = bitio.getDataUntil('\0');
+                obj.class2tag.symbols[i] = {
+                    tag: tagId,
+                    name: name
+                }
+
+                if (tagId == 0) {
+                    obj.class2tag.topLevelClass = name;
+                    continue;
+                }
+            }
+
+            return obj;
+        },
+
+        /**
+         * parseDefineSound
+         * @param length
+         */
+        parseDefineSound: function (length)
+        {
+            var _this = swftag;
+            var obj = {};
+            var startOffset = bitio.byte_offset;
+            obj.SoundId = bitio.getUI16();
+            obj.SoundFormat = bitio.getUIBits(4);
+            obj.SoundRate = bitio.getUIBits(2);
+            obj.SoundSize = bitio.getUIBit();
+            obj.SoundType = bitio.getUIBit();
+            obj.SoundSampleCount = bitio.getUI32();
+
+            var sub = bitio.byte_offset - startOffset;
+            obj.SoundData = bitio.getData(length - sub);
+            bitio.byte_offset = startOffset + length;
+
+            var mimeType = '';
+            switch (obj.SoundFormat) {
+                case 0:
+                case 3:
+                    mimeType = 'wav';
+                    break;
+                case 1:
+                    mimeType = 'adpcm';
+                    break;
+                case 2:
+                    mimeType = 'mp3';
+                    break;
+                case 4:
+                case 5:
+                case 6:
+                    mimeType = 'nellymoser';
+                    break;
+                case 11:
+                    mimeType = 'speex';
+                    break;
+            }
+            var audio = new _Audio(
+                'data:audio/'+ mimeType +';base64,'
+                    + _window.btoa(obj.SoundData)
+            );
+            audio.onload = function()
+            {
+                this.load();
+                this.preload = 'auto';
+                this.autoplay = false;
+                this.loop = false;
+            }
+            obj.Audio = audio;
+
+            sounds[obj.SoundId] = obj;
+        },
+
+        /**
+         * parseStartSound
+         * @param tagType
+         * @returns {{}}
+         */
+        parseStartSound: function(tagType)
+        {
+            var _this = swftag;
+            var obj = {};
+            obj.SoundId = bitio.getUI16();
+            if (tagType == 89) {
+                obj.SoundClassName = bitio.getDataUntil('\0');
+            }
+            obj.SoundInfo = _this.parseSoundInfo();
+            return obj;
+        },
+
+        /**
+         * parseSoundInfo
+         * @returns {{}}
+         */
+        parseSoundInfo: function()
+        {
+            var obj = {};
+            obj.Reserved = bitio.getUIBits(2);
+            obj.SyncStop = bitio.getUIBit();
+            obj.SyncNoMultiple = bitio.getUIBit();
+            obj.HasEnvelope = bitio.getUIBit();
+            obj.HasLoops = bitio.getUIBit();
+            obj.HasOutPoint = bitio.getUIBit();
+            obj.HasInPoint = bitio.getUIBit();
+
+            if (obj.HasInPoint) {
+                obj.InPoint = bitio.getUI32();
+            }
+
+            if (obj.HasOutPoint) {
+                obj.OutPoint = bitio.getUI32();
+            }
+
+            if (obj.HasLoops) {
+                obj.LoopCount = bitio.getUI16();
+            }
+
+            if (obj.HasEnvelope) {
+                obj.EnvPoints = bitio.getUI8();
+                obj.EnvelopeRecords = [];
+                for (var i = 0; i < obj.EnvPoints; i++) {
+                    obj.EnvelopeRecords[i] = {
+                        Pos44: bitio.getUI32(),
+                        LeftLevel: bitio.getUI16(),
+                        RightLevel: bitio.getUI16()
+                    };
+                }
+            }
+
+            return obj;
         }
     };
     var swftag = new SwfTag();
@@ -4197,13 +4578,12 @@
      * @param condActionSize
      * @constructor
      */
-    var ActionScript = function(data, endFlag, condActionSize, ActionOffset)
+    var ActionScript = function(data, endFlag, condActionSize)
     {
         var _this = this;
         _this.data = data;
         _this.endFlag = endFlag;
         _this.condActionSize = condActionSize;
-        _this.actionOffset = ActionOffset;
     };
 
     /**
@@ -4213,7 +4593,6 @@
         /**
          * start
          * @param obj
-         * @param isBtn
          */
         start: function(obj)
         {
@@ -4223,13 +4602,10 @@
             var actions_len = binary.length;
             var stack = [];
             var constantPool = '';
-
             var origin = obj;
             var newBitio = new BitIO();
             var condActionSize = _this.condActionSize;
-            var actionOffset = _this.actionOffset;
             var targets = [];
-            targets[0] = origin;
 
             // BitIO
             var abitio = new BitIO();
@@ -4302,17 +4678,27 @@
                         break;
                     // StopSounds
                     case 0x09:
-                        // TODO 未実装
-                        console.log('StopSounds');
+                        var sLen = sounds.length;
+                        for (var i = sLen; i--;) {
+                            var soundData = sounds[i];
+                            var audio = soundData.Audio;
+                            audio.stop();
+                        }
                         break;
                     // WaitForFrame
-                        // TODO 未実装
                         console.log('WaitForFrame');
                         newBitio.setData(actionData);
                         newBitio.setOffset(0, 0);
 
                         var frame = newBitio.getUI16();
                         var skipCount = newBitio.getUI8();
+                        if (origin.getFrame() == frame) {
+                            origin.stop();
+                        } else {
+                            // TODO 未実装
+
+                        }
+
                         break;
                     case 0x8B: // SetTarget
                         newBitio.setData(actionData);
@@ -4321,9 +4707,7 @@
                         var targetName = newBitio.getDataUntil("\0");
                         if (targetName != '') {
                             obj = _this.getAnimationClass(targetName, origin);
-                            if (obj == null) {
-                                obj = targets.pop();
-                            } else {
+                            if (obj != null) {
                                 targets[targets.length] = obj;
                             }
                         } else {
@@ -4598,6 +4982,7 @@
                                     if (string == '') {
                                         string = null;
                                     }
+
                                     stack[stack.length] = string;
                                     break;
                                 // Float
@@ -4825,7 +5210,7 @@
                         }
 
                         if (targetObj == null) {
-                            targetObj = obj;
+                            stack[stack.length] = null;
                             break;
                         }
 
@@ -4859,12 +5244,14 @@
                                 var xscale = (targetObj._xscale == null)
                                     ? 1
                                     : targetObj._xscale;
+
                                 value = targetObj._width * xscale;
                                 break;
                             case 9:
                                 var yscale = (targetObj._yscale == null)
                                     ? 1
                                     : targetObj._yscale;
+
                                 value = targetObj._height * yscale;
                                 break;
                             case 10:
@@ -4986,7 +5373,6 @@
                         obj = _this.getAnimationClass(targetName, origin);
                         if (obj == null) {
                             obj = origin;
-                            break;
                         }
                         break;
                     // SetProperty
@@ -4994,6 +5380,7 @@
                         var value  = stack.pop();
                         var index  = _floor(stack.pop());
                         var target = stack.pop();
+
 
                         var targetObj = obj;
                         if (target != null) {
@@ -5386,6 +5773,10 @@
                     break;
                 }
             }
+
+            newBitio = void 0;
+            abitio = void 0;
+            return void 0;
         },
 
         /**
@@ -5452,6 +5843,7 @@
         this.nameMap = [];
         this.actions = [];
         this.label = [];
+        this.soundCtrls = [];
 
         // 判定用
         this.playFlag = true;
@@ -5461,6 +5853,7 @@
         this.isActionWait = false;
         this.isClipDepth = false;
         this.endDepth = 0;
+        this.soundPlayFlag = false;
 
         // Property
         this._x = 0;
@@ -5585,9 +5978,11 @@
 
                             // 初期化
                             aClass.setFrame(1);
+                            aClass.soundPlayFlag = false;
                             aClass.play();
                         }
                     }
+                    _this.soundPlayFlag = false;
                 }
 
                 // 最初に戻す
@@ -5667,6 +6062,26 @@
         getLabel: function(name)
         {
             return this.label[name];
+        },
+
+        /**
+         * setSoundCtrls
+         * @param frame
+         * @param obj
+         */
+        setSoundCtrls: function(frame, obj)
+        {
+            this.soundCtrls[frame] = obj;
+        },
+
+        /**
+         * getSoundCtrls
+         * @param frame
+         * @returns {*}
+         */
+        getSoundCtrls: function(frame)
+        {
+            return this.soundCtrls[frame];
         },
 
         /**
@@ -6807,6 +7222,21 @@
     {
         // 複数対応
         data.setView();
+
+        // sound
+        var soundObj = data.getSoundCtrls(data.getFrame());
+        if (soundObj != undefined) {
+            var soundInfo = soundObj.SoundInfo;
+            var soundData = sounds[soundObj.SoundId];
+            if (soundInfo.SyncStop) {
+                soundData.Audio.stop();
+            } else if (!soundInfo.SyncNoMultiple
+                || (soundInfo.SyncNoMultiple && !data.soundPlayFlag)
+            ) {
+                soundData.Audio.play();
+                data.soundPlayFlag = true;
+            }
+        }
 
         // delete count
         var count = 0;
