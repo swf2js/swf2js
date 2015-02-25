@@ -1,11 +1,13 @@
 FlashをiPhoneで再生可能にする「swf2js」
 ======
-swfをJavaScriptでバイナリ分解してcanvas出力!!iPhoneでもswfを再生可能に  
-対応バージョン：Flash Lite 1.1(swf4)以下  
+swfをJavaScriptでバイナリ分解してcanvas出力!!  
+iPhoneでもswfを再生可能に  
+対応バージョン：SWF4以下(Flash Lite 1.x)  
+  
   
 output in the canvas with swf binary decomposition in JavaScript.  
 play the swf on the iPhone.  
-※Supports Flash Lite 1.1(swf4) or lower.  
+※Supports SWF4 or lower.  
 
 
 Demonstration Site
@@ -18,20 +20,20 @@ Facebook
 https://www.facebook.com/swf2js  
 
 
+Twitter  
+------
+https://twitter.com/swf2js
+
+
 Game using swf2js
 ------
-[覇者もん for GREE]  
-http://jp.apps.gree.net/ja/60428  
-
-
-[覇者もん for Mobage]  
-http://www.mbga.jp/_game_intro?game_id=12017896  
+[覇者もん for GREE and Mobage]  
+http://gamebiz.jp/?p=131364  
 
 
 html
 ------
     <script type="text/javascript" src="swf2js.js"></script>  
-    <div id="swf2js"></div>  
     <script type="text/javascript">  
         swf2js.load('SET SWF PATH', {※OPTIONS});  
     </script>  
@@ -42,7 +44,6 @@ html
 {  
     width: int,  // default 100%  
     height: int, // default 100%  
-    isSpriteSheet: bool // default false  
 }  
 
 
@@ -96,11 +97,9 @@ DefineFontInfo2
 DebugID  
 ScriptLimits  
 SetTabIndex  
-PlaceObject3  
 ImportAssets2  
 DefineFontAlignZones  
 CSMTextSettings  
-DefineFont3  
 DefineScalingGrid  
 DefineBinaryData  
 DefineFont4  
@@ -117,8 +116,22 @@ WebGL
 
 Release Notes  
 -------
---[ swf2js 0.1.7 ] Release Date: 28 Oct 2014  
+--[ swf2js 0.2.0 ] Release Date: 26 Feb 2015  
+* [BUGFIX] ActionScript  
+* [BUGFIX] render - mask  
+* [BUGFIX] unzip - ZLIB  
+* [BUGFIX] Tag 'DefineButton', 'DefineButton2'  
+* [BUGFIX] Tag 'DefineEditText'  
+* [BUGFIX] Tag 'DefineMorphShape' 'DefineMorphShape2'  
+* [NEW] Tag 'DefineFont3'  
+* [NEW] ArrayBuffer  
+* [NEW] Minimum Rendering  
+* [NEW] CacheStore  
+
+
+--[ swf2js 0.1.7 ] Release Date: 10 Nov 2014  
 * [BUGFIX] ActionScript 'SetTarget'  
+* [BUGFIX] render - mask  
 * [NEW] Tag 'DefineSceneAndFrameLabelData'  
 * [NEW] Tag 'SoundStreamHead'  
 * [NEW] Tag 'SoundStreamHead2'  
@@ -130,6 +143,7 @@ Release Notes
 * [NEW] Tag 'DefineSound'  
 * [NEW] Tag 'StartSound'  
 * [NEW] Tag 'StartSound2'  
+* [NEW] Tag 'PlaceObject3'  
 
 
 --[ swf2js 0.1.6 ] Release Date: 24 Oct 2014  
@@ -174,11 +188,11 @@ Release Notes
 
 
 --[ swf2js 0.1.0 ] Release Date: 28 Jul 2014  
-* [NEWS] Game using swf2js [覇者もん for Mobage] http://www.mbga.jp/_game_intro?game_id=12017896  
+* [NEWS] Game using swf2js [覇者もん for Mobage]  
 
 
 --[ swf2js 0.1.0 ] Release Date: 12 Jun 2014  
-* [NEWS] Game using swf2js [覇者もん for GREE] http://jp.apps.gree.net/ja/60428  
+* [NEWS] Game using swf2js [覇者もん for GREE]  
 * [BUGFIX] Tag 'DefineEditText'  
 * [NEW] parse & render speed up  
 
