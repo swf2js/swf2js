@@ -116,6 +116,13 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.1 ] Release Date: 27 Feb 2015  
+* [BUGFIX] ActionScript  
+* [BUGFIX] Tag 'DefineBits'  
+* [BUGFIX] Tag 'DefineButton', 'DefineButton2'  
+* [BUGFIX] CacheStore  
+
+
 --[ swf2js 0.2.0 ] Release Date: 26 Feb 2015  
 * [BUGFIX] ActionScript  
 * [BUGFIX] render - mask  

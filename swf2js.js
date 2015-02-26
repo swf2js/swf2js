@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.0)
+ * swf2js (version 0.2.1)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -111,12 +111,17 @@
      * CacheStore
      * @constructor
      */
-    var CacheStore = function(){};
+    var CacheStore = function ()
+    {
+        this.store = {};
+        this.size = 73400320; // 70M
+    };
+
     CacheStore.prototype = {
         /**
-         * init
+         * reset
          */
-        init: function()
+        reset: function()
         {
             this.store = {};
             this.size = 73400320; // 70M
@@ -141,12 +146,24 @@
         {
             var _this = this;
             var canvas = value.canvas;
-            //_this.size -= (canvas.width * canvas.height);
+            _this.size -= (canvas.width * canvas.height);
 
             // reset
             if (_this.size < 0) {
-                _this.init();
-                _this.size -= (canvas.width * canvas.height);
+                for (var cacheKey in _this.store) {
+                    var deleteCtx = _this.store[cacheKey];
+                    if (!(deleteCtx instanceof CanvasRenderingContext2D)) {
+                        continue;
+                    }
+
+                    var deleteCanvas = deleteCtx.canvas;
+                    _this.size += (deleteCanvas.width * deleteCanvas.height);
+
+                    delete _this.store[cacheKey];
+                    if (_this.size > 0) {
+                        break;
+                    }
+                }
             }
             this.store[key] = value;
         },
@@ -785,6 +802,7 @@
             var i = 0;
             var bo = _this.byte_offset;
             var data = _this.getData(bo);
+
             var deCompress = unzip(_this.data, true);
             var array = _this.createArray(length);
 
@@ -859,7 +877,7 @@
             player.parent = mc;
 
             // start
-            swf2js.play();
+            isLoad = true;
             if (imgUnLoadCount == 0) {
                 loaded();
             }
@@ -1406,6 +1424,7 @@
                 case 89: // StartSound2
                     obj = _this.parseStartSound(tagType);
                     break;
+
                 // TODO
                 case 3:  // FreeCharacter
                 case 13: // DefineFontInfo
@@ -1436,8 +1455,8 @@
                 case 65: // ScriptLimits
                 case 66: // SetTabIndex
                 case 71: // ImportAssets2
-                case 73: // DefineFontAlignZones
                 case 74: // CSMTextSettings
+                case 73: // DefineFontAlignZones
                 case 75: // DefineFont3
                 case 78: // DefineScalingGrid
                 case 87: // DefineBinaryData
@@ -3159,7 +3178,7 @@
                 canvas.width = width;
                 canvas.height = height;
                 var imageContext = canvas.getContext("2d");
-                imageContext.drawImage(this, 0, 0);
+                imageContext.drawImage(this, 0, 0, width, height);
 
                 // 半透明対応
                 if (BitmapAlphaData) {
@@ -3178,10 +3197,10 @@
 
                 // 読み完了
                 imgUnLoadCount--;
-                if (imgUnLoadCount == 0) {
+                if (isLoad && imgUnLoadCount == 0) {
                     loaded();
                 }
-            }
+            };
 
             image.src = "data:image/jpeg;base64,"
                 + swftag.base64encode(swftag.parseJpegData(JPEGData, jpegTables));
@@ -3197,43 +3216,53 @@
          */
         parseJpegData: function(JPEGData, jpegTables)
         {
-            var jBitio = new BitIO();
-            jBitio.setData(JPEGData);
-
             var marker;
             var dqt = '';
             var dht = '';
+            var sof = '';
+            var str = '';
+            var sos_eoi = '';
             var len = 0;
+            var i = 0;
 
+            if (JPEGData[0] == 255 && JPEGData[1] == 217
+                && JPEGData[2] == 255 && JPEGData[3] == 216
+            ) {
+                str = '';
+                len = JPEGData.length;
+                for (i = 4; i < len; i++) {
+                    str += _fromCharCode(JPEGData[i]);
+                }
+                return str;
+            }
+
+            var jBitio = new BitIO();
+            jBitio.setData(JPEGData);
             while (marker = jBitio.getUI16BE()) {
                 switch (marker) {
                     case 0xFFD8: // SOI
                     case 0xFFD9: // EOI
-                        break;
-                    default:
-                        len = jBitio.getUI16BE();
-                        jBitio.incrementOffset(len - 2, 0);
                         break;
                     case 0xFFC0: // SOF0
                     case 0xFFC2: // SOF2
                         len = jBitio.getUI16BE();
                         len += 2;
                         jBitio.incrementOffset(-4, 0);
-                        var data = jBitio.getData(len);
-                        var str = '';
-                        for (var i = 0; i < len; i++) {
-                            str += _fromCharCode(data[i]);
+                        var d = jBitio.getData(len);
+                        str = '';
+                        for (i = 0; i < len; i++) {
+                            str += _fromCharCode(d[i]);
                         }
-                        var sof = str;
+                        sof = str;
                         break;
                     case 0xFFDB: // DQT
                         len = jBitio.getUI16BE();
                         len += 2;
                         jBitio.incrementOffset(-4, 0);
-                        var data = jBitio.getData(len);
-                        var str = '';
-                        for (var i = 0; i < len; i++) {
-                            str += _fromCharCode(data[i]);
+                        var d = jBitio.getData(len);
+                        str = '';
+                        for (i = 0; i < len; i++) {
+                            str += _fromCharCode(d[i]);
                         }
 
                         dqt += str;
@@ -3242,24 +3271,28 @@
                         len = jBitio.getUI16BE();
                         len += 2;
                         jBitio.incrementOffset(-4, 0);
-                        var data = jBitio.getData(len);
-                        var str = '';
-                        for (var i = 0; i < len; i++) {
-                            str += _fromCharCode(data[i]);
+                        var d = jBitio.getData(len);
+                        str = '';
+                        for (i = 0; i < len; i++) {
+                            str += _fromCharCode(d[i]);
                         }
 
                         dht += str;
                         break;
                     case 0xFFDA: // SOS
                         jBitio.incrementOffset(-2, 0);
-                        var sos_eoi = jBitio.getDataUntil(null, false);
+                        sos_eoi += jBitio.getDataUntil(null, false);
+                        break;
+                    default:
+                        len = jBitio.getUI16BE();
+                        jBitio.incrementOffset(len - 2, 0);
                         break;
                 }
             }
 
             var dqt_dht = (typeof dqt === '')
                 ? jpegTables
-                : dqt + dht;
+                : dqt +''+ dht;
             return "\xFF\xD8" + sof + dqt_dht + sos_eoi;
         },
 
@@ -4716,6 +4749,7 @@
             var stack = [];
             var constantPool = [];
             var movieClip = mc;
+            var test = 0;
 
             var pBitio = _this.pBitio;
             pBitio.setOffset(0, 0);
@@ -4792,17 +4826,19 @@
                         }
                         break;
                     // WaitForFrame
+                    case 0x8A: // TODO 未実装
                         console.log('WaitForFrame');
-                        pBitio.setData(payload);
-                        pBitio.setOffset(0, 0);
+                        if (movieClip != null) {
+                            pBitio.setData(payload);
+                            pBitio.setOffset(0, 0);
 
-                        var frame = pBitio.getUI16();
-                        var skipCount = pBitio.getUI8();
-                        if (movieClip.getFrame() == frame) {
-                            movieClip.stop();
-                        } else {
-                            // TODO 未実装
+                            var frame = pBitio.getUI16();
+                            var skipCount = pBitio.getUI8();
+                            if (movieClip.getFrame() == frame) {
+                                movieClip.stop();
+                            } else {
 
+                            }
                         }
 
                         break;
@@ -4878,7 +4914,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = _parseFloat(a+b);
+                        stack[stack.length] = a+b;
 
                         break;
                     // Subtract
@@ -4893,7 +4929,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = _parseFloat(b-a);
+                        stack[stack.length] = b-a;
 
                         break;
                     // Multiply
@@ -4908,7 +4944,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = _parseFloat(a*b);
+                        stack[stack.length] = a*b;
 
                         break;
                     // Divide
@@ -4923,7 +4959,7 @@
                             b = 0;
                         }
 
-                        stack[stack.length] = _parseFloat(b/a);
+                        stack[stack.length] = b/a;
 
                         break;
 
@@ -5007,7 +5043,6 @@
 
                         var boolInt = (value == 0) ? 1 : 0;
                         stack[stack.length] = boolInt;
-
                         break;
 
                     // 文字列操作 ***********************************
@@ -5038,7 +5073,7 @@
                             b = '';
                         }
 
-                        var str = b +""+ a;
+                        var str = b +''+ a;
                         stack[stack.length] = str;
 
                         break;
@@ -5216,9 +5251,9 @@
                         break;
                     // If
                     case 0x9D:
-                        var condition = stack.pop();
+                        var condition = _parseFloat(stack.pop());
                         var offset = _this.bitio.toSI16LE(payload);
-                        if (condition == 1) {
+                        if (condition) {
                             _this.bitio.bit_offset = 0;
                             _this.bitio.incrementOffset(offset, 0);
                         }
@@ -5635,7 +5670,7 @@
 
                         // clone
                         var targetMc = movieClip.getMovieClip(source);
-                        if (targetMc != null) {
+                        if (targetMc != null && targetMc.CharacterId != 0) {
                             var cloneMc = new MovieClip();
                             cloneMc.init(targetMc.CharacterId, targetMc.getTotalFrames());
 
@@ -7322,7 +7357,7 @@
                                 (cache.offsetX + renderMatrix.TranslateX),
                                 (cache.offsetY + renderMatrix.TranslateY)
                             );
-                            ctx.drawImage(canvas, 0, 0);
+                            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
                         }
                     }
                 }
@@ -7372,6 +7407,7 @@
                     body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                     body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                     body += 'var ctx = canvas.getContext("2d");';
+                    body += 'ctx.imageSmoothingEnabled = false;';
                     body += 'ctx.offsetX = '+ rBound.X + ';';
                     body += 'ctx.offsetY = '+ rBound.Y + ';';
                     body += 'ctx.setTransform('
@@ -7652,6 +7688,7 @@
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
+                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.offsetX = '+ rBound.X + ';';
                 body += 'ctx.offsetY = '+ rBound.Y + ';';
                 body += 'ctx.setTransform('
@@ -7780,6 +7817,7 @@
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
+                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.offsetX = '+ rBound.X + ';';
                 body += 'ctx.offsetY = '+ rBound.Y + ';';
 
@@ -7990,6 +8028,7 @@
                 body += 'canvas.width = '+ _ceil(rBound.W+1) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H+1) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
+                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.textBaseline = "top";';
                 body += 'ctx.setTransform('
                     + matrix.ScaleX + ','
@@ -8221,999 +8260,1001 @@
                 (rBound.X + matrix.TranslateX),
                 (rBound.Y + matrix.TranslateY)
             );
-            ctx.drawImage(cache.canvas, 0, 0);
+            var canvas = cache.canvas;
+            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
         },
 
         /**
          * renderButton
-         * @param ctx
-         * @param matrix
-         * @param colorTransform
-         * @param tag
-         * @param depth
-         */
-        renderButton: function(ctx, matrix, colorTransform, tag, depth)
-        {
-            var _this = this;
-            var char = character[tag.CharacterId];
-            var characters = char.characters;
-            var _multiplicationMatrix = multiplicationMatrix;
-            var _multiplicationColor = multiplicationColor;
+                 * @param ctx
+                 * @param matrix
+                 * @param colorTransform
+                 * @param tag
+                 * @param depth
+                 */
+                renderButton: function(ctx, matrix, colorTransform, tag, depth)
+                {
+                    var _this = this;
+                    var char = character[tag.CharacterId];
+                    var characters = char.characters;
+                    var _multiplicationMatrix = multiplicationMatrix;
+                    var _multiplicationColor = multiplicationColor;
 
-            // enter
-            var actions = char.actions;
-            if (actions != undefined) {
-                for (var length = actions.length; length--;) {
-                    if (!(length in actions)) {
-                        continue;
-                    }
-
-                    var cond = actions[length];
-                    if (cond.CondKeyPress == 13) {
-                        buttonHits[buttonHits.length] = {
-                            CharacterId: tag.CharacterId,
-                            Xmax: width,
-                            Xmin: 0,
-                            Ymax: height,
-                            Ymin: 0,
-                            CondKeyPress: cond.CondKeyPress,
-                            parent: _this
-                        };
-                    }
-                }
-            }
-
-            var length = characters.length;
-            for (var d = 1; d < length; d++) {
-                if (!(d in characters)) {
-                    continue;
-                }
-
-                var cTags = characters[d];
-                var tagLength = cTags.length;
-                for (var i = 0; i < tagLength; i++) {
-                    if (!(i in cTags)) {
-                        continue;
-                    }
-
-                    var cache = null;
-                    var btnChar = cTags[i];
-                    var tagChar = tag.characters[d][i];
-
-                    var renderMatrix = _multiplicationMatrix(
-                        matrix, btnChar.Matrix
-                    );
-
-                    var renderColorTransform = _multiplicationColor(
-                        colorTransform, btnChar.ColorTransform
-                    );
-
-                    if (actions != undefined
-                        && btnChar.ButtonStateHitTest
-                    ) {
-                        var cacheKey = cacheStore.generateKey(
-                            'ButtonHit',
-                            tag.CharacterId,
-                            matrix,
-                            colorTransform
-                        );
-
-                        var hitObj = cacheStore.get(cacheKey);
-                        if (cache == undefined) {
-                            if (tagChar instanceof MovieClip) {
-                                var bounds = tagChar.getBounds(renderMatrix);
-                            } else {
-                                var bounds = character[tagChar.CharacterId];
+                    // enter
+                    var actions = char.actions;
+                    if (actions != undefined) {
+                        for (var length = actions.length; length--;) {
+                            if (!(length in actions)) {
+                                continue;
                             }
 
-                            var no = _Number.MAX_VALUE;
-                            var Xmax = -no;
-                            var Ymax = -no;
-                            var Xmin = no;
-                            var Ymin = no;
-
-                            var x0 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                            var x1 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                            var x2 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                            var x3 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                            var y0 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                            var y1 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                            var y2 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                            var y3 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
-
-                            Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
-                            Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
-                            Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
-                            Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
-
-                            cacheStore.store[cacheKey] = {
-                                CharacterId: tag.CharacterId,
-                                Xmax: Xmax,
-                                Xmin: Xmin,
-                                Ymax: Ymax,
-                                Ymin: Ymin,
-                                CondKeyPress: 0,
-                                parent: _this
-                            };
+                            var cond = actions[length];
+                            if (cond.CondKeyPress == 13) {
+                                buttonHits[buttonHits.length] = {
+                                    CharacterId: tag.CharacterId,
+                                    Xmax: width,
+                                    Xmin: 0,
+                                    Ymax: height,
+                                    Ymin: 0,
+                                    CondKeyPress: cond.CondKeyPress,
+                                    parent: _this
+                                };
+                            }
                         }
-                        buttonHits[buttonHits.length] = hitObj;
                     }
 
-                    if (touchObj != null && touchObj.CharacterId == tag.CharacterId) {
-                        if (!btnChar.ButtonStateDown) {
+                    var length = characters.length;
+                    for (var d = 1; d < length; d++) {
+                        if (!(d in characters)) {
                             continue;
                         }
 
-                        if (tagChar instanceof MovieClip) {
-                            tagChar.isButtonRemove = true;
-                            tagChar.addFrameTags();
-                            tagChar.action();
-                            tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
-                            tagChar.putFrame();
-                        } else {
-                            var obj = character[tagChar.CharacterId];
-                            switch (obj.tagType) {
-                                case 46: // MorphShape
-                                case 84: // MorphShape2
-                                    var controlTag = _this.getControlTag();
-                                    var cTag = controlTag[depth];
-                                    cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
-                                    break;
-                                case 2:  // DefineShape
-                                case 22: // DefineShape2
-                                case 32: // DefineShape3
-                                case 83: // DefineShape4
-                                    cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    if (obj.isClipDepth) {
-                                        continue;
-                                    }
-                                    break;
-                                case 7: // DefineButton
-                                case 34: // DefineButton2
-                                    _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    continue;
-                                case 11: // DefineText
-                                case 33: // DefineText2
-                                    cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    break;
-                                case 37: // DefineEditText
-                                    _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    continue;
-                                    break;
-                            } //  switch
-                        }
-                    } else if (btnChar.ButtonStateUp) {
-                        if (tagChar instanceof MovieClip) {
-                            tagChar.addFrameTags();
-                            tagChar.action();
-                            tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
-                            tagChar.putFrame();
-                        } else {
-                            var obj = character[tagChar.CharacterId];
-                            switch (obj.tagType) {
-                                case 46: // MorphShape
-                                case 84: // MorphShape2
-                                    var controlTag = _this.getControlTag();
-                                    var cTag = controlTag[depth];
-                                    cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
-                                    break;
-                                case 2:  // DefineShape
-                                case 22: // DefineShape2
-                                case 32: // DefineShape3
-                                case 83: // DefineShape4
-                                    cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    if (obj.isClipDepth) {
-                                        continue;
-                                    }
-                                    break;
-                                case 7: // DefineButton
-                                case 34: // DefineButton2
-                                    _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    continue
-                                    break;
-                                case 11: // DefineText
-                                case 33: // DefineText2
-                                    cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    break;
-                                case 37: // DefineEditText
-                                    _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
-                                    continue;
-                                    break;
-                            } //  switch
-                        }
-                    }
+                        var cTags = characters[d];
+                        var tagLength = cTags.length;
+                        for (var i = 0; i < tagLength; i++) {
+                            if (!(i in cTags)) {
+                                continue;
+                            }
 
-                    if (touchObj == null
-                        && tagChar instanceof MovieClip
-                        && tagChar.isButtonRemove
-                    ) {
-                        tagChar.isButtonRemove = false;
-                        tagChar.reset(false, 1);
-                    }
+                            var cache = null;
+                            var btnChar = cTags[i];
+                            var tagChar = tag.characters[d][i];
 
-                    if (cache instanceof CanvasRenderingContext2D) {
-                        var canvas = cache.canvas;
-                        if (canvas.width > 0 && canvas.height > 0) {
-                            ctx.setTransform(1, 0, 0, 1,
-                                (cache.offsetX + renderMatrix.TranslateX),
-                                (cache.offsetY + renderMatrix.TranslateY)
+                            var renderMatrix = _multiplicationMatrix(
+                                matrix, btnChar.Matrix
                             );
-                            ctx.drawImage(canvas, 0, 0);
-                        }
-                    }
-                }
-            }
-        },
 
-        /**
-         * renderBoundMatrix
-         * @param bound
-         * @param matrix
-         * @returns {{X: *, Y: *, W: number, H: number}}
-         */
-        renderBoundMatrix: function(bound, matrix)
-        {
-            var no = _Number.MAX_VALUE;
-            var Xmax = -no;
-            var Ymax = -no;
-            var Xmin = no;
-            var Ymin = no;
-
-            var x0 = bound.Xmax * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
-            var x1 = bound.Xmax * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
-            var x2 = bound.Xmin * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
-            var x3 = bound.Xmin * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
-            var y0 = bound.Xmax * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
-            var y1 = bound.Xmax * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
-            var y2 = bound.Xmin * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
-            var y3 = bound.Xmin * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
-
-            Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
-            Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
-            Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
-            Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
-
-            var x = Xmin;
-            var w = Xmax - x;
-            if (w < 0) {
-                w *= -1;
-            }
-
-            var y = Ymin;
-            var h = Ymax - y;
-            if (h < 0) {
-                h *= -1;
-            }
-
-            return {X: x, Y: y, W: w, H: h}
-        },
-
-        /**
-         * generateColorTransform
-         * @param R
-         * @param G
-         * @param B
-         * @param A
-         * @param data
-         * @returns {{R: *, G: *, B: *, A: *}}
-         */
-        generateColorTransform: function(R, G, B, A, data)
-        {
-            return {
-                R : _floor(_max(0, _min((R * data.RedMultiTerm) + data.RedAddTerm, 255))),
-                G : _floor(_max(0, _min((G * data.GreenMultiTerm) + data.GreenAddTerm, 255))),
-                B : _floor(_max(0, _min((B * data.BlueMultiTerm) + data.BlueAddTerm, 255))),
-                A : _max(0, _min((A * data.AlphaMultiTerm) + data.AlphaAddTerm, 255)) / 255
-            }
-        },
-
-        /**
-         * generateImageTransform
-         * @param ctx
-         * @param color
-         * @returns {*}
-         */
-        generateImageTransform: function(ctx, color)
-        {
-            var canvas = _document.createElement('canvas');
-            var width = ctx.canvas.width;
-            var height = ctx.canvas.height;
-
-            canvas.width = width;
-            canvas.height = height;
-            var imageContext = canvas.getContext("2d");
-
-            imageContext.drawImage(ctx.canvas, 0, 0);
-            var imgData = imageContext.getImageData(0, 0, width, height);
-            var pxData = imgData.data;
-            var idx = 0;
-            for (var y = height; y--;) {
-                for (var x = width; x--;) {
-                    var R = pxData[idx++];
-                    var G = pxData[idx++];
-                    var B = pxData[idx++];
-                    var A = pxData[idx++];
-                    pxData[idx - 4] = _floor(_max(0, _min((R * color.RedMultiTerm) + color.RedAddTerm, 255)));
-                    pxData[idx - 3] = _floor(_max(0, _min((G * color.GreenMultiTerm) + color.GreenAddTerm, 255)));
-                    pxData[idx - 2] = _floor(_max(0, _min((B * color.BlueMultiTerm) + color.BlueAddTerm, 255)));
-                    pxData[idx - 1] = _max(0, _min((A * color.AlphaMultiTerm) + color.AlphaAddTerm, 255));
-                }
-            }
-            imageContext.putImageData(imgData, 0, 0);
-
-            return imageContext;
-        }
-    };
-
-    /**
-     * parse
-     * @param swf
-     */
-    function parse(swf)
-    {
-        // swfデータをセット
-        bitio.init(swf);
-
-        // Header
-        setSwfHeader();
-
-        // swfを分解
-        swftag.parse();
-
-        // delete
-        bitio = _void;
-    }
-
-    /**
-     * setMovieHeader
-     */
-    function setSwfHeader()
-    {
-        // signature
-        signature = bitio.getHeaderSignature();
-
-        // version
-        version = bitio.getVersion();
-
-        // ファイルサイズ
-        player.fileLength = bitio.getUI32();
-
-        // 解凍
-        if (signature == 'CWS') {
-            bitio.deCompress(player.fileLength); // ZLIB
-        } else if (signature == 'ZWS') {
-            alert('not supported by LZMA');
-            return 0;
-        }
-
-        // フレームサイズ
-        var frameSize = swftag.rect();
-        player._width = (frameSize.Xmax - frameSize.Xmin);
-        player._height = (frameSize.Ymax - frameSize.Ymin);
-
-        // フレーム
-        player.frameRate  = bitio.getUI16() / 0x100;
-        player.frameCount = bitio.getUI16();
-        player.fps = _floor(1000 / player.frameRate);
-
-        // Canvasの画面サイズを調整
-        changeScreenSize();
-    }
-
-    /**
-     * loaded
-     */
-    function loaded()
-    {
-        cacheStore.init();
-        buttonHits = [];
-
-        var mc = player.parent;
-        mc.addFrameTags();
-        mc.action();
-        mc.render(
-            preContext,
-            mc.getMatrix(),
-            mc.getColorTransform(),
-            mc.getVisible()
-        );
-
-        deleteNode();
-        var div = _document.getElementById('swf2js');
-        context.drawImage(preContext.canvas, 0, 0);
-        div.appendChild(context.canvas);
-
-        isLoad = true;
-        intervalId = _setInterval(onEnterFrame, player.fps);
-    }
-
-    /**
-     * buffer
-     */
-    function buffer()
-    {
-        var mc = player.parent;
-        mc.putFrame();
-        mc.addFrameTags();
-        mc.action();
-
-        buttonHits = [];
-        clearPre();
-        mc.render(
-            preContext,
-            mc.getMatrix(),
-            mc.getColorTransform(),
-            mc.getVisible()
-        );
-    }
-
-    /**
-     * main canvas clear
-     */
-    function clearMain()
-    {
-        var canvas = context.canvas;
-        canvas.width = canvas.width;
-    }
-
-    /*
-     * pre canvas clear
-     */
-    function clearPre()
-    {
-        var canvas = preContext.canvas;
-        canvas.width = canvas.width;
-    }
-
-    /**
-     * タッチイベント
-     * @param event
-     */
-    function touchStart(event)
-    {
-        var div = _document.getElementById('swf2js');
-        var bounds = div.getBoundingClientRect();
-        var x = bounds.left;
-        var y = bounds.top;
-
-        var touchX = 0;
-        var touchY = 0;
-        if (isTouch) {
-            var changedTouche = event.targetTouches[0];
-            touchX = changedTouche.pageX - x;
-            touchY = changedTouche.pageY - y;
-        } else {
-            touchX = event.pageX - x;
-            touchY = event.pageY - y;
-        }
-
-        touchX *= devicePixelRatio;
-        touchY *= devicePixelRatio;
-
-        touchObj = null;
-        var len = buttonHits.length;
-        for (var i = len; i--;) {
-            if (!(i in buttonHits)) {
-                continue;
-            }
-
-            var hitObj = buttonHits[i];
-            if (hitObj == undefined) {
-                continue;
-            }
-
-            var char = character[hitObj.CharacterId];
-            if (char.actions == undefined) {
-                continue;
-            }
-
-            if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
-                && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
-            ){
-                touchObj = hitObj;
-                var actions = char.actions;
-                for (var idx = actions.length; idx--;) {
-                    if (!(idx in actions)) {
-                        continue;
-                    }
-
-                    var cond = actions[idx];
-                    if (hitObj.CondKeyPress == 13
-                        && hitObj.CondKeyPress != cond.CondKeyPress
-                    ) {
-                        continue;
-                    }
-
-                    var keyPress = cond.CondKeyPress;
-                    if (keyPress == 0 || keyPress == 13
-                        || (keyPress >= 48 && keyPress <= 57)
-                    ) {
-                        touchObj.ActionScript = cond.ActionScript;
-                        if (cond.CondOverDownToOverUp != 1) {
-                            touchEvent(event);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (touchObj != null) {
-                break;
-            }
-        }
-    }
-
-    /**
-     * 移動イベント
-     * @param event
-     */
-    function touchMove(event)
-    {
-        if (touchObj != null) {
-            event.preventDefault();
-            touchStart(event);
-        }
-    }
-
-    /**
-     * タッチイベント終了
-     * @param event
-     */
-    function touchEnd(event)
-    {
-        if (!isBtnAction) {
-            touchEvent(event);
-        }
-        touchObj = null;
-        isBtnAction = false;
-    }
-
-    /**
-     * イベント実行
-     * @param event
-     */
-    function touchEvent(event)
-    {
-        event.preventDefault();
-        if (!isBtnAction && touchObj != null) {
-            isBtnAction = true;
-            var mc = touchObj.parent;
-            touchObj.ActionScript.start(mc);
-        }
-    }
-
-    /**
-     * unzip
-     * @param compressed
-     * @param isDeCompress
-     * @returns {Array}
-     */
-    function unzip(compressed, isDeCompress)
-    {
-        /**
-         * decodeSymbol
-         * @param b
-         * @param table
-         * @returns {*}
-         */
-        var _decodeSymbol = function (b, table)
-        {
-            var code = 0;
-            var len = 0;
-            while (true) {
-                code = (code << 1) | b.readUB(1);
-                len++;
-                if (!(code in table)) {
-                    continue;
-                }
-
-                var entry = table[code];
-                if (entry.length == len) {
-                    return entry.symbol;
-                }
-            }
-        };
-
-        /**
-         * buildHuffTable
-         * @param bitLengths
-         * @returns {{}}
-         */
-        var _buildHuffTable = function(bitLengths)
-        {
-            var numLengths = bitLengths.length;
-            var blCount = [];
-            var maxBits = _max.apply(Math, bitLengths) + 1;
-            var nextCode = [];
-            var code = 0;
-            var table = {};
-            var i = numLengths;
-
-            while (i--) {
-                var len = bitLengths[i];
-                blCount[len] = (blCount[len] || 0) + (len > 0);
-            }
-
-            for (i = 1; i < maxBits; i++) {
-                len = i - 1;
-                if (!(len in blCount)) {
-                    blCount[len] = 0;
-                }
-
-                code = (code + blCount[len]) << 1;
-                nextCode[i] = code;
-            }
-
-            for (i = 0; i < numLengths; i++) {
-                len = bitLengths[i];
-                if (len) {
-                    table[nextCode[len]] = {
-                        length: len,
-                        symbol: i
-                    };
-                    nextCode[len]++;
-                }
-            }
-            return table;
-        };
-
-        var sym = 0;
-        var i = 0;
-        var buff = [];
-        var bitLengths = [];
-
-        var DEFLATE_CODE_LENGTH_ORDER =
-            [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
-        var DEFLATE_CODE_LENGTH_MAP = [
-            [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10],
-            [1, 11], [1, 13], [1, 15], [1, 17], [2, 19], [2, 23], [2, 27],
-            [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83],
-            [4, 99], [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
-        ];
-        var DEFLATE_DISTANCE_MAP = [
-            [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13],
-            [3, 17], [3, 25], [4, 33], [4, 49], [5, 65], [5, 97], [6, 129],
-            [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025],
-            [9, 1537], [10, 2049], [10, 3073], [11, 4097], [11, 6145],
-            [12, 8193], [12, 12289], [13, 16385], [13, 24577]
-        ];
-
-        var zBitio = new BitIO();
-        zBitio.setData(compressed);
-
-        if (isDeCompress) {
-            zBitio.setOffset(10, 8);
-        } else {
-            zBitio.setOffset(2, 8);
-        }
-
-        while (!done) {
-            var done = zBitio.readUB(1);
-            var type = zBitio.readUB(2);
-
-            var distTable = {};
-            var litTable = {};
-            var fixedDistTable = false;
-            var fixedLitTable = false;
-
-            if (type) {
-                if (type == 1) {
-                    distTable = fixedDistTable;
-                    litTable = fixedLitTable;
-
-                    if (!distTable) {
-                        bitLengths = [];
-                        for(i = 32; i--;){
-                            bitLengths[bitLengths.length] = 5;
-                        }
-                        distTable = fixedDistTable =
-                            _buildHuffTable(bitLengths);
-                    }
-
-                    if (!litTable) {
-                        bitLengths = [];
-                        i = 0;
-
-                        for(; i < 144; i++){
-                            bitLengths[bitLengths.length] = 8;
-                        }
-
-                        for(; i < 256; i++){
-                            bitLengths[bitLengths.length] = 9;
-                        }
-
-                        for(; i < 280; i++){
-                            bitLengths[bitLengths.length] = 7;
-                        }
-
-                        for(; i < 288; i++){
-                            bitLengths[bitLengths.length] = 8;
-                        }
-
-                        litTable = fixedLitTable =
-                            _buildHuffTable(bitLengths);
-                    }
-                } else {
-                    var numLitLengths = zBitio.readUB(5) + 257;
-                    var numDistLengths = zBitio.readUB(5) + 1;
-                    var numCodeLengths = zBitio.readUB(4) + 4;
-                    var codeLengths =
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-                    for(i = 0; i < numCodeLengths; i++){
-                        codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] =
-                            zBitio.readUB(3);
-                    }
-                    var codeTable = _buildHuffTable(codeLengths);
-                    var litLengths = [];
-                    var prevCodeLen = 0;
-                    var maxLengths = numLitLengths + numDistLengths;
-                    while (litLengths.length < maxLengths) {
-                        sym = _decodeSymbol(zBitio, codeTable);
-                        switch (sym) {
-                            case 16:
-                                i = zBitio.readUB(2) + 3;
-                                while (i--) {
-                                    litLengths[litLengths.length] =
-                                        prevCodeLen;
+                            var renderColorTransform = _multiplicationColor(
+                                colorTransform, btnChar.ColorTransform
+                            );
+
+                            if (actions != undefined
+                                && btnChar.ButtonStateHitTest
+                            ) {
+                                var cacheKey = cacheStore.generateKey(
+                                    'ButtonHit',
+                                    tag.CharacterId,
+                                    renderMatrix,
+                                    renderColorTransform
+                                );
+
+                                var hitObj = cacheStore.get(cacheKey);
+                                if (hitObj == undefined) {
+                                    if (tagChar instanceof MovieClip) {
+                                        var bounds = tagChar.getBounds(renderMatrix);
+                                    } else {
+                                        var bounds = character[tagChar.CharacterId];
+                                    }
+
+                                    var no = _Number.MAX_VALUE;
+                                    var Xmax = -no;
+                                    var Ymax = -no;
+                                    var Xmin = no;
+                                    var Ymin = no;
+
+                                    var x0 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
+                                    var x1 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
+                                    var x2 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
+                                    var x3 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
+                                    var y0 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
+                                    var y1 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
+                                    var y2 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
+                                    var y3 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
+
+                                    Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
+                                    Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
+                                    Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
+                                    Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
+
+                                    cacheStore.store[cacheKey] = {
+                                        CharacterId: tag.CharacterId,
+                                        Xmax: Xmax,
+                                        Xmin: Xmin,
+                                        Ymax: Ymax,
+                                        Ymin: Ymin,
+                                        CondKeyPress: 0,
+                                        parent: _this
+                                    };
                                 }
-                                break;
-                            case 17:
-                                i = zBitio.readUB(3) + 3;
-                                while (i--) {
-                                    litLengths[litLengths.length] = 0;
+                                buttonHits[buttonHits.length] = hitObj;
+                            }
+
+                            if (touchObj != null && touchObj.CharacterId == tag.CharacterId) {
+                                if (!btnChar.ButtonStateDown) {
+                                    continue;
                                 }
-                                break;
-                            case 18:
-                                i = zBitio.readUB(7) + 11;
-                                while (i--) {
-                                    litLengths[litLengths.length] = 0;
+
+                                if (tagChar instanceof MovieClip) {
+                                    tagChar.isButtonRemove = true;
+                                    tagChar.addFrameTags();
+                                    tagChar.action();
+                                    tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
+                                    tagChar.putFrame();
+                                } else {
+                                    var obj = character[tagChar.CharacterId];
+                                    switch (obj.tagType) {
+                                        case 46: // MorphShape
+                                        case 84: // MorphShape2
+                                            var controlTag = _this.getControlTag();
+                                            var cTag = controlTag[depth];
+                                            cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                            break;
+                                        case 2:  // DefineShape
+                                        case 22: // DefineShape2
+                                        case 32: // DefineShape3
+                                        case 83: // DefineShape4
+                                            cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            if (obj.isClipDepth) {
+                                                continue;
+                                            }
+                                            break;
+                                        case 7: // DefineButton
+                                        case 34: // DefineButton2
+                                            _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            continue;
+                                        case 11: // DefineText
+                                        case 33: // DefineText2
+                                            cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            break;
+                                        case 37: // DefineEditText
+                                            _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            continue;
+                                            break;
+                                    } //  switch
                                 }
-                                break;
-                            default:
-                                if(sym <= 15){
-                                    litLengths[litLengths.length] = sym;
-                                    prevCodeLen = sym;
+                            } else if (btnChar.ButtonStateUp) {
+                                if (tagChar instanceof MovieClip) {
+                                    tagChar.addFrameTags();
+                                    tagChar.action();
+                                    tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
+                                    tagChar.putFrame();
+                                } else {
+                                    var obj = character[tagChar.CharacterId];
+                                    switch (obj.tagType) {
+                                        case 46: // MorphShape
+                                        case 84: // MorphShape2
+                                            var controlTag = _this.getControlTag();
+                                            var cTag = controlTag[depth];
+                                            cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                            break;
+                                        case 2:  // DefineShape
+                                        case 22: // DefineShape2
+                                        case 32: // DefineShape3
+                                        case 83: // DefineShape4
+                                            cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            if (obj.isClipDepth) {
+                                                continue;
+                                            }
+                                            break;
+                                        case 7: // DefineButton
+                                        case 34: // DefineButton2
+                                            _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            continue
+                                            break;
+                                        case 11: // DefineText
+                                        case 33: // DefineText2
+                                            cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            break;
+                                        case 37: // DefineEditText
+                                            _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                            continue;
+                                            break;
+                                    } //  switch
                                 }
-                                break;
+                            }
+
+                            if (touchObj == null
+                                && tagChar instanceof MovieClip
+                                && tagChar.isButtonRemove
+                            ) {
+                                tagChar.isButtonRemove = false;
+                                tagChar.reset(false, 1);
+                            }
+
+                            if (cache instanceof CanvasRenderingContext2D) {
+                                var canvas = cache.canvas;
+                                if (canvas.width > 0 && canvas.height > 0) {
+                                    ctx.setTransform(1, 0, 0, 1,
+                                        (cache.offsetX + renderMatrix.TranslateX),
+                                        (cache.offsetY + renderMatrix.TranslateY)
+                                    );
+                                    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                                }
+                            }
                         }
                     }
-                    distTable = _buildHuffTable(
-                        litLengths.splice(numLitLengths, numDistLengths)
-                    );
-                    litTable = _buildHuffTable(litLengths);
-                }
+                },
 
-                while (sym != 256) {
-                    sym = _decodeSymbol(zBitio, litTable);
-                    if (sym < 256) {
-                        buff[buff.length] = sym;
-                    } else if(sym > 256){
-                        var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
-                        var len = lengthMap[1]
-                            + zBitio.readUB(lengthMap[0]);
-                        var distMap =
-                            DEFLATE_DISTANCE_MAP[
-                                _decodeSymbol(zBitio, distTable)
-                            ];
-                        var dist = distMap[1]
-                            + zBitio.readUB(distMap[0]);
-                        i = buff.length - dist;
-                        while (len--) {
-                            buff[buff.length] = buff[i++];
-                        }
-                    }
-                }
-            } else {
-                zBitio.bit_offset = 8;
-                var len = zBitio.readNumber(2);
-                var nlen = zBitio.readNumber(2);
-                while (len--) {
-                    buff[buff.length] = zBitio.readNumber(1);
-                }
-            }
-        }
-
-        return buff;
-    }
-
-    /**
-     * deleteNode
-     */
-    function deleteNode()
-    {
-        var div = _document.getElementById('swf2js');
-        var childNodes = div.childNodes;
-        var len = childNodes.length;
-        if (len) {
-            for (var i = len; i--;) {
-                div.removeChild(childNodes[i]);
-            }
-        }
-    }
-
-    /**
-     * onEnterFrame
-     */
-    function onEnterFrame()
-    {
-        if (isLoad && player.playStartFlag) {
-            clearMain();
-            context.drawImage(preContext.canvas, 0, 0);
-            _setTimeout(buffer, 0);
-        }
-    }
-
-    /**
-     * clone
-     * @param src
-     * @returns {{}}
-     */
-    function clone(src)
-    {
-        var execute = function(src, obj)
-        {
-            for(var prop in src) {
-                var value = src[prop];
-                if(value instanceof Array) {
-                    obj[prop] = [];
-                    execute(value, obj[prop]);
-                } else if(value instanceof Object) {
-                    obj[prop] = {};
-                    execute(value, obj[prop]);
-                } else {
-                    obj[prop] = value;
-                }
-            }
-        };
-
-        var obj = {};
-        execute(src, obj);
-        return obj;
-    }
-
-    /**
-     * multiplicationMatrix
-     * @param a
-     * @param b
-     * @returns {{ScaleX: number, RotateSkew0: number, RotateSkew1: number, ScaleY: number, TranslateX: number, TranslateY: number}}
-     */
-    function multiplicationMatrix(a, b) {
-        return {
-            ScaleX: a.ScaleX * b.ScaleX + a.RotateSkew1 * b.RotateSkew0,
-            RotateSkew0: a.RotateSkew0 * b.ScaleX + a.ScaleY * b.RotateSkew0,
-            RotateSkew1: a.ScaleX * b.RotateSkew1 + a.RotateSkew1 * b.ScaleY,
-            ScaleY: a.RotateSkew0 * b.RotateSkew1 + a.ScaleY * b.ScaleY,
-            TranslateX: a.ScaleX * b.TranslateX + a.RotateSkew1 * b.TranslateY + a.TranslateX,
-            TranslateY: a.RotateSkew0 * b.TranslateX + a.ScaleY * b.TranslateY + a.TranslateY
-        }
-    }
-
-    /**
-     * multiplicationColor
-     * @param a
-     * @param b
-     * @returns {{HasMultiTerms: *, RedMultiTerm: number, GreenMultiTerm: number, BlueMultiTerm: number, AlphaMultiTerm: number, HasAddTerms: *, RedAddTerm: number, GreenAddTerm: number, BlueAddTerm: number, AlphaAddTerm: number}}
-     */
-    function multiplicationColor(a, b)
-    {
-        return {
-            HasMultiTerms: _max(a.HasMultiTerms, b.HasMultiTerms),
-            RedMultiTerm: a.RedMultiTerm * b.RedMultiTerm,
-            GreenMultiTerm: a.GreenMultiTerm * b.GreenMultiTerm,
-            BlueMultiTerm: a.BlueMultiTerm * b.BlueMultiTerm,
-            AlphaMultiTerm: a.AlphaMultiTerm * b.AlphaMultiTerm,
-            HasAddTerms: _max(a.HasAddTerms, b.HasAddTerms),
-            RedAddTerm: a.RedMultiTerm * b.RedAddTerm + a.RedAddTerm,
-            GreenAddTerm: a.GreenMultiTerm * b.GreenAddTerm + a.GreenAddTerm,
-            BlueAddTerm: a.BlueMultiTerm * b.BlueAddTerm + a.BlueAddTerm,
-            AlphaAddTerm: a.AlphaMultiTerm * b.AlphaAddTerm + a.AlphaAddTerm
-        };
-    }
-
-    /**
-     * swf2js
-     * @type {{}}
-     */
-    var swf2js = {};
-
-    /**
-     * load
-     * @param url
-     * @param options
-     */
-    swf2js.load = function(url, options)
-    {
-        if (init()) {
-            // TODO 開発用
-            if (url == undefined) {
-                url = location.search.substr(1).split('&')[0];
-            }
-
-            // option
-            if (options != undefined) {
-                setWidth = options.width | 0;
-                setHeight = options.height | 0;
-                renderMode = options.mode | 'canvas';
-                isSpriteSheet = options.isSpriteSheet | false;
-            }
-
-            if (url) {
-                var xmlHttpRequest = new XMLHttpRequest();
-                xmlHttpRequest.open('GET', url);
-                xmlHttpRequest.overrideMimeType(
-                    'text/plain; charset=x-user-defined'
-                );
-                xmlHttpRequest.send(null);
-                xmlHttpRequest.onreadystatechange = function()
+                /**
+                 * renderBoundMatrix
+                 * @param bound
+                 * @param matrix
+                 * @returns {{X: *, Y: *, W: number, H: number}}
+                 */
+                renderBoundMatrix: function(bound, matrix)
                 {
-                    var readyState = xmlHttpRequest.readyState;
-                    if (readyState == 4) {
-                        var status = xmlHttpRequest.status;
-                        if (status == 200) {
-                            parse(xmlHttpRequest.responseText);
+                    var no = _Number.MAX_VALUE;
+                    var Xmax = -no;
+                    var Ymax = -no;
+                    var Xmin = no;
+                    var Ymin = no;
+
+                    var x0 = bound.Xmax * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
+                    var x1 = bound.Xmax * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
+                    var x2 = bound.Xmin * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
+                    var x3 = bound.Xmin * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
+                    var y0 = bound.Xmax * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
+                    var y1 = bound.Xmax * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
+                    var y2 = bound.Xmin * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
+                    var y3 = bound.Xmin * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
+
+                    Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
+                    Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
+                    Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
+                    Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
+
+                    var x = Xmin;
+                    var w = Xmax - x;
+                    if (w < 0) {
+                        w *= -1;
+                    }
+
+                    var y = Ymin;
+                    var h = Ymax - y;
+                    if (h < 0) {
+                        h *= -1;
+                    }
+
+                    return {X: x, Y: y, W: w, H: h}
+                },
+
+                /**
+                 * generateColorTransform
+                 * @param R
+                 * @param G
+                 * @param B
+                 * @param A
+                 * @param data
+                 * @returns {{R: *, G: *, B: *, A: *}}
+                 */
+                generateColorTransform: function(R, G, B, A, data)
+                {
+                    return {
+                        R : _floor(_max(0, _min((R * data.RedMultiTerm) + data.RedAddTerm, 255))),
+                        G : _floor(_max(0, _min((G * data.GreenMultiTerm) + data.GreenAddTerm, 255))),
+                        B : _floor(_max(0, _min((B * data.BlueMultiTerm) + data.BlueAddTerm, 255))),
+                        A : _max(0, _min((A * data.AlphaMultiTerm) + data.AlphaAddTerm, 255)) / 255
+                    }
+                },
+
+                /**
+                 * generateImageTransform
+                 * @param ctx
+                 * @param color
+                 * @returns {*}
+                 */
+                generateImageTransform: function(ctx, color)
+                {
+                    var canvas = _document.createElement('canvas');
+                    var width = ctx.canvas.width;
+                    var height = ctx.canvas.height;
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    var imageContext = canvas.getContext("2d");
+
+                    imageContext.drawImage(ctx.canvas, 0, 0, width, height);
+                    var imgData = imageContext.getImageData(0, 0, width, height);
+                    var pxData = imgData.data;
+                    var idx = 0;
+                    for (var y = height; y--;) {
+                        for (var x = width; x--;) {
+                            var R = pxData[idx++];
+                            var G = pxData[idx++];
+                            var B = pxData[idx++];
+                            var A = pxData[idx++];
+                            pxData[idx - 4] = _floor(_max(0, _min((R * color.RedMultiTerm) + color.RedAddTerm, 255)));
+                            pxData[idx - 3] = _floor(_max(0, _min((G * color.GreenMultiTerm) + color.GreenAddTerm, 255)));
+                            pxData[idx - 2] = _floor(_max(0, _min((B * color.BlueMultiTerm) + color.BlueAddTerm, 255)));
+                            pxData[idx - 1] = _max(0, _min((A * color.AlphaMultiTerm) + color.AlphaAddTerm, 255));
+                        }
+                    }
+                    imageContext.putImageData(imgData, 0, 0);
+
+                    return imageContext;
+                }
+            };
+
+            /**
+             * parse
+             * @param swf
+             */
+            function parse(swf)
+            {
+                // swfデータをセット
+                bitio.init(swf);
+
+                // Header
+                setSwfHeader();
+
+                // swfを分解
+                swftag.parse();
+
+                // delete
+                bitio = _void;
+            }
+
+            /**
+             * setMovieHeader
+             */
+            function setSwfHeader()
+            {
+                // signature
+                signature = bitio.getHeaderSignature();
+
+                // version
+                version = bitio.getVersion();
+
+                // ファイルサイズ
+                player.fileLength = bitio.getUI32();
+                // 解凍
+                if (signature == 'CWS') {
+                    bitio.deCompress(player.fileLength); // ZLIB
+                } else if (signature == 'ZWS') {
+                    alert('not supported by LZMA');
+                    return 0;
+                }
+
+                // フレームサイズ
+                var frameSize = swftag.rect();
+                player._width = (frameSize.Xmax - frameSize.Xmin);
+                player._height = (frameSize.Ymax - frameSize.Ymin);
+
+                // フレーム
+                player.frameRate  = bitio.getUI16() / 0x100;
+                player.frameCount = bitio.getUI16();
+                player.fps = _floor(1000 / player.frameRate);
+
+                // Canvasの画面サイズを調整
+                changeScreenSize();
+            }
+
+            /**
+             * loaded
+             */
+            function loaded()
+            {
+                cacheStore.reset();
+                buttonHits = [];
+
+                var mc = player.parent;
+                mc.addFrameTags();
+                mc.action();
+                mc.render(
+                    preContext,
+                    mc.getMatrix(),
+                    mc.getColorTransform(),
+                    mc.getVisible()
+                );
+
+                deleteNode();
+                var div = _document.getElementById('swf2js');
+                var canvas = preContext.canvas;
+                context.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                div.appendChild(context.canvas);
+
+                swf2js.play();
+                intervalId = _setInterval(onEnterFrame, player.fps);
+            }
+
+            /**
+             * buffer
+             */
+            function buffer()
+            {
+                var mc = player.parent;
+                mc.putFrame();
+                mc.addFrameTags();
+                mc.action();
+
+                buttonHits = [];
+                clearPre();
+                mc.render(
+                    preContext,
+                    mc.getMatrix(),
+                    mc.getColorTransform(),
+                    mc.getVisible()
+                );
+            }
+
+            /**
+             * main canvas clear
+             */
+            function clearMain()
+            {
+                var canvas = context.canvas;
+                canvas.width = canvas.width;
+            }
+
+            /*
+             * pre canvas clear
+             */
+            function clearPre()
+            {
+                var canvas = preContext.canvas;
+                canvas.width = canvas.width;
+            }
+
+            /**
+             * タッチイベント
+             * @param event
+             */
+            function touchStart(event)
+            {
+                var div = _document.getElementById('swf2js');
+                var bounds = div.getBoundingClientRect();
+                var x = bounds.left;
+                var y = bounds.top;
+
+                var touchX = 0;
+                var touchY = 0;
+                if (isTouch) {
+                    var changedTouche = event.targetTouches[0];
+                    touchX = changedTouche.pageX - x;
+                    touchY = changedTouche.pageY - y;
+                } else {
+                    touchX = event.pageX - x;
+                    touchY = event.pageY - y;
+                }
+
+                touchX *= devicePixelRatio;
+                touchY *= devicePixelRatio;
+
+                touchObj = null;
+                var len = buttonHits.length;
+                for (var i = len; i--;) {
+                    if (!(i in buttonHits)) {
+                        continue;
+                    }
+
+                    var hitObj = buttonHits[i];
+                    if (hitObj == undefined) {
+                        continue;
+                    }
+
+                    var char = character[hitObj.CharacterId];
+                    if (char.actions == undefined) {
+                        continue;
+                    }
+
+                    if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
+                        && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
+                    ){
+                        touchObj = hitObj;
+                        var actions = char.actions;
+                        for (var idx = actions.length; idx--;) {
+                            if (!(idx in actions)) {
+                                continue;
+                            }
+
+                            var cond = actions[idx];
+                            if (hitObj.CondKeyPress == 13
+                                && hitObj.CondKeyPress != cond.CondKeyPress
+                            ) {
+                                continue;
+                            }
+
+                            var keyPress = cond.CondKeyPress;
+                            if (keyPress == 0 || keyPress == 13
+                                || (keyPress >= 48 && keyPress <= 57)
+                            ) {
+                                touchObj.ActionScript = cond.ActionScript;
+                                if (cond.CondOverDownToOverUp != 1) {
+                                    touchEvent(event);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (touchObj != null) {
+                        break;
+                    }
+                }
+            }
+
+            /**
+             * 移動イベント
+             * @param event
+             */
+            function touchMove(event)
+            {
+                if (touchObj != null) {
+                    event.preventDefault();
+                    touchStart(event);
+                }
+            }
+
+            /**
+             * タッチイベント終了
+             * @param event
+             */
+            function touchEnd(event)
+            {
+                if (!isBtnAction) {
+                    touchEvent(event);
+                }
+                touchObj = null;
+                isBtnAction = false;
+            }
+
+            /**
+             * イベント実行
+             * @param event
+             */
+            function touchEvent(event)
+            {
+                event.preventDefault();
+                if (!isBtnAction && touchObj != null) {
+                    isBtnAction = true;
+                    var mc = touchObj.parent;
+                    touchObj.ActionScript.start(mc);
+                }
+            }
+
+            /**
+             * unzip
+             * @param compressed
+             * @param isDeCompress
+             * @returns {Array}
+             */
+            function unzip(compressed, isDeCompress)
+            {
+                /**
+                 * decodeSymbol
+                 * @param b
+                 * @param table
+                 * @returns {*}
+                 */
+                var _decodeSymbol = function (b, table)
+                {
+                    var code = 0;
+                    var len = 0;
+                    while (true) {
+                        code = (code << 1) | b.readUB(1);
+                        len++;
+                        if (!(code in table)) {
+                            continue;
+                        }
+
+                        var entry = table[code];
+                        if (entry.length == len) {
+                            return entry.symbol;
+                        }
+                    }
+                };
+
+                /**
+                 * buildHuffTable
+                 * @param bitLengths
+                 * @returns {{}}
+                 */
+                var _buildHuffTable = function(bitLengths)
+                {
+                    var numLengths = bitLengths.length;
+                    var blCount = [];
+                    var maxBits = _max.apply(Math, bitLengths) + 1;
+                    var nextCode = [];
+                    var code = 0;
+                    var table = {};
+                    var i = numLengths;
+
+                    while (i--) {
+                        var len = bitLengths[i];
+                        blCount[len] = (blCount[len] || 0) + (len > 0);
+                    }
+
+                    for (i = 1; i < maxBits; i++) {
+                        len = i - 1;
+                        if (!(len in blCount)) {
+                            blCount[len] = 0;
+                        }
+
+                        code = (code + blCount[len]) << 1;
+                        nextCode[i] = code;
+                    }
+
+                    for (i = 0; i < numLengths; i++) {
+                        len = bitLengths[i];
+                        if (len) {
+                            table[nextCode[len]] = {
+                                length: len,
+                                symbol: i
+                            };
+                            nextCode[len]++;
+                        }
+                    }
+                    return table;
+                };
+
+                var sym = 0;
+                var i = 0;
+                var buff = [];
+                var bitLengths = [];
+
+                var DEFLATE_CODE_LENGTH_ORDER =
+                    [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+                var DEFLATE_CODE_LENGTH_MAP = [
+                    [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10],
+                    [1, 11], [1, 13], [1, 15], [1, 17], [2, 19], [2, 23], [2, 27],
+                    [2, 31], [3, 35], [3, 43], [3, 51], [3, 59], [4, 67], [4, 83],
+                    [4, 99], [4, 115], [5, 131], [5, 163], [5, 195], [5, 227], [0, 258]
+                ];
+                var DEFLATE_DISTANCE_MAP = [
+                    [0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [1, 7], [2, 9], [2, 13],
+                    [3, 17], [3, 25], [4, 33], [4, 49], [5, 65], [5, 97], [6, 129],
+                    [6, 193], [7, 257], [7, 385], [8, 513], [8, 769], [9, 1025],
+                    [9, 1537], [10, 2049], [10, 3073], [11, 4097], [11, 6145],
+                    [12, 8193], [12, 12289], [13, 16385], [13, 24577]
+                ];
+
+                var zBitio = new BitIO();
+                zBitio.setData(compressed);
+
+                if (isDeCompress) {
+                    zBitio.setOffset(10, 8);
+                } else {
+                    zBitio.setOffset(2, 8);
+                }
+
+                while (!done) {
+                    var done = zBitio.readUB(1);
+                    var type = zBitio.readUB(2);
+
+                    var distTable = {};
+                    var litTable = {};
+                    var fixedDistTable = false;
+                    var fixedLitTable = false;
+
+                    if (type) {
+                        if (type == 1) {
+                            distTable = fixedDistTable;
+                            litTable = fixedLitTable;
+
+                            if (!distTable) {
+                                bitLengths = [];
+                                for(i = 32; i--;){
+                                    bitLengths[bitLengths.length] = 5;
+                                }
+                                distTable = fixedDistTable =
+                                    _buildHuffTable(bitLengths);
+                            }
+
+                            if (!litTable) {
+                                bitLengths = [];
+                                i = 0;
+
+                                for(; i < 144; i++){
+                                    bitLengths[bitLengths.length] = 8;
+                                }
+
+                                for(; i < 256; i++){
+                                    bitLengths[bitLengths.length] = 9;
+                                }
+
+                                for(; i < 280; i++){
+                                    bitLengths[bitLengths.length] = 7;
+                                }
+
+                                for(; i < 288; i++){
+                                    bitLengths[bitLengths.length] = 8;
+                                }
+
+                                litTable = fixedLitTable =
+                                    _buildHuffTable(bitLengths);
+                            }
                         } else {
-                            alert('unknown swf data');
-                            return 0;
+                            var numLitLengths = zBitio.readUB(5) + 257;
+                            var numDistLengths = zBitio.readUB(5) + 1;
+                            var numCodeLengths = zBitio.readUB(4) + 4;
+                            var codeLengths =
+                                [0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                            for(i = 0; i < numCodeLengths; i++){
+                                codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] =
+                                    zBitio.readUB(3);
+                            }
+                            var codeTable = _buildHuffTable(codeLengths);
+                            var litLengths = [];
+                            var prevCodeLen = 0;
+                            var maxLengths = numLitLengths + numDistLengths;
+                            while (litLengths.length < maxLengths) {
+                                sym = _decodeSymbol(zBitio, codeTable);
+                                switch (sym) {
+                                    case 16:
+                                        i = zBitio.readUB(2) + 3;
+                                        while (i--) {
+                                            litLengths[litLengths.length] =
+                                                prevCodeLen;
+                                        }
+                                        break;
+                                    case 17:
+                                        i = zBitio.readUB(3) + 3;
+                                        while (i--) {
+                                            litLengths[litLengths.length] = 0;
+                                        }
+                                        break;
+                                    case 18:
+                                        i = zBitio.readUB(7) + 11;
+                                        while (i--) {
+                                            litLengths[litLengths.length] = 0;
+                                        }
+                                        break;
+                                    default:
+                                        if(sym <= 15){
+                                            litLengths[litLengths.length] = sym;
+                                            prevCodeLen = sym;
+                                        }
+                                        break;
+                                }
+                            }
+                            distTable = _buildHuffTable(
+                                litLengths.splice(numLitLengths, numDistLengths)
+                            );
+                            litTable = _buildHuffTable(litLengths);
+                        }
+
+                        while (sym != 256) {
+                            sym = _decodeSymbol(zBitio, litTable);
+                            if (sym < 256) {
+                                buff[buff.length] = sym;
+                            } else if(sym > 256){
+                                var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
+                                var len = lengthMap[1]
+                                    + zBitio.readUB(lengthMap[0]);
+                                var distMap =
+                                    DEFLATE_DISTANCE_MAP[
+                                        _decodeSymbol(zBitio, distTable)
+                                    ];
+                                var dist = distMap[1]
+                                    + zBitio.readUB(distMap[0]);
+                                i = buff.length - dist;
+                                while (len--) {
+                                    buff[buff.length] = buff[i++];
+                                }
+                            }
+                        }
+                    } else {
+                        zBitio.bit_offset = 8;
+                        var len = zBitio.readNumber(2);
+                        var nlen = zBitio.readNumber(2);
+                        while (len--) {
+                            buff[buff.length] = zBitio.readNumber(1);
                         }
                     }
                 }
-            } else {
-                alert('please set swf url');
-                return 0;
+
+                return buff;
             }
-        }
-    };
 
-    /**
-     * play
-     */
-    swf2js.play = function()
-    {
-        player.playStartFlag = true;
-    };
+            /**
+             * deleteNode
+             */
+            function deleteNode()
+            {
+                var div = _document.getElementById('swf2js');
+                var childNodes = div.childNodes;
+                var len = childNodes.length;
+                if (len) {
+                    for (var i = len; i--;) {
+                        div.removeChild(childNodes[i]);
+                    }
+                }
+            }
 
-    /**
-     * stop
-     */
-    swf2js.stop = function()
-    {
-        player.playStartFlag = false;
-    };
+            /**
+             * onEnterFrame
+             */
+            function onEnterFrame()
+            {
+                if (isLoad && player.playStartFlag) {
+                    clearMain();
+                    var canvas = preContext.canvas;
+                    context.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                    _setTimeout(buffer, 0);
+                }
+            }
 
-    /**
-     * reLoad
-     * @param path
-     */
-    swf2js.reLoad = function(path)
-    {
-        _clearInterval(intervalId);
-        deleteNode();
+            /**
+             * clone
+             * @param src
+             * @returns {{}}
+             */
+            function clone(src)
+            {
+                var execute = function(src, obj)
+                {
+                    for(var prop in src) {
+                        var value = src[prop];
+                        if(value instanceof Array) {
+                            obj[prop] = [];
+                            execute(value, obj[prop]);
+                        } else if(value instanceof Object) {
+                            obj[prop] = {};
+                            execute(value, obj[prop]);
+                        } else {
+                            obj[prop] = value;
+                        }
+                    }
+                };
 
-        player.playStartFlag = false;
-        isLoad = false;
+                var obj = {};
+                execute(src, obj);
+                return obj;
+            }
 
-        swftag = new SwfTag();
-        bitio = new BitIO();
-        this.load(path, {width: setWidth, height: setHeight});
-    };
+            /**
+             * multiplicationMatrix
+             * @param a
+             * @param b
+             * @returns {{ScaleX: number, RotateSkew0: number, RotateSkew1: number, ScaleY: number, TranslateX: number, TranslateY: number}}
+             */
+            function multiplicationMatrix(a, b) {
+                return {
+                    ScaleX: a.ScaleX * b.ScaleX + a.RotateSkew1 * b.RotateSkew0,
+                    RotateSkew0: a.RotateSkew0 * b.ScaleX + a.ScaleY * b.RotateSkew0,
+                    RotateSkew1: a.ScaleX * b.RotateSkew1 + a.RotateSkew1 * b.ScaleY,
+                    ScaleY: a.RotateSkew0 * b.RotateSkew1 + a.ScaleY * b.ScaleY,
+                    TranslateX: a.ScaleX * b.TranslateX + a.RotateSkew1 * b.TranslateY + a.TranslateX,
+                    TranslateY: a.RotateSkew0 * b.TranslateX + a.ScaleY * b.TranslateY + a.TranslateY
+                }
+            }
 
-    /**
-     * output
-     * @param path
-     * @returns {boolean}
-     */
-    swf2js.output = function(path)
-    {
-        swf2js.stop();
+            /**
+             * multiplicationColor
+             * @param a
+             * @param b
+             * @returns {{HasMultiTerms: *, RedMultiTerm: number, GreenMultiTerm: number, BlueMultiTerm: number, AlphaMultiTerm: number, HasAddTerms: *, RedAddTerm: number, GreenAddTerm: number, BlueAddTerm: number, AlphaAddTerm: number}}
+             */
+            function multiplicationColor(a, b)
+            {
+                return {
+                    HasMultiTerms: _max(a.HasMultiTerms, b.HasMultiTerms),
+                    RedMultiTerm: a.RedMultiTerm * b.RedMultiTerm,
+                    GreenMultiTerm: a.GreenMultiTerm * b.GreenMultiTerm,
+                    BlueMultiTerm: a.BlueMultiTerm * b.BlueMultiTerm,
+                    AlphaMultiTerm: a.AlphaMultiTerm * b.AlphaMultiTerm,
+                    HasAddTerms: _max(a.HasAddTerms, b.HasAddTerms),
+                    RedAddTerm: a.RedMultiTerm * b.RedAddTerm + a.RedAddTerm,
+                    GreenAddTerm: a.GreenMultiTerm * b.GreenAddTerm + a.GreenAddTerm,
+                    BlueAddTerm: a.BlueMultiTerm * b.BlueAddTerm + a.BlueAddTerm,
+                    AlphaAddTerm: a.AlphaMultiTerm * b.AlphaAddTerm + a.AlphaAddTerm
+                };
+            }
 
-        if (!isLoad) {
-            _clearInterval(intervalId);
-            _setTimeout(swf2js.output, 1000, path);
-            return false;
-        }
+            /**
+             * swf2js
+             * @type {{}}
+             */
+            var swf2js = {};
 
-        var xmlHttpRequest = new XMLHttpRequest();
+            /**
+             * load
+             * @param url
+             * @param options
+             */
+            swf2js.load = function(url, options)
+            {
+                if (init()) {
+                    // TODO 開発用
+                    if (url == undefined) {
+                        url = location.search.substr(1).split('&')[0];
+                    }
+
+                    // option
+                    if (options != undefined) {
+                        setWidth = options.width | 0;
+                        setHeight = options.height | 0;
+                        renderMode = options.mode | 'canvas';
+                        isSpriteSheet = options.isSpriteSheet | false;
+                    }
+
+                    if (url) {
+                        var xmlHttpRequest = new XMLHttpRequest();
+                        xmlHttpRequest.open('GET', url);
+                        xmlHttpRequest.overrideMimeType(
+                            'text/plain; charset=x-user-defined'
+                        );
+                        xmlHttpRequest.send(null);
+                        xmlHttpRequest.onreadystatechange = function()
+                        {
+                            var readyState = xmlHttpRequest.readyState;
+                            if (readyState == 4) {
+                                var status = xmlHttpRequest.status;
+                                if (status == 200) {
+                                    parse(xmlHttpRequest.responseText);
+                                } else {
+                                    alert('unknown swf data');
+                                    return 0;
+                                }
+                            }
+                        }
+                    } else {
+                        alert('please set swf url');
+                        return 0;
+                    }
+                }
+            };
+
+            /**
+             * play
+             */
+            swf2js.play = function()
+            {
+                player.playStartFlag = true;
+            };
+
+            /**
+             * stop
+             */
+            swf2js.stop = function()
+            {
+                player.playStartFlag = false;
+            };
+
+            /**
+             * reLoad
+             * @param path
+             */
+            swf2js.reLoad = function(path)
+            {
+                _clearInterval(intervalId);
+                deleteNode();
+
+                player.playStartFlag = false;
+                isLoad = false;
+
+                swftag = new SwfTag();
+                bitio = new BitIO();
+                this.load(path, {width: setWidth, height: setHeight});
+            };
+
+            /**
+             * output
+             * @param path
+             * @returns {boolean}
+             */
+            swf2js.output = function(path)
+            {
+                swf2js.stop();
+
+                if (!isLoad) {
+                    _clearInterval(intervalId);
+                    _setTimeout(swf2js.output, 1000, path);
+                    return false;
+                }
+
+                var xmlHttpRequest = new XMLHttpRequest();
         xmlHttpRequest.open(
             'POST', path
         );
