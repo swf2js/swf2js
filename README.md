@@ -116,6 +116,10 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.2 ] Release Date: 28 Feb 2015  
+* [BUGFIX] ActionScript  
+
+
 --[ swf2js 0.2.1 ] Release Date: 27 Feb 2015  
 * [BUGFIX] ActionScript  
 * [BUGFIX] Tag 'DefineBits'  
