@@ -116,6 +116,10 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.3 ] Release Date: 3 Mar 2015  
+* [BUGFIX] ActionScript  
+
+
 --[ swf2js 0.2.2 ] Release Date: 28 Feb 2015  
 * [BUGFIX] ActionScript  
 
