@@ -1,7 +1,7 @@
-FlashをiPhoneで再生可能にする「swf2js」
+FlashをHTML5に変換してiPhone、Androidで再生可能にする「swf2js」
 ======
-swfをJavaScriptでバイナリ分解してcanvas出力!!  
-iPhoneでもswfを再生可能に  
+swfファイルをJavaScriptでバイナリ分解してcanvas出力!!  
+iPhoneでもAndroidでもswfを再生可能に  
 対応バージョン：SWF4以下(Flash Lite 1.x)  
   
   
@@ -70,7 +70,6 @@ SWF 10
 FreeCharacter  
 DefineFontInfo  
 StopSound  
-DefineButtonSound  
 SoundStreamBlock  
 DefineButtonCxform  
 PathsArePostScript  
@@ -116,6 +115,11 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.4 ] Release Date: 4 Mar 2015  
+* [BUGFIX] ActionScript  
+* [NEW] Tag DefineButtonSound  
+
+
 --[ swf2js 0.2.3 ] Release Date: 3 Mar 2015  
 * [BUGFIX] ActionScript  
 
