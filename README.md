@@ -58,12 +58,9 @@ Please send the file of swf which does not operate. A bug is fixed.
 TODO
 -------
 ▼ActionScript  
-SWF 5  
 SWF 6  
 SWF 7  
-SWF 8  
 SWF 9  
-SWF 10  
 
 
 ▼TAG  
@@ -115,6 +112,10 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.5 ] Release Date: 6 Mar 2015  
+* [NEW] SWF 5  
+
+
 --[ swf2js 0.2.4 ] Release Date: 4 Mar 2015  
 * [BUGFIX] ActionScript  
 * [NEW] Tag DefineButtonSound  

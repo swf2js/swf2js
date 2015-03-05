@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.4)
+ * swf2js (version 0.2.5)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -1232,6 +1232,8 @@
                     }
                     length = bitio.getUI32();
                 }
+
+                console.log(tagStartOffset, length);
 
                 var tagDataStartOffset = bitio.byte_offset;
                 if (tagType == 1) {
@@ -3019,6 +3021,7 @@
             // unCompress
             var sub = bitio.byte_offset - startOffset;
             var compressed = bitio.getData(length - sub);
+            console.log(compressed)
             var data = unzip(compressed, false);
 
             // canvas
@@ -3186,7 +3189,7 @@
             image.src = "data:image/jpeg;base64,"
                 + swftag.base64encode(swftag.parseJpegData(JPEGData, jpegTables));
 
-            _setTimeout(function() {}, 0);
+            //_setTimeout(function() {}, 0);
         },
 
         /**
@@ -3647,7 +3650,7 @@
             if (obj.HasText) {
                 var text = bitio.getDataUntil("\0");
                 if (obj.HTML) {
-                    console.log(text)
+                    console.log(text);
                 } else {
                     obj.InitialText = text;
                 }
@@ -4748,6 +4751,7 @@
         this.bitio = new BitIO();
         this.bitio.setData(data);
         this.pBitio = new BitIO();
+        this.constantPool = [];
     };
 
     /**
@@ -4764,7 +4768,6 @@
             var _this = this;
             var isEnd = false;
             var stack = [];
-            var constantPool = [];
             var movieClip = mc;
             var test = 0;
 
@@ -5233,8 +5236,29 @@
                                     stack[stack.length] = (pBitio.getUI8());
                                     break;
                                 // Double
-                                case 6: // TODO
+                                case 6:
+                                    var upperData = pBitio.getData(4);
+                                    var upperBits = 0;
+                                    for (var i = 4; i--;) {
+                                        upperBits |= upperData[i] << (i * 8);
+                                    }
 
+                                    var lowerData = pBitio.getData(4);
+                                    var lowerBits = 0;
+                                    for (var i = 4; i--;) {
+                                        lowerBits |= lowerData[i] << (i * 8);
+                                    }
+
+                                    var sign = upperBits >>> 31 & 0x1;
+                                    var exp = upperBits >>> 20 & 0x7FF;
+                                    var upperFraction = upperBits & 0xFFFFF;
+                                    var lowerFraction = lowerBits;
+
+                                    var val = ((sign == 0) ? 1 : -1)
+                                        * (upperFraction / _pow(2, 20) + lowerFraction / _pow(2, 52) + 1)
+                                            * _pow(2, exp - 1023);
+
+                                    stack[stack.length] = upperBits;
                                     break;
                                 // Integer
                                 case 7:
@@ -5242,14 +5266,13 @@
                                     break;
                                 // Constant8
                                 case 8:
-                                    stack[stack.length] = constantPool[pBitio.getUI8()];
+                                    stack[stack.length] = this.constantPool[pBitio.getUI8()];
                                     break;
                                 // Constant16
                                 case 9:
-                                    stack[stack.length] = constantPool[pBitio.getUI16()];
+                                    stack[stack.length] = this.constantPool[pBitio.getUI16()];
                                     break;
                                 default:
-                                    console.log('PUSH ERROR ??? ' + type);
                                     break;
                             }
                         }
@@ -5550,75 +5573,7 @@
                             }
                         }
 
-                        switch (index) {
-                            case 0:
-                                value = targetMc.getX();
-                                break;
-                            case 1:
-                                value = targetMc.getY();
-                                break;
-                            case 2:
-                                value = targetMc.getScaleX();
-                                break;
-                            case 3:
-                                value = targetMc.getScaleY();
-                                break;
-                            case 4:
-                                value = targetMc.getFrame();
-                                break;
-                            case 5:
-                                value = targetMc.getTotalFrames();
-                                break;
-                            case 6:
-                                value = targetMc.getAlpha();
-                                break;
-                            case 7:
-                                value = targetMc.getVisible();
-                                break;
-                            case 8:
-                                value = targetMc.getWidth();
-                                break;
-                            case 9:
-                                value = targetMc.getHeight();
-                                break;
-                            case 10:
-                                value = targetMc.getRotation();
-                                break;
-                            case 11:
-                                value = targetMc._target;
-                                break;
-                            case 12:
-                                value = targetMc._framesLoaded;
-                                break;
-                            case 13:
-                                value = targetMc.getName();
-                                break;
-                            case 14:
-                                value = targetMc._droptarget;
-                                break;
-                            case 15:
-                                value = targetMc._url;
-                                break;
-                            case 16:
-                                value = targetMc._highquality;
-                                break;
-                            case 17:
-                                value = targetMc._focusrect;
-                                break;
-                            case 18:
-                                value = targetMc._soundbuftime;
-                                break;
-                            case 19:
-                                value = targetMc._quality;
-                                break;
-                            case 20:
-                                value = targetMc._xmouse;
-                                break;
-                            case 21:
-                                value = targetMc._ymouse;
-                                break;
-                        }
-                        stack[stack.length] = value;
+                        stack[stack.length] = targetMc.getProperty(index);
 
                         break;
                     // GoToFrame2
@@ -5693,107 +5648,7 @@
                             }
                         }
 
-                        switch (index) {
-                            case 0:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setX(value);
-                                }
-                                break;
-                            case 1:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setY(value);
-                                }
-                                break;
-                            case 2:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setScaleX(value);
-                                }
-                                break;
-                            case 3:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setScaleY(value);
-                                }
-                                break;
-                            case 4:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setNextFrame(value);
-                                }
-                                break;
-                            case 5:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setTotalFrames(value);
-                                }
-                                break;
-                            case 6:
-                                value = _parseFloat(value / 100);
-                                if (!_isNaN(value)) {
-                                    targetMc.setAlpha(value);
-                                }
-                                break;
-                            case 7:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setVisible(value);
-                                }
-                                break;
-                            case 8:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setWidth(value);
-                                }
-                                break;
-                            case 9:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setHeight(value);
-                                }
-                                break;
-                            case 10:
-                                value = _parseFloat(value);
-                                if (!_isNaN(value)) {
-                                    targetMc.setRotation(value);
-                                }
-                                break;
-                            case 11:
-                                targetMc._target = value;
-                                break;
-                            case 12:
-                                targetMc._framesloaded = value;
-                                break;
-                            case 13:
-                                targetMc.setName(value);
-                                break;
-                            case 14:
-                                targetMc._droptarget = value;
-                                break;
-                            case 15:
-                                targetMc._url = value;
-                                break;
-                            case 16:
-                                targetMc._highquality = value;
-                                break;
-                            case 17:
-                                targetMc._focusrect = value;
-                                break;
-                            case 18:
-                                targetMc._soundbuftime = value;
-                                break;
-                            case 19:
-                                targetMc._quality = value;
-                                break;
-                            case 20:
-                                targetMc._xmouse = value;
-                                break;
-                            case 21:
-                                targetMc._ymouse = value;
-                                break;
-                        }
+                        targetMc.setProperty(index, value);
 
                         break;
                     // StartDrag
@@ -6005,12 +5860,9 @@
                         }
                         break;
 
-                    // TODO SWF5
                     // SWF 5 ***********************************
                     // CallMethod
                     case 0x52:
-                        console.log('------------ > CallMethod');
-                        console.log(stack);
                         var method = stack.pop();
                         var object = stack.pop();
                         var count = _parseFloat(stack.pop());
@@ -6020,22 +5872,25 @@
                             params[params.length] = stack.pop();
                         }
 
-                        console.log(method, object, stack);
+                        var value = null;
+                        if (object[method] != undefined) {
+                            value = object[method].apply(object, params);
+                        }
 
+                        stack[stack.length] = value;
                         break;
                     // ConstantPool
                     case 0x88:
-                        console.log('------------ > ConstantPool');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
 
+                        var _this = this;
                         var count = pBitio.getUI16();
-                        constantPool = [];
-                        for (var i = 0; i < count; i++) {
-                            constantPool[constantPool.length] = pBitio.getDataUntil("\0");
+                        _this.constantPool = [];
+                        for (; count--;) {
+                            _this.constantPool[_this.constantPool.length] =
+                                pBitio.getDataUntil("\0");
                         }
-
-                        console.log(constantPool)
                         break;
                     // ActionCallFunction
                     case 0x3d:
@@ -6048,59 +5903,80 @@
                         for (; numArgs--;) {
                             params[params.length] = stack.pop();
                         }
-                        console.log(FunctionName, params)
 
                         break;
                     // ActionDefineFunction
                     case 0x9b:
-                        // TODO 未実装
-                        console.log('ActionDefineFunction');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
+
                         var FunctionName = pBitio.getDataUntil("\0");
                         var NumParams = pBitio.getUI16();
-
                         var params = [];
                         for (; NumParams--;) {
                             params[params.length] = pBitio.getDataUntil("\0");
                         }
 
                         var codeSize  = pBitio.getUI16();
-                        stack[stack.length] = FunctionName;
-
-                        console.log(FunctionName, NumParams, codeSize, pBitio.byte_offset)
-
-
+                        var as = new ActionScript(this.bitio.getData(codeSize));
+                        as.constantPool = clone(this.constantPool);
+                        stack[stack.length] = as;
 
                         break;
                     // ActionDefineLocal
                     case 0x3c:
-                        // TODO 未実装
                         console.log('ActionDefineLocal');
+                        var value = stack.pop();
+                        var name = stack.pop();
+                        if (movieClip != null) {
+                            movieClip.setVariable(name, value);
+                        }
+
                         break;
                     // ActionDefineLocal2
                     case 0x41:
-                        // TODO 未実装
                         console.log('ActionDefineLocal2');
+                        var name = stack.pop();
                         break;
                     // ActionDelete
                     case 0x3a:
-                        // TODO 未実装
                         console.log('ActionDelete');
+                        var name = stack.pop();
+                        var object = stack.pop();
+
+                        if (object instanceof MovieClip) {
+                            object.deleteVariable(name);
+                        }
+
                         break;
                     // ActionDelete2
                     case 0x3b:
-                        // TODO 未実装
                         console.log('ActionDelete2');
+                        var name = stack.pop();
+                        if (movieClip != null) {
+                            movieClip.deleteVariable(name);
+                        }
+
                         break;
                     // ActionEnumerate
                     case 0x46:
-                        // TODO 未実装
                         console.log('ActionEnumerate');
+                        var path = stack.pop();
+                        stack[stack.length] = null;
+
+                        if (movieClip != null) {
+                            var targetMc = movieClip.getMovieClip(path);
+                            if (targetMc != null) {
+                                var variables = targetMc.variables;
+                                for (var slotName in variables) {
+                                    stack[stack.length] = slotName;
+                                }
+                            }
+                        }
+
                         break;
                     // ActionEquals2
                     case 0x49:
-                        // TODO 未実装
                         console.log('ActionEquals2');
                         var a = stack.pop();
                         var b = stack.pop();
@@ -6111,11 +5987,22 @@
                         break;
                     // ActionGetMember
                     case 0x4e:
-                        // TODO 未実装
-                        console.log('ActionGetMember');
+                        //console.log('ActionGetMember');
+                        var name = stack.pop();
+                        var object = stack.pop();
+
+                        var property = null;
+                        if (object instanceof MovieClip) {
+                            property = object.getProperty(name);
+                        }
+
+                        stack[stack.length] = property;
+
                         break;
                     // ActionInitArray
                     case 0x42:
+                        var  number = stack.pop();
+
                         // TODO 未実装
                         console.log('ActionInitArray');
                         break;
@@ -6131,124 +6018,181 @@
                         break;
                     // ActionNewObject
                     case 0x40:
-                        // TODO 未実装
-                        console.log('ActionNewObject');
+                        var object = stack.pop() + '';
+                        var numArgs = _parseFloat(stack.pop());
+
+                        var params = [];
+                        for (; numArgs--;) {
+                            params[params.length] = stack.pop();
+                        }
+
+                        stack[stack.length] = new (Function.prototype.bind.apply(window[object], params));
+
                         break;
                     // ActionSetMember
                     case 0x4f:
-                        // TODO 未実装
-                        console.log('ActionSetMember');
+                        var value = stack.pop();
+                        var name = stack.pop();
+                        var object = stack.pop();
+                        if (object instanceof MovieClip) {
+                            object.setProperty(name, value);
+                        }
                         break;
                     // ActionTargetPath
                     case 0x45:
-                        // TODO 未実装
                         console.log('ActionTargetPath');
+                        var object = stack.pop();
+                        var path = null;
+                        if (object instanceof MovieClip) {
+                            path = object.getName();
+                            if (path != null) {
+                                while (true) {
+                                    var parent = object.getParent();
+                                    if (parent == null) {
+                                        path = '/'+ path;
+                                        break;
+                                    }
+
+                                    var name = parent.getName();
+                                    if (name == null) {
+                                        path = null;
+                                        break;
+                                    }
+
+                                    path = name +'/'+ path;
+                                }
+                            }
+                        }
+
+                        stack[stack.length] = path;
                         break;
                     // ActionWith
                     case 0x94:
                         // TODO 未実装
                         console.log('ActionWith');
                         break;
-                    // ActionToNumber // Type actions
+                    // ActionToNumber
                     case 0x4a:
-                        // TODO 未実装
-                        console.log('ActionToNumber');
+                        var object = stack.pop();
+                        stack[stack.length] = _parseFloat(object);
                         break;
                     // ActionToString
                     case 0x4b:
-                        // TODO 未実装
-                        console.log('ActionToString');
+                        var object = stack.pop();
+                        stack[stack.length] = object + '';
                         break;
                     // ActionTypeOf
                     case 0x44:
-                        // TODO 未実装
-                        console.log('ActionTypeOf');
+                        var object = stack.pop();
+                        if (object instanceof MovieClip) {
+                            return 'movieclip';
+                        } else {
+                            return typeof object;
+                        }
+
                         break;
-                    // ActionAdd2 // Math actions
+                    // ActionAdd2
                     case 0x47:
-                        // TODO 未実装
-                        console.log('ActionAdd2');
                         var a = stack.pop();
                         var b = stack.pop();
-
-                        stack[stack.length] = a+b;
-
+                        stack[stack.length] = b+a;
                         break;
                     // ActionLess2
                     case 0x48:
-                        // TODO 未実装
-                        console.log('ActionLess2');
                         var a = stack.pop();
                         var b = stack.pop();
-                        stack[stack.length] = (b < a);
+                        var boolInt = (b < a) ? 1 : 0;
+                        stack[stack.length] = boolInt;
                         break;
                     // ActionModule
                     case 0x3f:
-                        // TODO 未実装
                         console.log('ActionModule');
+                        var x = stack.pop();
+                        var y = stack.pop();
+                        stack[stack.length] = x % y;
+                        break;
+                    // ActionBitAnd
+                    case 0x60:
+                        console.log('ActionBitAnd');
                         var a = stack.pop();
                         var b = stack.pop();
-                        stack[stack.length] = a % b;
-                        break;
-                    // ActionBitAnd // Stack operator actions
-                    case 0x60:
-                        // TODO 未実装
-                        console.log('ActionBitAnd');
+                        stack[stack.length] = x & y;
                         break;
                     // ActionBitLShift
                     case 0x63:
-                        // TODO 未実装
                         console.log('ActionBitLShift');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        stack[stack.length] = b << a;
                         break;
                     // ActionBitOr
                     case 0x61:
-                        // TODO 未実装
                         console.log('ActionBitOr');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        stack[stack.length] = b | a;
                         break;
                     // ActionBitRShift
                     case 0x64:
-                        // TODO 未実装
                         console.log('ActionBitRShift');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        stack[stack.length] = b >> a;
                         break;
                     // ActionBitURShift
                     case 0x65:
-                        // TODO 未実装
                         console.log('ActionBitURShift');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        stack[stack.length] = b >> a;
                         break;
                     // ActionBitXor
                     case 0x62:
-                        // TODO 未実装
                         console.log('ActionBitXor');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        stack[stack.length] = a ^ b;
                         break;
                     // ActionDecrement
                     case 0x51:
-                        // TODO 未実装
                         console.log('ActionDecrement');
+                        var value = _parseFloat(stack.pop());
+                        value--;
+                        stack[stack.length] = value;
                         break;
                     // ActionIncrement
                     case 0x50:
-                        // TODO 未実装
                         console.log('ActionIncrement');
+                        var value = _parseFloat(stack.pop());
+                        value++;
+                        stack[stack.length] = value;
                         break;
                     // ActionPushDuplicate
                     case 0x4c:
-                        // TODO 未実装
                         console.log('ActionPushDuplicate');
+                        var value = stack[0];
+                        stack[stack.length] = value;
                         break;
                     // ActionReturn
                     case 0x3e:
-                        // TODO 未実装
                         console.log('ActionReturn');
+                        var value = stack.pop();
                         break;
                     // ActionStackSwap
                     case 0x4d:
-                        // TODO 未実装
                         console.log('ActionStackSwap');
+                        var a = stack.pop();
+                        var b = stack.pop();
+
+                        stack[stack.length] = b;
+                        stack[stack.length] = a;
                         break;
                     // ActionStoreRegister
                     case 0x87:
-                        // TODO 未実装
                         console.log('ActionStoreRegister');
+                        pBitio.setData(payload);
+                        pBitio.setOffset(0, 0);
+                        var RegisterNumber = pBitio.getUI8();
                         break;
 
                     // SWF 6 ***********************************
@@ -6256,31 +6200,66 @@
                     case 0x59:
                         // TODO 未実装
                         console.log('DoInitAction');
+                        pBitio.setData(payload);
+                        pBitio.setOffset(0, 0);
+
+
+
                         break;
                     // ActionInstanceOf
                     case 0x54:
                         // TODO 未実装
                         console.log('ActionInstanceOf');
+                        var constr = stack.pop();
+                        var obj = stack.pop();
+                        var boolInt = (obj instanceof constr) ? 1 : 0;
+                        stack[stack.length] = boolInt;
                         break;
                     // ActionEnumerate2
                     case 0x55:
                         // TODO 未実装
                         console.log('ActionEnumerate2');
+
+                        var obj = stack.pop();
+                        stack[stack.length] = null;
+
+                        if (typeof obj == Object) {
+                            if (obj instanceof MovieClip) {
+                                obj = obj.variables;
+                            }
+
+                            for (var slotName in obj) {
+                                stack[stack.length] = slotName + '';
+                            }
+                        }
+
                         break;
                     // ActionStrictEquals
                     case 0x66:
                         // TODO 未実装
                         console.log('ActionStrictEquals');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        var boolInt = (a === b) ? 1 : 0;
+                        stack[stack.length] = boolInt;
                         break;
                     // ActionGreater
                     case 0x67:
                         // TODO 未実装
                         console.log('ActionGreater');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        var boolInt = (b > a) ? 1 : 0;
+                        stack[stack.length] = boolInt;
                         break;
                     // ActionStringGreater
                     case 0x68:
                         // TODO 未実装
                         console.log('ActionStringGreater');
+                        var a = stack.pop();
+                        var b = stack.pop();
+                        var boolInt = (b > a) ? 1 : 0;
+                        stack[stack.length] = boolInt;
                         break;
 
                     // SWF 7 ***********************************
@@ -6384,6 +6363,10 @@
         this._level = 0;
         this._name = null;
         this._framesloaded = 0;
+
+        // event
+        this.event = {};
+
     };
 
     MovieClip.prototype = {
@@ -6397,6 +6380,64 @@
             var _this = this;
             _this.characterId = characterId;
             _this._totalframes = frameCount;
+        },
+
+        /**
+         * addEvent
+         * @param name
+         * @param as
+         */
+        addEvent: function(name, as)
+        {
+            var _this = this;
+            var event = _this.event;
+            if(!(name in event)) {
+                event[name] = [];
+            } else {
+                _this.delEvent(name, as);
+            }
+            event[name].push(as);
+        },
+
+        /**
+         * delEvent
+         * @param name
+         * @param as
+         */
+        delEvent: function(name, as)
+        {
+            var _this = this;
+            var event = _this.event;
+            if (name in event) {
+                var length = event[name].length;
+                for (var i = length; i--;) {
+                    var obj = event[name][i];
+                    if (obj != as) {
+                        continue;
+                    }
+                    event[name].splice(i, 1);
+                }
+            }
+        },
+
+        /**
+         * dispatchEvent
+         * @param name
+         */
+        dispatchEvent: function(name)
+        {
+            var _this = this;
+            var event = _this.event;
+            if (name in event) {
+                var length = event[name].length;
+                for (var i = length; i--;) {
+                    var as = event[name][i];
+                    if (!(as instanceof ActionScript)) {
+                        continue;
+                    }
+                    as.start(_this);
+                }
+            }
         },
 
         /**
@@ -6418,6 +6459,11 @@
             for (var i = 0; i < len; i++) {
                 var name = splitData[i];
                 if (name == '') {
+                    continue;
+                }
+
+                if (name == '_root') {
+                    mc = player.parent;
                     continue;
                 }
 
@@ -6474,6 +6520,19 @@
         stop: function()
         {
             this.stopFlag = true;
+        },
+
+        /**
+         * gotoAndPlay
+         */
+        gotoAndPlay: function(frame)
+        {
+            var _this = this;
+            if (!(frame instanceof Number)) {
+                frame = _this.getLabel(frame);
+            }
+            _this.setNextFrame(frame);
+            _this.play();
         },
 
         /**
@@ -6651,6 +6710,252 @@
         },
 
         /**
+         * getProperty
+         * @param name
+         * @returns {null}
+         */
+        getProperty: function(name)
+        {
+            var value = null;
+            switch (name) {
+                case 0:
+                case '_x':
+                    value = this.getX();
+                    break;
+                case 1:
+                case '_y':
+                    value = this.getY();
+                    break;
+                case 2:
+                case '_xscale':
+                    value = this.getXScale();
+                    break;
+                case 3:
+                case '_yscale':
+                    value = this.getYScale();
+                    break;
+                case 4:
+                case '_currentframe':
+                    value = this.getFrame();
+                    break;
+                case 5:
+                case '_totalframes':
+                    value = this.getTotalFrames();
+                    break;
+                case 6:
+                case '_alpha':
+                    value = this.getAlpha();
+                    break;
+                case 7:
+                case '_visible':
+                    value = this.getVisible();
+                    break;
+                case 8:
+                case '_width':
+                    value = this.getWidth();
+                    break;
+                case 9:
+                case '_height':
+                    value = this.getHeight();
+                    break;
+                case 10:
+                case '_rotation':
+                    value = this.getRotation();
+                    break;
+                case 11:
+                case '_target':
+                    value = this._target;
+                    break;
+                case 12:
+                case '_framesloaded':
+                    value = this._framesloaded;
+                    break;
+                case 13:
+                case '_name':
+                    value = this.getName();
+                    break;
+                case 14:
+                case '_droptarget':
+                    value = this._droptarget;
+                    break;
+                case 15:
+                case '_url':
+                    value = this._url;
+                    break;
+                case 16:
+                case '_highquality':
+                    value = this._highquality;
+                    break;
+                case 17:
+                case '_focusrect':
+                    value = this._focusrect;
+                    break;
+                case 18:
+                case '_soundbuftime':
+                    value = this._soundbuftime;
+                    break;
+                case 19:
+                case '_quality':
+                    value = this._quality;
+                    break;
+                case 20:
+                case '_xmouse':
+                    value = this._xmouse;
+                    break;
+                case 21:
+                case '_ymouse':
+                    value = this._ymouse;
+                    break;
+                default:
+                    value = this.getVariable(name);
+                    if (value == undefined) {
+                        value = this.getMovieClip(name);
+                    }
+                    break;
+            }
+
+            return value;
+        },
+
+        /**
+         * setProperty
+         * @param name
+         * @param value
+         */
+        setProperty: function(name, value)
+        {
+            switch (name) {
+                case 0:
+                case '_x':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setX(value);
+                    }
+                    break;
+                case 1:
+                case '_y':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setY(value);
+                    }
+                    break;
+                case 2:
+                case '_xscale':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setXScale(value);
+                    }
+                    break;
+                case 3:
+                case '_yscale':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setYScale(value);
+                    }
+                    break;
+                case 4:
+                case '_currentframe':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setNextFrame(value);
+                    }
+                    break;
+                case 5:
+                case '_totalframes':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setTotalFrames(value);
+                    }
+                    break;
+                case 6:
+                case '_alpha':
+                    value = _parseFloat(value / 100);
+                    if (!_isNaN(value)) {
+                        this.setAlpha(value);
+                    }
+                    break;
+                case 7:
+                case '_visible':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setVisible(value);
+                    }
+                    break;
+                case 8:
+                case '_width':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setWidth(value);
+                    }
+                    break;
+                case 9:
+                case '_height':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setHeight(value);
+                    }
+                    break;
+                case 10:
+                case '_rotation':
+                    value = _parseFloat(value);
+                    if (!_isNaN(value)) {
+                        this.setRotation(value);
+                    }
+                    break;
+                case 11:
+                case '_target':
+                    this._target = value;
+                    break;
+                case 12:
+                case '_framesloaded':
+                    this._framesloaded = value;
+                    break;
+                case 13:
+                case '_name':
+                    this.setName(value);
+                    break;
+                case 14:
+                case '_droptarget':
+                    this._droptarget = value;
+                    break;
+                case 15:
+                case '_url':
+                    this._url = value;
+                    break;
+                case 16:
+                case '_highquality':
+                    this._highquality = value;
+                    break;
+                case 17:
+                case '_focusrect':
+                    this._focusrect = value;
+                    break;
+                case 18:
+                case '_soundbuftime':
+                    this._soundbuftime = value;
+                    break;
+                case 19:
+                case '_quality':
+                    this._quality = value;
+                    break;
+                case 20:
+                case '_xmouse':
+                    this._xmouse = value;
+                    break;
+                case 21:
+                case '_ymouse':
+                    this._ymouse = value;
+                    break;
+                case 'onEnterFrame':
+                    this.addEvent(name, value);
+                    break;
+                default:
+                    value = this.setVariable(name, value);
+                    break;
+            }
+        },
+
+        /**
          * setVariable
          * @param name
          * @param value
@@ -6667,7 +6972,25 @@
          */
         getVariable: function(name)
         {
-            return this.variables[name];
+            var value = this.variables[name];
+            if (value == undefined) {
+                value = window[name];
+                if (value == undefined) {
+                    value = this.getMovieClip(name);
+                }
+            }
+            return value;
+        },
+
+        /**
+         * deleteVariable
+         * @param name
+         */
+        deleteVariable: function(name)
+        {
+            if (name in this.variables) {
+                delete this.variables[name];
+            }
         },
 
         /**
@@ -7350,10 +7673,10 @@
         },
 
         /**
-         * getScaleX
+         * getXScale
          * @returns {*}
          */
-        getScaleX: function()
+        getXScale: function()
         {
             var _this = this;
             var Matrix = _this.getMatrix();
@@ -7361,10 +7684,10 @@
         },
 
         /**
-         * setScaleX
+         * setXScale
          * @param xscale
          */
-        setScaleX: function(xscale)
+        setXScale: function(xscale)
         {
             var _this = this;
             var Matrix = _this.getMatrix();
@@ -7376,10 +7699,10 @@
         },
 
         /**
-         * getScaleY
+         * getYScale
          * @returns {*}
          */
-        getScaleY: function()
+        getYScale: function()
         {
             var _this = this;
             var Matrix = _this.getMatrix();
@@ -7387,10 +7710,10 @@
         },
 
         /**
-         * setScaleY
+         * setScale
          * @param yscale
          */
-        setScaleY: function(yscale)
+        setYScale: function(yscale)
         {
             var _this = this;
             var Matrix = _this.getMatrix();
@@ -7443,6 +7766,7 @@
             var _this = this;
             var frameTags = _this.getFrameTags();
             var length = frameTags.length;
+            _this.dispatchEvent('onEnterFrame');
             for (var depth = 1; depth < length; depth++) {
                 if (!(depth in frameTags)) {
                     continue;
@@ -8280,14 +8604,20 @@
 
                 if (mc != null) {
                     inText = mc.getVariable(key);
+                    if (inText != undefined) {
+                        inText += '';
+                    } else {
+                        inText = null;
+                    }
                 } else {
-                    inText == null;
+                    inText = null;
                 }
 
                 if (inText == null) {
                     inText = '';
                 }
             }
+
             inText = (inText == '' && data.HasText)
                 ? data.InitialText
                 : inText;
@@ -8883,6 +9213,7 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
+        console.log(mc)
     }
 
     /**
