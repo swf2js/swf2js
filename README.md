@@ -58,8 +58,6 @@ Please send the file of swf which does not operate. A bug is fixed.
 TODO
 -------
 ▼ActionScript  
-SWF 6  
-SWF 7  
 SWF 9  
 
 
@@ -86,7 +84,6 @@ PlaceFunction
 GenTagObject  
 ImportAssets  
 EnableDebugger  
-DoInitAction  
 DefineVideoStream  
 VideoFrame  
 DefineFontInfo2  
@@ -94,8 +91,6 @@ DebugID
 ScriptLimits  
 SetTabIndex  
 ImportAssets2  
-DefineFontAlignZones  
-CSMTextSettings  
 DefineScalingGrid  
 DefineBinaryData  
 DefineFont4  
@@ -112,6 +107,19 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.6 ] Release Date: 8 Mar 2015  
+* [BUGFIX] ActionScript 'ActionSetMember'  
+* [BUGFIX] ActionScript 'ActionGetMember'  
+* [BUGFIX] ActionScript 'ActionInitArray'  
+* [BUGFIX] ActionScript 'ActionInitObject'  
+* [BUGFIX] ActionScript 'ActionCallFunction'  
+* [NEW] DoInitAction  
+* [NEW] SWF 6  
+* [NEW] SWF 7  
+* [NEW] Tag DefineFontAlignZones  
+* [NEW] Tag CSMTextSettings  
+
+
 --[ swf2js 0.2.5 ] Release Date: 6 Mar 2015  
 * [NEW] SWF 5  
 
