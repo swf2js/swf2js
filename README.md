@@ -12,7 +12,7 @@ play the swf on the iPhone.
 
 Demonstration Site
 ------
-http://ienaga.github.io/swf2js/  
+https://swf2js.wordpress.com/  
 
 
 Facebook  
@@ -113,11 +113,11 @@ Release Notes
 * [BUGFIX] ActionScript 'ActionInitArray'  
 * [BUGFIX] ActionScript 'ActionInitObject'  
 * [BUGFIX] ActionScript 'ActionCallFunction'  
-* [NEW] DoInitAction  
 * [NEW] SWF 6  
 * [NEW] SWF 7  
-* [NEW] Tag DefineFontAlignZones  
-* [NEW] Tag CSMTextSettings  
+* [NEW] Tag 'DoInitAction'  
+* [NEW] Tag 'DefineFontAlignZones'  
+* [NEW] Tag 'CSMTextSettings'  
 
 
 --[ swf2js 0.2.5 ] Release Date: 6 Mar 2015  
@@ -126,7 +126,7 @@ Release Notes
 
 --[ swf2js 0.2.4 ] Release Date: 4 Mar 2015  
 * [BUGFIX] ActionScript  
-* [NEW] Tag DefineButtonSound  
+* [NEW] Tag 'DefineButtonSound'  
 
 
 --[ swf2js 0.2.3 ] Release Date: 3 Mar 2015  
