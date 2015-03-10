@@ -3705,7 +3705,9 @@
                     var domParser = new DOMParser();
                     var htmlDoc = domParser.parseFromString(text, "text/html");
                     var fontObj = htmlDoc.getElementsByTagName('font')[0];
-                    obj.InitialText = fontObj.innerText;
+                    if (fontObj != undefined) {
+                        obj.InitialText = fontObj.innerText;
+                    }
                 } else {
                     obj.InitialText = text;
                 }
