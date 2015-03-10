@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.6)
+ * swf2js (version 0.2.7)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -1364,7 +1364,7 @@
                     obj = _this.parsePlaceObject(tagType, length);
                     break;
                 case 37: // DefineEditText
-                    _this.parseDefineEditText(tagType);
+                    _this.parseDefineEditText(tagType, length);
                     break;
                 case 39: // DefineSprite
                     _this.parseDefineSprite(bitio.byte_offset + length);
@@ -3212,7 +3212,7 @@
                 canvas.width = width;
                 canvas.height = height;
                 var imageContext = canvas.getContext("2d");
-                imageContext.drawImage(this, 0, 0, width, height);
+                imageContext.drawImage(this, 0, 0);
 
                 // 半透明対応
                 if (BitmapAlphaData) {
@@ -3642,11 +3642,13 @@
         /**
          * parseDefineEditText
          * @param tagType
+         * @param length
          */
-        parseDefineEditText: function(tagType)
+        parseDefineEditText: function(tagType, length)
         {
             var _this = swftag;
             var obj = {};
+            var startOffset = bitio.byte_offset;
 
             obj.CharacterId = bitio.getUI16();
             obj.Bound = _this.rect();
@@ -3700,7 +3702,10 @@
             if (obj.HasText) {
                 var text = bitio.getDataUntil("\0");
                 if (obj.HTML) {
-                    console.log(text);
+                    var domParser = new DOMParser();
+                    var htmlDoc = domParser.parseFromString(text, "text/html");
+                    var fontObj = htmlDoc.getElementsByTagName('font')[0];
+                    obj.InitialText = fontObj.innerText;
                 } else {
                     obj.InitialText = text;
                 }
@@ -4506,16 +4511,16 @@
                     filter = _this.bevelFilter();
                     break;
                 case 4:
-                    filter = _this.gradientGlowFilter(); // TODO
+                    filter = _this.gradientGlowFilter();
                     break;
                 case 5:
-                    filter = _this.convolutionFilter(); // TODO
+                    filter = _this.convolutionFilter();
                     break;
                 case 6:
-                    filter = _this.colorMatrixFilter(); // TODO
+                    filter = _this.colorMatrixFilter();
                     break;
                 case 7:
-                    filter = _this.gradientBevelFilter(); // TODO
+                    filter = _this.gradientBevelFilter();
                     break;
             }
             obj.Filter = filter;
@@ -6198,35 +6203,35 @@
                         var method = stack.pop();
 
                         var now = new _Date();
-                        switch (method) {
-                            case 'GetDateYear':
+                        switch (method.toLowerCase()) {
+                            case 'getdateyear':
                                 stack[stack.length] = now.getFullYear();
                                 break;
-                            case 'GetDateMonth':
+                            case 'getdatemonth':
                                 stack[stack.length] = now.getMonth() + 1;
                                 break;
-                            case 'GetDateDay':
+                            case 'getdateday':
                                 stack[stack.length] = now.getDate();
                                 break;
-                            case 'GetDateWeekday':
+                            case 'getdateweekday':
                                 stack[stack.length] = now.getDay();
                                 break;
-                            case 'GetTimeHours':
+                            case 'gettimehours':
                                 stack[stack.length] = now.getHours();
                                 break;
-                            case 'GetTimeMinutes':
+                            case 'gettimeminutes':
                                 stack[stack.length] = now.getMinutes();
                                 break;
-                            case 'GetTimeSeconds':
+                            case 'gettimeseconds':
                                 stack[stack.length] = now.getSeconds();
                                 break;
-                            case 'StartVibrate':
+                            case 'startvibrate':
                                 stack.pop();
                                 stack.pop();
                                 stack.pop();
                                 stack[stack.length] = -1;
                                 break;
-                            case 'SetQuality':
+                            case 'setquality':
                                 stack.pop();
                                 stack[stack.length] = -1;
                                 break;
@@ -7909,8 +7914,8 @@
                     RotateSkew0: 0,
                     RotateSkew1: 0,
                     ScaleY: scale,
-                    TranslateX: 0,
-                    TranslateY: 0
+                    TranslateX: -0.5,
+                    TranslateY: -0.5
                 };
             }
 
@@ -8463,11 +8468,10 @@
                     if (cache instanceof CanvasRenderingContext2D) {
                         var canvas = cache.canvas;
                         if (canvas.width > 0 && canvas.height > 0) {
-                            ctx.setTransform(1, 0, 0, 1,
-                                (cache.offsetX + renderMatrix.TranslateX),
-                                (cache.offsetY + renderMatrix.TranslateY)
-                            );
-                            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
+                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
+                            ctx.setTransform(1, 0, 0, 1, 0, 0);
+                            ctx.drawImage(canvas, x, y);
                         }
                     }
                 }
@@ -9372,12 +9376,11 @@
                 cacheStore.set(cacheKey, cache);
             }
 
-            ctx.setTransform(1, 0, 0, 1,
-                (rBound.X + matrix.TranslateX),
-                (rBound.Y + matrix.TranslateY)
-            );
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             var canvas = cache.canvas;
-            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+            var x = _ceil(rBound.X + matrix.TranslateX);
+            var y = _ceil(rBound.Y + matrix.TranslateY);
+            ctx.drawImage(canvas, x, y);
         },
 
         /**
@@ -9587,11 +9590,10 @@
                     if (cache instanceof CanvasRenderingContext2D) {
                         var canvas = cache.canvas;
                         if (canvas.width > 0 && canvas.height > 0) {
-                            ctx.setTransform(1, 0, 0, 1,
-                                (cache.offsetX + renderMatrix.TranslateX),
-                                (cache.offsetY + renderMatrix.TranslateY)
-                            );
-                            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                            ctx.setTransform(1, 0, 0, 1, 0, 0);
+                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
+                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
+                            ctx.drawImage(canvas, x, y);
                         }
                     }
                 }
@@ -9675,7 +9677,7 @@
             canvas.width = width;
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
-            imageContext.drawImage(ctx.canvas, 0, 0, width, height);
+            imageContext.drawImage(ctx.canvas, 0, 0);
             var imgData = imageContext.getImageData(0, 0, width, height);
             var pxData = imgData.data;
             var idx = 0;
@@ -9715,11 +9717,12 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
-        console.log(mc)
     }
 
     /**
-     * setMovieHeader
+     * setSwfHeader
+     * @param mc
+     * @returns {number}
      */
     function setSwfHeader(mc)
     {
@@ -9750,6 +9753,7 @@
             player.height = _ceil(frameSize.Ymax - frameSize.Ymin);
             player.frameRate = frameRate;
             player.fps = _floor(1000 / frameRate);
+
             // Canvasの画面サイズを調整
             changeScreenSize();
         }
@@ -9849,7 +9853,7 @@
     function clearMain()
     {
         var canvas = context.canvas;
-        canvas.width = canvas.width;
+        context.clearRect(0, 0, canvas.width, canvas.height);
     }
 
     /*
@@ -9858,7 +9862,7 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
-        canvas.width = canvas.width;
+        preContext.clearRect(0, 0, canvas.width, canvas.height);
     }
 
     /**
@@ -10343,11 +10347,6 @@
         swf2js.load = function(url, options)
         {
             if (init()) {
-                // TODO 開発用
-                if (url == undefined) {
-                    url = location.search.substr(1).split('&')[0];
-                }
-
                 // option
                 if (options != undefined) {
                     optionWidth = options.width | 0;
@@ -10357,29 +10356,37 @@
                     cacheSize = options.cacheSize | cacheSize;
                 }
 
+                // TODO 開発用
+                if (url == 'develop') {
+                    url = location.search.substr(1).split('&')[0];
+                }
+
                 if (url) {
-                    var xmlHttpRequest = new XMLHttpRequest();
-                    xmlHttpRequest.open('GET', url);
-                    xmlHttpRequest.overrideMimeType(
-                        'text/plain; charset=x-user-defined'
-                    );
-                    xmlHttpRequest.send(null);
-                    xmlHttpRequest.onreadystatechange = function()
+                    window.addEventListener('DOMContentLoaded', function()
                     {
-                        var readyState = xmlHttpRequest.readyState;
-                        if (readyState == 4) {
-                            var status = xmlHttpRequest.status;
-                            if (status == 200) {
-                                parse(xmlHttpRequest.responseText, player.parent);
-                                isLoad = true;
-                                if (imgUnLoadCount == 0) {
-                                    loaded();
+                        var xmlHttpRequest = new XMLHttpRequest();
+                        xmlHttpRequest.open('GET', url);
+                        xmlHttpRequest.overrideMimeType(
+                            'text/plain; charset=x-user-defined'
+                        );
+                        xmlHttpRequest.send(null);
+                        xmlHttpRequest.onreadystatechange = function()
+                        {
+                            var readyState = xmlHttpRequest.readyState;
+                            if (readyState == 4) {
+                                var status = xmlHttpRequest.status;
+                                if (status == 200) {
+                                    parse(xmlHttpRequest.responseText, player.parent);
+                                    isLoad = true;
+                                    if (imgUnLoadCount == 0) {
+                                        loaded();
+                                    }
+                                } else {
+                                    alert('unknown swf data');
                                 }
-                            } else {
-                                alert('unknown swf data');
                             }
                         }
-                    }
+                    })
                 } else {
                     alert('please set swf url');
                 }

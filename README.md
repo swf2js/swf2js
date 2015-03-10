@@ -107,6 +107,11 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.7 ] Release Date: 10 Mar 2015  
+* [BUGFIX] Tag 'DefineEditText'  
+* [BUGFIX] render 'anti-aliasing'  
+
+
 --[ swf2js 0.2.6 ] Release Date: 8 Mar 2015  
 * [BUGFIX] ActionScript 'ActionSetMember'  
 * [BUGFIX] ActionScript 'ActionGetMember'  
