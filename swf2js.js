@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.7)
+ * swf2js (version 0.2.8)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -108,6 +108,7 @@
     var CacheStore = function ()
     {
         this.store = {};
+        this.pool = [];
         this.size = cacheSize;
     };
 
@@ -117,8 +118,44 @@
          */
         reset: function()
         {
+            var _this = this;
+            for (var cacheKey in _this.store) {
+                var index = cacheKey.indexOf('Bitmap');
+                if (index != -1) {
+                    continue;
+                }
+
+                var deleteCtx = _this.store[cacheKey];
+                if (!(deleteCtx instanceof CanvasRenderingContext2D)) {
+                    continue;
+                }
+                var deleteCanvas = deleteCtx.canvas;
+                _this.destroy(deleteCanvas);
+            }
             this.store = {};
             this.size = cacheSize;
+        },
+
+        /**
+         * destroy
+         * @param canvas
+         */
+        destroy: function(canvas)
+        {
+            var pool = this.pool;
+            canvas.width = 0;
+            canvas.height = 0;
+            canvas.width = canvas.width;
+            pool[pool.length] = canvas;
+        },
+
+        /**
+         * getCanvas
+         * @returns {*}
+         */
+        getCanvas: function()
+        {
+            return this.pool.pop() || _document.createElement('canvas');
         },
 
         /**
@@ -145,6 +182,11 @@
             // reset
             if (_this.size < 0) {
                 for (var cacheKey in _this.store) {
+                    var index = cacheKey.indexOf('Bitmap');
+                    if (index != -1) {
+                        continue;
+                    }
+
                     var deleteCtx = _this.store[cacheKey];
                     if (!(deleteCtx instanceof CanvasRenderingContext2D)) {
                         continue;
@@ -152,6 +194,7 @@
 
                     var deleteCanvas = deleteCtx.canvas;
                     _this.size += (deleteCanvas.width * deleteCanvas.height);
+                    _this.destroy(deleteCanvas);
 
                     delete _this.store[cacheKey];
                     if (_this.size > 0) {
@@ -248,11 +291,14 @@
         style.webkitTransformOrigin  = '0 0';
         style.webkitTransform = 'scale('+ cssScale +','+ cssScale +')';
         context = canvas.getContext('2d');
+        context.globalCompositeOperation = 'copy';
+        context.imageSmoothingEnabled = false;
 
         var preCanvas = _document.createElement('canvas');
         preCanvas.width = canvas.width;
         preCanvas.height = canvas.height;
         preContext = preCanvas.getContext('2d');
+        preContext.imageSmoothingEnabled = false;
 
         if (isTouch) {
             var startEvent = 'touchstart';
@@ -3075,7 +3121,7 @@
             var data = unzip(compressed, false);
 
             // canvas
-            var canvas = _document.createElement('canvas');
+            var canvas = cacheStore.getCanvas();
             canvas.width = width;
             canvas.height = height;
 
@@ -3135,6 +3181,7 @@
 
             imageContext.putImageData(imgData, 0, 0);
             character[CharacterId] = imageContext;
+
         },
 
         /**
@@ -3208,7 +3255,7 @@
                 var width = this.width;
                 var height = this.height;
 
-                var canvas = _document.createElement('canvas');
+                var canvas = cacheStore.getCanvas();
                 canvas.width = width;
                 canvas.height = height;
                 var imageContext = canvas.getContext("2d");
@@ -8519,13 +8566,10 @@
 
                 var body = '';
                 if (!tag.isClipDepth) {
-                    body += 'var canvas = document.createElement("canvas");';
+                    body += 'var canvas = cacheStore.getCanvas();';
                     body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                     body += 'canvas.height = '+ _ceil(rBound.H) + ';';
-                    body += 'var ctx = canvas.getContext("2d");';
-                    body += 'ctx.imageSmoothingEnabled = false;';
-                    body += 'ctx.offsetX = '+ rBound.X + ';';
-                    body += 'ctx.offsetY = '+ rBound.Y + ';';
+                    body += 'ctx = canvas.getContext("2d");';
                     body += 'ctx.setTransform('
                         + matrix.ScaleX + ','
                         + matrix.RotateSkew0 + ','
@@ -8534,6 +8578,9 @@
                         + -rBound.X + ','
                         + -rBound.Y
                     + ');';
+                    body += 'ctx.imageSmoothingEnabled = false;';
+                    body += 'ctx.offsetX = '+ rBound.X + ';';
+                    body += 'ctx.offsetY = '+ rBound.Y + ';';
                 } else {
                     ctx.setTransform(
                         matrix.ScaleX,
@@ -8671,7 +8718,7 @@
                                             || colorTransform.RedAddTerm > 0
                                             || colorTransform.RedMultiTerm > 1
                                         ) {
-                                            image = _this.generateImageTransform(image, colorTransform);
+                                            image = generateImageTransform(image, colorTransform);
                                         } else {
                                             var alpha = _max(0, _min((255 * colorTransform.AlphaMultiTerm) + colorTransform.AlphaAddTerm, 255)) / 255;
                                             body += 'ctx.globalAlpha = '+ alpha +';';
@@ -8756,9 +8803,9 @@
 
                 // mask
                 if (tag.isClipDepth) {
-                    var func = new Function('ctx', body);
-                    func(ctx);
-                    ctx.clip();
+                    body += 'ctx.clip();';
+                    var func = new Function('ctx', body + 'return null;');
+                    cache = func(ctx);
                 } else {
                     // image clip
                     if (styleType == 0x41 || styleType == 0x43) {
@@ -8800,7 +8847,7 @@
             if (cache == undefined) {
                 var rBound = _this.renderBoundMatrix(tag, matrix);
                 var body = '';
-                body += 'var canvas = document.createElement("canvas");';
+                body += 'var canvas = cacheStore.getCanvas();';
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
@@ -8897,8 +8944,8 @@
                     }
                 }
 
-                var func = new Function(body + 'return ctx;');
-                cache = func();
+                var func = new Function('cacheStore', body + 'return ctx;');
+                cache = func(cacheStore);
                 cacheStore.set(cacheKey, cache);
             }
 
@@ -8929,7 +8976,7 @@
                 var rBound = _this.renderBoundMatrix(char.Bounds, matrix);
                 var Matrix = char.Matrix;
 
-                body += 'var canvas = document.createElement("canvas");';
+                body += 'var canvas = cacheStore.getCanvas();';
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
@@ -9025,8 +9072,8 @@
                     }
                 }
 
-                var func = new Function(body + 'return ctx;');
-                cache = func();
+                var func = new Function('cacheStore', body + 'return ctx;');
+                cache = func(cacheStore);
                 cacheStore.set(cacheKey, cache);
             }
 
@@ -9146,7 +9193,7 @@
             var rBound = _this.renderBoundMatrix(data.Bound, matrix);
             if (cache == undefined) {
                 var body = '';
-                body += 'var canvas = document.createElement("canvas");';
+                body += 'var canvas = cacheStore.getCanvas();';
                 body += 'canvas.width = '+ _ceil(rBound.W+1) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H+1) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
@@ -9373,8 +9420,8 @@
                 }
 
                 body += 'ctx.restore();';
-                var func = new Function(body + 'return ctx;');
-                cache = func();
+                var func = new Function('cacheStore', body + 'return ctx;');
+                cache = func(cacheStore);
                 cacheStore.set(cacheKey, cache);
             }
 
@@ -9662,41 +9709,6 @@
                 B : _floor(_max(0, _min((B * data.BlueMultiTerm) + data.BlueAddTerm, 255))),
                 A : _max(0, _min((A * data.AlphaMultiTerm) + data.AlphaAddTerm, 255)) / 255
             }
-        },
-
-        /**
-         * generateImageTransform
-         * @param ctx
-         * @param color
-         * @returns {*}
-         */
-        generateImageTransform: function(ctx, color)
-        {
-            var canvas = _document.createElement('canvas');
-            var width = ctx.canvas.width;
-            var height = ctx.canvas.height;
-
-            canvas.width = width;
-            canvas.height = height;
-            var imageContext = canvas.getContext("2d");
-            imageContext.drawImage(ctx.canvas, 0, 0);
-            var imgData = imageContext.getImageData(0, 0, width, height);
-            var pxData = imgData.data;
-            var idx = 0;
-            for (var y = height; y--;) {
-                for (var x = width; x--;) {
-                    var R = pxData[idx++];
-                    var G = pxData[idx++];
-                    var B = pxData[idx++];
-                    var A = pxData[idx++];
-                    pxData[idx - 4] = _floor(_max(0, _min((R * color.RedMultiTerm) + color.RedAddTerm, 255)));
-                    pxData[idx - 3] = _floor(_max(0, _min((G * color.GreenMultiTerm) + color.GreenAddTerm, 255)));
-                    pxData[idx - 2] = _floor(_max(0, _min((B * color.BlueMultiTerm) + color.BlueAddTerm, 255)));
-                    pxData[idx - 1] = _max(0, _min((A * color.AlphaMultiTerm) + color.AlphaAddTerm, 255));
-                }
-            }
-            imageContext.putImageData(imgData, 0, 0);
-            return imageContext;
         }
     };
 
@@ -9864,7 +9876,8 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
-        preContext.clearRect(0, 0, canvas.width, canvas.height);
+        preContext.fillStyle = backgroundColor;
+        preContext.fillRect(0, 0, canvas.width + 1, canvas.height);
     }
 
     /**
@@ -10246,7 +10259,7 @@
     function onEnterFrame()
     {
         if (isLoad && !player.stopFlag) {
-            clearMain();
+            //clearMain();
             var canvas = preContext.canvas;
             context.drawImage(canvas, 0, 0, canvas.width, canvas.height);
             _setTimeout(buffer, 0);
@@ -10318,6 +10331,41 @@
             BlueAddTerm: a.BlueMultiTerm * b.BlueAddTerm + a.BlueAddTerm,
             AlphaAddTerm: a.AlphaMultiTerm * b.AlphaAddTerm + a.AlphaAddTerm
         };
+    }
+
+    /**
+     * generateImageTransform
+     * @param ctx
+     * @param color
+     * @returns {*}
+     */
+    function generateImageTransform(ctx, color)
+    {
+        var width = ctx.canvas.width;
+        var height = ctx.canvas.height;
+
+        var canvas = cacheStore.getCanvas();
+        canvas.width = width;
+        canvas.height = height;
+        var imageContext = canvas.getContext("2d");
+        imageContext.drawImage(ctx.canvas, 0, 0);
+        var imgData = imageContext.getImageData(0, 0, width, height);
+        var pxData = imgData.data;
+        var idx = 0;
+        for (var y = height; y--;) {
+            for (var x = width; x--;) {
+                var R = pxData[idx++];
+                var G = pxData[idx++];
+                var B = pxData[idx++];
+                var A = pxData[idx++];
+                pxData[idx - 4] = _floor(_max(0, _min((R * color.RedMultiTerm) + color.RedAddTerm, 255)));
+                pxData[idx - 3] = _floor(_max(0, _min((G * color.GreenMultiTerm) + color.GreenAddTerm, 255)));
+                pxData[idx - 2] = _floor(_max(0, _min((B * color.BlueMultiTerm) + color.BlueAddTerm, 255)));
+                pxData[idx - 1] = _max(0, _min((A * color.AlphaMultiTerm) + color.AlphaAddTerm, 255));
+            }
+        }
+        imageContext.putImageData(imgData, 0, 0);
+        return imageContext;
     }
 
     /**

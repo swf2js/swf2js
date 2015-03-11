@@ -107,6 +107,10 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.8 ] Release Date: 11 Mar 2015  
+* [BUGFIX] render 'clip'  
+
+
 --[ swf2js 0.2.7 ] Release Date: 10 Mar 2015  
 * [BUGFIX] Tag 'DefineEditText'  
 * [BUGFIX] render 'anti-aliasing'  
