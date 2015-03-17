@@ -107,7 +107,7 @@ WebGL
 
 Release Notes  
 -------
---[ swf2js 0.2.9 ] Release Date: 15 Mar 2015  
+--[ swf2js 0.2.9 ] Release Date: 17 Mar 2015  
 * [BUGFIX] ActionScript 'ActionCallFunction'  
 
 
