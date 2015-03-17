@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.8)
+ * swf2js (version 0.2.9)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -12,19 +12,20 @@
  */
 (function(window) {
     var _document = window.document;
-    var _min = Math.min;
-    var _max = Math.max;
-    var _floor = Math.floor;
-    var _ceil = Math.ceil;
-    var _pow = Math.pow;
-    var _random = Math.random;
-    var _atan2 = Math.atan2;
-    var _sqrt = Math.sqrt;
-    var _cos = Math.cos;
-    var _sin = Math.sin;
-    var _PI = Math.PI;
+    var _Math = Math;
+    var _min = _Math.min;
+    var _max = _Math.max;
+    var _floor = _Math.floor;
+    var _ceil = _Math.ceil;
+    var _pow = _Math.pow;
+    var _random = _Math.random;
+    var _atan2 = _Math.atan2;
+    var _sqrt = _Math.sqrt;
+    var _cos = _Math.cos;
+    var _sin = _Math.sin;
+    var _log = _Math.log;
+    var _PI = _Math.PI;
     var _Number = Number;
-    var _void = void 0;
     var _fromCharCode = String.fromCharCode;
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
@@ -37,7 +38,7 @@
     var _Date = Date;
     var _decodeURIComponent = decodeURIComponent;
 
-    // option
+    // options
     var optionWidth = 0;
     var optionHeight = 0;
     var renderMode = 'canvas';
@@ -61,6 +62,7 @@
     var scale = 1;
     var width = 0;
     var height = 0;
+    var twips = 20;
     var startDate = new _Date();
     var ua = navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
@@ -202,6 +204,7 @@
                     }
                 }
             }
+
             this.store[key] = value;
         },
 
@@ -291,14 +294,11 @@
         style.webkitTransformOrigin  = '0 0';
         style.webkitTransform = 'scale('+ cssScale +','+ cssScale +')';
         context = canvas.getContext('2d');
-        context.globalCompositeOperation = 'copy';
-        context.imageSmoothingEnabled = false;
 
         var preCanvas = _document.createElement('canvas');
         preCanvas.width = canvas.width;
         preCanvas.height = canvas.height;
         preContext = preCanvas.getContext('2d');
-        preContext.imageSmoothingEnabled = false;
 
         if (isTouch) {
             var startEvent = 'touchstart';
@@ -434,9 +434,8 @@
             var length = binary.length;
             var array = _this.createArray(length);
             var key = 0;
-            for (var i = binary.length; i--;) {
-                array[key] = binary.charCodeAt(key) & 0xff;
-                key++;
+            for (; length--;) {
+                array[key] = binary.charCodeAt(key++) & 0xff;
             }
             this.data = array;
         },
@@ -1869,7 +1868,7 @@
             }
 
             return {
-                Ratio: (Ratio / 255).toFixed(1),
+                Ratio: Ratio / 255,
                 Color: Color
             };
         },
@@ -2573,6 +2572,28 @@
                         canvasArray[s][d] = [];
                     }
 
+                    var fCArray = obj.fArray;
+                    var length = fCArray.length;
+                    var cmd = '';
+                    cmd += 'ctx.lineWidth='+ obj.Width +';';
+                    cmd += 'ctx.lineCap="round";';
+                    cmd += 'ctx.lineJoin="round";';
+                    for (var i = 0; i < length; i++) {
+                        if (!(i in fCArray)) {
+                            continue;
+                        }
+
+                        var value = fCArray[i];
+                        if (value == 'lineTo') {
+                            cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                        } else if (value == 'quadraticCurveTo') {
+                            cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
+                        } else {
+                            cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                        }
+                    }
+                    obj.cmd = cmd;
+
                     // いらない情報を削除
                     delete obj.StartX;
                     delete obj.StartY;
@@ -2581,6 +2602,7 @@
                     delete obj.cArray;
                     delete obj.merge;
                     delete obj.Depth;
+                    delete obj.fArray;
 
                     var l = canvasArray[s][d].length;
                     canvasArray[s][d][l] = obj;
@@ -2650,18 +2672,19 @@
 
                             var fCArray = obj.fArray;
                             var length = fCArray.length;
+                            var text = '';
                             for (var i = 0; i < length; i++) {
                                 if (!(i in fCArray)) {
                                     continue;
                                 }
 
-                                var value = fCArray[i];
                                 var baseArray = array[depth].fArray;
-                                baseArray[baseArray.length] = value;
+                                baseArray[baseArray.length] = fCArray[i];
                             }
+                            array[depth].cmd = text;
 
                             // 使ったので削除
-                            delete fArray[s][key][d];
+                            fArray[s][key][d] = null;
                         }
                     }
                 }
@@ -2677,10 +2700,10 @@
 
                 var sLen = fArray.length;
                 for (var s = 0; s < sLen; s++) {
-                    var stackArray = fArray[s];
-                    if (stackArray == undefined) {
+                    if (!(s in fArray)) {
                         continue;
                     }
+                    var stackArray = fArray[s];
 
                     if (results[s] == undefined) {
                         results[s] = [];
@@ -2688,24 +2711,47 @@
 
                     var cLen = stackArray.length;
                     for (var c = 0; c < cLen; c++) {
-                        var array = stackArray[c];
-                        if (array == undefined) {
+                        if (!(c in stackArray)) {
                             continue;
                         }
+                        var array = stackArray[c];
 
                         var aLen = array.length;
                         for (var key = 0; key < aLen; key++) {
+                            if (!(key in array)) {
+                                continue;
+                            }
                             var obj = array[key];
-                            if (obj == undefined) {
+                            if (obj == null) {
                                 continue;
                             }
 
-                            if (results[s][obj.Depth] == undefined) {
-                                results[s][obj.Depth] = [];
+                            var Depth = obj.Depth;
+                            if (results[s][Depth] == undefined) {
+                                results[s][Depth] = [];
                             }
 
-                            var len = results[s][obj.Depth].length;
-                            results[s][obj.Depth][len] = obj;
+                            var fCArray = obj.fArray;
+                            var length = fCArray.length;
+                            var cmd = '';
+                            for (var i = 0; i < length; i++) {
+                                if (!(i in fCArray)) {
+                                    continue;
+                                }
+
+                                var value = fCArray[i];
+                                if (value == 'lineTo') {
+                                    cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                } else if (value == 'quadraticCurveTo') {
+                                    cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
+                                } else {
+                                    cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                }
+                            }
+                            obj.cmd = cmd;
+
+                            var len = results[s][Depth].length;
+                            results[s][Depth][len] = obj;
 
                             // 未使用のものは削除
                             delete obj.cArray;
@@ -2715,6 +2761,7 @@
                             delete obj.EndY;
                             delete obj.ColorIdx;
                             delete obj.Depth;
+                            delete obj.fArray;
                         }
                     }
                 }
@@ -5043,7 +5090,6 @@
          */
         parseDefineButtonSound: function()
         {
-            var _this = swftag;
             var buttonId = bitio.getUI16();
             var ButtonSoundChar0 = bitio.getUI16();
             var ButtonSoundChar1 = bitio.getUI16();
@@ -5163,6 +5209,7 @@
 
             bitio.byteAlign();
             obj.ZoneTable = ZoneTable;
+            console.log(obj);
         },
 
         /**
@@ -5292,12 +5339,12 @@
                     // StopSounds
                     case 0x09:
                         var sLen = loadSounds.length;
-                        for (var i = sLen; i--;) {
-                            if (!(i in loadSounds)) {
+                        for (; sLen--;) {
+                            if (!(sLen in loadSounds)) {
                                 continue;
                             }
 
-                            var audio = loadSounds[i];
+                            var audio = loadSounds[sLen];
                             audio.pause();
                             audio.currentTime = 0;
                         }
@@ -5399,6 +5446,8 @@
                                             var addTags = movieClip.getAddTags();
                                             addTags[level] = mc;
                                         }
+
+                                        cacheStore.reset();
                                     } else {
                                         return 0;
                                     }
@@ -5956,6 +6005,8 @@
                                                 var addTags = parent.getAddTags();
                                                 addTags[targetMc.getLevel()] = mc;
                                             }
+
+                                            cacheStore.reset();
                                         } else {
                                             return 0;
                                         }
@@ -6304,7 +6355,7 @@
                         }
 
                         var value = null;
-                        if (object[method] != undefined) {
+                        if (object != null && object[method] != undefined) {
                             value = object[method].apply(object, params);
                         }
 
@@ -6322,6 +6373,7 @@
                             _this.constantPool[_this.constantPool.length] =
                                 pBitio.getDataUntil("\0");
                         }
+
                         break;
                     // ActionCallFunction
                     case 0x3d:
@@ -6333,24 +6385,63 @@
                         }
 
                         if (movieClip != null) {
-                            var as = movieClip.getVariable(FunctionName);
-                            var register = as.register;
-
-                            // set
-                            for (var idx = params.length; idx--;) {
-                                if (!(idx in register)) {
-                                    continue;
+                            if (window[FunctionName]) {
+                                targetMc = movieClip;
+                                if (params[0] instanceof MovieClip) {
+                                    targetMc = params.shift();
                                 }
-                                register[idx].value = params[idx];
-                            }
 
-                            // build
-                            for (var idx = register.length; idx--;) {
-                                var obj = register[idx];
-                                as.params[obj.register] = obj.value;
-                            }
+                                if (params[0] instanceof ActionScript) {
+                                    var as = params.shift();
+                                } else {
+                                    var method = params.shift();
+                                    var as = targetMc.getVariable(method);
+                                }
 
-                            as.start(movieClip);
+                                params.unshift(function()
+                                {
+                                    // set
+                                    var register = as.register;
+                                    for (var idx = arguments.length; idx--;) {
+                                        if (!(idx in register)) {
+                                            continue;
+                                        }
+                                        register[idx].value = arguments[idx];
+                                    }
+
+                                    // build
+                                    for (var idx = register.length; idx--;) {
+                                        var obj = register[idx];
+                                        as.params[obj.register] = obj.value;
+                                    }
+
+                                    as.start(targetMc);
+                                });
+
+                                var ret = window[FunctionName].apply(window, params);
+                                stack[stack.length] = ret;
+
+                            } else {
+                                var as = movieClip.getVariable(FunctionName);
+                                if (as != undefined) {
+                                    var register = as.register;
+                                    // set
+                                    for (var idx = params.length; idx--;) {
+                                        if (!(idx in register)) {
+                                            continue;
+                                        }
+                                        register[idx].value = params[idx];
+                                    }
+
+                                    // build
+                                    for (var idx = register.length; idx--;) {
+                                        var obj = register[idx];
+                                        as.params[obj.register] = obj.value;
+                                    }
+
+                                    as.start(movieClip);
+                                }
+                            }
                         }
 
                         break;
@@ -6369,13 +6460,15 @@
                         var codeSize  = pBitio.getUI16();
                         var as = new ActionScript(this.bitio.getData(codeSize));
                         as.constantPool = clone(this.constantPool);
+                        movieClip.setVariable(FunctionName, as);
+
                         stack[stack.length] = as;
 
                         break;
                     // ActionDefineLocal
                     case 0x3c:
                         console.log('ActionDefineLocal');
-                        var value = stack.pop();
+                        var value = stack.pop() + '';
                         var name = stack.pop();
                         if (movieClip != null) {
                             movieClip.setVariable(name, value);
@@ -6386,6 +6479,8 @@
                     case 0x41:
                         console.log('ActionDefineLocal2');
                         var name = stack.pop();
+                        movieClip.setVariable(name, '');
+
                         break;
                     // ActionDelete
                     case 0x3a:
@@ -7957,7 +8052,7 @@
         getMatrix: function()
         {
             var _this = this;
-            if (_this.characterId == 0) {
+            if (_this.instanceId == 0) {
                 return {
                     ScaleX: scale,
                     RotateSkew0: 0,
@@ -8004,7 +8099,7 @@
         getColorTransform: function()
         {
             var _this = this;
-            if (_this.characterId == 0) {
+            if (_this.instanceId == 0) {
                 return {
                     HasMultiTerms: 0,
                     RedMultiTerm: 1,
@@ -8409,9 +8504,6 @@
                 }
 
                 var obj = frameTags[depth];
-                if (!_this.isClipDepth) {
-                    ctx.save();
-                }
 
                 // mask 終了
                 if (_this.isClipDepth && depth > _this.clipDepth) {
@@ -8438,6 +8530,10 @@
                     );
 
                     // _alpha
+                    if (obj.getAlpha() == 0) {
+                        continue;
+                    }
+
                     if (1 > obj.getAlpha()) {
                         renderColorTransform = _multiplicationColor(
                             renderColorTransform,
@@ -8524,10 +8620,6 @@
                         }
                     }
                 }
-
-                if (!_this.isClipDepth) {
-                    ctx.restore();
-                }
             }
 
             // mask 終了
@@ -8578,7 +8670,6 @@
                         + -rBound.X + ','
                         + -rBound.Y
                     + ');';
-                    body += 'ctx.imageSmoothingEnabled = false;';
                     body += 'ctx.offsetX = '+ rBound.X + ';';
                     body += 'ctx.offsetY = '+ rBound.Y + ';';
                 } else {
@@ -8606,14 +8697,12 @@
                         var styleLength = styles.length;
                         for (var sKey = 0; sKey < styleLength; sKey++) {
                             var styleObj = styles[sKey];
-                            var fArray = styleObj.fArray;
-                            var fLength = fArray.length;
+                            var cmd = styleObj.cmd;
                             var styleType = styleObj.styleType;
                             var isStroke = (styleObj.Width != undefined);
 
                             // beginPath
                             if (!tag.isClipDepth) {
-                                body += 'ctx.save();';
                                 body += 'ctx.beginPath();';
                             }
 
@@ -8689,6 +8778,10 @@
                                     +", "+ color.B
                                 +")";
 
+                                if (color.A == 0) {
+                                    continue;
+                                }
+
                                 body += 'ctx.globalAlpha = '+ color.A +';';
                             } else {
                                 // bitmap 0x40 - 0x43
@@ -8734,31 +8827,14 @@
 
                             if (css != null) {
                                 if (isStroke) {
-                                    body += 'ctx.lineWidth = '+ styleObj.Width / 1.1 +';';
-                                    body += 'ctx.lineCap = "round";';
-                                    body += 'ctx.lineJoin = "round";';
                                     body += 'ctx.strokeStyle = "'+ css +'";';
                                 } else {
                                     body += 'ctx.fillStyle = "'+ css +'";';
                                 }
                             }
 
-                            // draw
-                            for (var fKey = 0; fKey < fLength; fKey++) {
-                                var method = fArray[fKey++];
-                                if (method == 'moveTo') {
-                                    body += 'ctx.moveTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                                } else if (method == 'quadraticCurveTo') {
-                                    body += 'ctx.quadraticCurveTo('
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey]
-                                    + ');';
-                                } else {
-                                    body += 'ctx.lineTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                                }
-                            }
+                            // draw cmd
+                            body += cmd;
 
                             // グラデーション
                             if (styleType == 0x10
@@ -8795,7 +8871,15 @@
                                 } else {
                                     body += 'ctx.fill();';
                                 }
-                                body += 'ctx.restore();';
+
+                                if (styleType == 0x10
+                                    || styleType == 0x12
+                                    || styleType == 0x13
+                                    || styleType == 0x41
+                                    || styleType == 0x43
+                                ) {
+                                    body += 'ctx.restore();';
+                                }
                             }
                         }
                     }
@@ -8851,7 +8935,6 @@
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
-                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.offsetX = '+ rBound.X + ';';
                 body += 'ctx.offsetY = '+ rBound.Y + ';';
                 body += 'ctx.setTransform('
@@ -8877,8 +8960,7 @@
                         var styleLength = styles.length;
                         for (var sKey = 0; sKey < styleLength; sKey++) {
                             var styleObj = styles[sKey];
-                            var fArray = styleObj.fArray;
-                            var fLength = fArray.length;
+                            var cmd = styleObj.cmd;
                             var isStroke = (styleObj.Width != undefined);
 
                             var color = styleObj.Color;
@@ -8907,39 +8989,20 @@
 
                             body += 'ctx.globalAlpha = '+ color.A +';';
                             if (isStroke) {
-                                body += 'ctx.lineWidth = '+ styleObj.Width / 1.1 +';';
-                                body += 'ctx.lineCap = "round";';
-                                body += 'ctx.lineJoin = "round";';
                                 body += 'ctx.strokeStyle = "'+ css +'";';
                             } else {
                                 body += 'ctx.fillStyle = "'+ css +'";';
                             }
 
                             // draw
-                            body += 'ctx.save();';
                             body += 'ctx.beginPath();';
-                            for (var fKey = 0; fKey < fLength; fKey++) {
-                                var method = fArray[fKey++];
-                                if (method == 'moveTo') {
-                                    body += 'ctx.moveTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                                } else if (method == 'quadraticCurveTo') {
-                                    body += 'ctx.quadraticCurveTo('
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey++] +','
-                                        + fArray[fKey]
-                                    +');';
-                                } else {
-                                    body += 'ctx.lineTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                                }
-                            }
+                            body += cmd;
 
                             if (isStroke) {
                                 body += 'ctx.stroke();';
                             } else {
                                 body += 'ctx.fill();';
                             }
-                            body += 'ctx.restore();';
                         }
                     }
                 }
@@ -8980,7 +9043,6 @@
                 body += 'canvas.width = '+ _ceil(rBound.W) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
-                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.offsetX = '+ rBound.X + ';';
                 body += 'ctx.offsetY = '+ rBound.Y + ';';
 
@@ -9104,26 +9166,11 @@
                     var styleLength = styles.length;
                     for (var sKey = 0; sKey < styleLength; sKey++) {
                         var styleObj = styles[sKey];
-                        var fArray = styleObj.fArray;
-                        var fLength = fArray.length;
+                        var cmd = styleObj.cmd;
 
                         // draw
                         body += 'ctx.beginPath();';
-                        for (var fKey = 0; fKey < fLength; fKey++) {
-                            var method = fArray[fKey++];
-                            if (method == 'moveTo') {
-                                body += 'ctx.moveTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                            } else if (method == 'quadraticCurveTo') {
-                                body += 'ctx.quadraticCurveTo('
-                                    + fArray[fKey++] +','
-                                    + fArray[fKey++] +','
-                                    + fArray[fKey++] +','
-                                    + fArray[fKey]
-                                +');';
-                            } else {
-                                body += 'ctx.lineTo('+ fArray[fKey++] +','+ fArray[fKey] +');';
-                            }
-                        }
+                        body += cmd;
                         body += 'ctx.fill();';
                     }
                 }
@@ -9197,7 +9244,6 @@
                 body += 'canvas.width = '+ _ceil(rBound.W+1) + ';';
                 body += 'canvas.height = '+ _ceil(rBound.H+1) + ';';
                 body += 'var ctx = canvas.getContext("2d");';
-                body += 'ctx.imageSmoothingEnabled = false;';
                 body += 'ctx.textBaseline = "top";';
                 body += 'ctx.setTransform('
                     + matrix.ScaleX + ','
@@ -9222,7 +9268,7 @@
                     body += 'ctx.stroke();';
                 }
 
-                body += 'ctx.save();';
+                //body += 'ctx.save();';
                 body += 'ctx.beginPath();';
                 body += 'ctx.rect('+ data.Bound.Xmin +', '+ data.Bound.Ymin +', '+ W +', '+ H +');';
                 body += 'ctx.clip();';
@@ -9419,7 +9465,7 @@
                     }
                 }
 
-                body += 'ctx.restore();';
+                //body += 'ctx.restore();';
                 var func = new Function('cacheStore', body + 'return ctx;');
                 cache = func(cacheStore);
                 cacheStore.set(cacheKey, cache);
@@ -9800,9 +9846,10 @@
 
         deleteNode();
         var div = _document.getElementById('swf2js');
-        var canvas = preContext.canvas;
-        context.drawImage(canvas, 0, 0, canvas.width, canvas.height);
         div.appendChild(context.canvas);
+
+        var canvas = preContext.canvas;
+        context.drawImage(canvas, 0, 0);
 
         swf2js.play();
         intervalId = _setInterval(onEnterFrame, player.fps);
@@ -9861,13 +9908,14 @@
         }
     }
 
-    /**
+    /*
      * main canvas clear
      */
     function clearMain()
     {
         var canvas = context.canvas;
-        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.setTransform(1,0,0,1,0,0);
+        context.clearRect(0, 0, canvas.width + 1, canvas.height);
     }
 
     /*
@@ -9876,8 +9924,8 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
-        preContext.fillStyle = backgroundColor;
-        preContext.fillRect(0, 0, canvas.width + 1, canvas.height);
+        preContext.setTransform(1,0,0,1,0,0);
+        preContext.clearRect(0, 0, canvas.width + 1, canvas.height);
     }
 
     /**
@@ -10259,10 +10307,9 @@
     function onEnterFrame()
     {
         if (isLoad && !player.stopFlag) {
-            //clearMain();
-            var canvas = preContext.canvas;
-            context.drawImage(canvas, 0, 0, canvas.width, canvas.height);
             _setTimeout(buffer, 0);
+            clearMain();
+            context.drawImage(preContext.canvas, 0, 0);
         }
     }
 
