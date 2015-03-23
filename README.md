@@ -107,6 +107,17 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.10 ] Release Date: 23 Mar 2015  
+* [BUGFIX] ActionScript 'GetURL2'  
+* [BUGFIX] ActionScript 'StringExtract'  
+* [BUGFIX] ActionScript 'MBStringExtract'  
+* [BUGFIX] ActionScript 'GoToFrame2'  
+* [BUGFIX] ActionScript 'GetVariable'  
+* [BUGFIX] ActionScript 'SetVariable'  
+* [BUGFIX] Script 'onresize'  
+
+
+
 --[ swf2js 0.2.9 ] Release Date: 17 Mar 2015  
 * [BUGFIX] ActionScript 'ActionCallFunction'  
 

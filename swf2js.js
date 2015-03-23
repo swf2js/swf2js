@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.9)
+ * swf2js (version 0.2.10)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -23,7 +23,6 @@
     var _sqrt = _Math.sqrt;
     var _cos = _Math.cos;
     var _sin = _Math.sin;
-    var _log = _Math.log;
     var _PI = _Math.PI;
     var _Number = Number;
     var _fromCharCode = String.fromCharCode;
@@ -41,12 +40,12 @@
     // options
     var optionWidth = 0;
     var optionHeight = 0;
-    var renderMode = 'canvas';
+    var renderMode = window.WebGLRenderingContext && _document.createElement('canvas').getContext( 'webgl' ) ? 'webgl' : '2d';
     var isSpriteSheet = false;
     var cacheSize = 73400320; // 70M
 
     // params
-    var context, preContext
+    var context, preContext;
     var swftag, bitio;
     var intervalId = 0;
     var timeoutId = 0;
@@ -62,7 +61,6 @@
     var scale = 1;
     var width = 0;
     var height = 0;
-    var twips = 20;
     var startDate = new _Date();
     var ua = navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
@@ -96,7 +94,7 @@
      */
     window.onresize = function()
     {
-        if (!isSpriteSheet) {
+        if (!isSpriteSheet && isLoad) {
             _clearInterval(intervalId);
             changeScreenSize();
             loaded();
@@ -145,9 +143,9 @@
         destroy: function(canvas)
         {
             var pool = this.pool;
+            canvas.width = canvas.width; // clear
             canvas.width = 0;
             canvas.height = 0;
-            canvas.width = canvas.width;
             pool[pool.length] = canvas;
         },
 
@@ -278,6 +276,7 @@
         style.width = minSize + 'px';
         style.height = minSize + 'px';
         style.backgroundColor = '#000000';
+        style.overflow = 'hidden';
         style['-webkit-user-select'] = 'none';
 
         // loading
@@ -293,6 +292,7 @@
         var cssScale = 1 / devicePixelRatio;
         style.webkitTransformOrigin  = '0 0';
         style.webkitTransform = 'scale('+ cssScale +','+ cssScale +')';
+        style['-webkit-tap-highlight-color'] = 'rgba(0,0,0,0)';
         context = canvas.getContext('2d');
 
         var preCanvas = _document.createElement('canvas');
@@ -340,9 +340,9 @@
         css += '} \n';
 
         css += '@-webkit-keyframes spin {\n';
-        css += '0% { -webkit-transform: rotate(0deg); opacity: 0.4; }\n';
-        css += '50% { -webkit-transform: rotate(180deg); opacity: 1;}\n';
-        css += '100% { -webkit-transform: rotate(360deg); opacity: 0.4; }\n';
+        css += '0% {-webkit-transform: rotate(0deg); opacity: 0.4;}\n';
+        css += '50% {-webkit-transform: rotate(180deg); opacity: 1;}\n';
+        css += '100% {-webkit-transform: rotate(360deg); opacity: 0.4;}\n';
         css += '} \n';
 
         css += '</style>';
@@ -705,13 +705,10 @@
         getFloat16: function()
         {
             var data = this.getData(2);
-            var rv = 0;
+            var float = 0;
             for (var i = 2; i--;) {
-                rv |= data[i] << (i * 8);
+                float |= data[i] << (i * 8);
             }
-
-            var float = ((rv & 0x7fffffff) >> 13) - (0x38000000 >> 13);
-            float |= ((float & 0x80000000) >> 16);
 
             return _parseFloat(float);
         },
@@ -1087,6 +1084,8 @@
                     }
                 }
             }
+
+
         },
 
         /**
@@ -5409,11 +5408,24 @@
                             urls[idx] += str;
                         }
 
+                        var urlString = urls[0];
+                        var splitUrl = urlString.split('?');
+                        var query = '';
+
+                        // 分解してチェック
+                        if (2 in splitUrl) {
+                            var urlString = splitUrl[0];
+                            urlString += '?' + splitUrl[1];
+                            var paramLength = splitUrl.length;
+                            for (var i = 2; i < paramLength; i++) {
+                                urlString += '&' + splitUrl[i];
+                            }
+                        }
+
                         if (urls.length > 1) {
-                            var targetUrl = urls[0];
                             var level = _parseFloat(urls[1].substr(7));
                             var xmlHttpRequest = new XMLHttpRequest();
-                            xmlHttpRequest.open('GET', targetUrl);
+                            xmlHttpRequest.open('GET', urlString);
                             xmlHttpRequest.overrideMimeType(
                                 'text/plain; charset=x-user-defined'
                             );
@@ -5454,18 +5466,6 @@
                                 }
                             }
                         } else {
-                            // 分解してチェック
-                            var urlString = urls[0];
-                            var splitUrl = urlString.split('?');
-                            if (2 in splitUrl) {
-                                var urlString = splitUrl[0];
-                                urlString += '?' + splitUrl[1];
-                                var paramLength = splitUrl.length;
-                                for (var i = 2; i < paramLength; i++) {
-                                    urlString += '&' + splitUrl[i];
-                                }
-                            }
-
                             var func = new Function(
                                 "location.href = '"+ urlString +"';"
                             );
@@ -5582,6 +5582,7 @@
                         var a = _parseFloat(stack.pop());
                         var b = _parseFloat(stack.pop());
 
+
                         // 整数に置き換え
                         if (_isNaN(a)) {
                             a = 0;
@@ -5661,6 +5662,10 @@
                         var index = stack.pop() - 1;
                         if (index < 0) {
                             index = 0;
+                        }
+
+                        if (count < 0) {
+                            count = 1;
                         }
 
                         var string = stack.pop() + '';
@@ -5851,13 +5856,15 @@
                         var splitData = name.split(':');
                         var value = '';
 
-                        if (splitData.length > 1) {
-                            var targetMc = movieClip.getMovieClip(splitData[0]);
-                            if (targetMc != null) {
-                                value = targetMc.getVariable(splitData[1]);
+                        if (movieClip != null) {
+                            if (splitData.length > 1) {
+                                var targetMc = movieClip.getMovieClip(splitData[0]);
+                                if (targetMc != null) {
+                                    value = targetMc.getVariable(splitData[1]);
+                                }
+                            } else {
+                                value = movieClip.getVariable(name);
                             }
-                        } else {
-                            value = movieClip.getVariable(name);
                         }
 
                         stack[stack.length] = value;
@@ -5869,13 +5876,15 @@
                         var name = stack.pop() + '';
                         var splitData = name.split(':');
 
-                        if (splitData.length > 1) {
-                            var targetMc = movieClip.getMovieClip(splitData[0]);
-                            if (targetMc != null) {
-                                targetMc.setVariable(splitData[1], value);
+                        if (movieClip != null) {
+                            if (splitData.length > 1) {
+                                var targetMc = movieClip.getMovieClip(splitData[0]);
+                                if (targetMc != null) {
+                                    targetMc.setVariable(splitData[1], value);
+                                }
+                            } else {
+                                movieClip.setVariable(name, value);
                             }
-                        } else {
-                            movieClip.setVariable(name, value);
                         }
 
                         break;
@@ -5899,6 +5908,12 @@
                             // 分解してチェック
                             var urls = urlString.split('?');
                             var uLen = urls.length;
+
+                            var query = '';
+                            if (uLen == 1) {
+                                query = '?';
+                            }
+
                             if (uLen > 2) {
                                 var url = urls[0] + '?';
                                 url = url + urls[1];
@@ -5908,6 +5923,20 @@
                                 }
                             } else {
                                 var url = urlString;
+                            }
+
+                            // local variables
+                            if (SendVarsMethod) {
+                                var variables = movieClip.variables;
+                                var queryString = '';
+                                for (var key in variables) {
+                                    queryString += '&'+ key +'='+ variables[key];
+                                }
+
+                                if (query != '' && queryString != '') {
+                                    queryString = query + queryString.slice(0, 1);
+                                }
+                                url += queryString;
                             }
 
                             if (LoadVariablesFlag && LoadTargetFlag) {
@@ -6017,20 +6046,22 @@
                                     // form
                                     var form = _document.createElement('form');
                                     form.action = url;
-                                    form.method = 'post';
-                                    _document.body.appendChild(form);
+                                    form.method = 'POST';
 
-                                    var urls = urlString.split('?');
+                                    urls = url.split('?');
                                     if (urls.length > 1) {
-                                        var params = urls[1].split('=');
-                                        for(var key in params) {
+                                        var pears = urls[1].split('&');
+                                        var pLen = pears.length;
+                                        for (var pIdx = 0; pIdx < pLen; pIdx++) {
+                                            var pear = pears[pIdx].split('=');
                                             var input = _document.createElement('input');
                                             input.type = 'hidden';
-                                            input.name = key;
-                                            input.value = encodeURI(params[key]||'');
+                                            input.name = pear[0];
+                                            input.value = encodeURI(pear[1]||'');
+                                            form.appendChild(input);
                                         }
-                                        form.appendChild(input);
                                     }
+                                    _document.body.appendChild(form);
 
                                     form.submit();
                                 } else {
@@ -6073,7 +6104,7 @@
                         }
 
                         var frame = stack.pop();
-                        if (frame == null || frame == undefined) {
+                        if (frame == null || frame == undefined || movieClip == null) {
                             break;
                         }
 
@@ -6341,10 +6372,10 @@
                         }
                         break;
 
-
                     // SWF 5 ***********************************
                     // CallMethod
                     case 0x52:
+                        console.log('CallMethod');
                         var method = stack.pop();
                         var object = stack.pop();
                         var count = _parseFloat(stack.pop());
@@ -6363,6 +6394,7 @@
                         break;
                     // ConstantPool
                     case 0x88:
+                        console.log('ConstantPool');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
 
@@ -6377,6 +6409,7 @@
                         break;
                     // ActionCallFunction
                     case 0x3d:
+                        console.log('ActionCallFunction');
                         var FunctionName = stack.pop() + '';
                         var numArgs = _parseFloat(stack.pop());
                         var params = [];
@@ -6447,6 +6480,7 @@
                         break;
                     // ActionDefineFunction
                     case 0x9b:
+                        console.log('ActionDefineFunction');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
 
@@ -6521,6 +6555,7 @@
                         break;
                     // ActionEquals2
                     case 0x49:
+                        console.log('ActionEquals2');
                         var a = stack.pop();
                         var b = stack.pop();
 
@@ -6530,6 +6565,7 @@
                         break;
                     // ActionGetMember
                     case 0x4e:
+                        console.log('ActionGetMember');
                         var name = stack.pop();
                         var object = stack.pop();
 
@@ -6545,6 +6581,7 @@
                         break;
                     // ActionInitArray
                     case 0x42:
+                        console.log('ActionInitArray');
                         var number = stack.pop();
                         var array = [];
                         for (;number--;) {
@@ -6554,6 +6591,7 @@
                         break;
                     // ActionInitObject
                     case 0x43:
+                        console.log('ActionInitObject');
                         var number = stack.pop();
                         var object = {};
                         for (;number--;) {
@@ -6585,6 +6623,7 @@
                         break;
                     // ActionNewObject
                     case 0x40:
+                        console.log('ActionNewObject');
                         var object = stack.pop() + '';
                         var numArgs = _parseFloat(stack.pop());
 
@@ -6607,6 +6646,7 @@
                         break;
                     // ActionSetMember
                     case 0x4f:
+                        console.log('ActionSetMember');
                         var value = stack.pop();
                         var name = stack.pop();
                         var object = stack.pop();
@@ -6656,16 +6696,19 @@
                         break;
                     // ActionToNumber
                     case 0x4a:
+                        console.log('ActionToNumber');
                         var object = stack.pop();
                         stack[stack.length] = _parseFloat(object);
                         break;
                     // ActionToString
                     case 0x4b:
+                        console.log('ActionToString');
                         var object = stack.pop();
                         stack[stack.length] = object + '';
                         break;
                     // ActionTypeOf
                     case 0x44:
+                        console.log('ActionTypeOf');
                         var object = stack.pop();
                         if (object instanceof MovieClip) {
                             return 'movieclip';
@@ -6676,12 +6719,14 @@
                         break;
                     // ActionAdd2
                     case 0x47:
+                        console.log('ActionAdd2');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b+a;
                         break;
                     // ActionLess2
                     case 0x48:
+                        console.log('ActionLess2');
                         var a = stack.pop();
                         var b = stack.pop();
                         var boolInt = (b < a) ? 1 : 0;
@@ -8418,6 +8463,7 @@
             var frameTags = _this.getFrameTags();
             var length = frameTags.length;
             _this.dispatchEvent('onEnterFrame');
+
             for (var depth = 1; depth < length; depth++) {
                 if (!(depth in frameTags)) {
                     continue;
@@ -8472,9 +8518,8 @@
          * @param ctx
          * @param matrix
          * @param colorTransform
-         * @param visible
          */
-        render: function(ctx, matrix, colorTransform, visible)
+        render: function(ctx, matrix, colorTransform)
         {
             var _this = this;
             var frameTags = _this.getFrameTags();
@@ -8529,8 +8574,8 @@
                         obj.getColorTransform()
                     );
 
-                    // _alpha
-                    if (obj.getAlpha() == 0) {
+                    // _alpha or _visible
+                    if (obj.getAlpha() == 0 || obj.getVisible() == 0) {
                         continue;
                     }
 
@@ -8552,14 +8597,9 @@
                         );
                     }
 
-                    obj.render(
-                        ctx,
-                        renderMatrix,
-                        renderColorTransform,
-                        _min(visible, obj.getVisible())
-                    );
+                    obj.render(ctx, renderMatrix, renderColorTransform);
                 } else {
-                    if (!(obj.characterId in character) || visible == 0) {
+                    if (!(obj.characterId in character)) {
                         continue;
                     }
 
@@ -8615,8 +8655,8 @@
                         if (canvas.width > 0 && canvas.height > 0) {
                             var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
                             var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
-                            ctx.setTransform(1, 0, 0, 1, 0, 0);
-                            ctx.drawImage(canvas, x, y);
+                            ctx.setTransform(1, 0, 0, 1, x, y);
+                            ctx.drawImage(canvas, 0, 0);
                         }
                     }
                 }
@@ -8648,21 +8688,35 @@
                 colorTransform
             );
 
-            var cache = (tag.isClipDepth)
-                ? ctx
-                : cacheStore.get(cacheKey);
-
-            if (cache == undefined || tag.isClipDepth) {
+            var cache = cacheStore.get(cacheKey);
+            if (!cache || tag.isClipDepth) {
+                var body = '';
+                var cacheBody = '';
+                var isCache = false;
                 var char = character[tag.characterId];
                 var rBound = _this.renderBoundMatrix(char, matrix);
 
-                var body = '';
+                var transformBody = 'ctx.setTransform('
+                    + matrix.ScaleX + ','
+                    + matrix.RotateSkew0 + ','
+                    + matrix.RotateSkew1 + ','
+                    + matrix.ScaleY + ','
+                    + matrix.TranslateX + ','
+                    + matrix.TranslateY
+                + ');';
+
                 if (!tag.isClipDepth) {
-                    body += 'var canvas = cacheStore.getCanvas();';
-                    body += 'canvas.width = '+ _ceil(rBound.W) + ';';
-                    body += 'canvas.height = '+ _ceil(rBound.H) + ';';
-                    body += 'ctx = canvas.getContext("2d");';
-                    body += 'ctx.setTransform('
+                    if (width > _ceil(rBound.W)
+                        && height > _ceil(rBound.H)
+                    ) {
+                        isCache = true;
+                    }
+
+                    cacheBody += 'var canvas = cacheStore.getCanvas();';
+                    cacheBody += 'canvas.width = '+ _ceil(rBound.W) + ';';
+                    cacheBody += 'canvas.height = '+ _ceil(rBound.H) + ';';
+                    cacheBody += 'var ctx = canvas.getContext("2d");';
+                    cacheBody += 'ctx.setTransform('
                         + matrix.ScaleX + ','
                         + matrix.RotateSkew0 + ','
                         + matrix.RotateSkew1 + ','
@@ -8670,17 +8724,8 @@
                         + -rBound.X + ','
                         + -rBound.Y
                     + ');';
-                    body += 'ctx.offsetX = '+ rBound.X + ';';
-                    body += 'ctx.offsetY = '+ rBound.Y + ';';
-                } else {
-                    ctx.setTransform(
-                        matrix.ScaleX,
-                        matrix.RotateSkew0,
-                        matrix.RotateSkew1,
-                        matrix.ScaleY,
-                        matrix.TranslateX,
-                        matrix.TranslateY
-                    );
+                    cacheBody += 'ctx.offsetX = '+ rBound.X + ';';
+                    cacheBody += 'ctx.offsetY = '+ rBound.Y + ';';
                 }
 
                 var shapes = char.data;
@@ -8772,17 +8817,16 @@
                                     );
                                 }
 
-                                css = "rgb("
-                                    + color.R
-                                    +", "+ color.G
-                                    +", "+ color.B
-                                +")";
-
                                 if (color.A == 0) {
                                     continue;
                                 }
 
-                                body += 'ctx.globalAlpha = '+ color.A +';';
+                                css = "rgba("
+                                    + color.R
+                                    +", "+ color.G
+                                    +", "+ color.B
+                                    +", "+ color.A
+                                +")";
                             } else {
                                 // bitmap 0x40 - 0x43
                                 var bitmapObj = styleObj.Color;
@@ -8888,19 +8932,23 @@
                 // mask
                 if (tag.isClipDepth) {
                     body += 'ctx.clip();';
-                    var func = new Function('ctx', body + 'return null;');
-                    cache = func(ctx);
+                    var func = new Function('ctx', 'cacheStore', transformBody + body + 'return null;');
+                    cache = func(ctx, cacheStore);
                 } else {
-                    // image clip
-                    if (styleType == 0x41 || styleType == 0x43) {
-                        body += 'ctx.clip();';
-                        body += 'ctx.restore();';
-                    }
+                    if (isCache || styleType == 0x41 || styleType == 0x43) {
+                        // image clip
+                        if (styleType == 0x41 || styleType == 0x43) {
+                            body += 'ctx.clip();';
+                            body += 'ctx.restore();';
+                        }
 
-                    // cache
-                    var func = new Function('cacheStore', body + 'return ctx;');
-                    cache = func(cacheStore);
-                    cacheStore.set(cacheKey, cache);
+                        var func = new Function('cacheStore', cacheBody + body + 'return ctx;');
+                        cache = func(cacheStore);
+                        cacheStore.set(cacheKey, cache);
+                    } else {
+                        var func = new Function('ctx', 'cacheStore', transformBody + body + 'return null;');
+                        cache = func(ctx, cacheStore);
+                    }
                 }
             }
 
@@ -9268,7 +9316,6 @@
                     body += 'ctx.stroke();';
                 }
 
-                //body += 'ctx.save();';
                 body += 'ctx.beginPath();';
                 body += 'ctx.rect('+ data.Bound.Xmin +', '+ data.Bound.Ymin +', '+ W +', '+ H +');';
                 body += 'ctx.clip();';
@@ -9318,7 +9365,7 @@
                     );
 
                     fontHeight = data.FontHeight / 20;
-                    fontName = " '"+ fontData.FontName +"'";
+                    fontName = "'"+ fontData.FontName +"', 'HiraKakuProN-W3', 'sans-serif'";
                     if (fontData.FontFlagsItalic) {
                         fontType += 'italic ';
                     }
@@ -9465,17 +9512,16 @@
                     }
                 }
 
-                //body += 'ctx.restore();';
                 var func = new Function('cacheStore', body + 'return ctx;');
                 cache = func(cacheStore);
                 cacheStore.set(cacheKey, cache);
             }
 
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
             var canvas = cache.canvas;
             var x = _ceil(rBound.X + matrix.TranslateX);
             var y = _ceil(rBound.Y + matrix.TranslateY);
-            ctx.drawImage(canvas, x, y);
+            ctx.setTransform(1, 0, 0, 1, x, y);
+            ctx.drawImage(canvas, 0, 0);
         },
 
         /**
@@ -9603,7 +9649,7 @@
 
                         if (tagChar instanceof MovieClip) {
                             tagChar.isButtonRemove = true;
-                            tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
+                            tagChar.render(ctx, renderMatrix, renderColorTransform);
                         } else {
                             var obj = character[tagChar.characterId];
                             switch (obj.tagType) {
@@ -9638,7 +9684,7 @@
                         }
                     } else if (btnChar.ButtonStateUp) {
                         if (tagChar instanceof MovieClip) {
-                            tagChar.render(ctx, renderMatrix, renderColorTransform, tagChar.getVisible());
+                            tagChar.render(ctx, renderMatrix, renderColorTransform);
                         } else {
                             var obj = character[tagChar.characterId];
                             switch (obj.tagType) {
@@ -9685,10 +9731,10 @@
                     if (cache instanceof CanvasRenderingContext2D) {
                         var canvas = cache.canvas;
                         if (canvas.width > 0 && canvas.height > 0) {
-                            ctx.setTransform(1, 0, 0, 1, 0, 0);
                             var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
                             var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
-                            ctx.drawImage(canvas, x, y);
+                            ctx.setTransform(1, 0, 0, 1, x, y);
+                            ctx.drawImage(canvas, 0, 0);
                         }
                     }
                 }
@@ -9837,12 +9883,7 @@
         action();
 
         actions = [];
-        mc.render(
-            preContext,
-            mc.getMatrix(),
-            mc.getColorTransform(),
-            mc.getVisible()
-        );
+        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
 
         deleteNode();
         var div = _document.getElementById('swf2js');
@@ -9873,13 +9914,19 @@
         actions = [];
         buttonHits = [];
         clearPre();
-        mc.render(
-            preContext,
-            mc.getMatrix(),
-            mc.getColorTransform(),
-            mc.getVisible()
-        );
+        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
     }
+
+    /**
+     *
+     * @param body
+     */
+    function buildCanvas(body)
+    {
+        var func = new Function('ctx', 'cacheStore', body);
+        func(preContext, cacheStore);
+    }
+
 
     /**
      * action
@@ -10448,7 +10495,7 @@
                 if (options != undefined) {
                     optionWidth = options.width | 0;
                     optionHeight = options.height | 0;
-                    renderMode = options.mode | 'canvas';
+                    renderMode = options.mode | renderMode;
                     isSpriteSheet = options.isSpriteSheet | false;
                     cacheSize = options.cacheSize | cacheSize;
                 }
