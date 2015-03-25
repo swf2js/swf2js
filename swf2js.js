@@ -5932,7 +5932,7 @@
                                 }
 
                                 if (query != '' && queryString != '') {
-                                    queryString = query + queryString.slice(0, 1);
+                                    queryString = query + queryString.slice(1, -1);
                                 }
                                 url += queryString;
                             }
@@ -6066,7 +6066,7 @@
                                     func = new Function(
                                         "location.href = '"+ url +"';"
                                     );
-                                    func();
+                                    //func();
                                 }
                             }
                         }
