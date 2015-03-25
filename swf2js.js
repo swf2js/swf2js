@@ -6066,7 +6066,7 @@
                                     func = new Function(
                                         "location.href = '"+ url +"';"
                                     );
-                                    //func();
+                                    func();
                                 }
                             }
                         }
