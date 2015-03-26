@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.11)
+ * swf2js (version 0.2.12)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -1255,7 +1255,7 @@
                 obj.clipDepth = tag.ClipDepth;
             }
 
-            parent.originTags[frame][tag.Depth] = clone(tag);
+            parent.originTags[frame][tag.Depth] = _clone(tag);
             parent.controlTags[frame][tag.Depth] = controlTag;
             parent.addTags[frame][tag.Depth] = obj;
         },
@@ -6636,7 +6636,7 @@
                             stack[stack.length] = new (Function.prototype.bind.apply(window[object], params));
                         } else {
                             var func = movieClip.getVariable(object);
-                            if (func != undefined) {
+                            if (func instanceof Function) {
                                 stack[stack.length] = new func();
                             }
                         }
@@ -7050,7 +7050,6 @@
 
         // Property
         this._currentframe = 1;
-        this._alpha = 100;
         this._visible = 1;
         this._target = 0;
         this._droptarget = 0;
@@ -7270,10 +7269,8 @@
                             continue;
                         }
                         callback.call(tag);
-                        //tag.callback();
                     } else if (cTag.ButtonStateUp) {
                         callback.call(tag);
-                        //tag.callback();
                     }
                 }
             }
@@ -7661,6 +7658,16 @@
          */
         setVariable: function(name, value)
         {
+            var variables = this.variables;
+            if (version < 7 && typeof name == 'string') {
+                for (var key in variables) {
+                    if (key.toLowerCase() == name.toLowerCase()) {
+                        this.variables[key] = value;
+                        return 0;
+                    }
+                }
+            }
+
             this.variables[name] = value;
         },
 
@@ -7671,13 +7678,31 @@
          */
         getVariable: function(name)
         {
-            var value = this.variables[name];
-            if (value == undefined) {
-                value = window[name];
-                if (value == undefined) {
-                    value = this.getMovieClip(name);
+            var variables = this.variables;
+            var value;
+
+            if (name in variables) {
+                return variables[name];
+            }
+
+            if (version < 7) {
+                for (var key in variables) {
+                    if (typeof key != 'string') {
+                        continue;
+                    }
+
+                    if (key.toLowerCase() == name.toLowerCase()) {
+                        return variables[key];
+                    }
                 }
             }
+
+            if (version > 4) {
+                if (!(name in window)) {
+                    return this.getMovieClip(name);
+                }
+            }
+
             return value;
         },
 
@@ -7718,7 +7743,7 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
-            var alpha = colorTransform.AlphaMultiTerm + colorTransform.AlphaAddTerm / 255;
+            var alpha = colorTransform.AlphaMultiTerm + (colorTransform.AlphaAddTerm / 255);
             return alpha * 100;
         },
 
@@ -8112,8 +8137,8 @@
                     RotateSkew0: 0,
                     RotateSkew1: 0,
                     ScaleY: scale,
-                    TranslateX: -0.5,
-                    TranslateY: -0.5
+                    TranslateX: 0,
+                    TranslateY: 0
                 };
             }
 
@@ -8329,6 +8354,7 @@
             if (width < 0) {
                 width *= -1;
             }
+
             return width;
         },
 
@@ -8340,7 +8366,7 @@
         {
             var _this = this;
             var Matrix = _this.getMatrix();
-            Matrix.ScaleX = width / _this.getWidth();
+            Matrix.ScaleX = width * Matrix.ScaleX / _this.getWidth();
         },
 
         /**
@@ -8366,7 +8392,7 @@
         {
             var _this = this;
             var Matrix = _this.getMatrix();
-            Matrix.ScaleY = height / _this.getHeight();
+            Matrix.ScaleY = height * Matrix.ScaleY / _this.getHeight();
         },
 
         /**
@@ -8479,7 +8505,7 @@
             }
 
             if (_this.getNextFrame() > 0
-                // && !_this.stopFlag
+                //&& !_this.stopFlag
                 && (length == 0 || _this.getFrame() == _this.getTotalFrames())
             ) {
                 _this.putFrame();
@@ -8635,8 +8661,8 @@
                     if (cache instanceof CanvasRenderingContext2D) {
                         var canvas = cache.canvas;
                         if (canvas.width > 0 && canvas.height > 0) {
-                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
-                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
+                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX - 0.5);
+                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY - 0.5);
                             ctx.setTransform(1, 0, 0, 1, x, y);
                             ctx.drawImage(canvas, 0, 0);
                         }
@@ -9161,7 +9187,7 @@
             var char = character[tag.characterId];
             var data = char.data;
 
-            var inText = '';
+            var inText = null;
             if (data.VariableName != '') {
                 var variableName = data.VariableName;
                 var splitData = variableName.split(':');
@@ -9175,21 +9201,15 @@
 
                 if (mc != null) {
                     inText = mc.getVariable(key);
-                    if (inText != undefined) {
-                        inText += '';
+                    if (inText == undefined || inText == null) {
+                        inText = '';
                     } else {
-                        inText = null;
+                        inText += '';
                     }
-                } else {
-                    inText = null;
-                }
-
-                if (inText == null) {
-                    inText = '';
                 }
             }
 
-            inText = (inText == '' && data.HasText)
+            inText = (inText == null && data.HasText)
                 ? data.InitialText
                 : inText;
             inText += '';
@@ -9419,8 +9439,8 @@
             }
 
             var canvas = cache.canvas;
-            var x = _ceil(rBound.X + matrix.TranslateX);
-            var y = _ceil(rBound.Y + matrix.TranslateY);
+            var x = _ceil(rBound.X + matrix.TranslateX - 0.5);
+            var y = _ceil(rBound.Y + matrix.TranslateY - 0.5);
             ctx.setTransform(1, 0, 0, 1, x, y);
             ctx.drawImage(canvas, 0, 0);
         },
@@ -9632,8 +9652,8 @@
                     if (cache instanceof CanvasRenderingContext2D) {
                         var canvas = cache.canvas;
                         if (canvas.width > 0 && canvas.height > 0) {
-                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX);
-                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY);
+                            var x = _ceil(cache.offsetX + renderMatrix.TranslateX - 0.5);
+                            var y = _ceil(cache.offsetY + renderMatrix.TranslateY - 0.5);
                             ctx.setTransform(1, 0, 0, 1, x, y);
                             ctx.drawImage(canvas, 0, 0);
                         }
@@ -9981,7 +10001,7 @@
      */
     function touchMove(event)
     {
-        if (touchObj != null) {
+        if (!isBtnAction && touchObj != null) {
             event.preventDefault();
             touchStart(event);
         }
@@ -9993,12 +10013,13 @@
      */
     function touchEnd(event)
     {
-        isBtnAction = false;
         if (touchEndAction != null) {
             touchObj.ActionScript = touchEndAction;
+            isBtnAction = false;
             touchEvent(event);
             touchEndAction = null;
         }
+        isBtnAction = false;
         touchObj = null;
     }
 
@@ -10279,6 +10300,7 @@
         }
     }
 
+    var oid = 0;
     /**
      * clone
      * @param src
@@ -10304,6 +10326,7 @@
 
         var obj = {};
         execute(src, obj);
+        obj.oid = oid++;
         return obj;
     }
 
@@ -10328,7 +10351,7 @@
      * multiplicationColor
      * @param a
      * @param b
-     * @returns {{}}
+     * @returns {{RedMultiTerm: number, GreenMultiTerm: number, BlueMultiTerm: number, AlphaMultiTerm: number, RedAddTerm: number, GreenAddTerm: number, BlueAddTerm: number, AlphaAddTerm: number}}
      */
     function multiplicationColor(a, b)
     {
@@ -10353,10 +10376,12 @@
     function generateImageTransform(imageContext, color)
     {
         var canvas = imageContext.canvas;
-        var imgData = imageContext.getImageData(0, 0, canvas.width, canvas.height);
+        var width = canvas.width;
+        var height = canvas.height;
+        var imgData = imageContext.getImageData(0, 0, width, height);
         var pxData = imgData.data;
         var idx = 0;
-        for (var y = height; y--;) {
+        for (var y = width; y--;) {
             for (var x = width; x--;) {
                 var R = pxData[idx++];
                 var G = pxData[idx++];
@@ -10374,7 +10399,7 @@
 
     /**
      * player
-     * @type {{stopFlag: boolean, parent: {}, frameRate: number, fps: number, fileLength: number}}
+     * @type {{stopFlag: boolean, parent: MovieClip, frameRate: number, fps: number, fileLength: number}}
      */
     var player = {
         stopFlag: false,

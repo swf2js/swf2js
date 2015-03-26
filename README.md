@@ -107,6 +107,13 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.12 ] Release Date: 26 Mar 2015  
+* [BUGFIX] ActionScript 'ButtonActions'  
+* [BUGFIX] ActionScript 'GetVariable'  
+* [BUGFIX] render 'ImageTransform'  
+* [BUGFIX] Property '_width'  
+* [BUGFIX] Property '_height'  
+
 --[ swf2js 0.2.11 ] Release Date: 25 Mar 2015  
 * [BUGFIX] ActionScript 'StringExtract'  
 * [BUGFIX] ActionScript 'MBStringExtract'  
