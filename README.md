@@ -47,6 +47,36 @@ html
 }  
 
 
+API
+-------
+
+## play
+~~~
+swf2js.play();
+~~~
+
+
+## stop
+~~~
+swf2js.stop();
+~~~
+
+
+## reload
+
+
+##### *Parameters*
+*url*: string SWF PATH
+*options*: object ※OPTIONS
+
+
+##### *Example*
+~~~
+swf2js.reload('SET SWF PATH');  
+swf2js.reload('SET SWF PATH', {※OPTIONS});  
+setTimeou(swf2js.reload, 6000, 'SET SWF PATH');  
+setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});  
+~~~
 
 
 MEMO
@@ -107,12 +137,20 @@ WebGL
 
 Release Notes  
 -------
+--[ swf2js 0.2.13 ] Release Date: 27 Mar 2015  
+* [BUGFIX] ActionScript 'NextFrame'  
+* [BUGFIX] ActionScript 'PreviousFrame'  
+* [NEW] Event 'KeyPress(PC Browser Only)'  
+* [NEW] API 'play', 'stop', 'reload'  
+
+
 --[ swf2js 0.2.12 ] Release Date: 26 Mar 2015  
 * [BUGFIX] ActionScript 'ButtonActions'  
 * [BUGFIX] ActionScript 'GetVariable'  
 * [BUGFIX] render 'ImageTransform'  
 * [BUGFIX] Property '_width'  
 * [BUGFIX] Property '_height'  
+
 
 --[ swf2js 0.2.11 ] Release Date: 25 Mar 2015  
 * [BUGFIX] ActionScript 'StringExtract'  

@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.12)
+ * swf2js (version 0.2.13)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -72,7 +72,7 @@
     var isLoad = false;
     var jpegTables = null;
     var signature = '';
-    var backgroundColor = '';
+    var backgroundColor = null;
     var version = 0;
     var totalFrame = 0;
     var instanceId = 0;
@@ -310,6 +310,10 @@
         canvas.addEventListener(startEvent, touchStart, false);
         canvas.addEventListener(moveEvent, touchMove, false);
         canvas.addEventListener(endEvent, touchEnd, false);
+
+        if (!isTouch) {
+            window.addEventListener("keypress", keyPressAction, false);
+        }
 
         return true;
     }
@@ -1383,7 +1387,7 @@
                         + bitio.getUI8() +","
                         + bitio.getUI8() +","
                         + bitio.getUI8() +")";
-                    if (backgroundColor == '') {
+                    if (backgroundColor == null) {
                         var canvas = context.canvas;
                         var style = canvas.style;
                         style.backgroundColor = color;
@@ -5307,7 +5311,7 @@
                     case 0x04:
                         if (movieClip != null) {
                             movieClip.nextFrame();
-                            movieClip.stopFlag = false;
+                            movieClip.stopFlag = true;
                         }
 
                         break;
@@ -5315,7 +5319,7 @@
                     case 0x05:
                         if (movieClip != null) {
                             movieClip.previousFrame();
-                            movieClip.stopFlag = false;
+                            movieClip.stopFlag = true;
                         }
 
                         break;
@@ -7304,7 +7308,7 @@
                     : _this.getFrame() + 1;
                 var frameCount = _this.getTotalFrames();
 
-                if (frame > frameCount) {
+                if (frame > frameCount || frame <= 0) {
                     frame = 1;
                     if (frameCount > 1) {
                         _this.reset(false, frame);
@@ -7331,9 +7335,6 @@
             var frame = _this.getFrame();
             var frameCount = _this.getTotalFrames();
             frame++;
-            if (frame > frameCount) {
-                return 0;
-            }
             _this.setNextFrame(frame);
         },
 
@@ -7345,9 +7346,6 @@
             var _this = this;
             var frame = _this.getFrame();
             frame--;
-            if (frame <= 0) {
-                return 0;
-            }
             _this.setNextFrame(frame);
         },
 
@@ -9797,9 +9795,12 @@
      */
     function loaded()
     {
+        // reset
         _clearInterval(intervalId);
         cacheStore.reset();
         buttonHits = [];
+        touchActions = [];
+        actions = [];
 
         var _action = action;
         var mc = player.parent;
@@ -9830,7 +9831,6 @@
     function buffer()
     {
         var _action = action;
-
         var mc = player.parent;
         mc.putFrame();
         _action();
@@ -9904,6 +9904,45 @@
     }
 
     /**
+     * keyPressAction
+     * @param event
+     */
+    function keyPressAction(event)
+    {
+        var keyCode = event.keyCode;
+        var len = buttonHits.length;
+        for (var i = len; i--;) {
+            if (!(i in buttonHits)) {
+                continue;
+            }
+
+            var hitObj = buttonHits[i];
+            var char = character[hitObj.characterId];
+            if (char.actions == undefined) {
+                continue;
+            }
+
+            var actions = char.actions;
+            var aLen = actions.length
+            for (var idx = 0; idx < aLen; idx++) {
+                if (!(idx in actions)) {
+                    continue;
+                }
+
+                var cond = actions[idx];
+                if (cond.CondKeyPress != keyCode) {
+                    continue;
+                }
+
+                var mc = hitObj.parent;
+                var as = cond.ActionScript;
+                touchActions[touchActions.length] = {as: as, mc: mc};
+                break;
+            }
+        }
+    }
+
+    /**
      * タッチイベント
      * @param event
      */
@@ -9937,10 +9976,6 @@
             }
 
             var hitObj = buttonHits[i];
-            if (hitObj == undefined) {
-                continue;
-            }
-
             var char = character[hitObj.characterId];
             if (char.actions == undefined) {
                 continue;
@@ -9981,7 +10016,7 @@
                         }
 
                         touchObj.ActionScript = cond.ActionScript;
-                        if (cond.CondOverUpToOverDown || keyPress) {
+                        if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
                             touchEvent(event);
                             break;
                         }
@@ -10417,16 +10452,16 @@
          */
         var swf2js = {};
 
-        /**+
+        /**
          * load
          * @param url
          * @param options
-         * @return {{}}
          */
         swf2js.load = function(url, options)
         {
             if (init()) {
-                // option
+
+                // TODO options
                 if (options != undefined) {
                     optionWidth = options.width | 0;
                     optionHeight = options.height | 0;
@@ -10441,31 +10476,28 @@
                 }
 
                 if (url) {
-                    window.addEventListener('DOMContentLoaded', function()
+                    var xmlHttpRequest = new XMLHttpRequest();
+                    xmlHttpRequest.open('GET', url);
+                    xmlHttpRequest.overrideMimeType(
+                        'text/plain; charset=x-user-defined'
+                    );
+                    xmlHttpRequest.send(null);
+                    xmlHttpRequest.onreadystatechange = function()
                     {
-                        var xmlHttpRequest = new XMLHttpRequest();
-                        xmlHttpRequest.open('GET', url);
-                        xmlHttpRequest.overrideMimeType(
-                            'text/plain; charset=x-user-defined'
-                        );
-                        xmlHttpRequest.send(null);
-                        xmlHttpRequest.onreadystatechange = function()
-                        {
-                            var readyState = xmlHttpRequest.readyState;
-                            if (readyState == 4) {
-                                var status = xmlHttpRequest.status;
-                                if (status == 200) {
-                                    parse(xmlHttpRequest.responseText, player.parent);
-                                    isLoad = true;
-                                    if (imgUnLoadCount == 0) {
-                                        loaded();
-                                    }
-                                } else {
-                                    alert('unknown swf data');
+                        var readyState = xmlHttpRequest.readyState;
+                        if (readyState == 4) {
+                            var status = xmlHttpRequest.status;
+                            if (status == 200) {
+                                parse(xmlHttpRequest.responseText, player.parent);
+                                isLoad = true;
+                                if (imgUnLoadCount == 0) {
+                                    loaded();
                                 }
+                            } else {
+                                alert('unknown swf data');
                             }
                         }
-                    })
+                    }
                 } else {
                     alert('please set swf url');
                 }
@@ -10489,17 +10521,27 @@
         };
 
         /**
-         * reLoad
-         * @param path
+         * reload
+         * @param url
+         * @param options
          */
-        swf2js.reLoad = function(path)
+        swf2js.reload = function(url, options)
         {
+            // stop
+            _clearInterval(instanceId);
             swf2js.stop();
-            _clearInterval(intervalId);
-            isLoad = false;
 
+            // reset
+            isLoad = false;
+            instanceId = 0;
+            backgroundColor = null;
+            optionWidth = 0;
+            optionHeight = 0;
+            player.parent = new MovieClip();
             deleteNode();
-            this.load(path, {width: optionWidth, height: optionHeight});
+
+            // execute
+            swf2js.load(url, options);
         };
 
         /**
