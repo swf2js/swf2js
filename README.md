@@ -33,18 +33,10 @@ http://gamebiz.jp/?p=131364
 
 ## html
 ~~~
-<script type="text/javascript" src="swf2js.js"></script>  
-<script type="text/javascript">  
-    swf2js.load('SET SWF PATH', {※OPTIONS});  
+<script type="text/javascript" src="swf2js.js"></script>
+<script type="text/javascript">
+    swf2js.load('SET SWF PATH', {OPTIONS});
 </script>  
-~~~
-
-## ※OPTIONS  
-~~~
-{  
-    width: int,  // default 100%  
-    height: int, // default 100%  
-}  
 ~~~
 
 API  
@@ -74,9 +66,18 @@ swf2js.stop();
 ##### *Example*  
 ~~~
 swf2js.reload('SET SWF PATH');
-swf2js.reload('SET SWF PATH', {※OPTIONS});
+swf2js.reload('SET SWF PATH', {OPTIONS});
 setTimeou(swf2js.reload, 6000, 'SET SWF PATH');
 setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});
+~~~
+
+
+## OPTIONS  
+~~~
+{  
+    width: int,  // default 100%
+    height: int, // default 100%
+}  
 ~~~
 
 
