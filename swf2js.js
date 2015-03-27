@@ -5958,11 +5958,15 @@
                                 var variables = movieClip.variables;
                                 var queryString = '';
                                 for (var key in variables) {
-                                    queryString += '&'+ key +'='+ variables[key];
+                                    var value = variables[key];
+                                    if (value == null) {
+                                        value = '';
+                                    }
+                                    queryString += '&'+ key +'='+ value;
                                 }
 
                                 if (query != '' && queryString != '') {
-                                    queryString = query + queryString.slice(1, -1);
+                                    queryString = query + queryString.slice(1);
                                 }
                                 url += queryString;
                             }
