@@ -142,6 +142,7 @@ Release Notes
 --[ swf2js 0.2.13 ] Release Date: 27 Mar 2015  
 * [BUGFIX] ActionScript 'NextFrame'  
 * [BUGFIX] ActionScript 'PreviousFrame'  
+* [BUGFIX] ActionScript 'GetURL2'  
 * [BUGFIX] Property '_alpha'  
 * [BUGFIX] fscommand2  
 'FullScreen'  
