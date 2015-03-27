@@ -68,7 +68,7 @@ swf2js.stop();
 swf2js.reload('SET SWF PATH');
 swf2js.reload('SET SWF PATH', {OPTIONS});
 setTimeou(swf2js.reload, 6000, 'SET SWF PATH');
-setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});
+setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {OPTIONS});
 ~~~
 
 
@@ -81,19 +81,19 @@ setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});
 ~~~
 
 
-MEMO
--------
+## MEMO
+
 動作しないswfのファイルを送って頂ければバグ改修にもなるので助かります。  
 Please send the file of swf which does not operate. A bug is fixed.  
 
 
-TODO
--------
-▼ActionScript  
+## TODO
+
+##### *ActionScript*  
 SWF 9  
 
 
-▼TAG  
+##### *TAG*  
 FreeCharacter  
 DefineFontInfo  
 StopSound  
@@ -129,16 +129,16 @@ DefineFont4
 EnableTelemetry  
 
 
-▼UN ZIP TYPE  
+##### *UN ZIP TYPE*  
 LZMA  
 
 
-▼MODE  
+##### *MODE*  
 WebGL  
 
 
 Release Notes  
--------
+======
 --[ swf2js 0.2.13 ] Release Date: 27 Mar 2015  
 * [BUGFIX] ActionScript 'NextFrame'  
 * [BUGFIX] ActionScript 'PreviousFrame'  
