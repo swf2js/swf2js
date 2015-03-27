@@ -10,55 +10,56 @@ play the swf on the iPhone.
 ※Supports SWF4 or lower.  
 
 
-Demonstration Site
-------
+## Demonstration Site
+
 https://swf2js.wordpress.com/  
 
 
-Facebook  
-------
+## Facebook  
+
 https://www.facebook.com/swf2js  
 
 
-Twitter  
-------
+## Twitter  
+
 https://twitter.com/swf2js
 
 
-Game using swf2js
-------
+## Game using swf2js
+
 [覇者もん for GREE and Mobage]  
 http://gamebiz.jp/?p=131364  
 
 
-html
-------
-    <script type="text/javascript" src="swf2js.js"></script>  
-    <script type="text/javascript">  
-        swf2js.load('SET SWF PATH', {※OPTIONS});  
-    </script>  
+## html
+~~~
+<script type="text/javascript" src="swf2js.js"></script>  
+<script type="text/javascript">  
+    swf2js.load('SET SWF PATH', {※OPTIONS});  
+</script>  
+~~~
 
-
-※OPTIONS  
-------
+## ※OPTIONS  
+~~~
 {  
     width: int,  // default 100%  
     height: int, // default 100%  
 }  
-
+~~~
 
 API  
 ======
 
 ## play  
-~~~
-swf2js.play();  
-~~~
 
+~~~
+swf2js.play();
+~~~
 
 ## stop  
+
 ~~~
-swf2js.stop();  
+swf2js.stop();
 ~~~
 
 
@@ -72,10 +73,10 @@ swf2js.stop();
 
 ##### *Example*  
 ~~~
-swf2js.reload('SET SWF PATH');  
-swf2js.reload('SET SWF PATH', {※OPTIONS});  
-setTimeou(swf2js.reload, 6000, 'SET SWF PATH');  
-setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});  
+swf2js.reload('SET SWF PATH');
+swf2js.reload('SET SWF PATH', {※OPTIONS});
+setTimeou(swf2js.reload, 6000, 'SET SWF PATH');
+setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {※OPTIONS});
 ~~~
 
 
