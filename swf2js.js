@@ -64,7 +64,8 @@
     var width = 0;
     var height = 0;
     var startDate = new _Date();
-    var ua = navigator.userAgent;
+    var _navigator = window.navigator;
+    var ua = _navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
     var isIOs = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
     var isTouch = (isAndroid || isIOs);
@@ -6364,7 +6365,42 @@
                                 stack.pop();
                                 stack[stack.length] = -1;
                                 break;
+                            case 'gettimezoneoffset':
+                                movieClip.setVariable(stack.pop(), now.toUTCString());
+                                movieClip.setVariable(stack.pop(), 0);
+                                break;
+                            case 'getlocalelongdate':
+                                movieClip.setVariable(stack.pop(), now.toLocaleDateString());
+                                movieClip.setVariable(stack.pop(), 0);
+                                break;
+                            case 'getlocaleshortdate':
+                                movieClip.setVariable(stack.pop(), now.toDateString());
+                                movieClip.setVariable(stack.pop(), 0);
+                                break;
+                            case 'getlocaletime':
+                                movieClip.setVariable(stack.pop(), now.toLocaleTimeString());
+                                movieClip.setVariable(stack.pop(), 0);
+                                break;
+                            case 'getnetworkname':
+                            case 'getdevice':
+                            case 'getdeviceid':
+                                movieClip.setVariable(stack.pop(), '');
+                                movieClip.setVariable(stack.pop(), -1);
+                                break;
+                            case 'getlanguage':
+                                var language = _navigator.userLanguage || _navigator.language || _navigator.browserLanguage || '';
+                                movieClip.setVariable(stack.pop(), language);
+                                movieClip.setVariable(stack.pop(), 0);
+                                break;
+                            case 'setsoftkeys':
+                                stack.pop();
+                                stack.pop();
+                                stack[stack.length] = -1;
+                                break;
                             case 'setquality':
+                            case 'fullscreen':
+                            case 'getfreeplayermemory':
+                            case 'gettotalplayermemory':
                                 stack.pop();
                                 stack[stack.length] = -1;
                                 break;
@@ -6372,6 +6408,7 @@
                                 stack[stack.length] = -1;
                                 break;
                         }
+
                         break;
 
                     // SWF 5 ***********************************

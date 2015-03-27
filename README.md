@@ -142,8 +142,22 @@ Release Notes
 --[ swf2js 0.2.13 ] Release Date: 27 Mar 2015  
 * [BUGFIX] ActionScript 'NextFrame'  
 * [BUGFIX] ActionScript 'PreviousFrame'  
+* [BUGFIX] fscommand2 
+'FullScreen'  
+'GetFreePlayerMemory'  
+'GetTotalPlayerMemory'  
+'GetLocaleLongDate'  
+'GetLocaleShortDate'  
+'GetLocalTime'  
+'GetTimeZoneOffset'  
+'GetNetworkName'  
+'GetLanguage'  
+'GetDevice'  
+'GetDeviceID'  
+'SetSoftKeys'  
 * [NEW] Event 'KeyPress(PC Browser Only)'  
 * [NEW] API 'play', 'stop', 'reload'  
+
 
 
 --[ swf2js 0.2.12 ] Release Date: 26 Mar 2015  
