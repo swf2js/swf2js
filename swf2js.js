@@ -1232,23 +1232,48 @@
 
             // Matrix ColorTransform Object
             var controlTag = {};
+
+            // 初期値設定
+            if (obj instanceof MovieClip) {
+                if (!tag.PlaceFlagHasMatrix) {
+                    tag.PlaceFlagHasMatrix = 1;
+                    tag.Matrix = {
+                        ScaleX: 1,
+                        RotateSkew0: 0,
+                        RotateSkew1: 0,
+                        ScaleY: 1,
+                        TranslateX: 0,
+                        TranslateY: 0
+                    }
+                }
+
+                if (!tag.PlaceFlagHasColorTransform) {
+                    tag.PlaceFlagHasColorTransform = 1;
+                    tag.ColorTransform = {
+                        RedMultiTerm: 1,
+                        GreenMultiTerm: 1,
+                        BlueMultiTerm: 1,
+                        AlphaMultiTerm: 1,
+                        RedAddTerm: 0,
+                        GreenAddTerm: 0,
+                        BlueAddTerm: 0,
+                        AlphaAddTerm: 0
+                    };
+                }
+
+                controlTag._Matrix = _clone(tag.Matrix);
+                controlTag._ColorTransform = _clone(tag.ColorTransform);
+            }
+
             controlTag.HasMatrix = tag.PlaceFlagHasMatrix;
             if (tag.PlaceFlagHasMatrix) {
-                if (obj instanceof MovieClip) {
-                    controlTag._Matrix = _clone(tag.Matrix);
-                } else {
-                    obj.matrix = _clone(tag.Matrix);
-                }
+                obj.matrix = _clone(tag.Matrix);
             }
 
             controlTag.HasColorTransform =
                 tag.PlaceFlagHasColorTransform;
             if (tag.PlaceFlagHasColorTransform) {
-                if (obj instanceof MovieClip) {
-                    controlTag._ColorTransform = _clone(tag.ColorTransform);
-                } else {
-                    obj.colorTransform = _clone(tag.ColorTransform);
-                }
+                obj.colorTransform = _clone(tag.ColorTransform);
             }
 
             if (tag.PlaceFlagHasRatio) {
@@ -7790,6 +7815,7 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
+            colorTransform.PlaceFlagHasColorTransform = 1;
             colorTransform.AlphaMultiTerm = alpha / 100;
             colorTransform.AlphaAddTerm = 0;
         },
@@ -8639,6 +8665,10 @@
                     // _alpha or _visible
                     if (obj.getAlpha() == 0 || obj.getVisible() == 0) {
                         continue;
+                    }
+
+                    if (obj.getName() == 'hiru') {
+                        //console.log(obj.getAlpha())
                     }
 
                     obj.render(ctx, renderMatrix, renderColorTransform);
