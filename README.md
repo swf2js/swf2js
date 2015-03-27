@@ -47,30 +47,30 @@ html
 }  
 
 
-API
--------
+API  
+======
 
-## play
+## play  
 ~~~
-swf2js.play();
-~~~
-
-
-## stop
-~~~
-swf2js.stop();
+swf2js.play();  
 ~~~
 
 
-## reload
+## stop  
+~~~
+swf2js.stop();  
+~~~
 
 
-##### *Parameters*
-*url*: string SWF PATH
-*options*: object ※OPTIONS
+## reload  
 
 
-##### *Example*
+##### *Parameters*  
+*url*: string SWF PATH  
+*options*: object ※OPTIONS  
+
+
+##### *Example*  
 ~~~
 swf2js.reload('SET SWF PATH');  
 swf2js.reload('SET SWF PATH', {※OPTIONS});  
