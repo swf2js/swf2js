@@ -55,7 +55,7 @@ swf2js.stop();
 ~~~
 
 
-## reload  
+## load, reload  
 
 
 ##### *Parameters*  
@@ -65,6 +65,11 @@ swf2js.stop();
 
 ##### *Example*  
 ~~~
+swf2js.load('SET SWF PATH');
+swf2js.load('SET SWF PATH', {OPTIONS});
+setTimeou(swf2js.load, 6000, 'SET SWF PATH');
+setTimeou(swf2js.load, 6000, 'SET SWF PATH', {OPTIONS});
+
 swf2js.reload('SET SWF PATH');
 swf2js.reload('SET SWF PATH', {OPTIONS});
 setTimeou(swf2js.reload, 6000, 'SET SWF PATH');
@@ -139,6 +144,18 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.14 ] Release Date: 30 Mar 2015  
+* [BUGFIX] Event 'KeyPress(PC Browser Only)'  
+* [BUGFIX] ActionScript(SWF5) 'CallMethod'  
+* [BUGFIX] ActionScript(SWF5) 'Push(Double)'  
+* [BUGFIX] ActionScript(SWF5) 'mc.gotoAndPlay'  
+* [BUGFIX] ActionScript(SWF5) 'mc.gotoAndStop'  
+* [BUGFIX] ActionScript(SWF5) 'mc.nextFrame'  
+* [BUGFIX] ActionScript(SWF5) 'mc.previousFrame'  
+* [BUGFIX] ActionScript(SWF4) 'GotoFrame'  
+* [BUGFIX] ActionScript(SWF4) 'CloneSprite'  
+
+
 --[ swf2js 0.2.13 ] Release Date: 27 Mar 2015  
 * [BUGFIX] ActionScript 'NextFrame'  
 * [BUGFIX] ActionScript 'PreviousFrame'  
@@ -159,7 +176,6 @@ Release Notes
 'SetSoftKeys'  
 * [NEW] Event 'KeyPress(PC Browser Only)'  
 * [NEW] API 'play', 'stop', 'reload'  
-
 
 
 --[ swf2js 0.2.12 ] Release Date: 26 Mar 2015  

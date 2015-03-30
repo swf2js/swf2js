@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.13)
+ * swf2js (version 0.2.14)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -69,7 +69,7 @@
     var isAndroid = (ua.indexOf('Android') > 0);
     var isIOs = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
     var isTouch = (isAndroid || isIOs);
-    var isBtnAction = false;
+    var isTouchEvent = false;
     var isLoad = false;
     var jpegTables = null;
     var signature = '';
@@ -313,7 +313,7 @@
         canvas.addEventListener(endEvent, touchEnd, false);
 
         if (!isTouch) {
-            window.addEventListener("keypress", keyPressAction, false);
+            window.addEventListener("keydown", keyAction, false);
         }
 
         return true;
@@ -732,15 +732,47 @@
             var exp  = (rv >> 23) & 0xff;
             var fraction = rv & 0x7fffff;
 
+            var float = 0;
             if (!rv || rv == 0x80000000) {
-                var float = 0;
+                float = 0;
             } else {
-                var float = (sign ? -1 : 1)
+                float = (sign ? -1 : 1)
                     * (fraction | 0x800000)
                         *  _pow(2, (exp - 127 - 23));
             }
 
             return _parseFloat(float);
+        },
+
+        /**
+         * getFloat64(Double)
+         * @returns {number}
+         */
+        getFloat64: function()
+        {
+            var i = 4;
+            var _this = this;
+
+            var upperData = _this.getData(4);
+            var upperBits = 0;
+            for (i = 4; i--;) {
+                upperBits |= upperData[i] << (i * 8);
+            }
+
+            var lowerData = _this.getData(4);
+            var lowerBits = 0;
+            for (i = 4; i--;) {
+                lowerBits |= lowerData[i] << (i * 8);
+            }
+
+            var sign = upperBits >>> 31 & 0x1;
+            var exp = upperBits >>> 20 & 0x7FF;
+            var upperFraction = upperBits & 0xFFFFF;
+            var lowerFraction = lowerBits;
+
+            return ((sign == 0) ? 1 : -1)
+                * (upperFraction / _pow(2, 20) + lowerFraction / (_pow(2, 52) + 1))
+                    * _pow(2, exp - 1023);
         },
 
         /**
@@ -5282,19 +5314,14 @@
         /**
          * execute
          * @param mc
-         * @param isButton
          * @returns {*}
          */
-        execute: function(mc, isButton)
+        execute: function(mc)
         {
             // init action
             var characterId = mc.characterId;
             if (characterId in initActions) {
                 initActions[characterId].execute(mc);
-            }
-
-            if (isButton == undefined) {
-                isButton = false;
             }
 
             var _this = this;
@@ -5326,9 +5353,7 @@
                             pBitio.setOffset(0, 0);
 
                             var frame = _floor(pBitio.getUI16()) + 1;
-                            if (frame != movieClip.getFrame()) {
-                                movieClip.setNextFrame(frame);
-                            }
+                            movieClip.setNextFrame(frame);
                             movieClip.stopFlag = true;
                         }
 
@@ -5337,7 +5362,6 @@
                     case 0x04:
                         if (movieClip != null) {
                             movieClip.nextFrame();
-                            movieClip.stopFlag = true;
                         }
 
                         break;
@@ -5345,7 +5369,6 @@
                     case 0x05:
                         if (movieClip != null) {
                             movieClip.previousFrame();
-                            movieClip.stopFlag = true;
                         }
 
                         break;
@@ -5369,16 +5392,10 @@
                         break;
                     // StopSounds
                     case 0x09:
-                        var sLen = loadSounds.length;
-                        for (; sLen--;) {
-                            if (!(sLen in loadSounds)) {
-                                continue;
-                            }
-
-                            var audio = loadSounds[sLen];
-                            audio.pause();
-                            audio.currentTime = 0;
+                        if (movieClip != null) {
+                            movieClip.stopAllSounds();
                         }
+
                         break;
                     // WaitForFrame
                     case 0x8A:
@@ -5752,28 +5769,7 @@
                                     break;
                                 // Double
                                 case 6:
-                                    var upperData = pBitio.getData(4);
-                                    var upperBits = 0;
-                                    for (var i = 4; i--;) {
-                                        upperBits |= upperData[i] << (i * 8);
-                                    }
-
-                                    var lowerData = pBitio.getData(4);
-                                    var lowerBits = 0;
-                                    for (var i = 4; i--;) {
-                                        lowerBits |= lowerData[i] << (i * 8);
-                                    }
-
-                                    var sign = upperBits >>> 31 & 0x1;
-                                    var exp = upperBits >>> 20 & 0x7FF;
-                                    var upperFraction = upperBits & 0xFFFFF;
-                                    var lowerFraction = lowerBits;
-
-                                    var val = ((sign == 0) ? 1 : -1)
-                                        * (upperFraction / _pow(2, 20) + lowerFraction / _pow(2, 52) + 1)
-                                            * _pow(2, exp - 1023);
-
-                                    stack[stack.length] = upperBits;
+                                    stack[stack.length] = pBitio.getFloat64();
                                     break;
                                 // Integer
                                 case 7:
@@ -5839,7 +5835,7 @@
                                 if (as != undefined) {
                                     var len = as.length;
                                     for (var i = 0; i < len; i++) {
-                                        as[i].execute(targetMc, isButton);
+                                        as[i].execute(targetMc);
                                     }
                                 }
                             }
@@ -5854,7 +5850,7 @@
                             if (as != undefined) {
                                 var len = as.length;
                                 for (var i = 0; i < len; i++) {
-                                    as[i].execute(movieClip, isButton);
+                                    as[i].execute(movieClip);
                                 }
                             }
                         }
@@ -6249,6 +6245,8 @@
                                 parent = player.parent;
                             }
                             cloneMc.setParent(parent);
+                            cloneMc.setFrame(1);
+                            cloneMc.setNextFrame(1);
                             cloneMc.setName(target);
                             cloneMc.setLevel(depth);
 
@@ -6264,7 +6262,6 @@
                                 }
                                 addTags[frame][depth] = cloneMc;
                             }
-
 
                             var cTags = parent.controlTags;
                             var oTags = parent.originTags;
@@ -6304,8 +6301,9 @@
                                 }
                             }
 
+                            cloneMc.reset(true, 1);
                             cloneMc.addFrameTags();
-                            cloneMc.addActions();
+                            //cloneMc.addActions();
                         }
 
                         break;
@@ -6426,8 +6424,11 @@
                                 stack.pop();
                                 stack[stack.length] = -1;
                                 break;
-                            case 'setquality':
                             case 'fullscreen':
+                                var bool = stack.pop();
+                                stack[stack.length] = -1;
+                                break;
+                            case 'setquality':
                             case 'getfreeplayermemory':
                             case 'gettotalplayermemory':
                                 stack.pop();
@@ -6443,7 +6444,6 @@
                     // SWF 5 ***********************************
                     // CallMethod
                     case 0x52:
-                        console.log('CallMethod');
                         var method = stack.pop();
                         var object = stack.pop();
                         var count = _parseFloat(stack.pop());
@@ -6462,7 +6462,6 @@
                         break;
                     // ConstantPool
                     case 0x88:
-                        console.log('ConstantPool');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
 
@@ -6477,7 +6476,6 @@
                         break;
                     // ActionCallFunction
                     case 0x3d:
-                        console.log('ActionCallFunction');
                         var FunctionName = stack.pop() + '';
                         var numArgs = _parseFloat(stack.pop());
                         var params = [];
@@ -6548,7 +6546,6 @@
                         break;
                     // ActionDefineFunction
                     case 0x9b:
-                        console.log('ActionDefineFunction');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
 
@@ -6569,7 +6566,6 @@
                         break;
                     // ActionDefineLocal
                     case 0x3c:
-                        console.log('ActionDefineLocal');
                         var value = stack.pop() + '';
                         var name = stack.pop();
                         if (movieClip != null) {
@@ -6579,14 +6575,12 @@
                         break;
                     // ActionDefineLocal2
                     case 0x41:
-                        console.log('ActionDefineLocal2');
                         var name = stack.pop();
                         movieClip.setVariable(name, '');
 
                         break;
                     // ActionDelete
                     case 0x3a:
-                        console.log('ActionDelete');
                         var name = stack.pop();
                         var object = stack.pop();
 
@@ -6597,7 +6591,6 @@
                         break;
                     // ActionDelete2
                     case 0x3b:
-                        console.log('ActionDelete2');
                         var name = stack.pop();
                         if (movieClip != null) {
                             movieClip.deleteVariable(name);
@@ -6606,7 +6599,6 @@
                         break;
                     // ActionEnumerate
                     case 0x46:
-                        console.log('ActionEnumerate');
                         var path = stack.pop();
                         stack[stack.length] = null;
 
@@ -6623,7 +6615,6 @@
                         break;
                     // ActionEquals2
                     case 0x49:
-                        console.log('ActionEquals2');
                         var a = stack.pop();
                         var b = stack.pop();
 
@@ -6633,7 +6624,6 @@
                         break;
                     // ActionGetMember
                     case 0x4e:
-                        console.log('ActionGetMember');
                         var name = stack.pop();
                         var object = stack.pop();
 
@@ -6649,7 +6639,6 @@
                         break;
                     // ActionInitArray
                     case 0x42:
-                        console.log('ActionInitArray');
                         var number = stack.pop();
                         var array = [];
                         for (;number--;) {
@@ -6659,7 +6648,6 @@
                         break;
                     // ActionInitObject
                     case 0x43:
-                        console.log('ActionInitObject');
                         var number = stack.pop();
                         var object = {};
                         for (;number--;) {
@@ -6671,8 +6659,6 @@
                         break;
                     // ActionNewMethod
                     case 0x53:
-                        console.log('ActionNewMethod');
-
                         var method = stack.pop();
                         var object = stack.pop();
                         var number = stack.pop();
@@ -6691,7 +6677,6 @@
                         break;
                     // ActionNewObject
                     case 0x40:
-                        console.log('ActionNewObject');
                         var object = stack.pop() + '';
                         var numArgs = _parseFloat(stack.pop());
 
@@ -6714,7 +6699,6 @@
                         break;
                     // ActionSetMember
                     case 0x4f:
-                        console.log('ActionSetMember');
                         var value = stack.pop();
                         var name = stack.pop();
                         var object = stack.pop();
@@ -6764,13 +6748,11 @@
                         break;
                     // ActionToNumber
                     case 0x4a:
-                        console.log('ActionToNumber');
                         var object = stack.pop();
                         stack[stack.length] = _parseFloat(object);
                         break;
                     // ActionToString
                     case 0x4b:
-                        console.log('ActionToString');
                         var object = stack.pop();
                         stack[stack.length] = object + '';
                         break;
@@ -6787,14 +6769,12 @@
                         break;
                     // ActionAdd2
                     case 0x47:
-                        console.log('ActionAdd2');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b+a;
                         break;
                     // ActionLess2
                     case 0x48:
-                        console.log('ActionLess2');
                         var a = stack.pop();
                         var b = stack.pop();
                         var boolInt = (b < a) ? 1 : 0;
@@ -6802,81 +6782,69 @@
                         break;
                     // ActionModule
                     case 0x3f:
-                        console.log('ActionModule');
                         var x = stack.pop();
                         var y = stack.pop();
                         stack[stack.length] = x % y;
                         break;
                     // ActionBitAnd
                     case 0x60:
-                        console.log('ActionBitAnd');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = x & y;
                         break;
                     // ActionBitLShift
                     case 0x63:
-                        console.log('ActionBitLShift');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b << a;
                         break;
                     // ActionBitOr
                     case 0x61:
-                        console.log('ActionBitOr');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b | a;
                         break;
                     // ActionBitRShift
                     case 0x64:
-                        console.log('ActionBitRShift');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b >> a;
                         break;
                     // ActionBitURShift
                     case 0x65:
-                        console.log('ActionBitURShift');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = b >> a;
                         break;
                     // ActionBitXor
                     case 0x62:
-                        console.log('ActionBitXor');
                         var a = stack.pop();
                         var b = stack.pop();
                         stack[stack.length] = a ^ b;
                         break;
                     // ActionDecrement
                     case 0x51:
-                        console.log('ActionDecrement');
                         var value = _parseFloat(stack.pop());
                         value--;
                         stack[stack.length] = value;
                         break;
                     // ActionIncrement
                     case 0x50:
-                        console.log('ActionIncrement');
                         var value = _parseFloat(stack.pop());
                         value++;
                         stack[stack.length] = value;
                         break;
                     // ActionPushDuplicate
                     case 0x4c:
-                        console.log('ActionPushDuplicate');
                         var value = stack[0];
                         stack[stack.length] = value;
                         break;
                     // ActionReturn
                     case 0x3e:
-                        console.log('ActionReturn');
                         var value = stack.pop();
                         break;
                     // ActionStackSwap
                     case 0x4d:
-                        console.log('ActionStackSwap');
                         var a = stack.pop();
                         var b = stack.pop();
 
@@ -6885,7 +6853,6 @@
                         break;
                     // ActionStoreRegister
                     case 0x87:
-                        console.log('ActionStoreRegister');
                         pBitio.setData(payload);
                         pBitio.setOffset(0, 0);
                         var RegisterNumber = pBitio.getUI8();
@@ -6894,7 +6861,6 @@
                     // SWF 6 ***********************************
                     // ActionInstanceOf
                     case 0x54:
-                        console.log('ActionInstanceOf');
                         var constr = stack.pop();
                         var obj = stack.pop();
                         var boolInt = (obj instanceof constr) ? 1 : 0;
@@ -6902,7 +6868,6 @@
                         break;
                     // ActionEnumerate2
                     case 0x55:
-                        console.log('ActionEnumerate2');
                         var obj = stack.pop();
                         stack[stack.length] = null;
 
@@ -6919,7 +6884,6 @@
                         break;
                     // ActionStrictEquals
                     case 0x66:
-                        console.log('ActionStrictEquals');
                         var a = stack.pop();
                         var b = stack.pop();
                         var boolInt = (a === b) ? 1 : 0;
@@ -6927,7 +6891,6 @@
                         break;
                     // ActionGreater
                     case 0x67:
-                        console.log('ActionGreater');
                         var a = stack.pop();
                         var b = stack.pop();
                         var boolInt = (b > a) ? 1 : 0;
@@ -6935,7 +6898,6 @@
                         break;
                     // ActionStringGreater
                     case 0x68:
-                        console.log('ActionStringGreater');
                         var a = stack.pop();
                         var b = stack.pop();
                         var boolInt = (b > a) ? 1 : 0;
@@ -7107,6 +7069,7 @@
         // 判定用
         this.stopFlag = false;
         this.isAction = true;
+        this.isActionWait = false;
         this.isButtonRemove = false;
         this._nextFrame = 0;
 
@@ -7296,11 +7259,41 @@
         gotoAndPlay: function(frame)
         {
             var _this = this;
-            if (!(frame instanceof Number)) {
+            if (typeof frame != 'number') {
                 frame = _this.getLabel(frame);
             }
             _this.setNextFrame(frame);
             _this.play();
+        },
+
+        /**
+         * gotoAndStop
+         */
+        gotoAndStop: function(frame)
+        {
+            var _this = this;
+            if (typeof frame != 'number') {
+                frame = _this.getLabel(frame);
+            }
+            _this.setNextFrame(frame);
+            _this.stop();
+        },
+
+        /**
+         * stopAllSounds
+         */
+        stopAllSounds: function()
+        {
+            var sLen = loadSounds.length;
+            for (; sLen--;) {
+                if (!(sLen in loadSounds)) {
+                    continue;
+                }
+
+                var audio = loadSounds[sLen];
+                audio.pause();
+                audio.currentTime = 0;
+            }
         },
 
         /**
@@ -7343,6 +7336,43 @@
                         callback.call(tag);
                     }
                 }
+            }
+        },
+
+        /**
+         * putNextFrame
+         */
+        putNextFrame: function()
+        {
+            var _this = this;
+            var frameTags = _this.getFrameTags();
+            var length = frameTags.length;
+            for (var depth = 1; depth < length; depth++) {
+                if (!(depth in frameTags)) {
+                    continue;
+                }
+
+                var obj = frameTags[depth];
+                if (obj instanceof MovieClip) {
+                    obj.putNextFrame();
+                } else if (obj.characters instanceof Array) {
+                    // button
+                    _this.btnCallback(obj, _this.putNextFrame);
+                }
+            }
+
+            if (_this.getNextFrame() > 0) {
+                var frame = _this.getNextFrame();
+                var frameCount = _this.getTotalFrames();
+                if (frame > frameCount) {
+                    frame = frameCount;
+                } else if (frame <= 0) {
+                    frame = 1;
+                }
+
+                _this.reset(false, frame);
+                _this.remove();
+                _this.isActionWait = true;
             }
         },
 
@@ -7402,6 +7432,7 @@
             var frameCount = _this.getTotalFrames();
             frame++;
             _this.setNextFrame(frame);
+            _this.stop();
         },
 
         /**
@@ -7413,6 +7444,7 @@
             var frame = _this.getFrame();
             frame--;
             _this.setNextFrame(frame);
+            _this.stop();
         },
 
         /**
@@ -7762,7 +7794,9 @@
             }
 
             if (version > 4) {
-                if (!(name in window)) {
+                if (name in window) {
+                    return window[name];
+                } else {
                     return this.getMovieClip(name);
                 }
             }
@@ -8110,9 +8144,11 @@
                 }
 
                 var tag = frameTags[depth];
-                if (tag instanceof MovieClip) {
-                    tag.addActions();
+                if (!(tag instanceof MovieClip)) {
+                    continue;
                 }
+
+                tag.addActions();
             }
 
             if (_this.isAction) {
@@ -8570,7 +8606,6 @@
             }
 
             if (_this.getNextFrame() > 0
-                //&& !_this.stopFlag
                 && (length == 0 || _this.getFrame() == _this.getTotalFrames())
             ) {
                 _this.putFrame();
@@ -9873,16 +9908,12 @@
         touchActions = [];
         actions = [];
 
-        var _action = action;
         var mc = player.parent;
+
         mc.addFrameTags();
-        mc.addActions();
-        _action();
+        executeAction(mc);
 
-        mc.actionDiff();
-        _action();
-
-        actions = [];
+        // render
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
 
         deleteNode();
@@ -9901,22 +9932,40 @@
      */
     function buffer()
     {
-        var _action = action;
         var mc = player.parent;
+
+        executeAction(mc);
+
         mc.putFrame();
-        _action();
-
         mc.addFrameTags();
-        mc.addActions();
-        _action();
 
-        mc.actionDiff();
-        _action();
+        executeAction(mc);
 
-        actions = [];
         buttonHits = [];
         clearPre();
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
+    }
+
+    /**
+     * executeAction
+     * @param mc
+     */
+    function executeAction(mc)
+    {
+        buttonAction();
+
+        var _action = action;
+
+        // init action
+        mc.addActions();
+        _action();
+
+        // action loop
+        mc.actionDiff();
+        while (actions.length) {
+            _action();
+            mc.actionDiff();
+        }
     }
 
     /**
@@ -9924,15 +9973,6 @@
      */
     function action()
     {
-        var length = touchActions.length;
-        for (var i = 0; i < length; i++) {
-            var obj = touchActions[i];
-            var as = obj.as;
-            var mc = obj.mc;
-            as.execute(mc, true);
-        }
-        touchActions = [];
-
         var length = actions.length;
         for (var i = 0; i < length; i++) {
             if (!(i in actions)) {
@@ -9949,9 +9989,28 @@
                 }
                 as[idx].execute(mc);
             }
-
-            delete actions[i];
         }
+        actions  = [];
+    }
+
+    /**
+     * buttonAction
+     */
+    function buttonAction()
+    {
+        var length = touchActions.length;
+        for (var i = 0; i < length; i++) {
+            if (!(i in touchActions)) {
+                continue;
+            }
+
+            var obj = touchActions[i];
+            var as = obj.as;
+            var mc = obj.mc;
+            as.execute(mc);
+        }
+
+        touchActions = [];
     }
 
     /*
@@ -9975,19 +10034,61 @@
     }
 
     /**
-     * keyPressAction
+     * keyAction
      * @param event
      */
-    function keyPressAction(event)
+    function keyAction(event)
     {
         var keyCode = event.keyCode;
         var len = buttonHits.length;
+        var isEnd = false;
+
+        if (96 <= keyCode && keyCode <= 105) {
+            var n = keyCode - 96;
+            switch (n) {
+                case 0:
+                    keyCode = 48;
+                    break;
+                case 1:
+                    keyCode = 49;
+                    break;
+                case 2:
+                    keyCode = 50;
+                    break;
+                case 3:
+                    keyCode = 51;
+                    break;
+                case 4:
+                    keyCode = 52;
+                    break;
+                case 5:
+                    keyCode = 53;
+                    break;
+                case 6:
+                    keyCode = 54;
+                    break;
+                case 7:
+                    keyCode = 55;
+                    break;
+                case 8:
+                    keyCode = 56;
+                    break;
+                case 9:
+                    keyCode = 57;
+                    break;
+            }
+        }
+
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
             }
 
             var hitObj = buttonHits[i];
+            if (hitObj == null) {
+                continue;
+            }
+
             var char = character[hitObj.characterId];
             if (char.actions == undefined) {
                 continue;
@@ -10001,13 +10102,58 @@
                 }
 
                 var cond = actions[idx];
-                if (cond.CondKeyPress != keyCode) {
+                var CondKeyPress = cond.CondKeyPress;
+                switch (CondKeyPress) {
+                    case 1: // left arrow
+                        CondKeyPress = 37;
+                        break;
+                    case 2: // right arrow
+                        CondKeyPress = 39;
+                        break;
+                    case 3: // home
+                        CondKeyPress = 36;
+                        break;
+                    case 4: // end
+                        CondKeyPress = 35;
+                        break;
+                    case 5: // insert
+                        CondKeyPress = 45;
+                        break;
+                    case 6: // delete
+                        CondKeyPress = 46;
+                        break;
+                    case 14: // up arrow
+                        CondKeyPress = 38;
+                        break;
+                    case 15: // down arrow
+                        CondKeyPress = 40;
+                        break;
+                    case 16: // page up
+                        CondKeyPress = 33;
+                        break;
+                    case 17: // page down
+                        CondKeyPress = 34;
+                        break;
+                    case 18: // tab
+                        CondKeyPress = 9;
+                        break;
+                    case 19: // escape
+                        CondKeyPress = 27;
+                        break;
+                }
+
+                if (CondKeyPress != keyCode) {
                     continue;
                 }
 
                 var mc = hitObj.parent;
                 var as = cond.ActionScript;
                 touchActions[touchActions.length] = {as: as, mc: mc};
+                isEnd = true;
+                break;
+            }
+
+            if (isEnd) {
                 break;
             }
         }
@@ -10047,6 +10193,10 @@
             }
 
             var hitObj = buttonHits[i];
+            if (hitObj == undefined) {
+                continue;
+            }
+
             var char = character[hitObj.characterId];
             if (char.actions == undefined) {
                 continue;
@@ -10107,7 +10257,7 @@
      */
     function touchMove(event)
     {
-        if (!isBtnAction && touchObj != null) {
+        if (!isTouchEvent && touchObj != null) {
             event.preventDefault();
             touchStart(event);
         }
@@ -10119,13 +10269,15 @@
      */
     function touchEnd(event)
     {
-        if (touchEndAction != null) {
-            touchObj.ActionScript = touchEndAction;
-            isBtnAction = false;
-            touchEvent(event);
+        if (touchObj != null && touchEndAction != null) {
+            event.preventDefault();
+            var mc = touchObj.parent;
+            touchActions[touchActions.length] = {as: touchEndAction, mc: touchObj.parent};
+            buttonAction();
             touchEndAction = null;
         }
-        isBtnAction = false;
+
+        isTouchEvent = false;
         touchObj = null;
     }
 
@@ -10136,11 +10288,10 @@
     function touchEvent(event)
     {
         event.preventDefault();
-        if (!isBtnAction && touchObj != null) {
-            isBtnAction = true;
-            var mc = touchObj.parent;
-            var as = touchObj.ActionScript;
-            touchActions[touchActions.length] = {as: as, mc: mc};
+        if (touchObj != null) {
+            isTouchEvent = true;
+            touchActions[touchActions.length] = {as: touchObj.ActionScript, mc: touchObj.parent};
+            buttonAction();
         }
     }
 
@@ -10626,15 +10777,17 @@
                 return false;
             }
 
+            // stop
             _clearInterval(intervalId);
+            isLoad = false;
+            swf2js.stop();
+
             var mc = player.parent;
             mc.reset(true, 1);
             loaded();
 
             var xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open(
-                'POST', path
-            );
+            xmlHttpRequest.open('POST', path);
             xmlHttpRequest.setRequestHeader(
                 'Content-Type',
                 'application/x-www-form-urlencoded'
@@ -10651,6 +10804,7 @@
                     var status = xmlHttpRequest.status;
                     if (status == 200) {
                         alert('OUTPUT SUCCESS');
+                        return true;
                     } else {
                         alert('[ERROR] HTTP STATUS: '+ status);
                     }
