@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.14)
+ * swf2js (version 0.2.15)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -2633,7 +2633,6 @@
                     var fCArray = obj.fArray;
                     var length = fCArray.length;
                     var cmd = '';
-                    //cmd += 'ctx.lineWidth='+ obj.Width +';';
                     cmd += 'ctx.lineCap="round";';
                     cmd += 'ctx.lineJoin="round";';
                     for (var i = 0; i < length; i++) {
@@ -2646,10 +2645,11 @@
                             cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
                         } else if (value == 'quadraticCurveTo') {
                             cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                        } else {
+                        } else if (value == 'moveTo') {
                             cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
                         }
                     }
+
                     obj.cmd = cmd;
 
                     // いらない情報を削除
@@ -2802,7 +2802,7 @@
                                     cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
                                 } else if (value == 'quadraticCurveTo') {
                                     cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                                } else {
+                                } else if (value == 'moveTo') {
                                     cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
                                 }
                             }
@@ -5353,8 +5353,8 @@
                             pBitio.setOffset(0, 0);
 
                             var frame = _floor(pBitio.getUI16()) + 1;
+                            movieClip.stop();
                             movieClip.setNextFrame(frame);
-                            movieClip.stopFlag = true;
                         }
 
                         break;
@@ -5438,7 +5438,7 @@
                             var label = pBitio.getDataUntil("\0");
                             var frame = movieClip.getLabel(label);
 
-                            movieClip.stopFlag = true;
+                            movieClip.stop();
                             if (typeof frame == 'number') {
                                 movieClip.setNextFrame(frame);
                             }
@@ -5557,7 +5557,6 @@
                         if (_isNaN(b)) {
                             b = 0;
                         }
-
                         stack[stack.length] = b-a;
 
                         break;
@@ -6245,8 +6244,6 @@
                                 parent = player.parent;
                             }
                             cloneMc.setParent(parent);
-                            cloneMc.setFrame(1);
-                            cloneMc.setNextFrame(1);
                             cloneMc.setName(target);
                             cloneMc.setLevel(depth);
 
@@ -6303,7 +6300,6 @@
 
                             cloneMc.reset(true, 1);
                             cloneMc.addFrameTags();
-                            //cloneMc.addActions();
                         }
 
                         break;
@@ -6330,6 +6326,8 @@
                                     delete cTags[frame][depth];
                                 }
                             }
+
+                            parent.addFrameTags();
                         }
 
                         break;
@@ -7069,7 +7067,6 @@
         // 判定用
         this.stopFlag = false;
         this.isAction = true;
-        this.isActionWait = false;
         this.isButtonRemove = false;
         this._nextFrame = 0;
 
@@ -7361,19 +7358,7 @@
                 }
             }
 
-            if (_this.getNextFrame() > 0) {
-                var frame = _this.getNextFrame();
-                var frameCount = _this.getTotalFrames();
-                if (frame > frameCount) {
-                    frame = frameCount;
-                } else if (frame <= 0) {
-                    frame = 1;
-                }
-
-                _this.reset(false, frame);
-                _this.remove();
-                _this.isActionWait = true;
-            }
+            _this._nextFrame = 0;
         },
 
         /**
@@ -7415,7 +7400,9 @@
                 }
 
                 _this.setFrame(frame);
-                _this.setNextFrame(0);
+                if (_this.getNextFrame() > 0) {
+                    _this._nextFrame = 0;
+                }
 
                 // remove
                 _this.remove();
@@ -7429,7 +7416,6 @@
         {
             var _this = this;
             var frame = _this.getFrame();
-            var frameCount = _this.getTotalFrames();
             frame++;
             _this.setNextFrame(frame);
             _this.stop();
@@ -7480,7 +7466,48 @@
          */
         setNextFrame: function(frame)
         {
-            this._nextFrame = frame;
+            var _this = this;
+            if (_this.getFrame() != frame) {
+
+                _this.isAction = true;
+                if (frame > _this.getTotalFrames()) {
+                    frame = _this.getTotalFrames();
+                    _this.isAction = false;
+                }
+
+                var addTags = _this.getAddTags();
+                if (addTags != undefined && frame in _this.addTags) {
+                    var nextAddTags = _this.addTags[frame];
+                    var length = _max(addTags.length, nextAddTags.length);
+
+                    for (var depth = 1; depth < length; depth++) {
+                        if (!(depth in addTags) && !(depth in nextAddTags)) {
+                            continue;
+                        }
+
+                        var obj = addTags[depth];
+                        if (!(obj instanceof MovieClip)) {
+                            continue;
+                        }
+
+                        if (depth in nextAddTags) {
+                            var nextObj = nextAddTags[depth];
+                            if (!(nextObj instanceof MovieClip)) {
+                                obj.reset(true, 1);
+                            } else if (nextObj.instanceId != obj.instanceId) {
+                                obj.reset(true, 1);
+                            }
+                        } else {
+                            obj.reset(true, 1);
+                        }
+                    }
+                }
+
+                _this._nextFrame = frame;
+                _this.setFrame(frame);
+                _this.remove();
+                _this.addFrameTags();
+            }
         },
 
         /**
@@ -8066,7 +8093,7 @@
                                 if (obj instanceof MovieClip) {
                                     // loopは無視
                                     if ((!isRemove && tag.Ratio == undefined)
-                                        || (tag.Ratio < resetFrame && obj.getTotalFrames() > resetFrame)
+                                        || tag.Ratio <= resetFrame
                                     ) {
                                         continue;
                                     }
@@ -8081,11 +8108,7 @@
                                             _clone(tag._ColorTransform);
                                     }
 
-                                    if (obj.getTotalFrames() > 1) {
-                                        obj.play();
-                                        obj.setVisible(1);
-                                        obj.reset(isRemove, 1);
-                                    }
+                                    obj.reset(isRemove, 1);
                                 }
                             }
                         }
@@ -8096,11 +8119,38 @@
             if (isRemove) {
                 _this.play();
                 _this.setVisible(1);
+                _this.setAlpha(100);
             }
 
             _this.setFrame(resetFrame);
             _this.isAction = true;
             _this.soundStopFlag = false;
+        },
+
+        /**
+         * eventDispatcher
+         */
+        eventDispatcher: function()
+        {
+            var _this = this;
+            _this.dispatchEvent('onEnterFrame');
+
+            var addTags = _this.getAddTags();
+            if (addTags != undefined) {
+                var length = addTags.length;
+                for (;length--;) {
+                    if (!(length in addTags)) {
+                        continue;
+                    }
+
+                    var obj = addTags[length];
+                    if (obj instanceof MovieClip) {
+                        obj.eventDispatcher();
+                    } else if (obj.characters instanceof Array) {
+                        _this.btnCallback(obj, _this.eventDispatcher);
+                    }
+                }
+            }
         },
 
         /**
@@ -8455,7 +8505,6 @@
             if (width < 0) {
                 width *= -1;
             }
-
             return width;
         },
 
@@ -8583,38 +8632,6 @@
         },
 
         /**
-         * actionDiff
-         */
-        actionDiff: function()
-        {
-            var _this = this;
-            var frameTags = _this.getFrameTags();
-            var length = frameTags.length;
-            _this.dispatchEvent('onEnterFrame');
-
-            for (var depth = 1; depth < length; depth++) {
-                if (!(depth in frameTags)) {
-                    continue;
-                }
-
-                var obj = frameTags[depth];
-                if (obj instanceof MovieClip) {
-                    obj.actionDiff();
-                } else if (obj.characters instanceof Array) {
-                    _this.btnCallback(obj, _this.actionDiff);
-                }
-            }
-
-            if (_this.getNextFrame() > 0
-                && (length == 0 || _this.getFrame() == _this.getTotalFrames())
-            ) {
-                _this.putFrame();
-                _this.addFrameTags();
-                _this.addActions();
-            }
-        },
-
-        /**
          * getActions
          * @param frame
          * @returns {*}
@@ -8704,10 +8721,6 @@
                     // _alpha or _visible
                     if (obj.getAlpha() == 0 || obj.getVisible() == 0) {
                         continue;
-                    }
-
-                    if (obj.getName() == 'hiru') {
-                        //console.log(obj.getAlpha())
                     }
 
                     obj.render(ctx, renderMatrix, renderColorTransform);
@@ -9913,6 +9926,9 @@
         mc.addFrameTags();
         executeAction(mc);
 
+        mc.eventDispatcher();
+        executeAction(mc);
+
         // render
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
 
@@ -9934,15 +9950,18 @@
     {
         var mc = player.parent;
 
-        executeAction(mc);
+        buttonAction(mc);
 
         mc.putFrame();
         mc.addFrameTags();
 
         executeAction(mc);
+        mc.eventDispatcher();
+        executeAction(mc);
 
         buttonHits = [];
         clearPre();
+        mc.putNextFrame();
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
     }
 
@@ -9952,8 +9971,6 @@
      */
     function executeAction(mc)
     {
-        buttonAction();
-
         var _action = action;
 
         // init action
@@ -9961,10 +9978,10 @@
         _action();
 
         // action loop
-        mc.actionDiff();
+        mc.addActions();
         while (actions.length) {
             _action();
-            mc.actionDiff();
+            mc.addActions();
         }
     }
 
@@ -9995,8 +10012,9 @@
 
     /**
      * buttonAction
+     * @param mc
      */
-    function buttonAction()
+    function buttonAction(mc)
     {
         var length = touchActions.length;
         for (var i = 0; i < length; i++) {
@@ -10006,8 +10024,11 @@
 
             var obj = touchActions[i];
             var as = obj.as;
-            var mc = obj.mc;
-            as.execute(mc);
+            as.execute(obj.mc);
+        }
+
+        if (length) {
+            executeAction(mc);
         }
 
         touchActions = [];
@@ -10095,7 +10116,7 @@
             }
 
             var actions = char.actions;
-            var aLen = actions.length
+            var aLen = actions.length;
             for (var idx = 0; idx < aLen; idx++) {
                 if (!(idx in actions)) {
                     continue;
@@ -10271,10 +10292,10 @@
     {
         if (touchObj != null && touchEndAction != null) {
             event.preventDefault();
-            var mc = touchObj.parent;
-            touchActions[touchActions.length] = {as: touchEndAction, mc: touchObj.parent};
-            buttonAction();
-            touchEndAction = null;
+            touchActions[touchActions.length] = {
+                as: touchEndAction,
+                mc: touchObj.parent
+            };
         }
 
         isTouchEvent = false;
@@ -10290,8 +10311,10 @@
         event.preventDefault();
         if (touchObj != null) {
             isTouchEvent = true;
-            touchActions[touchActions.length] = {as: touchObj.ActionScript, mc: touchObj.parent};
-            buttonAction();
+            touchActions[touchActions.length] = {
+                as: touchObj.ActionScript,
+                mc: touchObj.parent
+            };
         }
     }
 
@@ -10557,7 +10580,6 @@
         }
     }
 
-    var oid = 0;
     /**
      * clone
      * @param src
@@ -10583,7 +10605,6 @@
 
         var obj = {};
         execute(src, obj);
-        obj.oid = oid++;
         return obj;
     }
 

@@ -31,7 +31,7 @@ https://twitter.com/swf2js
 http://gamebiz.jp/?p=131364  
 
 
-## html
+## HTML
 ~~~
 <script type="text/javascript" src="swf2js.js"></script>
 <script type="text/javascript">
@@ -144,6 +144,11 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.15 ] Release Date: 01 Apr 2015  
+* [BUGFIX] ActionScript 'ButtonActions'  
+* [BUGFIX] render 'line'  
+
+
 --[ swf2js 0.2.14 ] Release Date: 30 Mar 2015  
 * [BUGFIX] Event 'KeyPress(PC Browser Only)'  
 * [BUGFIX] ActionScript(SWF5) 'CallMethod'  
