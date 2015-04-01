@@ -572,7 +572,7 @@
                     ? decodeToShiftJis(array.join(''))
                     : array.join('');
 
-                if (ret.substr(-5) == '@LFCR') {
+                if (ret.length > 5 && ret.substr(-5) == '@LFCR') {
                     ret = ret.slice(0, -5);
                 }
             } else {
@@ -6352,7 +6352,8 @@
                     // Trace
                     case 0x26:
                         var value = stack.pop();
-                        console.log('[trace] ' + value);
+                        var str = value.split('@LFCR').join('\n');
+                        console.log('[trace] ' + str);
                         break;
                     case 0x00:
                         isEnd = true;
@@ -9867,6 +9868,7 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
+        console.log(mc)
     }
 
     /**

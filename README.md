@@ -146,6 +146,7 @@ Release Notes
 ======
 --[ swf2js 0.2.15 ] Release Date: 01 Apr 2015  
 * [BUGFIX] ActionScript 'ButtonActions'  
+* [BUGFIX] ActionScript(swf4) 'Push(String)'  
 * [BUGFIX] ActionScript(swf5) 'Event Dispatcher'  
 * [BUGFIX] render 'line'  
 
