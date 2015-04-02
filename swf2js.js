@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.15)
+ * swf2js (version 0.2.16)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -1268,7 +1268,6 @@
             // 初期値設定
             if (obj instanceof MovieClip) {
                 if (!tag.PlaceFlagHasMatrix) {
-                    tag.PlaceFlagHasMatrix = 1;
                     tag.Matrix = {
                         ScaleX: 1,
                         RotateSkew0: 0,
@@ -1280,7 +1279,6 @@
                 }
 
                 if (!tag.PlaceFlagHasColorTransform) {
-                    tag.PlaceFlagHasColorTransform = 1;
                     tag.ColorTransform = {
                         RedMultiTerm: 1,
                         GreenMultiTerm: 1,
@@ -1297,13 +1295,10 @@
                 controlTag._ColorTransform = _clone(tag.ColorTransform);
             }
 
-            controlTag.HasMatrix = tag.PlaceFlagHasMatrix;
             if (tag.PlaceFlagHasMatrix) {
                 obj.matrix = _clone(tag.Matrix);
             }
 
-            controlTag.HasColorTransform =
-                tag.PlaceFlagHasColorTransform;
             if (tag.PlaceFlagHasColorTransform) {
                 obj.colorTransform = _clone(tag.ColorTransform);
             }
@@ -2248,6 +2243,9 @@
                 Ymax: shapeBounds.Ymax,
                 Ymin: shapeBounds.Ymin
             };
+
+            // canvas set
+            cacheStore.destroy(_document.createElement('canvas'));
         },
 
         /**
@@ -2268,7 +2266,6 @@
             var ControlX = 0;
             var ControlY = 0;
 
-            var canvasArray = [];
             var canvasF0Array = [[]];
             var canvasF1Array = [[]];
             var canvasLArray = [[]];
@@ -2606,7 +2603,7 @@
             _this.fillMerge(F1Array, canvasLArray);
 
             // 色で集約
-            canvasArray = _this.bundle(F0Array, F1Array);
+            var canvasArray = _this.bundle(F0Array, F1Array);
 
             // line
             var len = canvasLArray.length;
@@ -2641,15 +2638,18 @@
                         }
 
                         var value = fCArray[i];
-                        if (value == 'lineTo') {
-                            cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                        } else if (value == 'quadraticCurveTo') {
-                            cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                        } else if (value == 'moveTo') {
-                            cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                        switch (value) {
+                            case 'lineTo':
+                                cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                break;
+                            case 'quadraticCurveTo':
+                                cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
+                                break;
+                            case 'moveTo':
+                                cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                break;
                         }
                     }
-
                     obj.cmd = cmd;
 
                     // いらない情報を削除
@@ -2763,7 +2763,7 @@
                     }
                     var stackArray = fArray[s];
 
-                    if (results[s] == undefined) {
+                    if (!(s in results)) {
                         results[s] = [];
                     }
 
@@ -2775,17 +2775,19 @@
                         var array = stackArray[c];
 
                         var aLen = array.length;
+                        depth = 0;
                         for (var key = 0; key < aLen; key++) {
                             if (!(key in array)) {
                                 continue;
                             }
+
                             var obj = array[key];
                             if (obj == null) {
                                 continue;
                             }
 
                             var Depth = obj.Depth;
-                            if (results[s][Depth] == undefined) {
+                            if (!(Depth in results[s])) {
                                 results[s][Depth] = [];
                             }
 
@@ -2798,12 +2800,16 @@
                                 }
 
                                 var value = fCArray[i];
-                                if (value == 'lineTo') {
-                                    cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                                } else if (value == 'quadraticCurveTo') {
-                                    cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                                } else if (value == 'moveTo') {
-                                    cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                switch (value) {
+                                    case 'lineTo':
+                                        cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                        break;
+                                    case 'quadraticCurveTo':
+                                        cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
+                                        break;
+                                    case 'moveTo':
+                                        cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
+                                        break;
                                 }
                             }
                             obj.cmd = cmd;
@@ -6277,24 +6283,10 @@
                                 }
 
                                 var tags = cTags[frame];
-                                oTags[frame][depth] =
-                                    _clone(oTags[frame][level]);
-
+                                oTags[frame][depth] = _clone(oTags[frame][level]);
                                 tags[depth] = {
-                                    HasMatrix: 0,
-                                    HasColorTransform: 0
-                                };
-
-                                if (tags[level].HasMatrix) {
-                                    tags[depth].HasMatrix = 1;
-                                    tags[depth]._Matrix =
-                                        _clone(tags[level]._Matrix);
-                                }
-
-                                if (tags[level].HasColorTransform) {
-                                    tags[depth].HasColorTransform = 1;
-                                    tags[depth]._ColorTransform =
-                                        _clone(tags[level]._ColorTransform);
+                                    _Matrix: _clone(tags[level]._Matrix),
+                                    _ColorTransform: _clone(tags[level]._ColorTransform)
                                 }
                             }
 
@@ -6352,8 +6344,10 @@
                     // Trace
                     case 0x26:
                         var value = stack.pop();
-                        var str = value.split('@LFCR').join('\n');
-                        console.log('[trace] ' + str);
+                        if (typeof value == 'string') {
+                            value = value.split('@LFCR').join('\n');
+                        }
+                        console.log('[trace] ' + value);
                         break;
                     case 0x00:
                         isEnd = true;
@@ -7869,6 +7863,9 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
+            if (colorTransform == undefined) {
+                return colorTransform;
+            }
             var alpha = colorTransform.AlphaMultiTerm + (colorTransform.AlphaAddTerm / 255);
             return alpha * 100;
         },
@@ -7881,9 +7878,10 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
-            colorTransform.PlaceFlagHasColorTransform = 1;
-            colorTransform.AlphaMultiTerm = alpha / 100;
-            colorTransform.AlphaAddTerm = 0;
+            if (colorTransform != undefined) {
+                colorTransform.AlphaMultiTerm = alpha / 100;
+                colorTransform.AlphaAddTerm = 0;
+            }
         },
 
         /**
@@ -8094,21 +8092,13 @@
                                 if (obj instanceof MovieClip) {
                                     // loopは無視
                                     if ((!isRemove && tag.Ratio == undefined)
-                                        || tag.Ratio <= resetFrame
+                                        || tag.Ratio < resetFrame
                                     ) {
                                         continue;
                                     }
 
-                                    if (tag.HasMatrix) {
-                                        originTags[frame][depth].Matrix =
-                                            _clone(tag._Matrix);
-                                    }
-
-                                    if (tag.HasColorTransform) {
-                                        originTags[frame][depth].ColorTransform =
-                                            _clone(tag._ColorTransform);
-                                    }
-
+                                    originTags[frame][depth].Matrix = _clone(tag._Matrix);
+                                    originTags[frame][depth].ColorTransform = _clone(tag._ColorTransform);
                                     obj.reset(isRemove, 1);
                                 }
                             }
@@ -8120,7 +8110,6 @@
             if (isRemove) {
                 _this.play();
                 _this.setVisible(1);
-                _this.setAlpha(100);
             }
 
             _this.setFrame(resetFrame);
@@ -8309,16 +8298,7 @@
             if (oTags != undefined) {
                 if (_this.getLevel() in oTags) {
                     var oTag = oTags[_this.getLevel()];
-                    _this.matrix = (oTag.PlaceFlagHasMatrix)
-                        ? oTag.Matrix
-                        : {
-                            ScaleX: 1,
-                            RotateSkew0: 0,
-                            RotateSkew1: 0,
-                            ScaleY: 1,
-                            TranslateX: 0,
-                            TranslateY: 0
-                        };
+                    _this.matrix = oTag.Matrix;
                 }
             }
         },
@@ -8358,18 +8338,7 @@
             if (oTags != undefined) {
                 if (_this.getLevel() in oTags) {
                     var oTag = oTags[_this.getLevel()];
-                    _this.colorTransform = (oTag.PlaceFlagHasColorTransform)
-                        ? oTag.ColorTransform
-                        : {
-                            RedMultiTerm: 1,
-                            GreenMultiTerm: 1,
-                            BlueMultiTerm: 1,
-                            AlphaMultiTerm: 1,
-                            RedAddTerm: 0,
-                            GreenAddTerm: 0,
-                            BlueAddTerm: 0,
-                            AlphaAddTerm: 0
-                        };
+                    _this.colorTransform = oTag.ColorTransform;
                 }
             }
         },
@@ -9305,7 +9274,7 @@
             var char = character[tag.characterId];
             var data = char.data;
 
-            var inText = null;
+            var inText = data.InitialText;
             if (data.VariableName != '') {
                 var variableName = data.VariableName;
                 var splitData = variableName.split(':');
@@ -9319,17 +9288,13 @@
 
                 if (mc != null) {
                     inText = mc.getVariable(key);
-                    if (inText == undefined || inText == null) {
+                    if (inText == undefined) {
+                        inText = data.InitialText;
+                    } else if (inText == null) {
                         inText = '';
-                    } else {
-                        inText += '';
                     }
                 }
             }
-
-            inText = (inText == null && data.HasText)
-                ? data.InitialText
-                : inText;
             inText += '';
 
             if (inText == '') {
@@ -9784,7 +9749,7 @@
          * renderBoundMatrix
          * @param bound
          * @param matrix
-         * @returns {{X: *, Y: *, W: number, H: number}}
+         * @returns {{X: number, Y: number, W: number, H: number}}
          */
         renderBoundMatrix: function(bound, matrix)
         {
@@ -9868,7 +9833,6 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
-        console.log(mc)
     }
 
     /**
@@ -9923,17 +9887,21 @@
         touchActions = [];
         actions = [];
 
+        // _root
         var mc = player.parent;
 
+        // frame set
         mc.addFrameTags();
-        executeAction(mc);
 
+        // action
+        executeAction(mc);
         mc.eventDispatcher();
         executeAction(mc);
 
         // render
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
 
+        // DOM
         deleteNode();
         var div = _document.getElementById('swf2js');
         div.appendChild(context.canvas);
@@ -9941,6 +9909,7 @@
         var canvas = preContext.canvas;
         context.drawImage(canvas, 0, 0);
 
+        // start
         swf2js.play();
         intervalId = _setInterval(onEnterFrame, player.fps);
     }
@@ -9950,20 +9919,25 @@
      */
     function buffer()
     {
+         // _root
         var mc = player.parent;
 
+        // button action
         buttonAction(mc);
 
+        // next frame
         mc.putFrame();
         mc.addFrameTags();
 
+        // next frame action
         executeAction(mc);
         mc.eventDispatcher();
         executeAction(mc);
 
-        buttonHits = [];
-        clearPre();
+        // render
         mc.putNextFrame();
+        clearPre();
+        buttonHits = [];
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
     }
 
@@ -10042,7 +10016,7 @@
     function clearMain()
     {
         var canvas = context.canvas;
-        context.setTransform(1,0,0,1,0,0);
+        context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width + 1, canvas.height);
     }
 
@@ -10052,7 +10026,7 @@
     function clearPre()
     {
         var canvas = preContext.canvas;
-        preContext.setTransform(1,0,0,1,0,0);
+        preContext.setTransform(1, 0, 0, 1, 0, 0);
         preContext.clearRect(0, 0, canvas.width + 1, canvas.height);
     }
 
@@ -10661,18 +10635,28 @@
         var imgData = imageContext.getImageData(0, 0, width, height);
         var pxData = imgData.data;
         var idx = 0;
+
+        var RedMultiTerm = color.RedMultiTerm;
+        var GreenMultiTerm = color.GreenMultiTerm;
+        var BlueMultiTerm = color.BlueMultiTerm;
+        var AlphaMultiTerm = color.AlphaMultiTerm;
+        var RedAddTerm = color.RedAddTerm;
+        var GreenAddTerm = color.GreenAddTerm;
+        var BlueAddTerm = color.BlueAddTerm;
+        var AlphaAddTerm = color.AlphaAddTerm;
         for (var y = width; y--;) {
             for (var x = width; x--;) {
                 var R = pxData[idx++];
                 var G = pxData[idx++];
                 var B = pxData[idx++];
                 var A = pxData[idx++];
-                pxData[idx - 4] = _floor(_max(0, _min((R * color.RedMultiTerm) + color.RedAddTerm, 255)));
-                pxData[idx - 3] = _floor(_max(0, _min((G * color.GreenMultiTerm) + color.GreenAddTerm, 255)));
-                pxData[idx - 2] = _floor(_max(0, _min((B * color.BlueMultiTerm) + color.BlueAddTerm, 255)));
-                pxData[idx - 1] = _max(0, _min((A * color.AlphaMultiTerm) + color.AlphaAddTerm, 255));
+                pxData[idx - 4] = _floor(_max(0, _min((R * RedMultiTerm) + RedAddTerm, 255)));
+                pxData[idx - 3] = _floor(_max(0, _min((G * GreenMultiTerm) + GreenAddTerm, 255)));
+                pxData[idx - 2] = _floor(_max(0, _min((B * BlueMultiTerm) + BlueAddTerm, 255)));
+                pxData[idx - 1] = _max(0, _min((A * AlphaMultiTerm) + AlphaAddTerm, 255));
             }
         }
+
         imageContext.putImageData(imgData, 0, 0);
         return imageContext;
     }

@@ -144,6 +144,11 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.16 ] Release Date: 01 Apr 2015  
+* [BUGFIX] Tag 'DefineEditText'  
+* [BUGFIX] Property '_alpha'  
+
+
 --[ swf2js 0.2.15 ] Release Date: 01 Apr 2015  
 * [BUGFIX] ActionScript 'ButtonActions'  
 * [BUGFIX] ActionScript(swf4) 'Push(String)'  
