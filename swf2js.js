@@ -7863,9 +7863,6 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
-            if (colorTransform == undefined) {
-                return colorTransform;
-            }
             var alpha = colorTransform.AlphaMultiTerm + (colorTransform.AlphaAddTerm / 255);
             return alpha * 100;
         },
@@ -7878,10 +7875,8 @@
         {
             var _this = this;
             var colorTransform = _this.getColorTransform();
-            if (colorTransform != undefined) {
-                colorTransform.AlphaMultiTerm = alpha / 100;
-                colorTransform.AlphaAddTerm = 0;
-            }
+            colorTransform.AlphaMultiTerm = alpha / 100;
+            colorTransform.AlphaAddTerm = 0;
         },
 
         /**
@@ -8301,6 +8296,17 @@
                     _this.matrix = oTag.Matrix;
                 }
             }
+
+            if (_this.matrix == undefined) {
+                _this.matrix = {
+                    ScaleX: scale,
+                    RotateSkew0: 0,
+                    RotateSkew1: 0,
+                    ScaleY: scale,
+                    TranslateX: 0,
+                    TranslateY: 0
+                };
+            }
         },
 
         /**
@@ -8340,6 +8346,19 @@
                     var oTag = oTags[_this.getLevel()];
                     _this.colorTransform = oTag.ColorTransform;
                 }
+            }
+
+            if (_this.colorTransform == undefined) {
+                _this.colorTransform = {
+                    RedMultiTerm: 1,
+                    GreenMultiTerm: 1,
+                    BlueMultiTerm: 1,
+                    AlphaMultiTerm: 1,
+                    RedAddTerm: 0,
+                    GreenAddTerm: 0,
+                    BlueAddTerm: 0,
+                    AlphaAddTerm: 0
+                };
             }
         },
 
