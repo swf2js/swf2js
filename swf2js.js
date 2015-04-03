@@ -7147,6 +7147,9 @@
             for (var i = length; i--;) {
                 var as = event[name][i];
                 if (!(as instanceof ActionScript)) {
+                    if (controllerMode) {
+                        as[name].apply();
+                    }
                     continue;
                 }
                 as.execute(_this);
@@ -8085,7 +8088,7 @@
 
                                 originTags[frame][depth].Matrix = _clone(tag._Matrix);
                                 originTags[frame][depth].ColorTransform = _clone(tag._ColorTransform);
-                                obj.reset(isRemove, 1);
+                                obj.reset(true, 1);
                             }
                         }
                     }
@@ -9921,6 +9924,10 @@
         // start
         swf2js.play();
         intervalId = _setInterval(onEnterFrame, player.fps);
+
+        if (controllerMode) {
+            swf2js$controller.apply(window, [player.parent]);
+        }
     }
 
     /**
@@ -10561,10 +10568,6 @@
         if (isLoad && !player.stopFlag) {
             clearMain();
             context.drawImage(preContext.canvas, 0, 0);
-
-            if (controllerMode) {
-                swf2js$controller.apply(window, [player.parent]);
-            }
             _setTimeout(buffer, 0);
         }
     }

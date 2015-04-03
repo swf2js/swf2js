@@ -278,6 +278,39 @@ movieClip.previousFrame();
 ~~~
 
 
+# Event Dispatch  
+
+
+## addEvent
+
+
+##### *Parameters*  
+*name*: string event name  
+*target*: object  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.addEvent(name, this);
+~~~
+
+
+## delEvent
+
+
+##### *Parameters*  
+*name*: string event name  
+*target*: object  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.delEvent(name, this);
+~~~
+
+
 ## TODO
 
 ##### *ActionScript*  

@@ -83,12 +83,27 @@
  * var movieClip = _root.getMovieClip(path);
  * movieClip.previousFrame();
  *
+ *********************
+ * ¡Event Dispatch
+ *********************
+ * žaddEvent
+ * @param string event name
+ * @param object this
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.addEvent(name, this);
+ *
+ * ždelEvent
+ * @param string event name
+ * @param object this
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.delEvent(name, this);
+ *
  * @param MovieClip _root
  * @constructor
  */
 swf2js$controller = function(_root)
 {
-//    // sample code
+    // sample code
 //    var mc = _root.getMovieClip('/');
 //    if (mc) {
 //        if (mc.getProperty('_currentframe') > 3) {
@@ -97,4 +112,20 @@ swf2js$controller = function(_root)
 //            mc.gotoAndPlay(1);
 //        }
 //    }
+
+//    mc.addEvent('onEnterFrame', this);
+//    this.onEnterFrame = function()
+//    {
+//        mc.delEvent('onEnterFrame', this);
+//        mc.gotoAndPlay(3);
+//    }
+
+//    var mc = _root.getMovieClip('/c0');
+//    mc.addEvent('originFunction', this);
+//    this.originFunction = function()
+//    {
+//        mc.delEvent('originFunction', this);
+//        mc.gotoAndStop(3);
+//    }
+
 }
