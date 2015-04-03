@@ -35,6 +35,7 @@
     var _setTimeout = setTimeout;
     var _clearTimeout = clearTimeout;
     var _Date = Date;
+    var _escape = escape;
     var _decodeURIComponent = decodeURIComponent;
 
     // options
@@ -5689,7 +5690,19 @@
                     case 0x14: // StringLength
                     case 0x31: // MBStringLength
                         var string = stack.pop() + '';
-                        stack[stack.length] = string.length;
+                        var src = _escape(string.toString());
+                        var length = 0;
+                        var sLen = src.length;
+                        for(i = 0; i < sLen; i++, length++){
+                            if(src.charAt(i) == "%"){
+                                if(src.charAt(++i) == "u"){
+                                    i += 3;
+                                    length++;
+                                }
+                                i++;
+                            }
+                        }
+                        stack[stack.length] = length;
 
                         break;
                     // StringAdd
