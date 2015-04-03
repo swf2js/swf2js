@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.16)
+ * swf2js (version 0.2.17)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -43,6 +43,7 @@
     var renderMode = window.WebGLRenderingContext && _document.createElement('canvas').getContext( 'webgl' ) ? 'webgl' : '2d';
     var isSpriteSheet = false;
     var cacheSize = 73400320; // 70M
+    var controllerMode = false;
 
     // params
     var context, preContext;
@@ -7135,10 +7136,10 @@
                 var length = event[name].length;
                 for (var i = length; i--;) {
                     var obj = event[name][i];
-                    if (obj != as) {
-                        continue;
+                    if (obj == as) {
+                        event[name].splice(i, 1);
+                        break;
                     }
-                    event[name].splice(i, 1);
                 }
             }
         },
@@ -7151,7 +7152,7 @@
         {
             var _this = this;
             var event = _this.event;
-            if (name in event) {
+            for (name in event) {
                 var length = event[name].length;
                 for (var i = length; i--;) {
                     var as = event[name][i];
@@ -10571,6 +10572,10 @@
         if (isLoad && !player.stopFlag) {
             clearMain();
             context.drawImage(preContext.canvas, 0, 0);
+
+            if (controllerMode) {
+                swf2js$Controller.apply(window, [player.parent]);
+            }
             _setTimeout(buffer, 0);
         }
     }
@@ -10716,6 +10721,7 @@
                     renderMode = options.mode | renderMode;
                     isSpriteSheet = options.isSpriteSheet | false;
                     cacheSize = options.cacheSize | cacheSize;
+                    controllerMode = options.controllerMode | false;
                 }
 
                 // TODO 開発用

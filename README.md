@@ -39,6 +39,16 @@ http://gamebiz.jp/?p=131364
 </script>  
 ~~~
 
+## OPTIONS  
+~~~
+{  
+    width: int,  // default 100%
+    height: int, // default 100%
+    controllerMode: bool // default false
+}  
+~~~
+
+
 API  
 ======
 
@@ -77,19 +87,195 @@ setTimeou(swf2js.reload, 6000, 'SET SWF PATH', {OPTIONS});
 ~~~
 
 
-## OPTIONS  
+Controller API  
+======
+
+
+# HTML
 ~~~
-{  
-    width: int,  // default 100%
-    height: int, // default 100%
-}  
+<script type="text/javascript" src="controller.js"></script>
+<script type="text/javascript" src="swf2js.js"></script>
+<script type="text/javascript">
+    swf2js.load('SET SWF PATH', {controllerMode: true});
+</script>  
 ~~~
 
 
-## MEMO
+# MovieClip  
 
-動作しないswfのファイルを送って頂ければバグ改修にもなるので助かります。  
-Please send the file of swf which does not operate. A bug is fixed.  
+
+## getMovieClip
+
+
+##### *Parameters*  
+*path*: string  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+~~~
+
+
+# Property  
+
+
+##### *Property List*  
+~~~
+_x
+_y
+_xscale
+_yscale
+_currentframe
+_totalframes
+_alpha
+_visible
+_width
+_height
+_rotation
+~~~
+
+
+## getProperty
+
+
+##### *Parameters*  
+*_property*: string  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+var value = movieClip.getProperty(_property);
+~~~
+
+
+## setProperty
+
+
+##### *Parameters*  
+*_property*: string  
+*value*: mixed  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.setProperty(_property, value);
+~~~
+
+
+# Variable  
+
+
+## getVariable
+
+
+##### *Parameters*  
+*key*: string  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+var value = movieClip.getVariable(key);
+~~~
+
+
+## setVariable
+
+
+##### *Parameters*  
+*key*: string  
+*value*: mixed  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.setVariable(key, value);
+~~~
+
+
+# Action  
+
+
+## play
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.play();
+~~~
+
+
+## stop
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.stop();
+~~~
+
+
+## stopAllSounds
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.stopAllSounds();
+~~~
+
+
+## gotoAndPlay
+
+
+##### *Parameters*  
+*value*: int | string(label)  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.gotoAndPlay(value);
+~~~
+
+
+## gotoAndStop
+
+
+##### *Parameters*  
+*value*: int | string(label)  
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.gotoAndStop(value);
+~~~
+
+
+## nextFrame
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.nextFrame();
+~~~
+
+
+## previousFrame
+
+
+##### *Example*  
+~~~
+var movieClip = _root.getMovieClip(path);
+movieClip.previousFrame();
+~~~
 
 
 ## TODO
@@ -144,6 +330,11 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.17 ] Release Date: 02 Apr 2015  
+* [NEW] controller.js swf control for jaavscript  
+* [NEW] Controller API
+
+
 --[ swf2js 0.2.16 ] Release Date: 02 Apr 2015  
 * [BUGFIX] Tag 'DefineEditText'  
 * [BUGFIX] Property '_alpha'  
