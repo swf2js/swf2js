@@ -10574,7 +10574,7 @@
             context.drawImage(preContext.canvas, 0, 0);
 
             if (controllerMode) {
-                swf2js$Controller.apply(window, [player.parent]);
+                swf2js$controller.apply(window, [player.parent]);
             }
             _setTimeout(buffer, 0);
         }

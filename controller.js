@@ -6,7 +6,7 @@
  * ÅûgetMovieClip
  * @param string path
  * @return MovieClip | null
- * var mc = _root.getMovieClip(path);
+ * var movieClip = _root.getMovieClip(path);
  *
  *********************
  * Å°Property
@@ -14,12 +14,14 @@
  * ÅûgetProperty
  * @param string _property
  * @return mixed | undefined
- * mc.getProperty(_property);
+ * var movieClip = _root.getMovieClip(path);
+ * var value = movieClip.getProperty(_property);
  *
  * ÅûsetProperty
  * @param string _property
  * @param mixed value
- * mc.setProperty(_property, value);
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.setProperty(_property, value);
  *
  * Å•_property List
  * _x
@@ -39,43 +41,52 @@
  *********************
  * ÅûgetVariable
  * @param mixed key
- * mc.getVariable(key);
+ * var movieClip = _root.getMovieClip(path);
+ * var value = movieClip.getVariable(key);
  *
  * ÅûsetVariable
  * @param mixed key
  * @param mixed value
- * mc.setVariable(key, value);
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.setVariable(key, value);
  *
  *********************
  * Å°Action
  *********************
  * Åûplay
- * mc.play();
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.play();
  *
  * Åûstop
- * mc.stop();
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.stop();
  *
  * ÅûstopAllSounds
- * mc.stopAllSounds();
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.stopAllSounds();
  *
  * ÅûgotoAndPlay
  * @param int | string(label) value
- * mc.gotoAndPlay(value):
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.gotoAndPlay(value):
  *
  * ÅûgotoAndStop
  * @param int | string(label) value
- * mc.gotoAndStop(value):
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.gotoAndStop(value):
  *
  * ÅûnextFrame
- * mc.nextFrame();
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.nextFrame();
  *
  * ÅûpreviousFrame
- * mc.previousFrame();
+ * var movieClip = _root.getMovieClip(path);
+ * movieClip.previousFrame();
  *
  * @param MovieClip _root
  * @constructor
  */
-swf2js$Controller = function(_root)
+swf2js$controller = function(_root)
 {
 //    // sample code
 //    var mc = _root.getMovieClip('/');
