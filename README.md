@@ -15,23 +15,13 @@ play the swf on the iPhone.
 https://swf2js.wordpress.com/  
 
 
-## Facebook  
-
-https://www.facebook.com/swf2js  
-
-
-## Twitter  
-
-https://twitter.com/swf2js
-
-
-## Game using swf2js
+## Game Using
 
 [覇者もん for GREE and Mobage]  
 http://gamebiz.jp/?p=131364  
 
 
-## HTML
+## HTML - SAMPLE CODE
 ~~~
 <script type="text/javascript" src="swf2js.js"></script>
 <script type="text/javascript">
@@ -44,7 +34,7 @@ http://gamebiz.jp/?p=131364
 {  
     width: int,  // default 100%
     height: int, // default 100%
-    controllerMode: bool // default false
+    controllerMode: bool // default false ※Controller API
 }  
 ~~~
 
@@ -57,6 +47,16 @@ https://swf2js.wordpress.com/api/
 ## Controller API  
 
 https://swf2js.wordpress.com/api/#ControllerAPI  
+
+
+## Facebook  
+
+https://www.facebook.com/swf2js  
+
+
+## Twitter  
+
+https://twitter.com/swf2js
 
 
 ## TODO
