@@ -112,12 +112,11 @@
      * CacheStore
      * @constructor
      */
-    var CacheStore = function ()
-    {
-        this.store = {};
-        this.pool = [];
-        this.size = cacheSize;
-    };
+    var CacheStore = function () {};
+
+    CacheStore.prototype.store = {};
+    CacheStore.prototype.pool = [];
+    CacheStore.prototype.size = cacheSize;
 
     /**
      * reset
@@ -417,8 +416,7 @@
      * BitIO
      * @constructor
      */
-    var BitIO = function()
-    {
+    var BitIO = function() {
         this.data = null;
         this.bit_offset = 0;
         this.byte_offset = 0;
@@ -943,10 +941,9 @@
     /**
      * SwfTag
      */
-    var SwfTag = function()
-    {
-        this.currentPosition = {x:0, y:0};
-    };
+    var SwfTag = function(){};
+
+    SwfTag.prototype.currentPosition = {x:0, y:0};
 
     /**
      * parse
@@ -7165,7 +7162,6 @@
      */
     MovieClip.prototype.getMovieClip = function(path)
     {
-        var _this = this;
         var _path = path + '';
         var splitData = _path.split('/');
         var len = splitData.length;
@@ -7175,9 +7171,6 @@
             mc = player.parent;
         }
 
-        var _getParent = _this.getParent;
-        var _getFrameTags = _this.getFrameTags;
-        var _getName = _this.getName;
         for (var i = 0; i < len; i++) {
             var name = splitData[i];
             if (name == '') {
@@ -7190,11 +7183,11 @@
             }
 
             if (name == '..') {
-                mc = _getParent.call(mc);
+                mc = mc.getParent();
                 continue;
             }
 
-            var tags = _getFrameTags.call(mc);
+            var tags = mc.getFrameTags();
             if (tags == undefined) {
                 mc = null;
                 break;
@@ -7212,7 +7205,7 @@
                     continue;
                 }
 
-                if (_getName.call(tag) == name) {
+                if (tag.getName() == name) {
                     mc = tag;
                     setTarget = true;
                     break;
@@ -8123,7 +8116,6 @@
         _this.dispatchEvent('onEnterFrame');
 
         var addTags = _this.getAddTags();
-        var _eventDispatcher = _this.eventDispatcher;
         if (addTags != undefined) {
             var length = addTags.length;
             for (;length--;) {
@@ -8133,9 +8125,9 @@
 
                 var obj = addTags[length];
                 if (obj instanceof MovieClip) {
-                    _eventDispatcher.call(obj);
+                    obj.eventDispatcher();
                 } else if (obj.characters instanceof Array) {
-                    _this.btnCallback(obj, _eventDispatcher);
+                    _this.btnCallback(obj, _this.eventDispatcher);
                 }
             }
         }
@@ -8296,19 +8288,18 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            var level = _this.getLevel();
-            if (level in oTags) {
-                var oTag = oTags[level];
+            if (_this.getLevel() in oTags) {
+                var oTag = oTags[_this.getLevel()];
                 _this.matrix = oTag.Matrix;
             }
         }
 
         if (_this.matrix == undefined) {
             _this.matrix = {
-                ScaleX: 1,
+                ScaleX: scale,
                 RotateSkew0: 0,
                 RotateSkew1: 0,
-                ScaleY: 1,
+                ScaleY: scale,
                 TranslateX: 0,
                 TranslateY: 0
             };
@@ -8348,9 +8339,8 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            var level = _this.getLevel();
-            if (level in oTags) {
-                var oTag = oTags[level];
+            if (_this.getLevel() in oTags) {
+                var oTag = oTags[_this.getLevel()];
                 _this.colorTransform = oTag.ColorTransform;
             }
         }
@@ -9049,8 +9039,9 @@
                         body += 'ctx.clip();';
                         body += 'ctx.restore();';
                     }
-                    var func = new Function('cacheStore', cacheBody + body + 'return ctx;');
-                    cache = func(cacheStore);
+
+                    var func = new Function('ctx', 'cacheStore', cacheBody + body + 'return ctx;');
+                    cache = func(ctx, cacheStore);
                     cacheStore.set(cacheKey, cache);
                 } else {
                     var func = new Function('ctx', 'cacheStore', transformBody + body + 'return null;');
