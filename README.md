@@ -111,6 +111,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.18 ] Release Date: 07 Apr 2015  
+* [BUGFIX] memory leak  
+
+
 --[ swf2js 0.2.17 ] Release Date: 03 Apr 2015  
 * [BUGFIX] ActionScript 'StringLength'  
 * [BUGFIX] ActionScript 'MBStringLength'  

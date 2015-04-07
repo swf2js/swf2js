@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.17)
+ * swf2js (version 0.2.18)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -37,6 +37,8 @@
     var _Date = Date;
     var _escape = escape;
     var _decodeURIComponent = decodeURIComponent;
+    var _drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    var _setTransform = CanvasRenderingContext2D.prototype.setTransform;
 
     // options
     var optionWidth = 0;
@@ -123,6 +125,7 @@
     CacheStore.prototype.reset = function()
     {
         var _this = this;
+        var _destroy = _this.destroy;
         for (var cacheKey in _this.store) {
             var index = cacheKey.indexOf('Bitmap');
             if (index != -1) {
@@ -134,7 +137,7 @@
                 continue;
             }
             var deleteCanvas = deleteCtx.canvas;
-            _this.destroy(deleteCanvas);
+            _destroy.call(_this, deleteCanvas);
         }
         this.store = {};
         this.size = cacheSize;
@@ -185,6 +188,7 @@
 
         // reset
         if (_this.size < 0) {
+            var _destroy = _this.destroy;
             for (var cacheKey in _this.store) {
                 var index = cacheKey.indexOf('Bitmap');
                 if (index != -1) {
@@ -198,7 +202,7 @@
 
                 var deleteCanvas = deleteCtx.canvas;
                 _this.size += (deleteCanvas.width * deleteCanvas.height);
-                _this.destroy(deleteCanvas);
+                _destroy.call(_this, deleteCanvas);
 
                 delete _this.store[cacheKey];
                 if (_this.size > 0) {
@@ -220,8 +224,7 @@
      */
     CacheStore.prototype.generateKey = function(name, id, matrix, colorTransform)
     {
-        var key = name
-            +"_"+ id;
+        var key = name +"_"+ id;
 
         if (matrix != undefined) {
             key += "_"+ matrix.ScaleX
@@ -414,15 +417,13 @@
      * BitIO
      * @constructor
      */
-    var BitIO = function(){};
-
-    /**
-     * prototype
-     */
-    BitIO.prototype.data = null;
-    BitIO.prototype.bit_offset = 0;
-    BitIO.prototype.byte_offset = 0;
-    BitIO.prototype.bit_buffer = null;
+    var BitIO = function()
+    {
+        this.data = null;
+        this.bit_offset = 0;
+        this.byte_offset = 0;
+        this.bit_buffer = null;
+    };
 
     /**
      * init
@@ -554,6 +555,7 @@
 
         var array = [];
         var ret = '';
+        var _join = Array.prototype.join;
         if (value != null) {
             for (var i = 0; i < n; i++) {
                 var code = data[bo + i];
@@ -567,8 +569,8 @@
             }
 
             ret = (isJis)
-                ? decodeToShiftJis(array.join(''))
-                : array.join('');
+                ? decodeToShiftJis(_join.call(array, ''))
+                : _join.call(array, '');
 
             if (ret.length > 5 && ret.substr(-5) == '@LFCR') {
                 ret = ret.slice(0, -5);
@@ -609,9 +611,10 @@
     {
         var value = 0;
         var _this = this;
+        var _getUIBit = _this.getUIBit;
         while (n--) {
             value <<= 1;
-            value |= _this.getUIBit();
+            value |= _getUIBit.call(_this);
         }
         return value;
     };
@@ -654,7 +657,7 @@
         var _this = this;
         _this.byteAlign();
         return _this.data[_this.byte_offset++];
-    },
+    };
 
     /**
      * 符号無し 16-bit 整数
@@ -851,9 +854,10 @@
     {
         var _this = this;
         var value = 0;
+        var _readNumber = _this.readNumber;
         for (var i = 0; i < length; i++) {
             if (_this.bit_offset == 8) {
-                _this.bit_buffer = _this.readNumber(1);
+                _this.bit_buffer = _readNumber.call(_this, 1);
                 _this.bit_offset = 0;
             }
 
@@ -939,9 +943,10 @@
     /**
      * SwfTag
      */
-    var SwfTag = function(){};
-
-    SwfTag.prototype.currentPosition = {x:0, y:0};
+    var SwfTag = function()
+    {
+        this.currentPosition = {x:0, y:0};
+    };
 
     /**
      * parse
@@ -2283,8 +2288,8 @@
             if (record.isChange) {
                 // 移動判定
                 if (record.StateMoveTo) {
-                    StartX = record.MoveX / 20;
-                    StartY = record.MoveY / 20;
+                    StartX = record.MoveX;
+                    StartY = record.MoveY;
                 } else {
                     StartX = AnchorX;
                     StartY = AnchorY;
@@ -2448,10 +2453,10 @@
                     }
                 }
             } else {
-                AnchorX  = record.AnchorX / 20;
-                AnchorY  = record.AnchorY / 20;
-                ControlX = record.ControlX / 20;
-                ControlY = record.ControlY / 20;
+                AnchorX  = record.AnchorX;
+                AnchorY  = record.AnchorY;
+                ControlX = record.ControlX;
+                ControlY = record.ControlY;
 
                 // 描画データ
                 var isCurved = record.isCurved;
@@ -2550,6 +2555,7 @@
 
         // 反転してマージ
         var len = F0Array.length;
+        var _fillReverse = _this.fillReverse;
         if (len) {
             for (var s = len; s--;) {
                 if (!(s in F1Array)) {
@@ -2578,7 +2584,7 @@
 
                         var obj = array[d];
                         if (!(d in f1Colors)) {
-                            f1Colors[d] = _this.fillReverse(obj);
+                            f1Colors[d] = _fillReverse.call(_this, obj);
                             delete F0Array[s][c][d];
                         } else {
                             delete F1Array[s][c][d];
@@ -2598,6 +2604,7 @@
 
         // line
         var len = canvasLArray.length;
+        var _buildCommand = _this.buildCommand;
         for (var s = 0; s < len; s++) {
             if (!(s in canvasArray)) {
                 canvasArray[s] = [];
@@ -2617,31 +2624,7 @@
                 if (canvasArray[s][d] == undefined) {
                     canvasArray[s][d] = [];
                 }
-
-                var fCArray = obj.fArray;
-                var length = fCArray.length;
-                var cmd = '';
-                cmd += 'ctx.lineCap="round";';
-                cmd += 'ctx.lineJoin="round";';
-                for (var i = 0; i < length; i++) {
-                    if (!(i in fCArray)) {
-                        continue;
-                    }
-
-                    var value = fCArray[i];
-                    switch (value) {
-                        case 'lineTo':
-                            cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                            break;
-                        case 'quadraticCurveTo':
-                            cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                            break;
-                        case 'moveTo':
-                            cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                            break;
-                    }
-                }
-                obj.cmd = cmd;
+                obj.cmd = _buildCommand.call(_this, obj.fArray);
 
                 // いらない情報を削除
                 delete obj.StartX;
@@ -2662,6 +2645,44 @@
     };
 
     /**
+     * buildCommand
+     * @param array
+     * @returns {Array}
+     */
+    SwfTag.prototype.buildCommand = function(array)
+    {
+        var length = array.length;
+        var cmd = [];
+        for (var i = 0; i < length; i++) {
+            if (!(i in array)) {
+                continue;
+            }
+
+            var value = array[i];
+            switch (value) {
+                case 'lineTo':
+                    cmd[cmd.length] = 1;
+                    cmd[cmd.length] = array[++i];
+                    cmd[cmd.length] = array[++i];
+                    break;
+                case 'quadraticCurveTo':
+                    cmd[cmd.length] = 2;
+                    cmd[cmd.length] = array[++i];
+                    cmd[cmd.length] = array[++i];
+                    cmd[cmd.length] = array[++i];
+                    cmd[cmd.length] = array[++i];
+                    break;
+                case 'moveTo':
+                    cmd[cmd.length] = 3;
+                    cmd[cmd.length] = array[++i];
+                    cmd[cmd.length] = array[++i];
+                    break;
+            }
+        }
+        return (window.ArrayBuffer) ? new Int16Array(cmd) : cmd;
+    };
+
+    /**
      * bundle
      * @param fill0Array
      * @param fill1Array
@@ -2669,6 +2690,7 @@
      */
     SwfTag.prototype.bundle = function(fill0Array, fill1Array)
     {
+        var _this = swftag;
         for (var r = 0; r < 2; r++) {
             if (r == 0) {
                 var fArray = fill0Array;
@@ -2721,7 +2743,6 @@
 
                         var fCArray = obj.fArray;
                         var length = fCArray.length;
-                        var text = '';
                         for (var i = 0; i < length; i++) {
                             if (!(i in fCArray)) {
                                 continue;
@@ -2730,7 +2751,6 @@
                             var baseArray = array[depth].fArray;
                             baseArray[baseArray.length] = fCArray[i];
                         }
-                        array[depth].cmd = text;
 
                         // 使ったので削除
                         fArray[s][key][d] = null;
@@ -2740,6 +2760,7 @@
         }
 
         var results = [];
+        var _buildCommand = _this.buildCommand;
         for (var r = 0; r < 2; r++) {
             if (r == 0) {
                 var fArray = fill0Array;
@@ -2781,29 +2802,7 @@
                         if (!(Depth in results[s])) {
                             results[s][Depth] = [];
                         }
-
-                        var fCArray = obj.fArray;
-                        var length = fCArray.length;
-                        var cmd = '';
-                        for (var i = 0; i < length; i++) {
-                            if (!(i in fCArray)) {
-                                continue;
-                            }
-
-                            var value = fCArray[i];
-                            switch (value) {
-                                case 'lineTo':
-                                    cmd += 'ctx.lineTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                                    break;
-                                case 'quadraticCurveTo':
-                                    cmd += 'ctx.quadraticCurveTo('+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +','+ fCArray[++i] +');';
-                                    break;
-                                case 'moveTo':
-                                    cmd += 'ctx.moveTo('+ fCArray[++i] +','+ fCArray[++i] +');';
-                                    break;
-                            }
-                        }
-                        obj.cmd = cmd;
+                        obj.cmd = _buildCommand.call(_this, obj.fArray);
 
                         var len = results[s][Depth].length;
                         results[s][Depth][len] = obj;
@@ -3360,7 +3359,7 @@
             canvas.width = width;
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
-            imageContext.drawImage(this, 0, 0);
+            _drawImage.call(imageContext, this, 0, 0);
 
             // 半透明対応
             if (BitmapAlphaData) {
@@ -5309,17 +5308,19 @@
     {
         // init action
         var characterId = mc.characterId;
-        if (characterId in initActions) {
-            initActions[characterId].execute(mc);
-        }
-
         var _this = this;
         var isEnd = false;
         var stack = [];
         var movieClip = mc;
+        var _execute = _this.execute;
 
         var pBitio = _this.pBitio;
         pBitio.setOffset(0, 0);
+
+        if (characterId in initActions) {
+            var initAction = initActions[characterId];
+            _execute.call(initAction, mc);
+        }
 
         // 開始
         _this.bitio.setOffset(0, 0);
@@ -5835,7 +5836,7 @@
                             if (as != undefined) {
                                 var len = as.length;
                                 for (var i = 0; i < len; i++) {
-                                    as[i].execute(targetMc);
+                                    _execute.call(as[i], targetMc);
                                 }
                             }
                         }
@@ -5850,7 +5851,7 @@
                         if (as != undefined) {
                             var len = as.length;
                             for (var i = 0; i < len; i++) {
-                                as[i].execute(movieClip);
+                                _execute.call(as[i], movieClip);
                             }
                         }
                     }
@@ -6502,7 +6503,7 @@
                                     as.params[obj.register] = obj.value;
                                 }
 
-                                as.execute(targetMc);
+                                _execute.call(as, targetMc);
                             });
 
                             var ret = window[FunctionName].apply(window, params);
@@ -6526,7 +6527,7 @@
                                     as.params[obj.register] = obj.value;
                                 }
 
-                                as.execute(movieClip);
+                                _execute.call(as, movieClip);
                             }
                         }
                     }
@@ -7164,6 +7165,7 @@
      */
     MovieClip.prototype.getMovieClip = function(path)
     {
+        var _this = this;
         var _path = path + '';
         var splitData = _path.split('/');
         var len = splitData.length;
@@ -7173,6 +7175,9 @@
             mc = player.parent;
         }
 
+        var _getParent = _this.getParent;
+        var _getFrameTags = _this.getFrameTags;
+        var _getName = _this.getName;
         for (var i = 0; i < len; i++) {
             var name = splitData[i];
             if (name == '') {
@@ -7185,11 +7190,11 @@
             }
 
             if (name == '..') {
-                mc = mc.getParent();
+                mc = _getParent.call(mc);
                 continue;
             }
 
-            var tags = mc.getFrameTags();
+            var tags = _getFrameTags.call(mc);
             if (tags == undefined) {
                 mc = null;
                 break;
@@ -7207,7 +7212,7 @@
                     continue;
                 }
 
-                if (tag.getName() == name) {
+                if (_getName.call(tag) == name) {
                     mc = tag;
                     setTarget = true;
                     break;
@@ -7332,6 +7337,7 @@
     {
         var _this = this;
         var frameTags = _this.getFrameTags();
+        var _putNextFrame = _this.putNextFrame;
         var length = frameTags.length;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
@@ -7340,10 +7346,10 @@
 
             var obj = frameTags[depth];
             if (obj instanceof MovieClip) {
-                obj.putNextFrame();
+                _putNextFrame.call(obj);
             } else if (obj.characters instanceof Array) {
                 // button
-                _this.btnCallback(obj, _this.putNextFrame);
+                _this.btnCallback(obj, _putNextFrame);
             }
         }
 
@@ -7357,6 +7363,8 @@
     {
         var _this = this;
         var frameTags = _this.getFrameTags();
+        var _putFrame = _this.putFrame;
+        var _remove = _this.remove;
         var length = frameTags.length;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
@@ -7365,10 +7373,10 @@
 
             var obj = frameTags[depth];
             if (obj instanceof MovieClip) {
-                obj.putFrame();
+                _putFrame.call(obj);
             } else if (obj.characters instanceof Array) {
                 // button
-                _this.btnCallback(obj, _this.putFrame);
+                _this.btnCallback(obj, _putFrame);
             }
         }
 
@@ -7394,7 +7402,7 @@
             }
 
             // remove
-            _this.remove();
+            _remove.call(_this);
         }
     };
 
@@ -8115,6 +8123,7 @@
         _this.dispatchEvent('onEnterFrame');
 
         var addTags = _this.getAddTags();
+        var _eventDispatcher = _this.eventDispatcher;
         if (addTags != undefined) {
             var length = addTags.length;
             for (;length--;) {
@@ -8124,9 +8133,9 @@
 
                 var obj = addTags[length];
                 if (obj instanceof MovieClip) {
-                    obj.eventDispatcher();
+                    _eventDispatcher.call(obj);
                 } else if (obj.characters instanceof Array) {
-                    _this.btnCallback(obj, _this.eventDispatcher);
+                    _this.btnCallback(obj, _eventDispatcher);
                 }
             }
         }
@@ -8141,6 +8150,7 @@
         _this.frameTags = [];
 
         var addTags = _this.getAddTags();
+        var _addFrameTags = _this.addFrameTags;
         if (addTags != undefined) {
             var length = addTags.length;
             for (;length--;) {
@@ -8150,9 +8160,9 @@
 
                 var obj = addTags[length];
                 if (obj instanceof MovieClip) {
-                    obj.addFrameTags();
+                    _addFrameTags.call(obj);
                 } else if (obj.characters instanceof Array) {
-                    _this.btnCallback(obj, _this.addFrameTags);
+                    _this.btnCallback(obj, _addFrameTags);
                 }
             }
             _this.frameTags = addTags;
@@ -8166,6 +8176,7 @@
     {
         var _this = this;
         var frameTags = _this.getFrameTags();
+        var _addActions = _this.addActions;
         var length = frameTags.length;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
@@ -8177,7 +8188,7 @@
                 continue;
             }
 
-            tag.addActions();
+            _addActions.call(tag);
         }
 
         if (_this.isAction) {
@@ -8285,18 +8296,19 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            if (_this.getLevel() in oTags) {
-                var oTag = oTags[_this.getLevel()];
+            var level = _this.getLevel();
+            if (level in oTags) {
+                var oTag = oTags[level];
                 _this.matrix = oTag.Matrix;
             }
         }
 
         if (_this.matrix == undefined) {
             _this.matrix = {
-                ScaleX: scale,
+                ScaleX: 1,
                 RotateSkew0: 0,
                 RotateSkew1: 0,
-                ScaleY: scale,
+                ScaleY: 1,
                 TranslateX: 0,
                 TranslateY: 0
             };
@@ -8336,8 +8348,9 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            if (_this.getLevel() in oTags) {
-                var oTag = oTags[_this.getLevel()];
+            var level = _this.getLevel();
+            if (level in oTags) {
+                var oTag = oTags[level];
                 _this.colorTransform = oTag.ColorTransform;
             }
         }
@@ -8425,6 +8438,8 @@
         var Ymin = no;
 
         var tags = _this.frameTags;
+        var _getBounds = _this.getBounds;
+        var _getMatrix = _this.getMatrix;
         for (var i = tags.length; i--;) {
             if (!(i in tags)) {
                 continue;
@@ -8436,7 +8451,7 @@
             }
 
             var Matrix = (tag instanceof MovieClip)
-                ? tag.getMatrix()
+                ? _getMatrix.call(tag)
                 : tag.matrix;
 
             var matrix = (parentMatrix != undefined)
@@ -8444,7 +8459,7 @@
                 : Matrix;
 
             if (tag instanceof MovieClip) {
-                var bounds = tag.getBounds(matrix);
+                var bounds = _getBounds.call(tag, matrix);
                 if (bounds) {
                     Xmax = _max(Xmax, bounds.Xmax);
                     Xmin = _min(Xmin, bounds.Xmin);
@@ -8670,6 +8685,14 @@
             }
         }
 
+        var _render = _this.render;
+        var _renderMorphShape = _this.renderMorphShape;
+        var _renderShape = _this.renderShape;
+        var _renderButton = _this.renderButton;
+        var _renderText = _this.renderText;
+        var _renderEditText = _this.renderEditText;
+        var _getMatrix = _this.getMatrix;
+        var _getColorTransform = _this.getColorTransform;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
                 continue;
@@ -8694,11 +8717,11 @@
 
             if (obj instanceof MovieClip) {
                 var renderMatrix =
-                    _multiplicationMatrix(matrix, obj.getMatrix());
+                    _multiplicationMatrix(matrix, _getMatrix.call(obj));
 
                 var renderColorTransform = _multiplicationColor(
                     colorTransform,
-                    obj.getColorTransform()
+                    _getColorTransform.call(obj)
                 );
 
                 // _alpha or _visible
@@ -8706,7 +8729,7 @@
                     continue;
                 }
 
-                obj.render(ctx, renderMatrix, renderColorTransform);
+                _render.call(obj, ctx, renderMatrix, renderColorTransform);
             } else {
                 if (!(obj.characterId in character)) {
                     continue;
@@ -8733,28 +8756,28 @@
                     case 84: // MorphShape2
                         var controlTag = _this.getControlTag();
                         var cTag = controlTag[depth];
-                        cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, obj, cTag.Ratio);
+                        cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, cTag.Ratio);
                         break;
                     case 2:  // DefineShape
                     case 22: // DefineShape2
                     case 32: // DefineShape3
                     case 83: // DefineShape4
-                        cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, obj);
+                        cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj);
                         if (obj.isClipDepth) {
                             continue;
                         }
                         break;
                     case 7: // DefineButton
                     case 34: // DefineButton2
-                        _this.renderButton(ctx, renderMatrix, renderColorTransform, obj, depth);
+                        _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, obj, depth);
                         continue;
                         break;
                     case 11: // DefineText
                     case 33: // DefineText2
-                        cache = _this.renderText(ctx, renderMatrix, renderColorTransform, obj);
+                        cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
                         break;
                     case 37: // DefineEditText
-                        _this.renderEditText(ctx, renderMatrix, renderColorTransform, obj);
+                        _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
                         continue;
                 } //  switch
 
@@ -8763,8 +8786,8 @@
                     if (canvas.width > 0 && canvas.height > 0) {
                         var x = _ceil(cache.offsetX + renderMatrix.TranslateX - 0.5);
                         var y = _ceil(cache.offsetY + renderMatrix.TranslateY - 0.5);
-                        ctx.setTransform(1, 0, 0, 1, x, y);
-                        ctx.drawImage(canvas, 0, 0);
+                        _setTransform.call(ctx, 1, 0, 0, 1, x, y);
+                        _drawImage.call(ctx, canvas, 0, 0);
                     }
                 }
             }
@@ -8799,6 +8822,9 @@
         var cache = cacheStore.get(cacheKey);
         if (!cache || tag.isClipDepth) {
             var body = '';
+            body += 'var _lineTo = CanvasRenderingContext2D.prototype.lineTo;';
+            body += 'var _moveTo = CanvasRenderingContext2D.prototype.moveTo;';
+            body += 'var _quadraticCurveTo = CanvasRenderingContext2D.prototype.quadraticCurveTo;';
             var cacheBody = '';
             var isCache = false;
             var char = character[tag.characterId];
@@ -8838,6 +8864,7 @@
 
             var shapes = char.data;
             var shapeLength = shapes.length;
+            var _draw = _this.draw;
             for (var idx = 0; idx < shapeLength; idx++) {
                 var stack = shapes[idx];
                 var stackLength = stack.length;
@@ -8851,7 +8878,6 @@
                     for (var sKey = 0; sKey < styleLength; sKey++) {
                         var styleObj = styles[sKey];
                         var cmd = styleObj.cmd;
-
                         var styleType = styleObj.styleType;
                         var isStroke = (styleObj.Width != undefined);
 
@@ -8930,7 +8956,7 @@
                                     canvas.height = image.canvas.height;
 
                                     var imageContext = canvas.getContext("2d");
-                                    imageContext.drawImage(image.canvas, 0, 0);
+                                    _drawImage.call(imageContext, image.canvas, 0, 0);
 
                                     image = generateImageTransform(imageContext, colorTransform);
                                 } else {
@@ -8952,13 +8978,15 @@
                                 var yScale = _sqrt(matrix.ScaleY * matrix.ScaleY + matrix.RotateSkew1 * matrix.RotateSkew1);
                                 var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
                                 body += 'ctx.lineWidth = '+ lineWidth +';';
+                                body += 'ctx.lineCap="round";';
+                                body += 'ctx.lineJoin="round";';
                             } else {
                                 body += 'ctx.fillStyle = "'+ css +'";';
                             }
                         }
 
                         // draw cmd
-                        body += cmd;
+                        body += _draw.call(_this, cmd);
 
                         // グラデーション
                         if (styleType == 0x10
@@ -9072,9 +9100,13 @@
                 + -rBound.X + ','
                 + -rBound.Y
             + ');';
+            body += '_lineTo = CanvasRenderingContext2D.prototype.lineTo;';
+            body += '_moveTo = CanvasRenderingContext2D.prototype.moveTo;';
+            body += '_quadraticCurveTo = CanvasRenderingContext2D.prototype.quadraticCurveTo;';
 
             var shapes = tag.data;
             var shapeLength = shapes.length;
+            var _draw = _this.draw;
             for (var idx = 0; idx < shapeLength; idx++) {
                 var stack = shapes[idx];
                 var stackLength = stack.length;
@@ -9107,7 +9139,7 @@
 
                         // draw
                         body += 'ctx.beginPath();';
-                        body += cmd;
+                        body += _draw.call(_this, cmd);
 
                         if (isStroke) {
                             body += 'ctx.stroke();';
@@ -9156,6 +9188,9 @@
             body += 'var ctx = canvas.getContext("2d");';
             body += 'ctx.offsetX = '+ rBound.X + ';';
             body += 'ctx.offsetY = '+ rBound.Y + ';';
+            body += 'var _lineTo = CanvasRenderingContext2D.prototype.lineTo;';
+            body += 'var _moveTo = CanvasRenderingContext2D.prototype.moveTo;';
+            body += 'var _quadraticCurveTo = CanvasRenderingContext2D.prototype.quadraticCurveTo;';
 
             var TextRecords = char.TextRecords;
             var len = TextRecords.length;
@@ -9241,7 +9276,9 @@
      * renderGlyph
      * @param records
      */
-    MovieClip.prototype.renderGlyph = function (records) {
+    MovieClip.prototype.renderGlyph = function (records)
+    {
+        var _this = this;
         var body = '';
         if (records.data == undefined) {
             records.data = swftag.vectorToCanvas(records);
@@ -9249,6 +9286,7 @@
 
         var shapes = records.data;
         var shapeLength = shapes.length;
+        var _draw = _this.draw;
         for (var idx = 0; idx < shapeLength; idx++) {
             var stack = shapes[idx];
             var stackLength = stack.length;
@@ -9265,7 +9303,7 @@
 
                     // draw
                     body += 'ctx.beginPath();';
-                    body += cmd;
+                    body += _draw.call(_this, cmd);
                     body += 'ctx.fill();';
                 }
             }
@@ -9338,6 +9376,9 @@
                 + -rBound.X + ','
                 + -rBound.Y
             + ');';
+            body += 'var _lineTo = CanvasRenderingContext2D.prototype.lineTo;';
+            body += 'var _moveTo = CanvasRenderingContext2D.prototype.moveTo;';
+            body += 'var _quadraticCurveTo = CanvasRenderingContext2D.prototype.quadraticCurveTo;';
 
             // border
             var W = _ceil(data.Bound.Xmax - data.Bound.Xmin);
@@ -9537,8 +9578,8 @@
         var canvas = cache.canvas;
         var x = _ceil(rBound.X + matrix.TranslateX - 0.5);
         var y = _ceil(rBound.Y + matrix.TranslateY - 0.5);
-        ctx.setTransform(1, 0, 0, 1, x, y);
-        ctx.drawImage(canvas, 0, 0);
+        _setTransform.call(ctx, 1, 0, 0, 1, x, y);
+        _drawImage.call(ctx, canvas, 0, 0);
     };
 
     /**
@@ -9580,6 +9621,12 @@
             }
         }
 
+        var _render = _this.render;
+        var _renderMorphShape = _this.renderMorphShape;
+        var _renderShape = _this.renderShape;
+        var _renderButton = _this.renderButton;
+        var _renderText = _this.renderText;
+        var _renderEditText = _this.renderEditText;
         var length = characters.length;
         for (var d = 1; d < length; d++) {
             if (!(d in characters)) {
@@ -9666,7 +9713,7 @@
 
                     if (tagChar instanceof MovieClip) {
                         tagChar.isButtonRemove = true;
-                        tagChar.render(ctx, renderMatrix, renderColorTransform);
+                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
                     } else {
                         var obj = character[tagChar.characterId];
                         switch (obj.tagType) {
@@ -9674,34 +9721,34 @@
                             case 84: // MorphShape2
                                 var controlTag = _this.getControlTag();
                                 var cTag = controlTag[depth];
-                                cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
                                 break;
                             case 2:  // DefineShape
                             case 22: // DefineShape2
                             case 32: // DefineShape3
                             case 83: // DefineShape4
-                                cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
+                                cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 if (obj.isClipDepth) {
                                     continue;
                                 }
                                 break;
                             case 7: // DefineButton
                             case 34: // DefineButton2
-                                _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 continue;
                             case 11: // DefineText
                             case 33: // DefineText2
-                                cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 break;
                             case 37: // DefineEditText
-                                _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 continue;
                                 break;
                         } //  switch
                     }
                 } else if (btnChar.ButtonStateUp) {
                     if (tagChar instanceof MovieClip) {
-                        tagChar.render(ctx, renderMatrix, renderColorTransform);
+                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
                     } else {
                         var obj = character[tagChar.characterId];
                         switch (obj.tagType) {
@@ -9709,28 +9756,28 @@
                             case 84: // MorphShape2
                                 var controlTag = _this.getControlTag();
                                 var cTag = controlTag[depth];
-                                cache = _this.renderMorphShape(ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
                                 break;
                             case 2:  // DefineShape
                             case 22: // DefineShape2
                             case 32: // DefineShape3
                             case 83: // DefineShape4
-                                cache = _this.renderShape(ctx, renderMatrix, renderColorTransform, tagChar);
+                                cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 if (obj.isClipDepth) {
                                     continue;
                                 }
                                 break;
                             case 7: // DefineButton
                             case 34: // DefineButton2
-                                _this.renderButton(ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 continue
                                 break;
                             case 11: // DefineText
                             case 33: // DefineText2
-                                cache = _this.renderText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 break;
                             case 37: // DefineEditText
-                                _this.renderEditText(ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 continue;
                                 break;
                         } //  switch
@@ -9750,12 +9797,37 @@
                     if (canvas.width > 0 && canvas.height > 0) {
                         var x = _ceil(cache.offsetX + renderMatrix.TranslateX - 0.5);
                         var y = _ceil(cache.offsetY + renderMatrix.TranslateY - 0.5);
-                        ctx.setTransform(1, 0, 0, 1, x, y);
-                        ctx.drawImage(canvas, 0, 0);
+                        _setTransform.call(ctx, 1, 0, 0, 1, x, y);
+                        _drawImage.call(ctx,canvas, 0, 0);
                     }
                 }
             }
         }
+    };
+
+    /**
+     * draw
+     * @param cmd
+     * @returns {string}
+     */
+    MovieClip.prototype.draw = function(cmd)
+    {
+        var body = '';
+        var length = cmd.length;
+        for (var i = 0; i < length; i++) {
+            switch (cmd[i]) {
+                case 1:
+                    body += '_lineTo.call(ctx, '+ cmd[++i]/20 +', '+ cmd[++i]/20 +');';
+                    break;
+                case 2:
+                    body += '_quadraticCurveTo.call(ctx, '+ cmd[++i]/20 +', '+ cmd[++i]/20 +', '+ cmd[++i]/20 +', '+ cmd[++i]/20 +');';
+                    break;
+                case 3:
+                    body += '_moveTo.call(ctx, '+ cmd[++i]/20 +', '+ cmd[++i]/20 +');';
+                    break;
+            }
+        }
+        return body;
     };
 
     /**
@@ -9919,14 +9991,14 @@
         div.appendChild(context.canvas);
 
         var canvas = preContext.canvas;
-        context.drawImage(canvas, 0, 0);
+        _drawImage.call(context, canvas, 0, 0);
 
         // start
         swf2js.play();
         intervalId = _setInterval(onEnterFrame, player.fps);
 
         if (controllerMode) {
-            swf2js$controller.apply(window, [player.parent]);
+            swf2js$controller.call(window, player.parent);
         }
     }
 
@@ -9964,16 +10036,17 @@
     function executeAction(mc)
     {
         var _action = action;
+        var _addActions = mc.addActions;
 
         // init action
-        mc.addActions();
+        _addActions.call(mc);
         _action();
 
         // action loop
-        mc.addActions();
+        _addActions.call(mc);
         while (actions.length) {
             _action();
-            mc.addActions();
+            _addActions.call(mc);
         }
     }
 
@@ -10567,7 +10640,7 @@
     {
         if (isLoad && !player.stopFlag) {
             clearMain();
-            context.drawImage(preContext.canvas, 0, 0);
+            _drawImage.call(context, preContext.canvas, 0, 0);
             _setTimeout(buffer, 0);
         }
     }
