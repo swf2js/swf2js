@@ -71,8 +71,8 @@
     var _navigator = window.navigator;
     var ua = _navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
-    var isIOs = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
-    var isTouch = (isAndroid || isIOs);
+    var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
+    var isTouch = (isAndroid || isiOS);
     var isTouchEvent = false;
     var isLoad = false;
     var jpegTables = null;
@@ -112,11 +112,12 @@
      * CacheStore
      * @constructor
      */
-    var CacheStore = function () {};
-
-    CacheStore.prototype.store = {};
-    CacheStore.prototype.pool = [];
-    CacheStore.prototype.size = cacheSize;
+    var CacheStore = function ()
+    {
+        this.store = {};
+        this.pool = [];
+        this.size = cacheSize;
+    };
 
     /**
      * reset
@@ -416,7 +417,8 @@
      * BitIO
      * @constructor
      */
-    var BitIO = function() {
+    var BitIO = function()
+    {
         this.data = null;
         this.bit_offset = 0;
         this.byte_offset = 0;
@@ -8116,6 +8118,7 @@
         _this.dispatchEvent('onEnterFrame');
 
         var addTags = _this.getAddTags();
+        var _eventDispatcher = _this.eventDispatcher;
         if (addTags != undefined) {
             var length = addTags.length;
             for (;length--;) {
@@ -8125,9 +8128,9 @@
 
                 var obj = addTags[length];
                 if (obj instanceof MovieClip) {
-                    obj.eventDispatcher();
+                    _eventDispatcher.call(obj);
                 } else if (obj.characters instanceof Array) {
-                    _this.btnCallback(obj, _this.eventDispatcher);
+                    _this.btnCallback(obj, _eventDispatcher);
                 }
             }
         }
@@ -8288,8 +8291,9 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            if (_this.getLevel() in oTags) {
-                var oTag = oTags[_this.getLevel()];
+            var level = _this.getLevel();
+            if (level in oTags) {
+                var oTag = oTags[level];
                 _this.matrix = oTag.Matrix;
             }
         }
@@ -8339,8 +8343,9 @@
         var parent = _this.getParent();
         var oTags = parent.getOriginTag();
         if (oTags != undefined) {
-            if (_this.getLevel() in oTags) {
-                var oTag = oTags[_this.getLevel()];
+            var level = _this.getLevel();
+            if (level in oTags) {
+                var oTag = oTags[level];
                 _this.colorTransform = oTag.ColorTransform;
             }
         }
@@ -8594,7 +8599,7 @@
         var _this = this;
         var Matrix = _this.getMatrix();
         return _atan2(Matrix.RotateSkew0, Matrix.ScaleX) * 180 / _PI;
-    },
+    };
 
     /**
      * setRotation
@@ -8855,6 +8860,7 @@
             var shapes = char.data;
             var shapeLength = shapes.length;
             var _draw = _this.draw;
+            var _generateColorTransform = _this.generateColorTransform;
             for (var idx = 0; idx < shapeLength; idx++) {
                 var stack = shapes[idx];
                 var stackLength = stack.length;
@@ -8896,7 +8902,7 @@
                             for (var rIdx = 0; rIdx < rLength; rIdx++) {
                                 var record = records[rIdx];
                                 var color = record.Color;
-                                color = _this.generateColorTransform(color, colorTransform);
+                                color = _generateColorTransform.call(_this, color, colorTransform);
                                 body += 'grad.addColorStop('
                                     + record.Ratio + ','
                                     + '"rgba('
@@ -8909,7 +8915,7 @@
                             body += 'ctx.fillStyle = grad;';
                         } else if (styleType == 0x00) {
                             var color = styleObj.Color;
-                            color = _this.generateColorTransform(color, colorTransform);
+                            color = _generateColorTransform.call(_this, color, colorTransform);
                             css = "rgba("
                                 + color.R
                                 +", "+ color.G
@@ -9098,6 +9104,7 @@
             var shapes = tag.data;
             var shapeLength = shapes.length;
             var _draw = _this.draw;
+            var _generateColorTransform = _this.generateColorTransform;
             for (var idx = 0; idx < shapeLength; idx++) {
                 var stack = shapes[idx];
                 var stackLength = stack.length;
@@ -9114,7 +9121,7 @@
                         var isStroke = (styleObj.Width != undefined);
 
                         var color = styleObj.Color;
-                        color = _this.generateColorTransform(color, colorTransform);
+                        color = _generateColorTransform.call(_this, color, colorTransform);
                         var css = "rgb("
                             + color.R
                             +", "+ color.G
@@ -9190,6 +9197,8 @@
             var YOffset = 0;
             var XOffset = 0;
             var gAdvance = 0;
+            var _generateColorTransform = _this.generateColorTransform;
+            var _renderGlyph = _this.renderGlyph;
             for (var i = 0; i < len; i++) {
                 body += 'ctx.setTransform('
                     + matrix.ScaleX + ','
@@ -9211,7 +9220,7 @@
                 // text color
                 if (textRecord.TextColor != undefined) {
                     var color = textRecord.TextColor;
-                    color = _this.generateColorTransform(color, colorTransform);
+                    color = _generateColorTransform.call(_this, color, colorTransform);
                     body += 'ctx.fillStyle = "rgb('+color.R+','+color.G+','+color.B+')";';
                     body += 'ctx.globalAlpha = '+ color.A +';';
                 }
@@ -9248,7 +9257,7 @@
                         + (Matrix.TranslateX + gAdvance + XOffset) + ','
                         + (Matrix.TranslateY + YOffset)
                     + ');';
-                    body += _this.renderGlyph(records);
+                    body += _renderGlyph.call(_this, records);
                     body += 'ctx.restore();';
 
                     XOffset += glyphEntry.GlyphAdvance;
@@ -9453,6 +9462,7 @@
                 leading += (fontData.FontAscent + fontData.FontDescent)
                     * fontScale;
                 var YOffset = (fontData.FontAscent * fontScale);
+                var _renderGlyph = _this.renderGlyph;
                 for (var i = 0; i < textLength; i++) {
                     txt = splitData[i];
 
@@ -9503,7 +9513,7 @@
                             + XOffset + ','
                             + YOffset
                         + ');';
-                        body += _this.renderGlyph(GlyphShapeTable[key]);
+                        body += _renderGlyph.call(_this, GlyphShapeTable[key]);
 
                         XOffset += FontAdvanceTable[key] * fontScale;
                     }
@@ -9618,6 +9628,7 @@
         var _renderButton = _this.renderButton;
         var _renderText = _this.renderText;
         var _renderEditText = _this.renderEditText;
+        var _getBounds = _this.getBounds;
         var length = characters.length;
         for (var d = 1; d < length; d++) {
             if (!(d in characters)) {
@@ -9656,7 +9667,7 @@
                     var hitObj = cacheStore.get(cacheKey);
                     if (hitObj == undefined) {
                         if (tagChar instanceof MovieClip) {
-                            var bounds = tagChar.getBounds(renderMatrix);
+                            var bounds = _getBounds.call(tagChar, renderMatrix);
                         } else {
                             var bounds = character[tagChar.characterId];
                         }
@@ -10724,7 +10735,7 @@
         var GreenAddTerm = color.GreenAddTerm;
         var BlueAddTerm = color.BlueAddTerm;
         var AlphaAddTerm = color.AlphaAddTerm;
-        for (var y = width; y--;) {
+        for (var y = height; y--;) {
             for (var x = width; x--;) {
                 var R = pxData[idx++];
                 var G = pxData[idx++];
