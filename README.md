@@ -111,6 +111,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.19 ] Release Date: 08 Apr 2015  
+* [BUGFIX] Tag 'DefineBitsLossLess(Android Alpha Bug)'  
+
+
 --[ swf2js 0.2.18 ] Release Date: 07 Apr 2015  
 * [BUGFIX] memory leak  
 
