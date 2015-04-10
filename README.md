@@ -34,8 +34,8 @@ http://gamebiz.jp/?p=131364
 {  
     width: int,  // default 100%
     height: int, // default 100%
-    controllerMode: bool // default false ※Controller API
-    tagId: string // tag id => <div id="●●"></div>
+    controllerMode: bool, // default false ※Controller API
+    tagId: string // tag id => <div id="●●">designate</div>
 }  
 ~~~
 
@@ -115,7 +115,7 @@ Release Notes
 --[ swf2js 0.2.20 ] Release Date: 10 Apr 2015  
 * [BUGFIX] Tag 'parseDefineEditText(HTML TEXT)'  
 * [UPDATE] refactoring rendering speed  
-* [NEW] OPTION designate  
+* [NEW] OPTION tagId  
 
 
 --[ swf2js 0.2.19 ] Release Date: 08 Apr 2015  
