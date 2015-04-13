@@ -112,6 +112,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.21 ] Release Date: 13 Apr 2015  
+* [UPDATE] refactoring rendering speed  
+
+
 --[ swf2js 0.2.20 ] Release Date: 10 Apr 2015  
 * [BUGFIX] Tag 'parseDefineEditText(HTML TEXT)'  
 * [UPDATE] refactoring rendering speed  

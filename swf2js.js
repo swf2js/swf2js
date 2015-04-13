@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.20)
+ * swf2js (version 0.2.21)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -169,21 +169,21 @@
         var key = name +"_"+ id;
 
         if (matrix != undefined) {
-            key += "_"+ matrix.ScaleX
-                +"_"+ matrix.RotateSkew0
-                +"_"+ matrix.RotateSkew1
-                +"_"+ matrix.ScaleY;
+            key += "_"+ matrix[0]
+                +"_"+ matrix[1]
+                +"_"+ matrix[2]
+                +"_"+ matrix[3];
         }
 
         if (colorTransform != undefined) {
-            key += "_"+ colorTransform.RedMultiTerm
-                +"_"+ colorTransform.GreenMultiTerm
-                +"_"+ colorTransform.BlueMultiTerm
-                +"_"+ colorTransform.AlphaMultiTerm
-                +"_"+ colorTransform.RedAddTerm
-                +"_"+ colorTransform.GreenAddTerm
-                +"_"+ colorTransform.BlueAddTerm
-                +"_"+ colorTransform.AlphaAddTerm;
+            key += "_"+ colorTransform[0]
+                +"_"+ colorTransform[1]
+                +"_"+ colorTransform[2]
+                +"_"+ colorTransform[3]
+                +"_"+ colorTransform[4]
+                +"_"+ colorTransform[5]
+                +"_"+ colorTransform[6]
+                +"_"+ colorTransform[7];
         }
 
         return key;
@@ -223,7 +223,6 @@
     var version = 0;
     var totalFrame = 0;
     var instanceId = 0;
-    var renderFunc = new Function('ctx', 'cacheStore', 'body', 'eval(body); return ctx;');
 
     // Alpha Bug
     var isAlphaBug = isAndroid;
@@ -286,18 +285,13 @@
         var containerDom = null;
         if (tagId != null) {
             containerDom = _document.getElementById(tagId);
-            if (containerDom) {
-                div = _document.createElement('div');
-                div.id = 'swf2js';
-                containerDom.appendChild(div);
+            if (!containerDom) {
+                alert('Not Found Tag Id');
+                return 0;
             }
-        }
-
-        if (!containerDom && !div) {
-            _document.open();
-            _document.write('<div id="swf2js"></div>');
-            _document.close();
-            div = _document.getElementById('swf2js');
+            div = _document.createElement('div');
+            div.id = 'swf2js';
+            containerDom.appendChild(div);
         }
 
         var parent = div.parentNode;
@@ -1302,27 +1296,11 @@
         // 初期値設定
         if (obj instanceof MovieClip) {
             if (!tag.PlaceFlagHasMatrix) {
-                tag.Matrix = {
-                    ScaleX: 1,
-                    RotateSkew0: 0,
-                    RotateSkew1: 0,
-                    ScaleY: 1,
-                    TranslateX: 0,
-                    TranslateY: 0
-                }
+                tag.Matrix = [1,0,0,1,0,0];
             }
 
             if (!tag.PlaceFlagHasColorTransform) {
-                tag.ColorTransform = {
-                    RedMultiTerm: 1,
-                    GreenMultiTerm: 1,
-                    BlueMultiTerm: 1,
-                    AlphaMultiTerm: 1,
-                    RedAddTerm: 0,
-                    GreenAddTerm: 0,
-                    BlueAddTerm: 0,
-                    AlphaAddTerm: 0
-                };
+                tag.ColorTransform = [1,1,1,1,0,0,0,0];
             }
 
             controlTag._Matrix = _clone(tag.Matrix);
@@ -1843,14 +1821,15 @@
 
     /**
      * rgb
-     * @returns {{R: number, G: number, B: number}}
+     * @returns {{R: number, G: number, B: number, A: number}}
      */
     SwfTag.prototype.rgb = function()
     {
         return {
             R: bitio.getUI8(),
             G: bitio.getUI8(),
-            B: bitio.getUI8()
+            B: bitio.getUI8(),
+            A: 1
         };
     };
 
@@ -1870,7 +1849,7 @@
 
     /**
      * matrix
-     * @returns {{HasScale: number, ScaleX: number, ScaleY: number, HasRotate: number, RotateSkew0: number, RotateSkew1: number, TranslateX: number, TranslateY: number}}
+     * @returns {Array}
      */
     SwfTag.prototype.matrix = function()
     {
@@ -1897,16 +1876,14 @@
         var TranslateX = bitio.getSIBits(nTranslateBits);
         var TranslateY = bitio.getSIBits(nTranslateBits);
 
-        return {
-            HasScale: HasScale,
-            ScaleX: ScaleX,
-            ScaleY: ScaleY,
-            HasRotate: HasRotate,
-            RotateSkew0: RotateSkew0,
-            RotateSkew1: RotateSkew1,
-            TranslateX: TranslateX,
-            TranslateY: TranslateY
-        };
+        return [
+            ScaleX,
+            RotateSkew0,
+            RotateSkew1,
+            ScaleY,
+            TranslateX,
+            TranslateY
+        ];
     };
 
     /**
@@ -4945,39 +4922,48 @@
 
     /**
      * colorTransform
-     * @returns {{}}
+     * @returns {Array}
      */
     SwfTag.prototype.colorTransform = function()
     {
         var obj = {};
         bitio.byteAlign();
         var first6bits = bitio.getUIBits(6);
-        obj.HasAddTerms = first6bits >> 5;
-        obj.HasMultiTerms = (first6bits >> 4) & 1;
+        var HasAddTerms = first6bits >> 5;
+        var HasMultiTerms = (first6bits >> 4) & 1;
         var nbits = first6bits & 0x0f;
 
-        obj.RedMultiTerm = 1;
-        obj.GreenMultiTerm = 1;
-        obj.BlueMultiTerm = 1;
-        obj.AlphaMultiTerm = 1;
-        if (obj.HasMultiTerms) {
-            obj.RedMultiTerm = bitio.getSIBits(nbits) / 256;
-            obj.GreenMultiTerm = bitio.getSIBits(nbits) / 256;
-            obj.BlueMultiTerm = bitio.getSIBits(nbits) / 256;
-            obj.AlphaMultiTerm = bitio.getSIBits(nbits) / 256;
+        var RedMultiTerm = 1;
+        var GreenMultiTerm = 1;
+        var BlueMultiTerm = 1;
+        var AlphaMultiTerm = 1;
+        if (HasMultiTerms) {
+            RedMultiTerm = bitio.getSIBits(nbits) / 256;
+            GreenMultiTerm = bitio.getSIBits(nbits) / 256;
+            BlueMultiTerm = bitio.getSIBits(nbits) / 256;
+            AlphaMultiTerm = bitio.getSIBits(nbits) / 256;
         }
 
-        obj.RedAddTerm = 0;
-        obj.GreenAddTerm = 0;
-        obj.BlueAddTerm = 0;
-        obj.AlphaAddTerm = 0;
-        if (obj.HasAddTerms) {
-            obj.RedAddTerm = bitio.getSIBits(nbits);
-            obj.GreenAddTerm = bitio.getSIBits(nbits);
-            obj.BlueAddTerm = bitio.getSIBits(nbits);
-            obj.AlphaAddTerm = bitio.getSIBits(nbits);
+        var RedAddTerm = 0;
+        var GreenAddTerm = 0;
+        var BlueAddTerm = 0;
+        var AlphaAddTerm = 0;
+        if (HasAddTerms) {
+            RedAddTerm = bitio.getSIBits(nbits);
+            GreenAddTerm = bitio.getSIBits(nbits);
+            BlueAddTerm = bitio.getSIBits(nbits);
+            AlphaAddTerm = bitio.getSIBits(nbits);
         }
-        return obj;
+        return [
+            RedMultiTerm,
+            GreenMultiTerm,
+            BlueMultiTerm,
+            AlphaMultiTerm,
+            RedAddTerm,
+            GreenAddTerm,
+            BlueAddTerm,
+            AlphaAddTerm
+        ];
     };
 
     /**
@@ -7131,6 +7117,7 @@
         this.originTags = [];
         this.controlTags = [];
         this.addTags = [];
+        this.frameTags = null;
         this.removeTags = [];
         this.actions = [];
         this.labels = [];
@@ -7257,6 +7244,9 @@
             mc = player.parent;
         }
 
+        var _getAddTags = mc.getAddTags;
+        var _getParent = mc.getParent;
+        var _getName = mc.getName;
         for (var i = 0; i < len; i++) {
             var name = splitData[i];
             if (name == '') {
@@ -7269,11 +7259,11 @@
             }
 
             if (name == '..') {
-                mc = mc.getParent();
+                mc = _getParent.call(mc);
                 continue;
             }
 
-            var tags = mc.getAddTags();
+            var tags = _getAddTags.call(mc);
             if (tags == undefined) {
                 mc = null;
                 break;
@@ -7291,7 +7281,7 @@
                     continue;
                 }
 
-                if (tag.getName() == name) {
+                if (_getName.call(tag) == name) {
                     mc = tag;
                     setTarget = true;
                     break;
@@ -7480,6 +7470,7 @@
      */
     MovieClip.prototype.setFrame = function(frame)
     {
+        this.frameTags = null;
         this._currentframe = frame;
     };
 
@@ -7500,7 +7491,6 @@
     {
         var _this = this;
         if (_this.getFrame() != frame) {
-
             _this.isAction = true;
             if (frame > _this.getTotalFrames()) {
                 frame = _this.getTotalFrames();
@@ -7900,7 +7890,7 @@
     {
         var _this = this;
         var colorTransform = _this.getColorTransform();
-        var alpha = colorTransform.AlphaMultiTerm + (colorTransform.AlphaAddTerm / 255);
+        var alpha = colorTransform[3] + (colorTransform[7] / 255);
         return alpha * 100;
     };
 
@@ -7912,8 +7902,8 @@
     {
         var _this = this;
         var colorTransform = _this.getColorTransform();
-        colorTransform.AlphaMultiTerm = alpha / 100;
-        colorTransform.AlphaAddTerm = 0;
+        colorTransform[3] = alpha / 100;
+        colorTransform[7] = 0;
     };
 
     /**
@@ -8033,8 +8023,23 @@
     MovieClip.prototype.getAddTags = function()
     {
         var _this = this;
+        if (_this.frameTags == null) {
+            _this.setAddTags();
+        }
+        return _this.frameTags;
+    };
+
+    /**
+     *
+     * @returns {*}
+     */
+    MovieClip.prototype.setAddTags = function()
+    {
+        var _this = this;
         var frame = _this.getFrame();
-        return (frame in _this.addTags) ? _this.addTags[frame] : [];
+        _this.frameTags = (frame in _this.addTags)
+            ? _this.addTags[frame]
+            : [];
     };
 
     /**
@@ -8270,14 +8275,7 @@
     {
         var _this = this;
         if (_this.instanceId == 0) {
-            return {
-                ScaleX: scale,
-                RotateSkew0: 0,
-                RotateSkew1: 0,
-                ScaleY: scale,
-                TranslateX: 0,
-                TranslateY: 0
-            };
+            return [scale,0,0,scale,0,0];
         }
 
         _this.setMatrix();
@@ -8301,14 +8299,7 @@
         }
 
         if (_this.matrix == undefined) {
-            _this.matrix = {
-                ScaleX: 1,
-                RotateSkew0: 0,
-                RotateSkew1: 0,
-                ScaleY: 1,
-                TranslateX: 0,
-                TranslateY: 0
-            };
+            _this.matrix = [1,0,0,1,0,0];
         }
     };
 
@@ -8320,16 +8311,7 @@
     {
         var _this = this;
         if (_this.instanceId == 0) {
-            return {
-                RedMultiTerm: 1,
-                GreenMultiTerm: 1,
-                BlueMultiTerm: 1,
-                AlphaMultiTerm: 1,
-                RedAddTerm: 0,
-                GreenAddTerm: 0,
-                BlueAddTerm: 0,
-                AlphaAddTerm: 0
-            };
+            return [1,1,1,1,0,0,0,0];
         }
 
         _this.setColorTransform();
@@ -8353,16 +8335,7 @@
         }
 
         if (_this.colorTransform == undefined) {
-            _this.colorTransform = {
-                RedMultiTerm: 1,
-                GreenMultiTerm: 1,
-                BlueMultiTerm: 1,
-                AlphaMultiTerm: 1,
-                RedAddTerm: 0,
-                GreenAddTerm: 0,
-                BlueAddTerm: 0,
-                AlphaAddTerm: 0
-            };
+            _this.colorTransform = [1,1,1,1,0,0,0,0];
         }
     };
 
@@ -8374,7 +8347,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        return Matrix.TranslateX/20;
+        return Matrix[4]/20;
     };
 
     /**
@@ -8385,7 +8358,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        Matrix.TranslateX = x*20;
+        Matrix[4] = x*20;
     };
 
     /**
@@ -8396,7 +8369,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        return Matrix.TranslateY/20;
+        return Matrix[5]/20;
     };
 
     /**
@@ -8407,7 +8380,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        Matrix.TranslateY = y*20;
+        Matrix[5] = y*20;
     };
 
     /**
@@ -8418,7 +8391,7 @@
     MovieClip.prototype.getBounds = function(parentMatrix)
     {
         var _this = this;
-        var _multiplicationMatrix = multiplicationMatrix;
+        var _multiplicationMatrix = _this.multiplicationMatrix;
         var no = _Number.MAX_VALUE;
         var Xmax = -no;
         var Ymax = -no;
@@ -8443,7 +8416,7 @@
                 : tag.matrix;
 
             var matrix = (parentMatrix != undefined)
-                ? _multiplicationMatrix(parentMatrix, Matrix)
+                ? _multiplicationMatrix.call(tag, parentMatrix, Matrix)
                 : Matrix;
 
             if (tag instanceof MovieClip) {
@@ -8460,14 +8433,14 @@
             }
 
             if (bounds) {
-                var x0 = bounds.Xmax * matrix.ScaleX + bounds.Ymax * matrix.RotateSkew1 + matrix.TranslateX;
-                var x1 = bounds.Xmax * matrix.ScaleX + bounds.Ymin * matrix.RotateSkew1 + matrix.TranslateX;
-                var x2 = bounds.Xmin * matrix.ScaleX + bounds.Ymax * matrix.RotateSkew1 + matrix.TranslateX;
-                var x3 = bounds.Xmin * matrix.ScaleX + bounds.Ymin * matrix.RotateSkew1 + matrix.TranslateX;
-                var y0 = bounds.Xmax * matrix.RotateSkew0 + bounds.Ymax * matrix.ScaleY + matrix.TranslateY;
-                var y1 = bounds.Xmax * matrix.RotateSkew0 + bounds.Ymin * matrix.ScaleY + matrix.TranslateY;
-                var y2 = bounds.Xmin * matrix.RotateSkew0 + bounds.Ymax * matrix.ScaleY + matrix.TranslateY;
-                var y3 = bounds.Xmin * matrix.RotateSkew0 + bounds.Ymin * matrix.ScaleY + matrix.TranslateY;
+                var x0 = bounds.Xmax * matrix[0] + bounds.Ymax * matrix[2] + matrix[4];
+                var x1 = bounds.Xmax * matrix[0] + bounds.Ymin * matrix[2] + matrix[4];
+                var x2 = bounds.Xmin * matrix[0] + bounds.Ymax * matrix[2] + matrix[4];
+                var x3 = bounds.Xmin * matrix[0] + bounds.Ymin * matrix[2] + matrix[4];
+                var y0 = bounds.Xmax * matrix[1] + bounds.Ymax * matrix[3] + matrix[5];
+                var y1 = bounds.Xmax * matrix[1] + bounds.Ymin * matrix[3] + matrix[5];
+                var y2 = bounds.Xmin * matrix[1] + bounds.Ymax * matrix[3] + matrix[5];
+                var y3 = bounds.Xmin * matrix[1] + bounds.Ymin * matrix[3] + matrix[5];
 
                 Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
                 Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
@@ -8502,7 +8475,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        Matrix.ScaleX = width * Matrix.ScaleX / _this.getWidth();
+        Matrix[0] = width * Matrix[0] / _this.getWidth();
     };
 
     /**
@@ -8528,7 +8501,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        Matrix.ScaleY = height * Matrix.ScaleY / _this.getHeight();
+        Matrix[3] = height * Matrix[3] / _this.getHeight();
     };
 
     /**
@@ -8539,7 +8512,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        return _sqrt(Matrix.ScaleX * Matrix.ScaleX + Matrix.RotateSkew0 * Matrix.RotateSkew0) * 100;
+        return _sqrt(Matrix[0] * Matrix[0] + Matrix[1] * Matrix[1]) * 100;
     };
 
     /**
@@ -8550,11 +8523,11 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        var radianX = _atan2(Matrix.RotateSkew0, Matrix.ScaleX);
+        var radianX = _atan2(Matrix[1], Matrix[0]);
 
         xscale /= 100;
-        Matrix.ScaleX = xscale * _cos(radianX);
-        Matrix.RotateSkew0 = xscale * _sin(radianX);
+        Matrix[0] = xscale * _cos(radianX);
+        Matrix[1] = xscale * _sin(radianX);
     };
 
     /**
@@ -8565,7 +8538,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        return _sqrt(Matrix.RotateSkew1 * Matrix.RotateSkew1 + Matrix.ScaleY * Matrix.ScaleY) * 100;
+        return _sqrt(Matrix[2] * Matrix[2] + Matrix[3] * Matrix[3]) * 100;
     };
 
     /**
@@ -8576,11 +8549,11 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        var radianY = _atan2(-Matrix.RotateSkew1, Matrix.ScaleY);
+        var radianY = _atan2(-Matrix[2], Matrix[3]);
 
         yscale /= 100;
-        Matrix.RotateSkew1 = -yscale * _sin(radianY);
-        Matrix.ScaleY = yscale * _cos(radianY);
+        Matrix[2] = -yscale * _sin(radianY);
+        Matrix[3] = yscale * _cos(radianY);
     };
 
     /**
@@ -8591,7 +8564,7 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        return _atan2(Matrix.RotateSkew0, Matrix.ScaleX) * 180 / _PI;
+        return _atan2(Matrix[1], Matrix[0]) * 180 / _PI;
     };
 
     /**
@@ -8602,19 +8575,19 @@
     {
         var _this = this;
         var Matrix = _this.getMatrix();
-        var radianX = _atan2(Matrix.RotateSkew0, Matrix.ScaleX);
-        var radianY = _atan2(-Matrix.RotateSkew1, Matrix.ScaleY);
-        var ScaleX = _sqrt(Matrix.ScaleX * Matrix.ScaleX + Matrix.RotateSkew0 * Matrix.RotateSkew0);
-        var ScaleY = _sqrt(Matrix.RotateSkew1 * Matrix.RotateSkew1 + Matrix.ScaleY * Matrix.ScaleY);
+        var radianX = _atan2(Matrix[1], Matrix[0]);
+        var radianY = _atan2(-Matrix[2], Matrix[3]);
+        var ScaleX = _sqrt(Matrix[0] * Matrix[0] + Matrix[1] * Matrix[1]);
+        var ScaleY = _sqrt(Matrix[2] * Matrix[2] + Matrix[3] * Matrix[3]);
 
         rotation *= _PI / 180;
         radianY += rotation - radianX;
         radianX = rotation;
 
-        Matrix.ScaleX = ScaleX * _cos(radianX);
-        Matrix.RotateSkew0 = ScaleX * _sin(radianX);
-        Matrix.RotateSkew1 = -ScaleY * _sin(radianY);
-        Matrix.ScaleY = ScaleY * _cos(radianY);
+        Matrix[0] = ScaleX * _cos(radianX);
+        Matrix[1] = ScaleX * _sin(radianX);
+        Matrix[2] = -ScaleY * _sin(radianY);
+        Matrix[3] = ScaleY * _cos(radianY);
     };
 
     /**
@@ -8654,8 +8627,6 @@
         var _this = this;
         var frameTags = _this.getAddTags();
         var length = frameTags.length;
-        var _multiplicationMatrix = multiplicationMatrix;
-        var _multiplicationColor = multiplicationColor;
 
         // sound
         if (!_this.soundStopFlag) {
@@ -8681,7 +8652,8 @@
         var _renderEditText = _this.renderEditText;
         var _getMatrix = _this.getMatrix;
         var _getColorTransform = _this.getColorTransform;
-
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var _multiplicationColor = _this.multiplicationColor;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
                 continue;
@@ -8706,9 +8678,10 @@
 
             if (obj instanceof MovieClip) {
                 var renderMatrix =
-                    _multiplicationMatrix(matrix, _getMatrix.call(obj));
+                    _multiplicationMatrix.call(obj, matrix, _getMatrix.call(obj));
 
-                var renderColorTransform = _multiplicationColor(
+                var renderColorTransform = _multiplicationColor.call(
+                    obj,
                     colorTransform,
                     _getColorTransform.call(obj)
                 );
@@ -8773,8 +8746,8 @@
                 if (cache instanceof CanvasRenderingContext2D) {
                     var canvas = cache.canvas;
                     if (canvas.width > 0 && canvas.height > 0) {
-                        var x = _ceil(cache.offsetX + renderMatrix.TranslateX + 0.5);
-                        var y = _ceil(cache.offsetY + renderMatrix.TranslateY + 0.5);
+                        var x = _ceil(cache.offsetX + renderMatrix[4] - 0.5);
+                        var y = _ceil(cache.offsetY + renderMatrix[5] - 0.5);
                         _setTransform.call(ctx, 1, 0, 0, 1, x, y);
                         _drawImage.call(ctx, canvas, 0, 0);
                     }
@@ -8813,49 +8786,50 @@
 
         var cache = cacheStore.get(cacheKey);
         if (!cache || tag.isClipDepth) {
-            var body = '';
-            var cacheBody = '';
-            var isCache = false;
             var char = character[tag.characterId];
             var rBound = _this.renderBoundMatrix(char, matrix);
+            var W = _ceil(rBound[2]);
+            var H = _ceil(rBound[3]);
 
-            var main = 'ctx.setTransform(1/20,0,0,1/20,0,0);';
-            var transformBody = 'ctx.setTransform('
-                + matrix.ScaleX + ','
-                + matrix.RotateSkew0 + ','
-                + matrix.RotateSkew1 + ','
-                + matrix.ScaleY + ','
-                + matrix.TranslateX + ','
-                + matrix.TranslateY
-            + ');';
-
+            var isCache = false;
             if (!tag.isClipDepth) {
-                if (width > _ceil(rBound.W)
-                    && height > _ceil(rBound.H)
-                ) {
+                if (width > W || height > H) {
                     isCache = true;
                 }
+            }
 
-                cacheBody += 'var canvas = cacheStore.getCanvas();';
-                cacheBody += 'canvas.width = '+ _ceil(rBound.W) + ';';
-                cacheBody += 'canvas.height = '+ _ceil(rBound.H) + ';';
-                cacheBody += 'var ctx = canvas.getContext("2d");';
-                cacheBody += 'ctx.transform('
-                    + matrix.ScaleX + ','
-                    + matrix.RotateSkew0 + ','
-                    + matrix.RotateSkew1 + ','
-                    + matrix.ScaleY + ','
-                    + -rBound.X + ','
-                    + -rBound.Y
-                + ');';
-                cacheBody += 'ctx.offsetX = '+ rBound.X + ';';
-                cacheBody += 'ctx.offsetY = '+ rBound.Y + ';';
+            if (isCache) {
+                var canvas = cacheStore.getCanvas();
+                canvas.width = W;
+                canvas.height = H;
+                cache = canvas.getContext("2d");
+                cache.offsetX = rBound[0];
+                cache.offsetY = rBound[1];
+                cache.setTransform(
+                    matrix[0],
+                    matrix[1],
+                    matrix[2],
+                    matrix[3],
+                    -rBound[0],
+                    -rBound[1]
+                );
+            } else {
+                cache = ctx;
+                cache.setTransform(
+                    matrix[0],
+                    matrix[1],
+                    matrix[2],
+                    matrix[3],
+                    matrix[4],
+                    matrix[5]
+                );
             }
 
             var shapes = char.data;
             var shapeLength = shapes.length;
             var _draw = _this.draw;
             var _generateColorTransform = _this.generateColorTransform;
+            var _generateImageTransform = _this.generateImageTransform;
 
             for (var idx = 0; idx < shapeLength; idx++) {
                 if (!(idx in shapes)) {
@@ -8872,7 +8846,7 @@
 
                     // beginPath
                     if (!tag.isClipDepth) {
-                        body += 'ctx.beginPath();';
+                        cache.beginPath();
                     }
 
                     var css = null;
@@ -8885,9 +8859,9 @@
                         var gradientMatrix = gradientObj.gradientMatrix;
                         var type = gradientObj.fillStyleType;
                         if (type == 18 || type == 19) {
-                            body += 'var grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 16384);';
+                            css = cache.createRadialGradient(0, 0, 0, 0, 0, 16384);
                         } else if (type == 16) {
-                            body += 'var grad = ctx.createLinearGradient(-16384, 0, 16384, 0);';
+                            css = cache.createLinearGradient(-16384, 0, 16384, 0);
                         }
 
                         var records = gradientObj.gradient.GradientRecords;
@@ -8896,16 +8870,15 @@
                             var record = records[rIdx];
                             var color = record.Color;
                             color = _generateColorTransform.call(_this, color, colorTransform);
-                            body += 'grad.addColorStop('
-                                + record.Ratio + ','
-                                + '"rgba('
+                            css.addColorStop(
+                                record.Ratio,
+                                'rgba('
                                     + color.R +', '
                                     + color.G +', '
                                     + color.B +', '
-                                    + color.A +')"'
-                            +');';
+                                    + color.A +')'
+                            );
                         }
-                        body += 'ctx.fillStyle = grad;';
                     } else if (styleType == 0x00) {
                         var color = styleObj.Color;
                         color = _generateColorTransform.call(_this, color, colorTransform);
@@ -8933,12 +8906,12 @@
                         if (image == undefined) {
                             image = character[bitmapId];
 
-                            if (colorTransform.BlueAddTerm > 0
-                                || colorTransform.BlueMultiTerm > 1
-                                || colorTransform.GreenAddTerm > 0
-                                || colorTransform.GreenMultiTerm > 1
-                                || colorTransform.RedAddTerm > 0
-                                || colorTransform.RedMultiTerm > 1
+                            if (colorTransform[0] > 0
+                                || colorTransform[1] > 1
+                                || colorTransform[2] > 0
+                                || colorTransform[4] > 1
+                                || colorTransform[5] > 0
+                                || colorTransform[6] > 1
                             ) {
                                 var canvas = cacheStore.getCanvas();
                                 canvas.width = image.canvas.width;
@@ -8947,83 +8920,89 @@
                                 var imageContext = canvas.getContext("2d");
                                 _drawImage.call(imageContext, image.canvas, 0, 0);
 
-                                image = generateImageTransform(imageContext, colorTransform);
+                                image = _generateImageTransform.call(_this, imageContext, colorTransform);
                             } else {
-                                var alpha = _max(0, _min((255 * colorTransform.AlphaMultiTerm) + colorTransform.AlphaAddTerm, 255)) / 255;
-                                body += 'ctx.globalAlpha = '+ alpha +';';
+                                var alpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
+                                cache.globalAlpha = alpha;
                             }
 
                             cacheStore.set(bitmapCacheKey, image);
                         }
 
-                        body += 'var css = ctx.createPattern(cacheStore.get("'+ bitmapCacheKey +'").canvas, "'+ repeat +'");';
-                        body += 'ctx.fillStyle = css;';
+                        css = cache.createPattern(cacheStore.get(bitmapCacheKey).canvas, repeat);
                     }
 
                     if (css != null) {
                         if (isStroke) {
-                            body += 'ctx.strokeStyle = "'+ css +'";';
-                            var xScale = _sqrt(matrix.ScaleX * matrix.ScaleX + matrix.RotateSkew0 * matrix.RotateSkew0);
-                            var yScale = _sqrt(matrix.ScaleY * matrix.ScaleY + matrix.RotateSkew1 * matrix.RotateSkew1);
+                            cache.strokeStyle = css;
+                            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+                            var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
                             var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
-                            body += 'ctx.lineWidth = '+ lineWidth +';';
-                            body += 'ctx.lineCap="round";';
-                            body += 'ctx.lineJoin="round";';
+                            cache.lineWidth = lineWidth;
+                            cache.lineCap = "round";
+                            cache.lineJoin = "round";
                         } else {
-                            body += 'ctx.fillStyle = "'+ css +'";';
+                            cache.fillStyle = css;
                         }
                     }
 
                     // draw cmd
-                    body += _draw.call(_this, cmd);
-
-                    // グラデーション
-                    if (styleType == 0x10
-                        || styleType == 0x12
-                        || styleType == 0x13
-                    ) {
-                        body += 'ctx.save();';
-                        body += 'ctx.transform('
-                            + gradientMatrix.ScaleX + ','
-                            + gradientMatrix.RotateSkew0 + ','
-                            + gradientMatrix.RotateSkew1 + ','
-                            + gradientMatrix.ScaleY + ','
-                            + gradientMatrix.TranslateX + ','
-                            + gradientMatrix.TranslateY
-                        +');';
-                    } else if (styleType == 0x41
-                        || styleType == 0x40
-                        || styleType == 0x42
-                        || styleType == 0x43
-                    ) {
-                        // bitmap clip
-                        body += 'ctx.save();';
-                        body += 'ctx.transform('
-                            + bitmapMatrix.ScaleX + ','
-                            + bitmapMatrix.RotateSkew0 + ','
-                            + bitmapMatrix.RotateSkew1 + ','
-                            + bitmapMatrix.ScaleY + ','
-                            + bitmapMatrix.TranslateX + ','
-                            + bitmapMatrix.TranslateY
-                        +');';
+                    if (styleObj.func == undefined) {
+                        styleObj.func = new Function('ctx', _draw.call(_this, cmd));
+                        styleObj.cmd = null;
                     }
+                    styleObj.func(cache);
 
                     if (!tag.isClipDepth) {
+                        // グラデーション
+                        if (styleType == 0x10
+                            || styleType == 0x12
+                            || styleType == 0x13
+                        ) {
+                            cache.save();
+                            cache.transform(
+                                gradientMatrix[0],
+                                gradientMatrix[1],
+                                gradientMatrix[2],
+                                gradientMatrix[3],
+                                gradientMatrix[4],
+                                gradientMatrix[5]
+                            );
+                        } else if (styleType == 0x41
+                            || styleType == 0x40
+                            || styleType == 0x42
+                            || styleType == 0x43
+                        ) {
+                            // bitmap clip
+                            cache.save();
+                            cache.transform(
+                                bitmapMatrix[0],
+                                bitmapMatrix[1],
+                                bitmapMatrix[2],
+                                bitmapMatrix[3],
+                                bitmapMatrix[4],
+                                bitmapMatrix[5]
+                            );
+                        }
+
                         if (isStroke) {
-                            body += 'ctx.stroke();';
+                            cache.stroke();
                         } else {
-                            body += 'ctx.fill();';
+                            cache.fill();
                         }
 
                         if (styleType == 0x10
                             || styleType == 0x12
                             || styleType == 0x13
-                            || styleType == 0x40
+                        ) {
+                            cache.restore();
+                        } else if (styleType == 0x40
                             || styleType == 0x41
                             || styleType == 0x42
                             || styleType == 0x43
                         ) {
-                            body += 'ctx.restore();';
+                            cache.clip();
+                            cache.restore();
                         }
                     }
                 }
@@ -9031,25 +9010,14 @@
 
             // mask
             if (tag.isClipDepth) {
-                body += 'ctx.clip();';
-                var func = new Function('ctx', 'cacheStore', transformBody + body + 'return null;');
-                cache = func(ctx, cacheStore);
-            } else {
-                if (isCache || styleType == 0x40 || styleType == 0x41 || styleType == 0x42 || styleType == 0x43) {
-                    // image clip
-                    if (styleType == 0x41 || styleType == 0x43) {
-                        body += 'ctx.clip();';
-                        body += 'ctx.restore();';
-                    }
+                cache.clip();
+            }
 
-                    cache = renderFunc(ctx, cacheStore, main + cacheBody + body + '//return ctx;');
-//                    var func = new Function('ctx', 'cacheStore', cacheBody + body + 'return ctx;');
-//                    cache = func(ctx, cacheStore);
-                    cacheStore.set(cacheKey, cache);
-                } else {
-                    var func = new Function('ctx', 'cacheStore', transformBody + body + 'return null;');
-                    cache = func(ctx, cacheStore);
-                }
+            // cache
+            if (!tag.isClipDepth && isCache) {
+                cacheStore.set(cacheKey, cache);
+            } else {
+                cache = null;
             }
         }
 
@@ -9079,21 +9047,21 @@
         var cache = cacheStore.get(cacheKey);
         if (cache == undefined) {
             var rBound = _this.renderBoundMatrix(tag, matrix);
-            var body = '';
-            body += 'var canvas = cacheStore.getCanvas();';
-            body += 'canvas.width = '+ _ceil(rBound.W) + ';';
-            body += 'canvas.height = '+ _ceil(rBound.H) + ';';
-            body += 'var ctx = canvas.getContext("2d");';
-            body += 'ctx.offsetX = '+ rBound.X + ';';
-            body += 'ctx.offsetY = '+ rBound.Y + ';';
-            body += 'ctx.setTransform('
-                + matrix.ScaleX + ','
-                + matrix.RotateSkew0 + ','
-                + matrix.RotateSkew1 + ','
-                + matrix.ScaleY + ','
-                + -rBound.X + ','
-                + -rBound.Y
-            + ');';
+
+            var canvas = cacheStore.getCanvas();
+            canvas.width = _ceil(rBound[2]);
+            canvas.height = _ceil(rBound[3]);
+            cache = canvas.getContext("2d");
+            cache.offsetX = rBound[0];
+            cache.offsetY = rBound[1];
+            cache.setTransform(
+                matrix[0],
+                matrix[1],
+                matrix[2],
+                matrix[3],
+                -rBound[0],
+                -rBound[1]
+            );
 
             var shapes = tag.data;
             var shapeLength = shapes.length;
@@ -9104,8 +9072,9 @@
                     continue;
                 }
 
-                var styles = shapes[idx];;
+                var styles = shapes[idx];
                 var styleLength = styles.length;
+                var css = null;
                 for (var sKey = 0; sKey < styleLength; sKey++) {
                     var styleObj = styles[sKey];
                     var cmd = styleObj.cmd;
@@ -9113,33 +9082,36 @@
 
                     var color = styleObj.Color;
                     color = _generateColorTransform.call(_this, color, colorTransform);
-                    var css = "rgb("
+                    css = "rgb("
                         + color.R
                         +", "+ color.G
                         +", "+ color.B
                         +")";
 
-                    body += 'ctx.globalAlpha = '+ color.A +';';
+                    cache.globalAlpha = color.A;
                     if (isStroke) {
-                        body += 'ctx.strokeStyle = "'+ css +'";';
+                        cache.strokeStyle = css;
                     } else {
-                        body += 'ctx.fillStyle = "'+ css +'";';
+                        cache.fillStyle = css;
                     }
 
                     // draw
-                    body += 'ctx.beginPath();';
-                    body += _draw.call(_this, cmd);
+                    cache.beginPath();
+                    // draw cmd
+                    if (styleObj.func == undefined) {
+                        styleObj.func = new Function('ctx', _draw.call(_this, cmd));
+                        styleObj.cmd = null;
+                    }
+                    styleObj.func(cache);
 
                     if (isStroke) {
-                        body += 'ctx.stroke();';
+                        cache.stroke();
                     } else {
-                        body += 'ctx.fill();';
+                        cache.fill();
                     }
                 }
             }
 
-            var func = new Function('cacheStore', body + 'return ctx;');
-            cache = func(cacheStore);
             cacheStore.set(cacheKey, cache);
         }
 
@@ -9165,17 +9137,16 @@
 
         var cache = cacheStore.get(cacheKey);
         if (cache == undefined) {
-            var body = '';
             var char = character[tag.characterId];
             var rBound = _this.renderBoundMatrix(char.Bounds, matrix);
             var Matrix = char.Matrix;
 
-            body += 'var canvas = cacheStore.getCanvas();';
-            body += 'canvas.width = '+ _ceil(rBound.W) + ';';
-            body += 'canvas.height = '+ _ceil(rBound.H) + ';';
-            body += 'var ctx = canvas.getContext("2d");';
-            body += 'ctx.offsetX = '+ rBound.X + ';';
-            body += 'ctx.offsetY = '+ rBound.Y + ';';
+            var canvas = cacheStore.getCanvas();
+            canvas.width = _ceil(rBound[2]);
+            canvas.height = _ceil(rBound[3]);
+            cache = canvas.getContext("2d");
+            cache.offsetX = rBound[0];
+            cache.offsetY = rBound[1];
 
             var TextRecords = char.TextRecords;
             var len = TextRecords.length;
@@ -9186,14 +9157,14 @@
             var _generateColorTransform = _this.generateColorTransform;
             var _renderGlyph = _this.renderGlyph;
             for (var i = 0; i < len; i++) {
-                body += 'ctx.setTransform('
-                    + matrix.ScaleX + ','
-                    + matrix.RotateSkew0 + ','
-                    + matrix.RotateSkew1 + ','
-                    + matrix.ScaleY + ','
-                    + -rBound.X + ','
-                    + -rBound.Y
-                + ');';
+                cache.setTransform(
+                    matrix[0],
+                    matrix[1],
+                    matrix[2],
+                    matrix[3],
+                    -rBound[0],
+                    -rBound[1]
+                );
 
                 var textRecord = TextRecords[i];
 
@@ -9206,8 +9177,8 @@
                 if (textRecord.TextColor != undefined) {
                     var color = textRecord.TextColor;
                     color = _generateColorTransform.call(_this, color, colorTransform);
-                    body += 'ctx.fillStyle = "rgb('+color.R+','+color.G+','+color.B+')";';
-                    body += 'ctx.globalAlpha = '+ color.A +';';
+                    cache.fillStyle = 'rgb('+color.R+','+color.G+','+color.B+')';
+                    cache.globalAlpha = color.A;
                 }
 
                 // text height
@@ -9232,24 +9203,22 @@
                     var idx = glyphEntry.GlyphIndex;
                     var records = defineFont.GlyphShapeTable[idx];
 
-                    body += 'ctx.save();';
-                    body += 'ctx.transform('
-                        + scale + ','
-                        + Matrix.RotateSkew0 + ','
-                        + Matrix.RotateSkew1 + ','
-                        + scale + ','
-                        + (Matrix.TranslateX + XOffset) + ','
-                        + (Matrix.TranslateY + YOffset)
-                    + ');';
-                    body += _renderGlyph.call(_this, records);
-                    body += 'ctx.restore();';
+                    cache.save();
+                    cache.transform(
+                        scale,
+                        Matrix[1],
+                        Matrix[2],
+                        scale,
+                        (Matrix[4] + XOffset),
+                        (Matrix[5] + YOffset)
+                    );
+                    cache = _renderGlyph.call(_this, records, cache);
+                    cache.restore();
 
                     XOffset += glyphEntry.GlyphAdvance;
                 }
             }
 
-            var func = new Function('cacheStore', body + 'return ctx;');
-            cache = func(cacheStore);
             cacheStore.set(cacheKey, cache);
         }
 
@@ -9259,11 +9228,11 @@
     /**
      * renderGlyph
      * @param records
+     * @param ctx
      */
-    MovieClip.prototype.renderGlyph = function (records)
+    MovieClip.prototype.renderGlyph = function (records, ctx)
     {
         var _this = this;
-        var body = '';
         if (records.data == undefined) {
             records.data = swftag.vectorToCanvas(records);
         }
@@ -9283,13 +9252,17 @@
                 var cmd = styleObj.cmd;
 
                 // draw
-                body += 'ctx.beginPath();';
-                body += _draw.call(_this, cmd);
-                body += 'ctx.fill();';
+                ctx.beginPath();
+                if (styleObj.func == undefined) {
+                    styleObj.func = new Function('ctx', _draw.call(_this, cmd));
+                    styleObj.cmd = null;
+                }
+                styleObj.func(ctx);
+                ctx.fill();
             }
         }
 
-        return body;
+        return ctx;
     };
 
     /**
@@ -9341,20 +9314,21 @@
         var cache = cacheStore.get(cacheKey);
         var rBound = _this.renderBoundMatrix(data.Bound, matrix);
         if (cache == undefined) {
-            var body = '';
-            body += 'var canvas = cacheStore.getCanvas();';
-            body += 'canvas.width = '+ _ceil(rBound.W+1) + ';';
-            body += 'canvas.height = '+ _ceil(rBound.H+1) + ';';
-            body += 'var ctx = canvas.getContext("2d");';
-            body += 'ctx.textBaseline = "top";';
-            body += 'ctx.setTransform('
-                + matrix.ScaleX*20 + ','
-                + matrix.RotateSkew0*20 + ','
-                + matrix.RotateSkew1*20 + ','
-                + matrix.ScaleY*20 + ','
-                + -rBound.X + ','
-                + -rBound.Y
-            + ');';
+            var canvas = cacheStore.getCanvas();
+            canvas.width = _ceil(rBound[2]+1);
+            canvas.height = _ceil(rBound[3]+1);
+            cache = canvas.getContext("2d");
+            cache.setTransform(
+                matrix[0]*20,
+                matrix[1]*20,
+                matrix[2]*20,
+                matrix[3]*20,
+                -rBound[0],
+                -rBound[1]
+            );
+            cache.offsetX = rBound[0];
+            cache.offsetY = rBound[1];
+            cache.textBaseline = "top";
 
             // border
             var XMax = data.Bound.Xmax / 20;
@@ -9365,19 +9339,19 @@
             var H = _ceil(YMax - YMin);
 
             if (data.Border) {
-                body += 'ctx.beginPath();';
-                body += 'ctx.rect('+ XMin +', '+ YMin +', '+ W +', '+ H +');';
-                body += 'ctx.fillStyle = "#fff";';
-                body += 'ctx.strokeStyle = "#000";';
-                body += 'ctx.lineWidth = 1;';
-                body += 'ctx.globalAlpha = 1;';
-                body += 'ctx.fill();';
-                body += 'ctx.stroke();';
+                cache.beginPath();
+                cache.rect(XMin, YMin, W, H);
+                cache.fillStyle = "#fff";
+                cache.strokeStyle = "#000";
+                cache.lineWidth = 1;
+                cache.globalAlpha = 1;
+                cache.fill();
+                cache.stroke();
             }
 
-            body += 'ctx.beginPath();';
-            body += 'ctx.rect('+ XMin +', '+ YMin +', '+ W +', '+ H +');';
-            body += 'ctx.clip();';
+            cache.beginPath();
+            cache.rect(XMin, YMin, W, H);
+            cache.clip();
 
             // 文字色
             var color = {R: 0, G: 0, B: 0, A: 1};
@@ -9386,12 +9360,12 @@
             }
 
             color = _this.generateColorTransform(color, colorTransform);
-            body += 'ctx.fillStyle = "rgba('
+            cache.fillStyle = 'rgb('
                 + color.R +','
                 + color.G +','
-                + color.B +','
-                + color.A
-            +')";';
+                + color.B +
+            ')';
+            cache.globalAlpha = color.A;
 
             // font type
             var fontHeight = 0;
@@ -9416,8 +9390,7 @@
                     fontType += 'bold ';
                 }
             }
-            body += 'ctx.font = "'+ fontType + fontHeight +'px '+ fontName +'";';
-            ctx.font = fontType + fontHeight +'px '+ fontName;
+            cache.font = fontType + fontHeight +'px '+ fontName;
 
             // 座標
             var leading = 0;
@@ -9480,23 +9453,23 @@
                             continue;
                         }
 
-                        body += 'ctx.setTransform('
-                            + matrix.ScaleX + ','
-                            + matrix.RotateSkew0 + ','
-                            + matrix.RotateSkew1 + ','
-                            + matrix.ScaleY + ','
-                            + -rBound.X + ','
-                            + -rBound.Y
-                        + ');';
-                        body += 'ctx.transform('
-                            + fontScale + ','
-                            + 0 + ','
-                            + 0 + ','
-                            + fontScale + ','
-                            + XOffset + ','
-                            + YOffset
-                        + ');';
-                        body += _renderGlyph.call(_this, GlyphShapeTable[key]);
+                        cache.setTransform(
+                            matrix[0],
+                            matrix[1],
+                            matrix[2],
+                            matrix[3],
+                            -rBound[0],
+                            -rBound[1]
+                        );
+                        cache.transform(
+                            fontScale,
+                            0,
+                            0,
+                            fontScale,
+                            XOffset,
+                            YOffset
+                        );
+                        cache = _renderGlyph.call(_this, GlyphShapeTable[key], cache);
 
                         XOffset += FontAdvanceTable[key] * fontScale;
                     }
@@ -9511,10 +9484,10 @@
                     indent = data.Indent / 20;
 
                     if (data.Align == 1) {
-                        body += 'ctx.textAlign = "end";';
+                        cache.textAlign = "end";
                         dx += (XMax + XMin) - rightMargin;
                     } else if (data.Align == 2) {
-                        body += 'ctx.textAlign = "center";';
+                        cache.textAlign = "center";
                         dx += (indent + leftMargin)
                             + (((XMax + XMin) - indent - leftMargin - rightMargin) / 2);
                     } else {
@@ -9538,29 +9511,27 @@
                                 joinWidth += textOne.width;
                                 joinTxt += txt[t];
                                 if (joinWidth >= areaWidth || (t + 1) == txtLength) {
-                                    body += 'ctx.fillText("'+ joinTxt +'",'+ dx +','+ dy +','+ W +');';
+                                    cache.fillText(joinTxt, dx, dy, W);
                                     joinWidth = fontHeight;
                                     joinTxt = '';
                                     dy += leading + fontHeight;
                                 }
                             }
                         } else {
-                            body += 'ctx.fillText("'+ txt +'",'+ dx +','+ dy +','+ W +');';
+                            cache.fillText(txt, dx, dy, W);
                         }
                     } else {
-                        body += 'ctx.fillText("'+ txt +'",'+ dx +','+ dy +','+ W +');';
+                        cache.fillText(txt, dx, dy, W);
                     }
                     dy += leading + fontHeight;
                 }
             }
 
-            var func = new Function('cacheStore', body + 'return ctx;');
-            cache = func(cacheStore);
             cacheStore.set(cacheKey, cache);
         }
 
-        var x = _ceil(rBound.X + matrix.TranslateX - 0.5);
-        var y = _ceil(rBound.Y + matrix.TranslateY - 0.5);
+        var x = _ceil(rBound[0] + matrix[4] - 0.5);
+        var y = _ceil(rBound[1] + matrix[5] - 0.5);
         _setTransform.call(ctx, 1, 0, 0, 1, x, y);
         _drawImage.call(ctx, cache.canvas, 0, 0);
     };
@@ -9578,8 +9549,6 @@
         var _this = this;
         var char = character[tag.characterId];
         var characters = char.characters;
-        var _multiplicationMatrix = multiplicationMatrix;
-        var _multiplicationColor = multiplicationColor;
 
         // enter
         var actions = char.actions;
@@ -9611,6 +9580,9 @@
         var _renderText = _this.renderText;
         var _renderEditText = _this.renderEditText;
         var _getBounds = _this.getBounds;
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var _multiplicationColor = _this.multiplicationColor;
+
         var length = characters.length;
         for (var d = 1; d < length; d++) {
             if (!(d in characters)) {
@@ -9628,12 +9600,16 @@
                 var btnChar = cTags[i];
                 var tagChar = tag.characters[d][i];
 
-                var renderMatrix = _multiplicationMatrix(
-                    matrix, btnChar.Matrix
+                var renderMatrix = _multiplicationMatrix.call(
+                    _this,
+                    matrix,
+                    btnChar.Matrix
                 );
 
-                var renderColorTransform = _multiplicationColor(
-                    colorTransform, btnChar.ColorTransform
+                var renderColorTransform = _multiplicationColor.call(
+                    _this,
+                    colorTransform,
+                    btnChar.ColorTransform
                 );
 
                 if (actions != undefined
@@ -9660,14 +9636,14 @@
                         var Xmin = no;
                         var Ymin = no;
 
-                        var x0 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                        var x1 = bounds.Xmax * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                        var x2 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymax * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                        var x3 = bounds.Xmin * renderMatrix.ScaleX + bounds.Ymin * renderMatrix.RotateSkew1 + renderMatrix.TranslateX;
-                        var y0 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                        var y1 = bounds.Xmax * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                        var y2 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymax * renderMatrix.ScaleY + renderMatrix.TranslateY;
-                        var y3 = bounds.Xmin * renderMatrix.RotateSkew0 + bounds.Ymin * renderMatrix.ScaleY + renderMatrix.TranslateY;
+                        var x0 = bounds.Xmax * renderMatrix[0] + bounds.Ymax * renderMatrix[2] + renderMatrix[4];
+                        var x1 = bounds.Xmax * renderMatrix[0] + bounds.Ymin * renderMatrix[2] + renderMatrix[4];
+                        var x2 = bounds.Xmin * renderMatrix[0] + bounds.Ymax * renderMatrix[2] + renderMatrix[4];
+                        var x3 = bounds.Xmin * renderMatrix[0] + bounds.Ymin * renderMatrix[2] + renderMatrix[4];
+                        var y0 = bounds.Xmax * renderMatrix[1] + bounds.Ymax * renderMatrix[3] + renderMatrix[5];
+                        var y1 = bounds.Xmax * renderMatrix[1] + bounds.Ymin * renderMatrix[3] + renderMatrix[5];
+                        var y2 = bounds.Xmin * renderMatrix[1] + bounds.Ymax * renderMatrix[3] + renderMatrix[5];
+                        var y3 = bounds.Xmin * renderMatrix[1] + bounds.Ymin * renderMatrix[3] + renderMatrix[5];
 
                         Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
                         Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
@@ -9782,8 +9758,8 @@
                 if (cache instanceof CanvasRenderingContext2D) {
                     var canvas = cache.canvas;
                     if (canvas.width > 0 && canvas.height > 0) {
-                        var x = _ceil(cache.offsetX + renderMatrix.TranslateX - 0.5);
-                        var y = _ceil(cache.offsetY + renderMatrix.TranslateY - 0.5);
+                        var x = _ceil(cache.offsetX + renderMatrix[4] - 0.5);
+                        var y = _ceil(cache.offsetY + renderMatrix[5] - 0.5);
                         _setTransform.call(ctx, 1, 0, 0, 1, x, y);
                         _drawImage.call(ctx,canvas, 0, 0);
                     }
@@ -9821,7 +9797,7 @@
      * renderBoundMatrix
      * @param bound
      * @param matrix
-     * @returns {{X: number, Y: number, W: number, H: number}}
+     * @returns {Array}
      */
     MovieClip.prototype.renderBoundMatrix = function(bound, matrix)
     {
@@ -9831,14 +9807,14 @@
         var Xmin = no;
         var Ymin = no;
 
-        var x0 = bound.Xmax * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
-        var x1 = bound.Xmax * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
-        var x2 = bound.Xmin * matrix.ScaleX + bound.Ymax * matrix.RotateSkew1;
-        var x3 = bound.Xmin * matrix.ScaleX + bound.Ymin * matrix.RotateSkew1;
-        var y0 = bound.Xmax * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
-        var y1 = bound.Xmax * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
-        var y2 = bound.Xmin * matrix.RotateSkew0 + bound.Ymax * matrix.ScaleY;
-        var y3 = bound.Xmin * matrix.RotateSkew0 + bound.Ymin * matrix.ScaleY;
+        var x0 = bound.Xmax * matrix[0] + bound.Ymax * matrix[2];
+        var x1 = bound.Xmax * matrix[0] + bound.Ymin * matrix[2];
+        var x2 = bound.Xmin * matrix[0] + bound.Ymax * matrix[2];
+        var x3 = bound.Xmin * matrix[0] + bound.Ymin * matrix[2];
+        var y0 = bound.Xmax * matrix[1] + bound.Ymax * matrix[3];
+        var y1 = bound.Xmax * matrix[1] + bound.Ymin * matrix[3];
+        var y2 = bound.Xmin * matrix[1] + bound.Ymax * matrix[3];
+        var y3 = bound.Xmin * matrix[1] + bound.Ymin * matrix[3];
 
         Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
         Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
@@ -9857,7 +9833,7 @@
             h *= -1;
         }
 
-        return {X: x, Y: y, W: w, H: h}
+        return [x, y, w, h];
     };
 
     /**
@@ -9871,18 +9847,92 @@
         var R = color.R;
         var G = color.G;
         var B = color.B;
-        var A = color.A;
-        if (A == undefined) {
-            A = 1;
-        }
-        A *= 255;
+        var A = color.A * 255;
 
         return {
-            R : _floor(_max(0, _min((R * data.RedMultiTerm) + data.RedAddTerm, 255))),
-            G : _floor(_max(0, _min((G * data.GreenMultiTerm) + data.GreenAddTerm, 255))),
-            B : _floor(_max(0, _min((B * data.BlueMultiTerm) + data.BlueAddTerm, 255))),
-            A : _max(0, _min((A * data.AlphaMultiTerm) + data.AlphaAddTerm, 255)) / 255
+            R : _floor(_max(0, _min((R * data[0]) + data[4], 255))),
+            G : _floor(_max(0, _min((G * data[1]) + data[5], 255))),
+            B : _floor(_max(0, _min((B * data[2]) + data[6], 255))),
+            A : _max(0, _min((A * data[3]) + data[7], 255)) / 255
         }
+    };
+
+    /**
+     * multiplicationMatrix
+     * @param a
+     * @param b
+     * @returns {Array}
+     */
+    MovieClip.prototype.multiplicationMatrix = function(a, b)
+    {
+        return [
+            a[0] * b[0] + a[2] * b[1],
+            a[1] * b[0] + a[3] * b[1],
+            a[0] * b[2] + a[2] * b[3],
+            a[1] * b[2] + a[3] * b[3],
+            a[0] * b[4] + a[2] * b[5] + a[4],
+            a[1] * b[4] + a[3] * b[5] + a[5]
+        ];
+    };
+
+    /**
+     *
+     * @param a
+     * @param b
+     * @returns {Array}
+     */
+    MovieClip.prototype.multiplicationColor = function(a, b)
+    {
+        return [
+            a[0] * b[0],
+            a[1] * b[1],
+            a[2] * b[2],
+            a[3] * b[3],
+            a[0] * b[4] + a[4],
+            a[1] * b[5] + a[5],
+            a[2] * b[6] + a[6],
+            a[3] * b[7] + a[7]
+        ];
+    };
+
+    /**
+     * generateImageTransform
+     * @param ctx
+     * @param color
+     * @returns {*}
+     */
+    MovieClip.prototype.generateImageTransform = function(ctx, color)
+    {
+        var canvas = ctx.canvas;
+        var width = canvas.width;
+        var height = canvas.height;
+        var imgData = ctx.getImageData(0, 0, width, height);
+        var pxData = imgData.data;
+        var idx = 0;
+
+        var RedMultiTerm = color[0];
+        var GreenMultiTerm = color[1];
+        var BlueMultiTerm = color[2];
+        var AlphaMultiTerm = color[3];
+        var RedAddTerm = color[4];
+        var GreenAddTerm = color[5];
+        var BlueAddTerm = color[6];
+        var AlphaAddTerm = color[7];
+        for (var y = height; y--;) {
+            for (var x = width; x--;) {
+                var R = pxData[idx++];
+                var G = pxData[idx++];
+                var B = pxData[idx++];
+                var A = pxData[idx++];
+                pxData[idx - 4] = _floor(_max(0, _min((R * RedMultiTerm) + RedAddTerm, 255)));
+                pxData[idx - 3] = _floor(_max(0, _min((G * GreenMultiTerm) + GreenAddTerm, 255)));
+                pxData[idx - 2] = _floor(_max(0, _min((B * BlueMultiTerm) + BlueAddTerm, 255)));
+                pxData[idx - 1] = _max(0, _min((A * AlphaMultiTerm) + AlphaAddTerm, 255));
+            }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        return ctx;
     };
 
     /**
@@ -10230,6 +10280,11 @@
      */
     function touchStart(event)
     {
+        var len = buttonHits.length;
+        if (!len) {
+            return 0;
+        }
+
         var div = _document.getElementById('swf2js');
         var bounds = div.getBoundingClientRect();
         var x = bounds.left;
@@ -10251,7 +10306,6 @@
 
         touchObj = null;
         touchEndAction = null;
-        var len = buttonHits.length;
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -10652,83 +10706,6 @@
         var obj = {};
         execute(src, obj);
         return obj;
-    }
-
-    /**
-     * multiplicationMatrix
-     * @param a
-     * @param b
-     * @returns {{ScaleX: number, RotateSkew0: number, RotateSkew1: number, ScaleY: number, TranslateX: number, TranslateY: number}}
-     */
-    function multiplicationMatrix(a, b) {
-        return {
-            ScaleX: a.ScaleX * b.ScaleX + a.RotateSkew1 * b.RotateSkew0,
-            RotateSkew0: a.RotateSkew0 * b.ScaleX + a.ScaleY * b.RotateSkew0,
-            RotateSkew1: a.ScaleX * b.RotateSkew1 + a.RotateSkew1 * b.ScaleY,
-            ScaleY: a.RotateSkew0 * b.RotateSkew1 + a.ScaleY * b.ScaleY,
-            TranslateX: a.ScaleX * b.TranslateX + a.RotateSkew1 * b.TranslateY + a.TranslateX,
-            TranslateY: a.RotateSkew0 * b.TranslateX + a.ScaleY * b.TranslateY + a.TranslateY
-        }
-    }
-
-    /**
-     * multiplicationColor
-     * @param a
-     * @param b
-     * @returns {{RedMultiTerm: number, GreenMultiTerm: number, BlueMultiTerm: number, AlphaMultiTerm: number, RedAddTerm: number, GreenAddTerm: number, BlueAddTerm: number, AlphaAddTerm: number}}
-     */
-    function multiplicationColor(a, b)
-    {
-        return {
-            RedMultiTerm: a.RedMultiTerm * b.RedMultiTerm,
-            GreenMultiTerm: a.GreenMultiTerm * b.GreenMultiTerm,
-            BlueMultiTerm: a.BlueMultiTerm * b.BlueMultiTerm,
-            AlphaMultiTerm: a.AlphaMultiTerm * b.AlphaMultiTerm,
-            RedAddTerm: a.RedMultiTerm * b.RedAddTerm + a.RedAddTerm,
-            GreenAddTerm: a.GreenMultiTerm * b.GreenAddTerm + a.GreenAddTerm,
-            BlueAddTerm: a.BlueMultiTerm * b.BlueAddTerm + a.BlueAddTerm,
-            AlphaAddTerm: a.AlphaMultiTerm * b.AlphaAddTerm + a.AlphaAddTerm
-        };
-    }
-
-    /**
-     * generateImageTransform
-     * @param imageContext
-     * @param color
-     * @returns {*}
-     */
-    function generateImageTransform(imageContext, color)
-    {
-        var canvas = imageContext.canvas;
-        var width = canvas.width;
-        var height = canvas.height;
-        var imgData = imageContext.getImageData(0, 0, width, height);
-        var pxData = imgData.data;
-        var idx = 0;
-
-        var RedMultiTerm = color.RedMultiTerm;
-        var GreenMultiTerm = color.GreenMultiTerm;
-        var BlueMultiTerm = color.BlueMultiTerm;
-        var AlphaMultiTerm = color.AlphaMultiTerm;
-        var RedAddTerm = color.RedAddTerm;
-        var GreenAddTerm = color.GreenAddTerm;
-        var BlueAddTerm = color.BlueAddTerm;
-        var AlphaAddTerm = color.AlphaAddTerm;
-        for (var y = height; y--;) {
-            for (var x = width; x--;) {
-                var R = pxData[idx++];
-                var G = pxData[idx++];
-                var B = pxData[idx++];
-                var A = pxData[idx++];
-                pxData[idx - 4] = _floor(_max(0, _min((R * RedMultiTerm) + RedAddTerm, 255)));
-                pxData[idx - 3] = _floor(_max(0, _min((G * GreenMultiTerm) + GreenAddTerm, 255)));
-                pxData[idx - 2] = _floor(_max(0, _min((B * BlueMultiTerm) + BlueAddTerm, 255)));
-                pxData[idx - 1] = _max(0, _min((A * AlphaMultiTerm) + AlphaAddTerm, 255));
-            }
-        }
-
-        imageContext.putImageData(imgData, 0, 0);
-        return imageContext;
     }
 
     /**
