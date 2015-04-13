@@ -9500,14 +9500,14 @@
                 for (var i = 0; i < textLength; i++) {
                     txt = splitData[i];
                     if (wordWrap && multiLine) {
-                        var measureText = ctx.measureText(txt);
+                        var measureText = cache.measureText(txt);
                         var txtTotalWidth = measureText.width;
                         if (txtTotalWidth > areaWidth) {
                             var txtLength = txt.length;
                             var joinTxt = '';
                             var joinWidth = fontHeight;
                             for (var t = 0; t < txtLength; t++) {
-                                var textOne = ctx.measureText(txt[t]);
+                                var textOne = cache.measureText(txt[t]);
                                 joinWidth += textOne.width;
                                 joinTxt += txt[t];
                                 if (joinWidth >= areaWidth || (t + 1) == txtLength) {
