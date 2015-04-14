@@ -2662,7 +2662,7 @@
     SwfTag.prototype.buildCommand = function(array)
     {
         var length = array.length;
-        var cmd = [];
+        var str = '';
         for (var i = 0; i < length; i++) {
             if (!(i in array)) {
                 continue;
@@ -2671,25 +2671,17 @@
             var value = array[i];
             switch (value) {
                 case 'lineTo':
-                    cmd[cmd.length] = 1;
-                    cmd[cmd.length] = array[++i];
-                    cmd[cmd.length] = array[++i];
+                    str += 'ctx.lineTo('+ array[++i] +', '+ array[++i] +');'
                     break;
                 case 'quadraticCurveTo':
-                    cmd[cmd.length] = 2;
-                    cmd[cmd.length] = array[++i];
-                    cmd[cmd.length] = array[++i];
-                    cmd[cmd.length] = array[++i];
-                    cmd[cmd.length] = array[++i];
+                    str += 'ctx.quadraticCurveTo('+ array[++i] +', '+ array[++i] +', '+ array[++i] +', '+ array[++i] +');'
                     break;
                 case 'moveTo':
-                    cmd[cmd.length] = 3;
-                    cmd[cmd.length] = array[++i];
-                    cmd[cmd.length] = array[++i];
+                    str += 'ctx.moveTo('+ array[++i] +', '+ array[++i] +');'
                     break;
             }
         }
-        return (window.ArrayBuffer) ? new Int16Array(cmd) : cmd;
+        return new Function('ctx', str);
     };
 
     /**
@@ -8827,7 +8819,6 @@
 
             var shapes = char.data;
             var shapeLength = shapes.length;
-            var _draw = _this.draw;
             var _generateColorTransform = _this.generateColorTransform;
             var _generateImageTransform = _this.generateImageTransform;
 
@@ -8850,11 +8841,20 @@
                     }
 
                     var css = null;
-                    // グラデーション
-                    if (styleType == 0x10
+                    if (styleType == 0x00) {
+                        var color = styleObj.Color;
+                        color = _generateColorTransform.call(_this, color, colorTransform);
+                        css = "rgba("
+                            + color.R
+                            +", "+ color.G
+                            +", "+ color.B
+                            +", "+ color.A
+                        +")";
+                    } else if (styleType == 0x10
                         || styleType == 0x12
                         || styleType == 0x13
                     ) {
+                        // グラデーション
                         var gradientObj = styleObj.Color;
                         var gradientMatrix = gradientObj.gradientMatrix;
                         var type = gradientObj.fillStyleType;
@@ -8879,15 +8879,6 @@
                                     + color.A +')'
                             );
                         }
-                    } else if (styleType == 0x00) {
-                        var color = styleObj.Color;
-                        color = _generateColorTransform.call(_this, color, colorTransform);
-                        css = "rgba("
-                            + color.R
-                            +", "+ color.G
-                            +", "+ color.B
-                            +", "+ color.A
-                        +")";
                     } else {
                         // bitmap 0x40 - 0x43
                         var bitmapObj = styleObj.Color;
@@ -8906,12 +8897,12 @@
                         if (image == undefined) {
                             image = character[bitmapId];
 
-                            if (colorTransform[0] > 0
+                            if (colorTransform[0] > 1
                                 || colorTransform[1] > 1
-                                || colorTransform[2] > 0
-                                || colorTransform[4] > 1
+                                || colorTransform[2] > 1
+                                || colorTransform[4] > 0
                                 || colorTransform[5] > 0
-                                || colorTransform[6] > 1
+                                || colorTransform[6] > 0
                             ) {
                                 var canvas = cacheStore.getCanvas();
                                 canvas.width = image.canvas.width;
@@ -8929,7 +8920,7 @@
                             cacheStore.set(bitmapCacheKey, image);
                         }
 
-                        css = cache.createPattern(cacheStore.get(bitmapCacheKey).canvas, repeat);
+                        css = ctx.createPattern(image.canvas, repeat);
                     }
 
                     if (css != null) {
@@ -8947,11 +8938,7 @@
                     }
 
                     // draw cmd
-                    if (styleObj.func == undefined) {
-                        styleObj.func = new Function('ctx', _draw.call(_this, cmd));
-                        styleObj.cmd = null;
-                    }
-                    styleObj.func(cache);
+                    cmd(cache);
 
                     if (!tag.isClipDepth) {
                         // グラデーション
@@ -9065,7 +9052,6 @@
 
             var shapes = tag.data;
             var shapeLength = shapes.length;
-            var _draw = _this.draw;
             var _generateColorTransform = _this.generateColorTransform;
             for (var idx = 0; idx < shapeLength; idx++) {
                 if (!(idx in shapes)) {
@@ -9097,12 +9083,7 @@
 
                     // draw
                     cache.beginPath();
-                    // draw cmd
-                    if (styleObj.func == undefined) {
-                        styleObj.func = new Function('ctx', _draw.call(_this, cmd));
-                        styleObj.cmd = null;
-                    }
-                    styleObj.func(cache);
+                    cmd(cache);
 
                     if (isStroke) {
                         cache.stroke();
@@ -9239,7 +9220,6 @@
 
         var shapes = records.data;
         var shapeLength = shapes.length;
-        var _draw = _this.draw;
         for (var idx = 0; idx < shapeLength; idx++) {
             if (!(idx in shapes)) {
                 continue;
@@ -9250,14 +9230,8 @@
             for (var sKey = 0; sKey < styleLength; sKey++) {
                 var styleObj = styles[sKey];
                 var cmd = styleObj.cmd;
-
-                // draw
                 ctx.beginPath();
-                if (styleObj.func == undefined) {
-                    styleObj.func = new Function('ctx', _draw.call(_this, cmd));
-                    styleObj.cmd = null;
-                }
-                styleObj.func(ctx);
+                cmd(ctx);
                 ctx.fill();
             }
         }
@@ -9766,31 +9740,6 @@
                 }
             }
         }
-    };
-
-    /**
-     * draw
-     * @param cmd
-     * @returns {string}
-     */
-    MovieClip.prototype.draw = function(cmd)
-    {
-        var body = '';
-        var length = cmd.length;
-        for (var i = 0; i < length; i++) {
-            switch (cmd[i]) {
-                case 1:
-                    body += 'ctx.lineTo('+ cmd[++i] +', '+ cmd[++i] +');';
-                    break;
-                case 2:
-                    body += 'ctx.quadraticCurveTo('+ cmd[++i] +', '+ cmd[++i] +', '+ cmd[++i] +', '+ cmd[++i] +');';
-                    break;
-                case 3:
-                    body += 'ctx.moveTo('+ cmd[++i] +', '+ cmd[++i] +');';
-                    break;
-            }
-        }
-        return body;
     };
 
     /**
