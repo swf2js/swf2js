@@ -8897,12 +8897,12 @@
                         if (image == undefined) {
                             image = character[bitmapId];
 
-                            if (colorTransform[0] > 1
-                                || colorTransform[1] > 1
-                                || colorTransform[2] > 1
-                                || colorTransform[4] > 0
-                                || colorTransform[5] > 0
-                                || colorTransform[6] > 0
+                            if (colorTransform[0] != 1
+                                || colorTransform[1] != 1
+                                || colorTransform[2] != 1
+                                || colorTransform[4] != 0
+                                || colorTransform[5] != 0
+                                || colorTransform[6] != 0
                             ) {
                                 var canvas = cacheStore.getCanvas();
                                 canvas.width = image.canvas.width;
@@ -8988,6 +8988,7 @@
                             || styleType == 0x42
                             || styleType == 0x43
                         ) {
+                            var test = true;
                             cache.clip();
                             cache.restore();
                         }
