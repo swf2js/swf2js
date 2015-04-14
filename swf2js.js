@@ -8187,11 +8187,11 @@
             }
 
             var tag = frameTags[depth];
-            if (!(tag instanceof MovieClip)) {
-                continue;
+            if (tag instanceof MovieClip) {
+                _addActions.call(tag);
+            } else if (tag.characters instanceof Array) {
+                _this.btnCallback(tag, _addActions);
             }
-
-            _addActions.call(tag);
         }
 
         if (_this.isAction) {
