@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.21)
+ * swf2js (version 0.2.22)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -223,6 +223,8 @@
     var version = 0;
     var totalFrame = 0;
     var instanceId = 0;
+    var cacheMode = false;
+    var shapeCount = 0;
 
     // Alpha Bug
     var isAlphaBug = isAndroid;
@@ -1446,6 +1448,7 @@
                 } else {
                     _this.parseDefineShape(tagType);
                 }
+                shapeCount++;
                 break;
             case 9:  // BackgroundColor
                 var color = "rgb("
@@ -2252,9 +2255,6 @@
             Ymax: shapeBounds.Ymax,
             Ymin: shapeBounds.Ymin
         };
-
-        // canvas set
-        cacheStore.destroy(_document.createElement('canvas'));
     };
 
     /**
@@ -5357,12 +5357,11 @@
         this.length = data.length;
         this.bitio = new BitIO();
         this.bitio.setData(data);
+        this.constantPool = [];
+        this.register = [];
+        this.params = [];
+        this.pBitio = new BitIO();
     };
-
-    ActionScript.prototype.pBitio = new BitIO();
-    ActionScript.prototype.constantPool = [];
-    ActionScript.prototype.register = [];
-    ActionScript.prototype.params = [];
 
     /**
      * execute
@@ -8669,8 +8668,11 @@
             }
 
             if (obj instanceof MovieClip) {
-                var renderMatrix =
-                    _multiplicationMatrix.call(obj, matrix, _getMatrix.call(obj));
+                var renderMatrix = _multiplicationMatrix.call(
+                    obj,
+                    matrix,
+                    _getMatrix.call(obj)
+                );
 
                 var renderColorTransform = _multiplicationColor.call(
                     obj,
@@ -8692,15 +8694,19 @@
                 var char = character[obj.characterId];
                 var renderMatrix = matrix;
                 if (obj.matrix != undefined) {
-                    renderMatrix = _multiplicationMatrix(
-                        matrix, obj.matrix
+                    renderMatrix = _multiplicationMatrix.call(
+                        _this,
+                        matrix,
+                        obj.matrix
                     );
                 }
 
                 var renderColorTransform = colorTransform;
                 if (obj.colorTransform != undefined) {
-                    renderColorTransform = _multiplicationColor(
-                        colorTransform, obj.colorTransform
+                    renderColorTransform = _multiplicationColor.call(
+                        _this,
+                        colorTransform,
+                        obj.colorTransform
                     );
                 }
 
@@ -8725,11 +8731,10 @@
                     case 34: // DefineButton2
                         _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, obj, depth);
                         continue;
-                        break;
                     case 11: // DefineText
                     case 33: // DefineText2
-                        cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
-                        break;
+                        _renderText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
+                        continue;
                     case 37: // DefineEditText
                         _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
                         continue;
@@ -8784,10 +8789,8 @@
             var H = _ceil(rBound[3]);
 
             var isCache = false;
-            if (!tag.isClipDepth) {
-                if (width > W || height > H) {
-                    isCache = true;
-                }
+            if (cacheMode && !tag.isClipDepth && width > W && height > H) {
+                isCache = true;
             }
 
             if (isCache) {
@@ -8797,7 +8800,8 @@
                 cache = canvas.getContext("2d");
                 cache.offsetX = rBound[0];
                 cache.offsetY = rBound[1];
-                cache.setTransform(
+                _setTransform.call(
+                    cache,
                     matrix[0],
                     matrix[1],
                     matrix[2],
@@ -8807,7 +8811,8 @@
                 );
             } else {
                 cache = ctx;
-                cache.setTransform(
+                _setTransform.call(
+                    cache,
                     matrix[0],
                     matrix[1],
                     matrix[2],
@@ -8889,9 +8894,28 @@
                         var bitmapCacheKey = cacheStore.generateKey(
                             'Bitmap',
                             bitmapId + "_" + repeat,
-                            matrix,
+                            null,
                             colorTransform
                         );
+
+                        if (!isCache) {
+                            var canvas = cacheStore.getCanvas();
+                            canvas.width = W;
+                            canvas.height = H;
+                            cache = canvas.getContext("2d");
+                            cache.offsetX = rBound[0];
+                            cache.offsetY = rBound[1];
+                            _setTransform.call(
+                                cache,
+                                matrix[0],
+                                matrix[1],
+                                matrix[2],
+                                matrix[3],
+                                -rBound[0],
+                                -rBound[1]
+                            );
+                            isCache = true;
+                        }
 
                         var image = cacheStore.get(bitmapCacheKey);
                         if (image == undefined) {
@@ -8907,20 +8931,18 @@
                                 var canvas = cacheStore.getCanvas();
                                 canvas.width = image.canvas.width;
                                 canvas.height = image.canvas.height;
-
                                 var imageContext = canvas.getContext("2d");
                                 _drawImage.call(imageContext, image.canvas, 0, 0);
 
                                 image = _generateImageTransform.call(_this, imageContext, colorTransform);
+                                cacheStore.set(bitmapCacheKey, image);
                             } else {
                                 var alpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
                                 cache.globalAlpha = alpha;
                             }
-
-                            cacheStore.set(bitmapCacheKey, image);
                         }
 
-                        css = ctx.createPattern(image.canvas, repeat);
+                        css = cache.createPattern(image.canvas, repeat);
                     }
 
                     if (css != null) {
@@ -8988,7 +9010,6 @@
                             || styleType == 0x42
                             || styleType == 0x43
                         ) {
-                            var test = true;
                             cache.clip();
                             cache.restore();
                         }
@@ -9007,6 +9028,8 @@
             } else {
                 cache = null;
             }
+
+            ctx.globalAlpha = 1;
         }
 
         return cache;
@@ -9036,20 +9059,41 @@
         if (cache == undefined) {
             var rBound = _this.renderBoundMatrix(tag, matrix);
 
-            var canvas = cacheStore.getCanvas();
-            canvas.width = _ceil(rBound[2]);
-            canvas.height = _ceil(rBound[3]);
-            cache = canvas.getContext("2d");
-            cache.offsetX = rBound[0];
-            cache.offsetY = rBound[1];
-            cache.setTransform(
-                matrix[0],
-                matrix[1],
-                matrix[2],
-                matrix[3],
-                -rBound[0],
-                -rBound[1]
-            );
+            var W = _ceil(rBound[2]);
+            var H = _ceil(rBound[3]);
+            var isCache = false;
+            if (cacheMode && width > W && height > H) {
+                isCache = true;
+            }
+
+            if (isCache) {
+                var canvas = cacheStore.getCanvas();
+                canvas.width = _ceil(rBound[2]);
+                canvas.height = _ceil(rBound[3]);
+                cache = canvas.getContext("2d");
+                cache.offsetX = rBound[0];
+                cache.offsetY = rBound[1];
+                _setTransform.call(
+                    cache,
+                    matrix[0],
+                    matrix[1],
+                    matrix[2],
+                    matrix[3],
+                    -rBound[0],
+                    -rBound[1]
+                );
+            } else {
+                cache = ctx;
+                _setTransform.call(
+                    cache,
+                    matrix[0],
+                    matrix[1],
+                    matrix[2],
+                    matrix[3],
+                    matrix[4],
+                    matrix[5]
+                );
+            }
 
             var shapes = tag.data;
             var shapeLength = shapes.length;
@@ -9074,10 +9118,16 @@
                         +", "+ color.G
                         +", "+ color.B
                         +")";
-
                     cache.globalAlpha = color.A;
+
                     if (isStroke) {
                         cache.strokeStyle = css;
+                        var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+                        var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
+                        var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
+                        cache.lineWidth = lineWidth;
+                        cache.lineCap = "round";
+                        cache.lineJoin = "round";
                     } else {
                         cache.fillStyle = css;
                     }
@@ -9094,7 +9144,13 @@
                 }
             }
 
-            cacheStore.set(cacheKey, cache);
+            if (isCache) {
+                cacheStore.set(cacheKey, cache);
+            } else {
+                cache = null;
+            }
+
+            ctx.globalAlpha = 1;
         }
 
         return cache;
@@ -9110,101 +9166,84 @@
     MovieClip.prototype.renderText = function(ctx, matrix, colorTransform, tag)
     {
         var _this = this;
-        var cacheKey = cacheStore.generateKey(
-            'Text',
-            tag.characterId,
-            matrix,
-            colorTransform
-        );
+        var char = character[tag.characterId];
+        var Matrix = char.Matrix;
+        var TextRecords = char.TextRecords;
+        var len = TextRecords.length;
+        var defineFont = {};
+        var textHeight = 0;
+        var YOffset = 0;
+        var XOffset = 0;
 
-        var cache = cacheStore.get(cacheKey);
-        if (cache == undefined) {
-            var char = character[tag.characterId];
-            var rBound = _this.renderBoundMatrix(char.Bounds, matrix);
-            var Matrix = char.Matrix;
+        var _generateColorTransform = _this.generateColorTransform;
+        var _renderGlyph = _this.renderGlyph;
+        var _transform = ctx.transform;
+        for (var i = 0; i < len; i++) {
+            _setTransform.call(
+                ctx,
+                matrix[0],
+                matrix[1],
+                matrix[2],
+                matrix[3],
+                matrix[4],
+                matrix[5]
+            );
 
-            var canvas = cacheStore.getCanvas();
-            canvas.width = _ceil(rBound[2]);
-            canvas.height = _ceil(rBound[3]);
-            cache = canvas.getContext("2d");
-            cache.offsetX = rBound[0];
-            cache.offsetY = rBound[1];
+            var textRecord = TextRecords[i];
 
-            var TextRecords = char.TextRecords;
-            var len = TextRecords.length;
-            var defineFont = {};
-            var textHeight = 0;
-            var YOffset = 0;
-            var XOffset = 0;
-            var _generateColorTransform = _this.generateColorTransform;
-            var _renderGlyph = _this.renderGlyph;
-            for (var i = 0; i < len; i++) {
-                cache.setTransform(
-                    matrix[0],
-                    matrix[1],
-                    matrix[2],
-                    matrix[3],
-                    -rBound[0],
-                    -rBound[1]
-                );
-
-                var textRecord = TextRecords[i];
-
-                // font master
-                if (textRecord.FontId != undefined) {
-                    defineFont = character[textRecord.FontId];
-                }
-
-                // text color
-                if (textRecord.TextColor != undefined) {
-                    var color = textRecord.TextColor;
-                    color = _generateColorTransform.call(_this, color, colorTransform);
-                    cache.fillStyle = 'rgb('+color.R+','+color.G+','+color.B+')';
-                    cache.globalAlpha = color.A;
-                }
-
-                // text height
-                if (textRecord.TextHeight != undefined) {
-                    textHeight = textRecord.TextHeight;
-                }
-
-                var glyphEntries = textRecord.GlyphEntries;
-                var count = textRecord.GlyphCount;
-
-                if (textRecord.StyleFlagsHasXOffset) {
-                    XOffset = textRecord.XOffset;
-                }
-
-                if (textRecord.StyleFlagsHasYOffset) {
-                    YOffset = textRecord.YOffset;
-                }
-
-                var scale = textHeight / 1024;
-                for (var g = 0; g < count; g++) {
-                    var glyphEntry = glyphEntries[g];
-                    var idx = glyphEntry.GlyphIndex;
-                    var records = defineFont.GlyphShapeTable[idx];
-
-                    cache.save();
-                    cache.transform(
-                        scale,
-                        Matrix[1],
-                        Matrix[2],
-                        scale,
-                        (Matrix[4] + XOffset),
-                        (Matrix[5] + YOffset)
-                    );
-                    cache = _renderGlyph.call(_this, records, cache);
-                    cache.restore();
-
-                    XOffset += glyphEntry.GlyphAdvance;
-                }
+            // font master
+            if (textRecord.FontId != undefined) {
+                defineFont = character[textRecord.FontId];
             }
 
-            cacheStore.set(cacheKey, cache);
+            // text color
+            if (textRecord.TextColor != undefined) {
+                var color = textRecord.TextColor;
+                color = _generateColorTransform.call(_this, color, colorTransform);
+                ctx.fillStyle = 'rgb('+color.R+','+color.G+','+color.B+')';
+                ctx.globalAlpha = color.A;
+            }
+
+            // text height
+            if (textRecord.TextHeight != undefined) {
+                textHeight = textRecord.TextHeight;
+            }
+
+            var glyphEntries = textRecord.GlyphEntries;
+            var count = textRecord.GlyphCount;
+
+            if (textRecord.StyleFlagsHasXOffset) {
+                XOffset = textRecord.XOffset;
+            }
+
+            if (textRecord.StyleFlagsHasYOffset) {
+                YOffset = textRecord.YOffset;
+            }
+
+            var scale = textHeight / 1024;
+            for (var g = 0; g < count; g++) {
+                var glyphEntry = glyphEntries[g];
+                var idx = glyphEntry.GlyphIndex;
+                var records = defineFont.GlyphShapeTable[idx];
+
+                ctx.save();
+                _transform.call(
+                    ctx,
+                    scale,
+                    Matrix[1],
+                    Matrix[2],
+                    scale,
+                    (Matrix[4] + XOffset),
+                    (Matrix[5] + YOffset)
+                );
+                ctx = _renderGlyph.call(_this, records, ctx);
+                ctx.restore();
+
+                XOffset += glyphEntry.GlyphAdvance;
+            }
         }
 
-        return cache;
+        ctx.globalAlpha = 1;
     };
 
     /**
@@ -9214,7 +9253,6 @@
      */
     MovieClip.prototype.renderGlyph = function (records, ctx)
     {
-        var _this = this;
         if (records.data == undefined) {
             records.data = swftag.vectorToCanvas(records);
         }
@@ -9280,235 +9318,220 @@
             return undefined;
         }
 
-        var cacheKey = cacheStore.generateKey(
-            'Font',
-            tag.characterId +'_'+ inText,
-            matrix,
-            colorTransform
+        ctx.save();
+        _setTransform.call(
+            ctx,
+            matrix[0]*20,
+            matrix[1]*20,
+            matrix[2]*20,
+            matrix[3]*20,
+            matrix[4],
+            matrix[5]
         );
-        var cache = cacheStore.get(cacheKey);
-        var rBound = _this.renderBoundMatrix(data.Bound, matrix);
-        if (cache == undefined) {
-            var canvas = cacheStore.getCanvas();
-            canvas.width = _ceil(rBound[2]+1);
-            canvas.height = _ceil(rBound[3]+1);
-            cache = canvas.getContext("2d");
-            cache.setTransform(
-                matrix[0]*20,
-                matrix[1]*20,
-                matrix[2]*20,
-                matrix[3]*20,
-                -rBound[0],
-                -rBound[1]
-            );
-            cache.offsetX = rBound[0];
-            cache.offsetY = rBound[1];
-            cache.textBaseline = "top";
+        ctx.textBaseline = "top";
 
-            // border
-            var XMax = data.Bound.Xmax / 20;
-            var XMin = data.Bound.Xmin / 20;
-            var YMax = data.Bound.Ymax / 20;
-            var YMin = data.Bound.Ymin / 20;
-            var W = _ceil(XMax - XMin);
-            var H = _ceil(YMax - YMin);
+        // border
+        var XMax = data.Bound.Xmax / 20;
+        var XMin = data.Bound.Xmin / 20;
+        var YMax = data.Bound.Ymax / 20;
+        var YMin = data.Bound.Ymin / 20;
+        var W = _ceil(XMax - XMin);
+        var H = _ceil(YMax - YMin);
 
-            if (data.Border) {
-                cache.beginPath();
-                cache.rect(XMin, YMin, W, H);
-                cache.fillStyle = "#fff";
-                cache.strokeStyle = "#000";
-                cache.lineWidth = 1;
-                cache.globalAlpha = 1;
-                cache.fill();
-                cache.stroke();
-            }
-
-            cache.beginPath();
-            cache.rect(XMin, YMin, W, H);
-            cache.clip();
-
-            // 文字色
-            var color = {R: 0, G: 0, B: 0, A: 1};
-            if (data.HasTextColor) {
-                color = data.TextColor;
-            }
-
-            color = _this.generateColorTransform(color, colorTransform);
-            cache.fillStyle = 'rgb('
-                + color.R +','
-                + color.G +','
-                + color.B +
-            ')';
-            cache.globalAlpha = color.A;
-
-            // font type
-            var fontHeight = 0;
-            var fontName = '';
-            var fontType = '';
-            var useOutlines = false;
-            if (data.HasFont) {
-                var fontData = character[data.FontID];
-                useOutlines = (
-                    fontData.FontFlagsHasLayout
-                    && data.UseOutlines
-                    && !data.Password
-                );
-
-                fontHeight = data.FontHeight / 20;
-                fontName = "'"+ fontData.FontName +"', 'HiraKakuProN-W3', 'sans-serif'";
-                if (fontData.FontFlagsItalic) {
-                    fontType += 'italic ';
-                }
-
-                if (fontData.FontFlagsBold) {
-                    fontType += 'bold ';
-                }
-            }
-            cache.font = fontType + fontHeight +'px '+ fontName;
-
-            // 座標
-            var leading = 0;
-            var indent = 0;
-            var leftMargin = 0;
-            var rightMargin = 0;
-            var dx = 0;
-            var dy = 0;
-
-            var txt = '';
-            var wordWrap = data.WordWrap;
-            var multiLine = data.Multiline;
-            var splitData = inText.split('@LFCR');
-            var textLength = splitData.length;
-
-            // アウトラインフォント
-            if (useOutlines) {
-                var CodeTable = fontData.CodeTable;
-                var GlyphShapeTable = fontData.GlyphShapeTable;
-                var FontAdvanceTable = fontData.FontAdvanceTable;
-                var fontScale = data.FontHeight / 1024;
-
-                leading += (fontData.FontAscent + fontData.FontDescent)
-                    * fontScale;
-
-                var YOffset = (fontData.FontAscent * fontScale);
-                var _renderGlyph = _this.renderGlyph;
-                for (var i = 0; i < textLength; i++) {
-                    txt = splitData[i];
-
-                    // 埋め込まれてないもの対応の為に一回全体のサイズを取得
-                    var XOffset = XMin*20;
-                    var txtLength = txt.length;
-                    var textWidth = 0;
-                    for (var idx = 0; idx < txtLength; idx++) {
-                        var str = txt[idx];
-                        var key = CodeTable.indexOf(str.charCodeAt(0));
-                        if (key < 0) {
-                            continue;
-                        }
-                        textWidth += FontAdvanceTable[key] * fontScale;
-                    }
-
-                    // レイアウトに合わせてレンダリング
-                    if (data.HasLayout) {
-                        if (data.Align == 1) {
-                            XOffset += W*20 - rightMargin - textWidth - 2;
-                        } else if (data.Align == 2) {
-                            XOffset += (indent + leftMargin)
-                                + ((W*20 - indent - leftMargin - rightMargin - textWidth) / 2);
-                        } else {
-                            XOffset += indent + leftMargin + 2;
-                        }
-                    }
-
-                    for (var idx = 0; idx < txtLength; idx++) {
-                        var str = txt[idx];
-                        var key = CodeTable.indexOf(str.charCodeAt(0));
-                        if (key < 0) {
-                            continue;
-                        }
-
-                        cache.setTransform(
-                            matrix[0],
-                            matrix[1],
-                            matrix[2],
-                            matrix[3],
-                            -rBound[0],
-                            -rBound[1]
-                        );
-                        cache.transform(
-                            fontScale,
-                            0,
-                            0,
-                            fontScale,
-                            XOffset,
-                            YOffset
-                        );
-                        cache = _renderGlyph.call(_this, GlyphShapeTable[key], cache);
-
-                        XOffset += FontAdvanceTable[key] * fontScale;
-                    }
-
-                    YOffset += leading;
-                }
-            } else {
-                if (data.HasLayout) {
-                    leading = data.Leading / 20;
-                    rightMargin = data.RightMargin / 20;
-                    leftMargin = data.LeftMargin / 20;
-                    indent = data.Indent / 20;
-
-                    if (data.Align == 1) {
-                        cache.textAlign = "end";
-                        dx += (XMax + XMin) - rightMargin;
-                    } else if (data.Align == 2) {
-                        cache.textAlign = "center";
-                        dx += (indent + leftMargin)
-                            + (((XMax + XMin) - indent - leftMargin - rightMargin) / 2);
-                    } else {
-                        dx += indent + leftMargin;
-                    }
-                }
-
-                var areaWidth = (XMax + XMin)
-                    - indent - leftMargin - rightMargin;
-                for (var i = 0; i < textLength; i++) {
-                    txt = splitData[i];
-                    if (wordWrap && multiLine) {
-                        var measureText = cache.measureText(txt);
-                        var txtTotalWidth = measureText.width;
-                        if (txtTotalWidth > areaWidth) {
-                            var txtLength = txt.length;
-                            var joinTxt = '';
-                            var joinWidth = fontHeight;
-                            for (var t = 0; t < txtLength; t++) {
-                                var textOne = cache.measureText(txt[t]);
-                                joinWidth += textOne.width;
-                                joinTxt += txt[t];
-                                if (joinWidth >= areaWidth || (t + 1) == txtLength) {
-                                    cache.fillText(joinTxt, dx, dy, W);
-                                    joinWidth = fontHeight;
-                                    joinTxt = '';
-                                    dy += leading + fontHeight;
-                                }
-                            }
-                        } else {
-                            cache.fillText(txt, dx, dy, W);
-                        }
-                    } else {
-                        cache.fillText(txt, dx, dy, W);
-                    }
-                    dy += leading + fontHeight;
-                }
-            }
-
-            cacheStore.set(cacheKey, cache);
+        if (data.Border) {
+            ctx.beginPath();
+            ctx.rect(XMin, YMin, W, H);
+            ctx.fillStyle = "#fff";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 1;
+            ctx.fill();
+            ctx.stroke();
         }
 
-        var x = _ceil(rBound[0] + matrix[4] - 0.5);
-        var y = _ceil(rBound[1] + matrix[5] - 0.5);
-        _setTransform.call(ctx, 1, 0, 0, 1, x, y);
-        _drawImage.call(ctx, cache.canvas, 0, 0);
+        ctx.beginPath();
+        ctx.rect(XMin, YMin, W, H);
+        ctx.clip();
+
+        // 文字色
+        var color = {R: 0, G: 0, B: 0, A: 1};
+        if (data.HasTextColor) {
+            color = data.TextColor;
+        }
+
+        color = _this.generateColorTransform(color, colorTransform);
+        ctx.fillStyle = 'rgb('
+            + color.R +','
+            + color.G +','
+            + color.B +
+        ')';
+        ctx.globalAlpha = color.A;
+
+        // font type
+        var fontHeight = 0;
+        var fontName = '';
+        var fontType = '';
+        var useOutlines = false;
+        if (data.HasFont) {
+            var fontData = character[data.FontID];
+            useOutlines = (
+                fontData.FontFlagsHasLayout
+                && data.UseOutlines
+                && !data.Password
+            );
+
+            fontHeight = data.FontHeight / 20;
+            fontName = "'"+ fontData.FontName +"', 'HiraKakuProN-W3', 'sans-serif'";
+            if (fontData.FontFlagsItalic) {
+                fontType += 'italic ';
+            }
+
+            if (fontData.FontFlagsBold) {
+                fontType += 'bold ';
+            }
+        }
+        ctx.font = fontType + fontHeight +'px '+ fontName;
+
+        // 座標
+        var leading = 0;
+        var indent = 0;
+        var leftMargin = 0;
+        var rightMargin = 0;
+        var dx = 0;
+        var dy = 0;
+
+        var txt = '';
+        var wordWrap = data.WordWrap;
+        var multiLine = data.Multiline;
+        var splitData = inText.split('@LFCR');
+        var textLength = splitData.length;
+
+        // アウトラインフォント
+        if (useOutlines) {
+            var CodeTable = fontData.CodeTable;
+            var GlyphShapeTable = fontData.GlyphShapeTable;
+            var FontAdvanceTable = fontData.FontAdvanceTable;
+            var fontScale = data.FontHeight / 1024;
+
+            leading += (fontData.FontAscent + fontData.FontDescent)
+                * fontScale;
+
+            var YOffset = (fontData.FontAscent * fontScale);
+            var _renderGlyph = _this.renderGlyph;
+            var _transform = ctx.transform;
+            for (var i = 0; i < textLength; i++) {
+                txt = splitData[i];
+
+                // 埋め込まれてないもの対応の為に一回全体のサイズを取得
+                var XOffset = XMin*20;
+                var txtLength = txt.length;
+                var textWidth = 0;
+                for (var idx = 0; idx < txtLength; idx++) {
+                    var str = txt[idx];
+                    var key = CodeTable.indexOf(str.charCodeAt(0));
+                    if (key < 0) {
+                        continue;
+                    }
+                    textWidth += FontAdvanceTable[key] * fontScale;
+                }
+
+                // レイアウトに合わせてレンダリング
+                if (data.HasLayout) {
+                    if (data.Align == 1) {
+                        XOffset += W*20 - rightMargin - textWidth - 2;
+                    } else if (data.Align == 2) {
+                        XOffset += (indent + leftMargin)
+                            + ((W*20 - indent - leftMargin - rightMargin - textWidth) / 2);
+                    } else {
+                        XOffset += indent + leftMargin + 2;
+                    }
+                }
+
+                for (var idx = 0; idx < txtLength; idx++) {
+                    var str = txt[idx];
+                    var key = CodeTable.indexOf(str.charCodeAt(0));
+                    if (key < 0) {
+                        continue;
+                    }
+
+                    _setTransform.call(
+                        ctx,
+                        matrix[0],
+                        matrix[1],
+                        matrix[2],
+                        matrix[3],
+                        matrix[4],
+                        matrix[5]
+                    );
+                    _transform.call(
+                        ctx,
+                        fontScale,
+                        0,
+                        0,
+                        fontScale,
+                        XOffset,
+                        YOffset
+                    );
+                    ctx = _renderGlyph.call(_this, GlyphShapeTable[key], ctx);
+
+                    XOffset += FontAdvanceTable[key] * fontScale;
+                }
+
+                YOffset += leading;
+            }
+        } else {
+            if (data.HasLayout) {
+                leading = data.Leading / 20;
+                rightMargin = data.RightMargin / 20;
+                leftMargin = data.LeftMargin / 20;
+                indent = data.Indent / 20;
+
+                if (data.Align == 1) {
+                    ctx.textAlign = "end";
+                    dx += (XMax + XMin) - rightMargin;
+                } else if (data.Align == 2) {
+                    ctx.textAlign = "center";
+                    dx += (indent + leftMargin)
+                        + (((XMax + XMin) - indent - leftMargin - rightMargin) / 2);
+                } else {
+                    dx += indent + leftMargin;
+                }
+            }
+
+            var areaWidth = (XMax + XMin)
+                - indent - leftMargin - rightMargin;
+            for (var i = 0; i < textLength; i++) {
+                txt = splitData[i];
+                if (wordWrap && multiLine) {
+                    var measureText = ctx.measureText(txt);
+                    var txtTotalWidth = measureText.width;
+                    if (txtTotalWidth > areaWidth) {
+                        var txtLength = txt.length;
+                        var joinTxt = '';
+                        var joinWidth = fontHeight;
+                        for (var t = 0; t < txtLength; t++) {
+                            var textOne = ctx.measureText(txt[t]);
+                            joinWidth += textOne.width;
+                            joinTxt += txt[t];
+                            if (joinWidth >= areaWidth || (t + 1) == txtLength) {
+                                ctx.fillText(joinTxt, dx, dy, W);
+                                joinWidth = fontHeight;
+                                joinTxt = '';
+                                dy += leading + fontHeight;
+                            }
+                        }
+                    } else {
+                        ctx.fillText(txt, dx, dy, W);
+                    }
+                } else {
+                    ctx.fillText(txt, dx, dy, W);
+                }
+                dy += leading + fontHeight;
+            }
+        }
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
     };
 
     /**
@@ -9903,6 +9926,8 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
+        cacheMode = (shapeCount > 250);
+        bitio = null;
     }
 
     /**

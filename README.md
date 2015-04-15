@@ -112,6 +112,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.22 ] Release Date: 15 Apr 2015  
+* [UPDATE] refactoring rendering speed  
+
+
 --[ swf2js 0.2.21 ] Release Date: 13 Apr 2015  
 * [UPDATE] refactoring rendering speed  
 
