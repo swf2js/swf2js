@@ -3376,7 +3376,7 @@
 
         // render
         imgUnLoadCount++;
-        var image = new Image();
+        var image = _document.createElement('img');
         image.onload = function()
         {
             var width = this.width;
@@ -3393,10 +3393,10 @@
                 var data = unzip(BitmapAlphaData, false);
                 var imgData = imageContext.getImageData(0, 0, width, height);
                 var pxData = imgData.data;
-                var pxIdx = 0;
-                var len = width * height * 4;
+                var pxIdx = 3;
+                var len = width * height;
                 for (var i = 0; i < len; i++) {
-                    pxData[pxIdx + 3] = data[i];
+                    pxData[pxIdx] = data[i];
                     pxIdx += 4;
                 }
                 imageContext.putImageData(imgData, 0, 0);
@@ -9890,17 +9890,16 @@
         var GreenAddTerm = color[5];
         var BlueAddTerm = color[6];
         var AlphaAddTerm = color[7];
-        for (var y = height; y--;) {
-            for (var x = width; x--;) {
-                var R = pxData[idx++];
-                var G = pxData[idx++];
-                var B = pxData[idx++];
-                var A = pxData[idx++];
-                pxData[idx - 4] = _floor(_max(0, _min((R * RedMultiTerm) + RedAddTerm, 255)));
-                pxData[idx - 3] = _floor(_max(0, _min((G * GreenMultiTerm) + GreenAddTerm, 255)));
-                pxData[idx - 2] = _floor(_max(0, _min((B * BlueMultiTerm) + BlueAddTerm, 255)));
-                pxData[idx - 1] = _max(0, _min((A * AlphaMultiTerm) + AlphaAddTerm, 255));
-            }
+        var length = width * height;
+        for (; length--;) {
+            var R = pxData[idx++];
+            var G = pxData[idx++];
+            var B = pxData[idx++];
+            var A = pxData[idx++];
+            pxData[idx - 4] = _floor(_max(0, _min((R * RedMultiTerm) + RedAddTerm, 255)));
+            pxData[idx - 3] = _floor(_max(0, _min((G * GreenMultiTerm) + GreenAddTerm, 255)));
+            pxData[idx - 2] = _floor(_max(0, _min((B * BlueMultiTerm) + BlueAddTerm, 255)));
+            pxData[idx - 1] = _max(0, _min((A * AlphaMultiTerm) + AlphaAddTerm, 255));
         }
 
         ctx.putImageData(imgData, 0, 0);
