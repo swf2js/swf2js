@@ -8894,14 +8894,14 @@
                         var bitmapCacheKey = cacheStore.generateKey(
                             'Bitmap',
                             bitmapId + "_" + repeat,
-                            null,
+                            undefined,
                             colorTransform
                         );
 
                         if (!isCache) {
                             var canvas = cacheStore.getCanvas();
-                            canvas.width = W;
-                            canvas.height = H;
+                            canvas.width = _floor(rBound[2]);
+                            canvas.height = _floor(rBound[3]);
                             cache = canvas.getContext("2d");
                             cache.offsetX = rBound[0];
                             cache.offsetY = rBound[1];
@@ -8941,7 +8941,6 @@
                                 cache.globalAlpha = alpha;
                             }
                         }
-
                         css = cache.createPattern(image.canvas, repeat);
                     }
 
