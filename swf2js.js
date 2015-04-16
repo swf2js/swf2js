@@ -38,8 +38,6 @@
     var _escape = escape;
     var _unescape = unescape;
     var _decodeURIComponent = decodeURIComponent;
-    var _drawImage = CanvasRenderingContext2D.prototype.drawImage;
-    var _setTransform = CanvasRenderingContext2D.prototype.setTransform;
 
     // options
     var optionWidth = 0;
@@ -2481,7 +2479,7 @@
                     obj.EndX = AnchorX;
                     obj.EndY = AnchorY;
                     obj.cArray[obj.cArray.length] = {
-                        isCurved: record.isCurved,
+                        isCurved: isCurved,
                         AnchorX:  AnchorX,
                         AnchorY:  AnchorY,
                         ControlX: ControlX,
@@ -2509,7 +2507,7 @@
                     obj.EndX = AnchorX;
                     obj.EndY = AnchorY;
                     obj.cArray[obj.cArray.length] = {
-                        isCurved: record.isCurved,
+                        isCurved: isCurved,
                         AnchorX:  AnchorX,
                         AnchorY:  AnchorY,
                         ControlX: ControlX,
@@ -2537,7 +2535,7 @@
                     obj.EndX = AnchorX;
                     obj.EndY = AnchorY;
                     obj.cArray[obj.cArray.length] = {
-                        isCurved: record.isCurved,
+                        isCurved: isCurved,
                         AnchorX:  AnchorX,
                         AnchorY:  AnchorY,
                         ControlX: ControlX,
@@ -2641,7 +2639,7 @@
                     Color: obj.Color,
                     Width: obj.Width,
                     styleType: obj.styleType,
-                    cmd: _buildCommand.call(_this, obj.fArray)
+                    cmd: _buildCommand.call(_this, obj.fArray, true)
                 };
 
                 obj = null;
@@ -2656,7 +2654,7 @@
      * @param array
      * @returns {Array}
      */
-    SwfTag.prototype.buildCommand = function(array)
+    SwfTag.prototype.buildCommand = function(array, test)
     {
         var length = array.length;
         var str = '';
@@ -2668,13 +2666,13 @@
             var value = array[i];
             switch (value) {
                 case 'lineTo':
-                    str += 'ctx.lineTo('+ array[++i] +', '+ array[++i] +');'
+                    str += 'ctx.lineTo('+ array[++i] +', '+ array[++i] +');';
                     break;
                 case 'quadraticCurveTo':
-                    str += 'ctx.quadraticCurveTo('+ array[++i] +', '+ array[++i] +', '+ array[++i] +', '+ array[++i] +');'
+                    str += 'ctx.quadraticCurveTo('+ array[++i] +', '+ array[++i] +', '+ array[++i] +', '+ array[++i] +');';
                     break;
                 case 'moveTo':
-                    str += 'ctx.moveTo('+ array[++i] +', '+ array[++i] +');'
+                    str += 'ctx.moveTo('+ array[++i] +', '+ array[++i] +');';
                     break;
             }
         }
@@ -2744,6 +2742,7 @@
                         var length = fCArray.length;
                         for (var i = 0; i < length; i++) {
                             if (!(i in fCArray)) {
+                                console.log(fCArray)
                                 continue;
                             }
 
@@ -2922,10 +2921,7 @@
                 var lineLength = preLine.length;
 
                 var cArray = [];
-                var fArray = [];
                 var lArray = [];
-                var flArray = [];
-
                 var cfArray = [];
                 var cflArray = [];
                 var preCount = preFill.length;
@@ -2994,8 +2990,7 @@
                                 var lineFArray = lObj.fArray;
                                 var len = lineFArray.length;
                                 for (var i = 0; i < len; i++) {
-                                    cflArray[cflArray.length] =
-                                        lineFArray[i];
+                                    cflArray[cflArray.length] = lineFArray[i];
                                 }
                             }
 
@@ -3044,8 +3039,7 @@
                                 var lineFArray = lObj.fArray;
                                 var len = lineFArray.length;
                                 for (var i = 0; i < len; i++) {
-                                    cflArray[cflArray.length] =
-                                        lineFArray[i];
+                                    cflArray[cflArray.length] = lineFArray[i];
                                 }
                             }
 
@@ -3107,7 +3101,7 @@
                                 }
 
                                 var lFArray = lObj.fArray;
-                                var len = lFArray.length;
+                                var len = cflArray.length;
                                 for (var i = 0; i < len; i++) {
                                     lFArray[lFArray.length] = cflArray[i];
                                 }
@@ -3115,12 +3109,10 @@
 
                             // fill
                             cArray = [];
-                            fArray = [];
                             cfArray = [];
 
                             // line
                             lArray = [];
-                            flArray = [];
                             cflArray = [];
 
                             // params
@@ -3378,6 +3370,7 @@
             canvas.width = width;
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
+            var _drawImage = imageContext.drawImage;
             _drawImage.call(imageContext, this, 0, 0);
 
             // 半透明対応
@@ -6292,18 +6285,15 @@
                     var targetMc = movieClip.getMovieClip(source);
                     if (targetMc != null && targetMc.characterId != 0) {
                         var cloneMc = new MovieClip();
-                        cloneMc.init(
-                            targetMc.characterId,
-                            targetMc.getTotalFrames()
-                        );
-
                         var parent = targetMc.getParent();
                         if (parent == null) {
                             parent = player.parent;
                         }
+                        cloneMc.characterId = targetMc.characterId;
                         cloneMc.setParent(parent);
                         cloneMc.setName(target);
                         cloneMc.setLevel(depth);
+                        cloneMc.setTotalFrames(targetMc.getTotalFrames());
 
                         var char = character[targetMc.characterId];
                         swftag.build(char, cloneMc);
@@ -7084,6 +7074,7 @@
             }
         }
     };
+    var cacheAS = new ActionScript([]);
 
     /**
      * MovieClip
@@ -7139,18 +7130,6 @@
     };
 
     /**
-     * init
-     * @param characterId
-     * @param frameCount
-     */
-    MovieClip.prototype.init = function(characterId, frameCount)
-    {
-        var _this = this;
-        _this.characterId = characterId;
-        _this._totalframes = frameCount;
-    };
-
-    /**
      * addEvent
      * @param name
      * @param as
@@ -7196,6 +7175,7 @@
     {
         var _this = this;
         var event = _this.event;
+        var _execute = cacheAS;
         for (name in event) {
             var length = event[name].length;
             for (var i = length; i--;) {
@@ -7206,7 +7186,7 @@
                     }
                     continue;
                 }
-                as.execute(_this);
+                _execute.call(as, _this);
             }
         }
     };
@@ -8637,6 +8617,8 @@
         var _getColorTransform = _this.getColorTransform;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
+        var _drawImage = ctx.drawImage;
+        var _setTransform = ctx.setTransform;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
                 continue;
@@ -8777,6 +8759,8 @@
         if (!cache || tag.isClipDepth) {
             var char = character[tag.characterId];
             var _executeRenderShape = _this.executeRenderShape;
+            var _setTransform = ctx.setTransform;
+
             var isCache = false;
 
             cache = ctx;
@@ -8854,6 +8838,7 @@
         var _generateColorTransform = _this.generateColorTransform;
         var _generateImageTransform = _this.generateImageTransform;
         var _transform = ctx.transform;
+        var _drawImage = ctx.drawImage;
         for (var idx = 0; idx < shapeLength; idx++) {
             if (!(idx in shapes)) {
                 continue;
@@ -9067,6 +9052,7 @@
         if (cache == undefined) {
             var isCache = false;
             var _executeRenderShape = _this.executeRenderShape;
+            var _setTransform = ctx.setTransform;
 
             cache = ctx;
             _setTransform.call(
@@ -9141,6 +9127,7 @@
 
         var _generateColorTransform = _this.generateColorTransform;
         var _renderGlyph = _this.renderGlyph;
+        var _setTransform = ctx.setTransform;
         var _transform = ctx.transform;
         for (var i = 0; i < len; i++) {
             _setTransform.call(
@@ -9254,6 +9241,7 @@
         var _this = this;
         var char = character[tag.characterId];
         var data = char.data;
+        var _setTransform = ctx.setTransform;
 
         var inText = data.InitialText;
         if (data.VariableName != '') {
@@ -9544,6 +9532,8 @@
         var _getBounds = _this.getBounds;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
+        var _drawImage = ctx.drawImage;
+        var _setTransform = ctx.setTransform;
 
         var length = characters.length;
         for (var d = 1; d < length; d++) {
@@ -9965,6 +9955,7 @@
         div.appendChild(context.canvas);
 
         var canvas = preContext.canvas;
+        var _drawImage = context.drawImage;
         _drawImage.call(context, canvas, 0, 0);
 
         // start
@@ -10007,12 +9998,6 @@
     {
         var _action = action;
         var _addActions = mc.addActions;
-
-        // init action
-        _addActions.call(mc);
-        _action();
-
-        // action loop
         _addActions.call(mc);
         while (actions.length) {
             _action();
@@ -10026,6 +10011,7 @@
     function action()
     {
         var length = actions.length;
+        var _execute = cacheAS.execute;
         for (var i = 0; i < length; i++) {
             if (!(i in actions)) {
                 continue;
@@ -10039,7 +10025,7 @@
                 if (!(idx in as)) {
                     continue;
                 }
-                as[idx].execute(mc);
+                _execute.call(as[idx], mc);
             }
         }
         actions  = [];
@@ -10052,6 +10038,7 @@
     function buttonAction(mc)
     {
         var length = touchActions.length;
+        var _execute = cacheAS.execute;
         for (var i = 0; i < length; i++) {
             if (!(i in touchActions)) {
                 continue;
@@ -10059,7 +10046,7 @@
 
             var obj = touchActions[i];
             var as = obj.as;
-            as.execute(obj.mc);
+            _execute.call(as, obj.mc);
         }
 
         if (length) {
@@ -10615,9 +10602,12 @@
     function onEnterFrame()
     {
         if (isLoad && !player.stopFlag) {
-            clearMain();
-            _drawImage.call(context, preContext.canvas, 0, 0);
+            var canvas = preContext.canvas;
             _setTimeout(buffer, 0);
+
+            var _drawImage = context.drawImage;
+            clearMain();
+            _drawImage.call(context, canvas, 0, 0);
         }
     }
 
