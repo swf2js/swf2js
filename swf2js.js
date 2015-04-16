@@ -8776,234 +8776,49 @@
         var cache = cacheStore.get(cacheKey);
         if (!cache || tag.isClipDepth) {
             var char = character[tag.characterId];
-            var rBound = _this.renderBoundMatrix(char, matrix);
-            var W = _ceil(rBound[2]);
-            var H = _ceil(rBound[3]);
-
+            var _executeRenderShape = _this.executeRenderShape;
             var isCache = false;
-            if (cacheMode && !tag.isClipDepth && width > W && height > H) {
-                isCache = true;
-            }
 
-            if (isCache) {
-                var canvas = cacheStore.getCanvas();
-                canvas.width = W;
-                canvas.height = H;
-                cache = canvas.getContext("2d");
-                cache.offsetX = rBound[0];
-                cache.offsetY = rBound[1];
-                _setTransform.call(
-                    cache,
-                    matrix[0],
-                    matrix[1],
-                    matrix[2],
-                    matrix[3],
-                    -rBound[0],
-                    -rBound[1]
-                );
-            } else {
-                cache = ctx;
-                _setTransform.call(
-                    cache,
-                    matrix[0],
-                    matrix[1],
-                    matrix[2],
-                    matrix[3],
-                    matrix[4],
-                    matrix[5]
-                );
-            }
+            cache = ctx;
+            _setTransform.call(
+                cache,
+                matrix[0],
+                matrix[1],
+                matrix[2],
+                matrix[3],
+                matrix[4],
+                matrix[5]
+            );
 
-            var shapes = char.data;
-            var shapeLength = shapes.length;
-            var _generateColorTransform = _this.generateColorTransform;
-            var _generateImageTransform = _this.generateImageTransform;
-            var _transform = ctx.transform;
-            for (var idx = 0; idx < shapeLength; idx++) {
-                if (!(idx in shapes)) {
-                    continue;
-                }
+            if (cacheMode && !tag.isClipDepth) {
+                var _renderBoundMatrix = _this.renderBoundMatrix;
+                var rBound = _renderBoundMatrix.call(_this, char, matrix);
+                var W = _ceil(rBound[2]);
+                var H = _ceil(rBound[3]);
 
-                var styles = shapes[idx];
-                var styleLength = styles.length;
-                for (var sKey = 0; sKey < styleLength; sKey++) {
-                    if (!(sKey in styles)) {
-                        continue;
-                    }
+                if (width > W && height > H) {
+                    isCache = true;
 
-                    var styleObj = styles[sKey];
-                    var cmd = styleObj.cmd;
-
-                    if (tag.isClipDepth) {
-                        cmd(cache);
-                        continue;
-                    }
-
-                    var styleType = styleObj.styleType;
-                    var isStroke = (styleObj.Width != undefined);
-
-                    cache.beginPath();
-                    cmd(cache);
-                    switch (styleType) {
-                        case 0x00:
-                            var color = styleObj.Color;
-                            color = _generateColorTransform.call(_this, color, colorTransform);
-                            var css = "rgba("
-                                + color.R
-                                +", "+ color.G
-                                +", "+ color.B
-                                +", "+ color.A
-                            +")";
-
-                            if (isStroke) {
-                                cache.strokeStyle = css;
-                                var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-                                var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
-                                var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
-                                cache.lineWidth = lineWidth;
-                                cache.lineCap = "round";
-                                cache.lineJoin = "round";
-                                cache.stroke();
-                            } else {
-                                cache.fillStyle = css;
-                                cache.fill();
-                            }
-
-                            break;
-
-                        // グラデーション
-                        case 0x10:
-                        case 0x12:
-                        case 0x13:
-                            var gradientObj = styleObj.Color;
-                            var gradientMatrix = gradientObj.gradientMatrix;
-
-                            cache.save();
-                            _transform.call(
-                                cache,
-                                gradientMatrix[0],
-                                gradientMatrix[1],
-                                gradientMatrix[2],
-                                gradientMatrix[3],
-                                gradientMatrix[4],
-                                gradientMatrix[5]
-                            );
-
-                            var type = gradientObj.fillStyleType;
-                            if (type == 18 || type == 19) {
-                                var css = cache.createRadialGradient(0, 0, 0, 0, 0, 16384);
-                            } else if (type == 16) {
-                                var css = cache.createLinearGradient(-16384, 0, 16384, 0);
-                            }
-
-                            var records = gradientObj.gradient.GradientRecords;
-                            var rLength = records.length;
-                            for (var rIdx = 0; rIdx < rLength; rIdx++) {
-                                var record = records[rIdx];
-                                var color = record.Color;
-                                color = _generateColorTransform.call(_this, color, colorTransform);
-                                css.addColorStop(
-                                    record.Ratio,
-                                    'rgba('
-                                        + color.R +', '
-                                        + color.G +', '
-                                        + color.B +', '
-                                        + color.A +')'
-                                );
-                            }
-
-                            if (isStroke) {
-                                cache.strokeStyle = css;
-                                var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-                                var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
-                                var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
-                                cache.lineWidth = lineWidth;
-                                cache.lineCap = "round";
-                                cache.lineJoin = "round";
-                                cache.stroke();
-                            } else {
-                                cache.fillStyle = css;
-                                cache.fill();
-                            }
-
-                            cache.restore();
-
-                            break;
-
-                        // bitmap
-                        case 0x40:
-                        case 0x41:
-                        case 0x42:
-                        case 0x43:
-                            var bitmapObj = styleObj.Color;
-                            var bitmapId = bitmapObj.bitmapId;
-                            var bitmapMatrix = bitmapObj.bitmapMatrix;
-                            var repeat = (styleType == 0x40 || styleType == 0x42) ? 'repeat' : 'no-repeat';
-
-                            var bitmapCacheKey = cacheStore.generateKey(
-                                'Bitmap',
-                                bitmapId + "_" + repeat,
-                                undefined,
-                                colorTransform
-                            );
-
-                            var image = cacheStore.get(bitmapCacheKey);
-                            if (image == undefined) {
-                                image = character[bitmapId];
-
-                                if (colorTransform[0] != 1
-                                    || colorTransform[1] != 1
-                                    || colorTransform[2] != 1
-                                    || colorTransform[4] != 0
-                                    || colorTransform[5] != 0
-                                    || colorTransform[6] != 0
-                                ) {
-                                    var canvas = cacheStore.getCanvas();
-                                    canvas.width = image.canvas.width;
-                                    canvas.height = image.canvas.height;
-                                    var imageContext = canvas.getContext("2d");
-                                    _drawImage.call(imageContext, image.canvas, 0, 0);
-
-                                    image = _generateImageTransform.call(_this, imageContext, colorTransform);
-                                    cacheStore.set(bitmapCacheKey, image);
-                                } else {
-                                    var alpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
-                                    cache.globalAlpha = alpha;
-                                }
-                            }
-
-                            cache.save();
-                            if (styleType == 0x41 || styleType == 0x43) {
-                                cache.clip();
-                                _transform.call(
-                                    cache,
-                                    bitmapMatrix[0],
-                                    bitmapMatrix[1],
-                                    bitmapMatrix[2],
-                                    bitmapMatrix[3],
-                                    bitmapMatrix[4],
-                                    bitmapMatrix[5]
-                                );
-                                _drawImage.call(cache, image.canvas, 0, 0);
-                            } else {
-                                cache.fillStyle = context.createPattern(image.canvas, repeat);
-                                _transform.call(
-                                    cache,
-                                    bitmapMatrix[0],
-                                    bitmapMatrix[1],
-                                    bitmapMatrix[2],
-                                    bitmapMatrix[3],
-                                    bitmapMatrix[4],
-                                    bitmapMatrix[5]
-                                );
-                                cache.fill();
-                            }
-                            cache.restore();
-
-                            break;
-                    }
+                    var canvas = cacheStore.getCanvas();
+                    canvas.width = W;
+                    canvas.height = H;
+                    cache = canvas.getContext("2d");
+                    cache.offsetX = rBound[0];
+                    cache.offsetY = rBound[1];
+                    _setTransform.call(
+                        cache,
+                        matrix[0],
+                        matrix[1],
+                        matrix[2],
+                        matrix[3],
+                        -rBound[0],
+                        -rBound[1]
+                    );
                 }
             }
+
+            // 実行
+            cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
 
             // mask
             if (tag.isClipDepth) {
@@ -9021,6 +8836,211 @@
         }
 
         return cache;
+    };
+
+    /**
+     * executeRenderShape
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param shapes
+     * @param isClipDepth
+     * @returns {*}
+     */
+    MovieClip.prototype.executeRenderShape = function(ctx, matrix, colorTransform, shapes, isClipDepth)
+    {
+        var _this = this;
+        var shapeLength = shapes.length;
+        var _generateColorTransform = _this.generateColorTransform;
+        var _generateImageTransform = _this.generateImageTransform;
+        var _transform = ctx.transform;
+        for (var idx = 0; idx < shapeLength; idx++) {
+            if (!(idx in shapes)) {
+                continue;
+            }
+
+            var styles = shapes[idx];
+            var styleLength = styles.length;
+            for (var sKey = 0; sKey < styleLength; sKey++) {
+                if (!(sKey in styles)) {
+                    continue;
+                }
+
+                var styleObj = styles[sKey];
+                var cmd = styleObj.cmd;
+
+                if (isClipDepth) {
+                    cmd(ctx);
+                    continue;
+                }
+
+                var styleType = styleObj.styleType;
+                var isStroke = (styleObj.Width != undefined);
+
+                ctx.beginPath();
+                cmd(ctx);
+                switch (styleType) {
+                    case 0x00:
+                        var color = styleObj.Color;
+                        color = _generateColorTransform.call(_this, color, colorTransform);
+                        var css = "rgba("
+                            + color.R
+                            +", "+ color.G
+                            +", "+ color.B
+                            +", "+ color.A
+                        +")";
+
+                        if (isStroke) {
+                            ctx.strokeStyle = css;
+                            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+                            var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
+                            var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
+                            ctx.lineWidth = lineWidth;
+                            ctx.lineCap = "round";
+                            ctx.lineJoin = "round";
+                            ctx.stroke();
+                        } else {
+                            ctx.fillStyle = css;
+                            ctx.fill();
+                        }
+
+                        break;
+
+                    // グラデーション
+                    case 0x10:
+                    case 0x12:
+                    case 0x13:
+                        var gradientObj = styleObj.Color;
+                        var gradientMatrix = gradientObj.gradientMatrix;
+
+                        ctx.save();
+                        _transform.call(
+                            ctx,
+                            gradientMatrix[0],
+                            gradientMatrix[1],
+                            gradientMatrix[2],
+                            gradientMatrix[3],
+                            gradientMatrix[4],
+                            gradientMatrix[5]
+                        );
+
+                        var type = gradientObj.fillStyleType;
+                        if (type == 18 || type == 19) {
+                            var css = ctx.createRadialGradient(0, 0, 0, 0, 0, 16384);
+                        } else if (type == 16) {
+                            var css = ctx.createLinearGradient(-16384, 0, 16384, 0);
+                        }
+
+                        var records = gradientObj.gradient.GradientRecords;
+                        var rLength = records.length;
+                        for (var rIdx = 0; rIdx < rLength; rIdx++) {
+                            var record = records[rIdx];
+                            var color = record.Color;
+                            color = _generateColorTransform.call(_this, color, colorTransform);
+                            css.addColorStop(
+                                record.Ratio,
+                                'rgba('
+                                    + color.R +', '
+                                    + color.G +', '
+                                    + color.B +', '
+                                    + color.A +')'
+                            );
+                        }
+
+                        if (isStroke) {
+                            ctx.strokeStyle = css;
+                            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+                            var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
+                            var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
+                            ctx.lineWidth = lineWidth;
+                            ctx.lineCap = "round";
+                            ctx.lineJoin = "round";
+                            ctx.stroke();
+                        } else {
+                            ctx.fillStyle = css;
+                            ctx.fill();
+                        }
+
+                        ctx.restore();
+
+                        break;
+
+                    // bitmap
+                    case 0x40:
+                    case 0x41:
+                    case 0x42:
+                    case 0x43:
+                        var bitmapObj = styleObj.Color;
+                        var bitmapId = bitmapObj.bitmapId;
+                        var bitmapMatrix = bitmapObj.bitmapMatrix;
+                        var repeat = (styleType == 0x40 || styleType == 0x42) ? 'repeat' : 'no-repeat';
+
+                        var bitmapCacheKey = cacheStore.generateKey(
+                            'Bitmap',
+                            bitmapId + "_" + repeat,
+                            undefined,
+                            colorTransform
+                        );
+
+                        var image = cacheStore.get(bitmapCacheKey);
+                        if (image == undefined) {
+                            image = character[bitmapId];
+
+                            if (colorTransform[0] != 1
+                                || colorTransform[1] != 1
+                                || colorTransform[2] != 1
+                                || colorTransform[4] != 0
+                                || colorTransform[5] != 0
+                                || colorTransform[6] != 0
+                            ) {
+                                var canvas = cacheStore.getCanvas();
+                                canvas.width = image.canvas.width;
+                                canvas.height = image.canvas.height;
+                                var imageContext = canvas.getContext("2d");
+                                _drawImage.call(imageContext, image.canvas, 0, 0);
+
+                                image = _generateImageTransform.call(_this, imageContext, colorTransform);
+                                cacheStore.set(bitmapCacheKey, image);
+                            } else {
+                                var alpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
+                                ctx.globalAlpha = alpha;
+                            }
+                        }
+
+                        ctx.save();
+                        if (styleType == 0x41 || styleType == 0x43) {
+                            ctx.clip();
+                            _transform.call(
+                                ctx,
+                                bitmapMatrix[0],
+                                bitmapMatrix[1],
+                                bitmapMatrix[2],
+                                bitmapMatrix[3],
+                                bitmapMatrix[4],
+                                bitmapMatrix[5]
+                            );
+                            _drawImage.call(ctx, image.canvas, 0, 0);
+                        } else {
+                            ctx.fillStyle = context.createPattern(image.canvas, repeat);
+                            _transform.call(
+                                ctx,
+                                bitmapMatrix[0],
+                                bitmapMatrix[1],
+                                bitmapMatrix[2],
+                                bitmapMatrix[3],
+                                bitmapMatrix[4],
+                                bitmapMatrix[5]
+                            );
+                            ctx.fill();
+                        }
+                        ctx.restore();
+
+                        break;
+                }
+            }
+        }
+
+        return ctx;
     };
 
     /**
@@ -9045,92 +9065,48 @@
 
         var cache = cacheStore.get(cacheKey);
         if (cache == undefined) {
-            var rBound = _this.renderBoundMatrix(tag, matrix);
-
-            var W = _ceil(rBound[2]);
-            var H = _ceil(rBound[3]);
             var isCache = false;
-            if (cacheMode && width > W && height > H) {
-                isCache = true;
-            }
+            var _executeRenderShape = _this.executeRenderShape;
 
-            if (isCache) {
-                var canvas = cacheStore.getCanvas();
-                canvas.width = _ceil(rBound[2]);
-                canvas.height = _ceil(rBound[3]);
-                cache = canvas.getContext("2d");
-                cache.offsetX = rBound[0];
-                cache.offsetY = rBound[1];
-                _setTransform.call(
-                    cache,
-                    matrix[0],
-                    matrix[1],
-                    matrix[2],
-                    matrix[3],
-                    -rBound[0],
-                    -rBound[1]
-                );
-            } else {
-                cache = ctx;
-                _setTransform.call(
-                    cache,
-                    matrix[0],
-                    matrix[1],
-                    matrix[2],
-                    matrix[3],
-                    matrix[4],
-                    matrix[5]
-                );
-            }
+            cache = ctx;
+            _setTransform.call(
+                cache,
+                matrix[0],
+                matrix[1],
+                matrix[2],
+                matrix[3],
+                matrix[4],
+                matrix[5]
+            );
 
-            var shapes = tag.data;
-            var shapeLength = shapes.length;
-            var _generateColorTransform = _this.generateColorTransform;
-            for (var idx = 0; idx < shapeLength; idx++) {
-                if (!(idx in shapes)) {
-                    continue;
-                }
+            if (cacheMode) {
+                var _renderBoundMatrix = _this.renderBoundMatrix;
+                var rBound = _renderBoundMatrix.call(_this, tag, matrix);
+                var W = _ceil(rBound[2]);
+                var H = _ceil(rBound[3]);
+                if (width > W && height > H) {
+                    isCache = true;
 
-                var styles = shapes[idx];
-                var styleLength = styles.length;
-                var css = null;
-                for (var sKey = 0; sKey < styleLength; sKey++) {
-                    var styleObj = styles[sKey];
-                    var cmd = styleObj.cmd;
-                    var isStroke = (styleObj.Width != undefined);
-
-                    var color = styleObj.Color;
-                    color = _generateColorTransform.call(_this, color, colorTransform);
-                    css = "rgb("
-                        + color.R
-                        +", "+ color.G
-                        +", "+ color.B
-                        +")";
-                    cache.globalAlpha = color.A;
-
-                    if (isStroke) {
-                        cache.strokeStyle = css;
-                        var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-                        var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
-                        var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
-                        cache.lineWidth = lineWidth;
-                        cache.lineCap = "round";
-                        cache.lineJoin = "round";
-                    } else {
-                        cache.fillStyle = css;
-                    }
-
-                    // draw
-                    cache.beginPath();
-                    cmd(cache);
-
-                    if (isStroke) {
-                        cache.stroke();
-                    } else {
-                        cache.fill();
-                    }
+                    var canvas = cacheStore.getCanvas();
+                    canvas.width = _ceil(rBound[2]);
+                    canvas.height = _ceil(rBound[3]);
+                    cache = canvas.getContext("2d");
+                    cache.offsetX = rBound[0];
+                    cache.offsetY = rBound[1];
+                    _setTransform.call(
+                        cache,
+                        matrix[0],
+                        matrix[1],
+                        matrix[2],
+                        matrix[3],
+                        -rBound[0],
+                        -rBound[1]
+                    );
                 }
             }
+
+            // 実行
+            cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, tag.data, false);
 
             if (isCache) {
                 cacheStore.set(cacheKey, cache);
