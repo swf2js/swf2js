@@ -2639,7 +2639,7 @@
                     Color: obj.Color,
                     Width: obj.Width,
                     styleType: obj.styleType,
-                    cmd: _buildCommand.call(_this, obj.fArray, true)
+                    cmd: _buildCommand.call(_this, obj.fArray)
                 };
 
                 obj = null;
@@ -2654,7 +2654,7 @@
      * @param array
      * @returns {Array}
      */
-    SwfTag.prototype.buildCommand = function(array, test)
+    SwfTag.prototype.buildCommand = function(array)
     {
         var length = array.length;
         var str = '';
