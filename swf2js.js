@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.23)
+ * swf2js (version 0.2.24)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -162,28 +162,17 @@
      * @param colorTransform
      * @returns {string}
      */
-    CacheStore.prototype.generateKey = function(name, id, matrix, colorTransform)
+    CacheStore.prototype.generateKey = function(name, id, matrix, cxForm)
     {
         var key = name +"_"+ id;
-
         if (matrix != undefined) {
-            key += "_"+ matrix[0]
-                +"_"+ matrix[1]
-                +"_"+ matrix[2]
-                +"_"+ matrix[3];
+            key += "_"+ matrix[0] +"_"+ matrix[1] +"_"+ matrix[2] +"_"+ matrix[3];
         }
 
-        if (colorTransform != undefined) {
-            key += "_"+ colorTransform[0]
-                +"_"+ colorTransform[1]
-                +"_"+ colorTransform[2]
-                +"_"+ colorTransform[3]
-                +"_"+ colorTransform[4]
-                +"_"+ colorTransform[5]
-                +"_"+ colorTransform[6]
-                +"_"+ colorTransform[7];
+        if (cxForm != undefined) {
+            key += "_"+ cxForm[0] +"_"+ cxForm[1] +"_"+ cxForm[2] +"_"+ cxForm[3]
+                +"_"+ cxForm[4] +"_"+ cxForm[5] +"_"+ cxForm[6] +"_"+ cxForm[7];
         }
-
         return key;
     };
     var cacheStore = new CacheStore();
@@ -920,29 +909,6 @@
     };
 
     /**
-     * readString
-     * @param n
-     * @returns {string}
-     */
-    BitIO.prototype.readString = function(n)
-    {
-        var _this = this;
-        var str = '';
-        var data = _this.data;
-        var bo = _this.byte_offset;
-        var i = (n != undefined)
-            ? n
-            : data.length - bo;
-
-        while (i--) {
-            str += _fromCharCode(data[bo++]);
-        }
-
-        _this.byte_offset = bo;
-        return str;
-    };
-
-    /**
      * 圧縮swf対応
      * @returns {*}
      */
@@ -1603,7 +1569,6 @@
             case 65: // ScriptLimits
             case 66: // SetTabIndex
             case 71: // ImportAssets2
-            case 75: // DefineFont3
             case 78: // DefineScalingGrid
             case 87: // DefineBinaryData
             case 91: // DefineFont4
@@ -2742,7 +2707,6 @@
                         var length = fCArray.length;
                         for (var i = 0; i < length; i++) {
                             if (!(i in fCArray)) {
-                                console.log(fCArray)
                                 continue;
                             }
 
@@ -3293,7 +3257,6 @@
 
         imageContext.putImageData(imgData, 0, 0);
         character[CharacterId] = imageContext;
-
     };
 
     /**
@@ -3321,12 +3284,7 @@
      */
     SwfTag.prototype.parseJPEGTables = function(length)
     {
-        var data = bitio.getData(length);
-        var str = '';
-        for (var i = 0; i < length; i++) {
-            str += _fromCharCode(data[i]);
-        }
-        return str;
+        return bitio.getData(length);
     };
 
     /**
@@ -3396,98 +3354,76 @@
             }
         };
 
+        if (jpegTables != null && jpegTables.length > 4) {
+            var margeData = [];
+            var len = jpegTables.length - 2;
+            for (var idx = 0; idx < len; idx++) {
+                margeData[margeData.length] = jpegTables[idx];
+            }
+
+            len = JPEGData.length;
+            for (idx = 2; idx < len; idx++) {
+                margeData[margeData.length] = JPEGData[idx];
+            }
+
+            JPEGData = margeData;
+        }
+
         image.src = "data:image/jpeg;base64,"
-            + swftag.base64encode(swftag.parseJpegData(JPEGData, jpegTables));
+            + swftag.base64encode(swftag.parseJpegData(JPEGData));
 
         _setTimeout(function() {}, 0);
     };
 
     /**
-     *
+     * parseJpegData
      * @param JPEGData
-     * @param jpegTables
      * @returns {string}
      */
-    SwfTag.prototype.parseJpegData = function(JPEGData, jpegTables)
+    SwfTag.prototype.parseJpegData = function(JPEGData)
     {
-        var marker;
-        var dqt = '';
-        var dht = '';
-        var sof = '';
-        var str = '';
-        var sos_eoi = '';
-        var len = 0;
         var i = 0;
+        var idx = 0;
+        var str = '';
+        var length = JPEGData.length;
 
-        if (JPEGData[0] == 255 && JPEGData[1] == 217
-            && JPEGData[2] == 255 && JPEGData[3] == 216
+        // erroneous
+        if (JPEGData[0] == 0xFF && JPEGData[1] == 0xD9
+            && JPEGData[2] == 0xFF && JPEGData[3] == 0xD8
         ) {
-            str = '';
-            len = JPEGData.length;
-            for (i = 4; i < len; i++) {
+            for (i = 4; i < length; i++) {
                 str += _fromCharCode(JPEGData[i]);
             }
-            return str;
-        }
+        } else if (JPEGData[i++] == 0xFF && JPEGData[i++] == 0xD8) {
+            for (idx = 0; idx < i; idx++) {
+                str += _fromCharCode(JPEGData[idx]);
+            }
 
-        var jBitio = new BitIO();
-        jBitio.setData(JPEGData);
-        while (marker = jBitio.getUI16BE()) {
-            switch (marker) {
-                case 0xFFD8: // SOI
-                case 0xFFD9: // EOI
-                    break;
-                case 0xFFC0: // SOF0
-                case 0xFFC2: // SOF2
-                    len = jBitio.getUI16BE();
-                    len += 2;
-                    jBitio.incrementOffset(-4, 0);
-                    var d = jBitio.getData(len);
-                    str = '';
-                    for (i = 0; i < len; i++) {
-                        str += _fromCharCode(d[i]);
+            while (i < length) {
+                if (JPEGData[i] == 0xFF) {
+                    if (JPEGData[i + 1] == 0xD9 && JPEGData[i + 2] == 0xFF && JPEGData[i + 3] == 0xD8) {
+                        i += 4;
+                        for (idx = i; idx < length; idx++) {
+                            str += _fromCharCode(JPEGData[idx]);
+                        }
+                        break;
+                    } else if(JPEGData[i+1] == 0xDA) {
+                        for (idx = i; idx < length; idx++) {
+                            str += _fromCharCode(JPEGData[idx]);
+                        }
+                        break;
+                    } else {
+                        var segmentLength = (JPEGData[i + 2] << 8) + JPEGData[i + 3] + i + 2;
+                        for (idx = i; idx < segmentLength; idx++) {
+                            str += _fromCharCode(JPEGData[idx]);
+                        }
+                        i += segmentLength - i;
                     }
-                    sof = str;
-                    break;
-                case 0xFFDB: // DQT
-                    len = jBitio.getUI16BE();
-                    len += 2;
-                    jBitio.incrementOffset(-4, 0);
-                    var d = jBitio.getData(len);
-                    str = '';
-                    for (i = 0; i < len; i++) {
-                        str += _fromCharCode(d[i]);
-                    }
-
-                    dqt += str;
-                    break;
-                case 0xFFC4: // DHT
-                    len = jBitio.getUI16BE();
-                    len += 2;
-                    jBitio.incrementOffset(-4, 0);
-                    var d = jBitio.getData(len);
-                    str = '';
-                    for (i = 0; i < len; i++) {
-                        str += _fromCharCode(d[i]);
-                    }
-
-                    dht += str;
-                    break;
-                case 0xFFDA: // SOS
-                    jBitio.incrementOffset(-2, 0);
-                    sos_eoi += jBitio.getDataUntil(null);
-                    break;
-                default:
-                    len = jBitio.getUI16BE();
-                    jBitio.incrementOffset(len - 2, 0);
-                    break;
+                }
             }
         }
 
-        var dqt_dht = (typeof dqt === '')
-            ? jpegTables
-            : dqt +''+ dht;
-        return "\xFF\xD8" + sof + dqt_dht + sos_eoi;
+        return str;
     };
 
     /**
@@ -10468,8 +10404,7 @@
                         for(i = 32; i--;){
                             bitLengths[bitLengths.length] = 5;
                         }
-                        distTable = fixedDistTable =
-                            _buildHuffTable(bitLengths);
+                        distTable = fixedDistTable = _buildHuffTable(bitLengths);
                     }
 
                     if (!litTable) {
@@ -10492,20 +10427,17 @@
                             bitLengths[bitLengths.length] = 8;
                         }
 
-                        litTable = fixedLitTable =
-                            _buildHuffTable(bitLengths);
+                        litTable = fixedLitTable = _buildHuffTable(bitLengths);
                     }
                 } else {
                     var numLitLengths = zBitio.readUB(5) + 257;
                     var numDistLengths = zBitio.readUB(5) + 1;
                     var numCodeLengths = zBitio.readUB(4) + 4;
-                    var codeLengths =
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    var codeLengths = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                     for(i = 0; i < numCodeLengths; i++){
-                        codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] =
-                            zBitio.readUB(3);
+                        codeLengths[DEFLATE_CODE_LENGTH_ORDER[i]] = zBitio.readUB(3);
                     }
+
                     var codeTable = _buildHuffTable(codeLengths);
                     var litLengths = [];
                     var prevCodeLen = 0;
@@ -10516,8 +10448,7 @@
                             case 16:
                                 i = zBitio.readUB(2) + 3;
                                 while (i--) {
-                                    litLengths[litLengths.length] =
-                                        prevCodeLen;
+                                    litLengths[litLengths.length] = prevCodeLen;
                                 }
                                 break;
                             case 17:
@@ -10547,19 +10478,19 @@
                 }
 
                 while (sym != 256) {
+                    if (zBitio.byte_offset > zBitio.data.length) {
+                        break;
+                    }
+
                     sym = _decodeSymbol(zBitio, litTable);
+
                     if (sym < 256) {
                         buff[buff.length] = sym;
                     } else if(sym > 256){
                         var lengthMap = DEFLATE_CODE_LENGTH_MAP[sym - 257];
-                        var len = lengthMap[1]
-                            + zBitio.readUB(lengthMap[0]);
-                        var distMap =
-                            DEFLATE_DISTANCE_MAP[
-                                _decodeSymbol(zBitio, distTable)
-                            ];
-                        var dist = distMap[1]
-                            + zBitio.readUB(distMap[0]);
+                        var len = lengthMap[1] + zBitio.readUB(lengthMap[0]);
+                        var distMap = DEFLATE_DISTANCE_MAP[_decodeSymbol(zBitio, distTable)];
+                        var dist = distMap[1] + zBitio.readUB(distMap[0]);
                         i = buff.length - dist;
                         while (len--) {
                             buff[buff.length] = buff[i++];

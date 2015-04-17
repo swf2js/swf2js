@@ -112,6 +112,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.24 ] Release Date: 17 Apr 2015  
+* [BUGFIX] Tag 'DefineBits'  
+
+
 --[ swf2js 0.2.23 ] Release Date: 16 Apr 2015  
 * [BUGFIX] render 'vectorToCanvas - lineStyle'  
 * [UPDATE] refactoring rendering speed  
