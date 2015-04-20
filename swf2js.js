@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.24)
+ * swf2js (version 0.2.25)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -490,10 +490,9 @@
     {
         var _this = this;
         var str = '';
-        for (var i = 3; i--;) {
-            str += _fromCharCode(_this.getUI8());
-        }
-
+        str += _fromCharCode(_this.getUI8());
+        str += _fromCharCode(_this.getUI8());
+        str += _fromCharCode(_this.getUI8());
         return str;
     };
 
@@ -501,9 +500,9 @@
      * バージョン情報
      * @returns {number}
      */
-    BitIO.prototype.getVersion = function()
+    BitIO.prototype.setVersion = function()
     {
-        return this.getUI8();
+        version = this.getUI8();
     };
 
     /**
@@ -966,9 +965,9 @@
             var sLen = loadSounds.length;
             if (sLen) {
                 var canvas = context.canvas;
-                canvas.removeEventListener('touchstart', arguments.callee, false);
-                canvas.addEventListener('touchstart', function ()
+                var loadSound = function ()
                 {
+                    canvas.removeEventListener('touchstart', loadSound, false);
                     for (var i = sLen; i--;) {
                         if (!(i in loadSounds)) {
                             continue;
@@ -976,9 +975,8 @@
                         var audio = loadSounds[i];
                         audio.load();
                     }
-                    this.removeEventListener('touchstart', arguments.callee, false);
-                    this.addEventListener('touchstart', touchStart, false);
-                }, false);
+                };
+                canvas.addEventListener('touchstart', loadSound, false);
             }
         }
 
@@ -4898,8 +4896,7 @@
      */
     SwfTag.prototype.parseDoAction = function(length)
     {
-        var data = bitio.getData(length);
-        return new ActionScript(data);
+        return new ActionScript(bitio.getData(length));
     };
 
     /**
@@ -5296,6 +5293,7 @@
         var _this = this;
         var isEnd = false;
         var stack = [];
+        var bitio = _this.bitio;
         var movieClip = mc;
         var _execute = _this.execute;
 
@@ -5308,13 +5306,13 @@
         }
 
         // 開始
-        _this.bitio.setOffset(0, 0);
-        while (_this.bitio.byte_offset < _this.length) {
+        bitio.setOffset(0, 0);
+        while (bitio.byte_offset < _this.length) {
             var actionCode = _this.bitio.getUI8();
             var payload = null;
             if (actionCode >= 0x80) {
-                var payloadLength = _this.bitio.getUI16();
-                payload = _this.bitio.getData(payloadLength);
+                var payloadLength = bitio.getUI16();
+                payload = bitio.getData(payloadLength);
             }
 
             switch (actionCode) {
@@ -5845,18 +5843,18 @@
                 // If
                 case 0x9D:
                     var condition = _parseFloat(stack.pop());
-                    var offset = _this.bitio.toSI16LE(payload);
+                    var offset = bitio.toSI16LE(payload);
                     if (condition) {
-                        _this.bitio.bit_offset = 0;
-                        _this.bitio.incrementOffset(offset, 0);
+                        bitio.bit_offset = 0;
+                        bitio.incrementOffset(offset, 0);
                     }
 
                     break;
                 // Jump
                 case 0x99:
-                    var offset = _this.bitio.toSI16LE(payload);
-                    _this.bitio.bit_offset = 0;
-                    _this.bitio.incrementOffset(offset, 0);
+                    var offset = bitio.toSI16LE(payload);
+                    bitio.bit_offset = 0;
+                    bitio.incrementOffset(offset, 0);
                     break;
 
                 // 変数 ***********************************
@@ -6525,7 +6523,7 @@
                     }
 
                     var codeSize  = pBitio.getUI16();
-                    var as = new ActionScript(this.bitio.getData(codeSize));
+                    var as = new ActionScript(bitio.getData(codeSize));
                     as.constantPool = clone(this.constantPool);
                     movieClip.setVariable(FunctionName, as);
 
@@ -6906,7 +6904,7 @@
                     }
 
                     var codeSize = pBitio.getUI16();
-                    var as = new ActionScript(this.bitio.getData(codeSize));
+                    var as = new ActionScript(bitio.getData(codeSize));
                     as.constantPool = clone(this.constantPool);
                     as.register = params;
                     stack[stack.length] = as;
@@ -7111,7 +7109,7 @@
     {
         var _this = this;
         var event = _this.event;
-        var _execute = cacheAS;
+        var _execute = cacheAS.execute;
         for (name in event) {
             var length = event[name].length;
             for (var i = length; i--;) {
@@ -7999,6 +7997,8 @@
 
     /**
      * reset
+     * @param isRemove
+     * @param resetFrame
      */
     MovieClip.prototype.reset = function(isRemove, resetFrame)
     {
@@ -8047,6 +8047,10 @@
         if (isRemove) {
             _this.play();
             _this.setVisible(1);
+        }
+
+        if (_this.instanceId in actions) {
+            actions[_this.instanceId] = null;
         }
 
         _this.setFrame(resetFrame);
@@ -8105,6 +8109,8 @@
             var as = _this.getActions(_this.getFrame());
             if (as != undefined) {
                 actions[_this.instanceId] = {as: as, mc: _this};
+            } else if (_this.instanceId in actions) {
+                actions[_this.instanceId] = null;
             }
             _this.isAction = false;
         }
@@ -9833,7 +9839,7 @@
         signature = bitio.getHeaderSignature();
 
         // version
-        version = bitio.getVersion();
+        bitio.setVersion();
 
         // ファイルサイズ
         var fileLength = bitio.getUI32();
@@ -9851,13 +9857,9 @@
         var frameRate  = bitio.getUI16() / 0x100;
         var frameCount = bitio.getUI16();
         if (mc.characterId == 0) {
-            player.fileLength = fileLength;
             player.width = _ceil(frameSize.Xmax - frameSize.Xmin);
             player.height = _ceil(frameSize.Ymax - frameSize.Ymin);
-            player.frameRate = frameRate;
             player.fps = _floor(1000 / frameRate);
-
-            // Canvasの画面サイズを調整
             changeScreenSize();
         }
     }
@@ -9878,9 +9880,10 @@
         var mc = player.parent;
 
         // action
-        executeAction(mc);
+        var _executeAction = executeAction;
+        _executeAction(mc);
         mc.eventDispatcher();
-        executeAction(mc);
+        _executeAction(mc);
 
         // render
         mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
@@ -9914,9 +9917,10 @@
         // action
         buttonAction(mc);
 
-        executeAction(mc);
+        var _executeAction = executeAction;
+        _executeAction(mc);
         mc.eventDispatcher();
-        executeAction(mc);
+        _executeAction(mc);
 
         // clear
         clearPre();
@@ -9954,6 +9958,10 @@
             }
 
             var obj = actions[i];
+            if (obj == null) {
+                continue;
+            }
+
             var as = obj.as;
             var mc = obj.mc;
             var aLen = as.length;
@@ -9984,12 +9992,11 @@
             var as = obj.as;
             _execute.call(as, obj.mc);
         }
+        touchActions = [];
 
         if (length) {
             executeAction(mc);
         }
-
-        touchActions = [];
     }
 
     /*
@@ -10572,14 +10579,12 @@
 
     /**
      * player
-     * @type {{stopFlag: boolean, parent: MovieClip, frameRate: number, fps: number, fileLength: number}}
+     * @type {{stopFlag: boolean, parent: MovieClip, fps: number}}
      */
     var player = {
         stopFlag: true,
         parent: new MovieClip(),
-        frameRate: 0,
-        fps: 0,
-        fileLength: 0
+        fps: 0
     };
 
     // swf2js
