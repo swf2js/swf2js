@@ -178,7 +178,7 @@
     var cacheStore = new CacheStore();
 
     // params
-    var context, preContext;
+    var context, preContext, tmpContext;
     var swftag, bitio;
     var intervalId = 0;
     var timeoutId = 0;
@@ -201,6 +201,7 @@
     var ua = _navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
     var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
+    var isChrome = (ua.indexOf('Chrome') > 0);
     var isTouch = (isAndroid || isiOS);
     var isTouchEvent = false;
     var isLoad = false;
@@ -322,6 +323,13 @@
         preCanvas.height = canvas.height;
         preContext = preCanvas.getContext('2d');
 
+        if (isAndroid && isChrome) {
+            var tmpCanvas = _document.createElement('canvas');
+            tmpCanvas.width = canvas.width;
+            tmpCanvas.height = canvas.height;
+            tmpContext = tmpCanvas.getContext('2d');
+        }
+
         if (isTouch) {
             var startEvent = 'touchstart';
             var moveEvent  = 'touchmove';
@@ -434,6 +442,13 @@
         var preCanvas = preContext.canvas;
         preCanvas.width = width;
         preCanvas.height = height;
+
+        // tmp
+        if (isAndroid && isChrome) {
+            var tmpCanvas = tmpContext.canvas;
+            tmpCanvas.width = width;
+            tmpCanvas.height = height;
+        }
     }
 
     /**
@@ -2639,6 +2654,7 @@
                     break;
             }
         }
+
         return new Function('ctx', str);
     };
 
@@ -8639,9 +8655,6 @@
                     case 32: // DefineShape3
                     case 83: // DefineShape4
                         cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj);
-                        if (obj.isClipDepth) {
-                            continue;
-                        }
                         break;
                     case 7: // DefineButton
                     case 34: // DefineButton2
@@ -8744,12 +8757,12 @@
             }
 
             // 実行
+//            if (_this.getName() == 'mg1' || _this.getName() == 'mg2' || _this.getName() == 'mg3') {
+//                cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, false);
+//            } else {
+//                cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
+//            }
             cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
-
-            // mask
-            if (tag.isClipDepth) {
-                cache.clip();
-            }
 
             // cache
             if (!tag.isClipDepth && isCache) {
@@ -8757,8 +8770,6 @@
             } else {
                 cache = null;
             }
-
-            ctx.globalAlpha = 1;
         }
 
         return cache;
@@ -8781,6 +8792,7 @@
         var _generateImageTransform = _this.generateImageTransform;
         var _transform = ctx.transform;
         var _drawImage = ctx.drawImage;
+
         for (var idx = 0; idx < shapeLength; idx++) {
             if (!(idx in shapes)) {
                 continue;
@@ -8966,6 +8978,26 @@
                 }
             }
         }
+
+        if (isClipDepth) {
+            ctx.clip();
+
+            if (isAndroid && isChrome) {
+                _drawImage.call(tmpContext, ctx.canvas, 0, 0);
+                ctx.save();
+                ctx.setTransform(1,0,0,1,0,0);
+                ctx.beginPath();
+                ctx.clearRect(0, 0, ctx.canvas.width+1, ctx.canvas.height);
+                _drawImage.call(ctx, tmpContext.canvas, 0, 0);
+                ctx.restore();
+                clearTmp();
+            }
+        }
+
+        var resetCss = 'rgba(0,0,0,1)';
+        ctx.strokeStyle = resetCss;
+        ctx.fillStyle = resetCss;
+        ctx.globalAlpha = 1;
 
         return ctx;
     };
@@ -9212,7 +9244,6 @@
             return undefined;
         }
 
-        ctx.save();
         _setTransform.call(
             ctx,
             matrix[0]*20,
@@ -9243,6 +9274,7 @@
             ctx.stroke();
         }
 
+        ctx.save();
         ctx.beginPath();
         ctx.rect(XMin, YMin, W, H);
         ctx.clip();
@@ -10020,6 +10052,16 @@
     }
 
     /**
+     * tmp canvas clear
+     */
+    function clearTmp()
+    {
+        var canvas = tmpContext.canvas;
+        tmpContext.setTransform(1, 0, 0, 1, 0, 0);
+        tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height);
+    }
+
+    /**
      * keyAction
      * @param event
      */
@@ -10485,10 +10527,6 @@
                 }
 
                 while (sym != 256) {
-                    if (zBitio.byte_offset > zBitio.data.length) {
-                        break;
-                    }
-
                     sym = _decodeSymbol(zBitio, litTable);
 
                     if (sym < 256) {
