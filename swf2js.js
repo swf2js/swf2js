@@ -8068,6 +8068,7 @@
 
         var addTags = _this.getAddTags();
         var _eventDispatcher = _this.eventDispatcher;
+        var _btnCallback = _this.btnCallback;
         var length = addTags.length;
         for (;length--;) {
             if (!(length in addTags)) {
@@ -8078,7 +8079,7 @@
             if (obj instanceof MovieClip) {
                 _eventDispatcher.call(obj);
             } else if (obj.characters instanceof Array) {
-                _this.btnCallback(obj, _eventDispatcher);
+                _btnCallback.call(_this, obj, _eventDispatcher);
             }
         }
     };
@@ -8091,6 +8092,7 @@
         var _this = this;
         var frameTags = _this.getAddTags();
         var _addActions = _this.addActions;
+        var _btnCallback = _this.btnCallback;
         var length = frameTags.length;
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in frameTags)) {
@@ -8101,7 +8103,7 @@
             if (tag instanceof MovieClip) {
                 _addActions.call(tag);
             } else if (tag.characters instanceof Array) {
-                _this.btnCallback(tag, _addActions);
+                _btnCallback.call(_this, tag, _addActions);
             }
         }
 
@@ -8109,8 +8111,6 @@
             var as = _this.getActions(_this.getFrame());
             if (as != undefined) {
                 actions[_this.instanceId] = {as: as, mc: _this};
-            } else if (_this.instanceId in actions) {
-                actions[_this.instanceId] = null;
             }
             _this.isAction = false;
         }
@@ -10540,12 +10540,9 @@
     function onEnterFrame()
     {
         if (isLoad && !player.stopFlag) {
-            var canvas = preContext.canvas;
-            _setTimeout(buffer, 0);
-
-            var _drawImage = context.drawImage;
             clearMain();
-            _drawImage.call(context, canvas, 0, 0);
+            context.drawImage(preContext.canvas, 0, 0);
+            _setTimeout(buffer, 0);
         }
     }
 

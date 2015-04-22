@@ -29,16 +29,6 @@ http://gamebiz.jp/?p=131364
 </script>  
 ~~~
 
-## OPTIONS  
-~~~
-{  
-    width: int,  // default 100%
-    height: int, // default 100%
-    controllerMode: bool, // default false ※Controller API
-    tagId: string // tag id => <div id="●●">designate</div>
-}  
-~~~
-
 
 ##API  
 
