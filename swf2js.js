@@ -8757,11 +8757,6 @@
             }
 
             // 実行
-//            if (_this.getName() == 'mg1' || _this.getName() == 'mg2' || _this.getName() == 'mg3') {
-//                cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, false);
-//            } else {
-//                cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
-//            }
             cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
 
             // cache
