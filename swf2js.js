@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.25)
+ * swf2js (version 0.2.26)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -11,19 +11,19 @@
  * コピーも改変もご自由にどうぞ。
  */
 (function(window) {
+    'use strict';
     var _document = window.document;
-    var _Math = Math;
-    var _min = _Math.min;
-    var _max = _Math.max;
-    var _floor = _Math.floor;
-    var _ceil = _Math.ceil;
-    var _pow = _Math.pow;
-    var _random = _Math.random;
-    var _atan2 = _Math.atan2;
-    var _sqrt = _Math.sqrt;
-    var _cos = _Math.cos;
-    var _sin = _Math.sin;
-    var _PI = _Math.PI;
+    var _min = Math.min;
+    var _max = Math.max;
+    var _floor = Math.floor;
+    var _ceil = Math.ceil;
+    var _pow = Math.pow;
+    var _random = Math.random;
+    var _atan2 = Math.atan2;
+    var _sqrt = Math.sqrt;
+    var _cos = Math.cos;
+    var _sin = Math.sin;
+    var _PI = Math.PI;
     var _Number = Number;
     var _fromCharCode = String.fromCharCode;
     var _parseInt = parseInt;
@@ -7442,6 +7442,10 @@
             _this._nextFrame = frame;
             _this.setFrame(frame);
             _this.remove();
+
+            if (_this.instanceId in actions) {
+                actions[_this.instanceId] = null;
+            }
         }
     };
 
@@ -7886,32 +7890,39 @@
      */
     MovieClip.prototype.executeSound = function(sound)
     {
-        var _this = this;
-        var tag = character[sound.SoundId];
+        var soundId = sound.SoundId;
+        if (!(soundId in character)) {
+            return 0;
+        }
+        
+        var tag = character[soundId];
         var soundInfo = tag.SoundInfo;
+        var audio = sound.Audio;
         if (soundInfo.SyncStop) {
-            sound.Audio.stop();
+            audio.stop();
         } else {
             if (soundInfo.HasLoops) {
-                sound.Audio.loopCount = soundInfo.LoopCount;
-                sound.Audio.addEventListener('ended', function() {
+                audio.loopCount = soundInfo.LoopCount;
+                var loopSound = function()
+                {
                     this.loopCount--;
                     if (!this.loopCount) {
-                        this.removeEventListener('ended', arguments.callee, false);
+                        this.removeEventListener('ended', loopSound, false);
                     } else {
                         this.currentTime = 0;
                         this.play();
                     }
-                }, false);
+                };
+                audio.addEventListener('ended', loopSound, false);
             }
 
             if (soundInfo.HasInPoint) {
-                sound.Audio.currentTime = soundInfo.InPoint;
+                audio.currentTime = soundInfo.InPoint;
             }
 
-            sound.Audio.currentTime = 0;
-            sound.Audio.play();
-            _this.soundStopFlag = true;
+            audio.currentTime = 0;
+            audio.play();
+            this.soundStopFlag = true;
         }
     };
 
@@ -8063,10 +8074,6 @@
         if (isRemove) {
             _this.play();
             _this.setVisible(1);
-        }
-
-        if (_this.instanceId in actions) {
-            actions[_this.instanceId] = null;
         }
 
         _this.setFrame(resetFrame);
@@ -8896,7 +8903,6 @@
                         }
 
                         ctx.restore();
-
                         break;
 
                     // bitmap

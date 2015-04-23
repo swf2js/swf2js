@@ -102,6 +102,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.26 ] Release Date: 23 Apr 2015  
+* [BUGFIX] ActionScript  
+
+
 --[ swf2js 0.2.25 ] Release Date: 22 Apr 2015  
 * [BUGFIX] ActionScript(swf5) 'Event Dispatcher'  
 * [BUGFIX] Android Chrome 'mask'  
