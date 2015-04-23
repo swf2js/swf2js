@@ -28,14 +28,17 @@
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
     var _isNaN = isNaN;
-    var _setInterval = setInterval;
-    var _clearInterval = clearInterval;
     var _setTimeout = setTimeout;
     var _clearTimeout = clearTimeout;
     var _Date = Date;
     var _escape = escape;
     var _unescape = unescape;
     var _decodeURIComponent = decodeURIComponent;
+    var requestAnimationFrame = window.requestAnimationFrame
+                                || window.webkitRequestAnimationFrame
+                                || window.mozRequestAnimationFrame
+                                || window.setTimeout;
+    window.requestAnimationFrame = requestAnimationFrame;
 
     // options
     var optionWidth = 0;
@@ -178,7 +181,6 @@
     // params
     var context, preContext, tmpContext;
     var swftag, bitio;
-    var intervalId = 0;
     var timeoutId = 0;
     var character = [];
     var buttonHits = [];
@@ -211,6 +213,7 @@
     var instanceId = 0;
     var cacheMode = false;
     var shapeCount = 0;
+    var startTime = _Date.now();
 
     // Alpha Bug
     var isAlphaBug = isAndroid;
@@ -254,7 +257,7 @@
     window.onresize = function()
     {
         if (!isSpriteSheet && isLoad) {
-            _clearInterval(intervalId);
+            swf2js.stop();
             changeScreenSize();
             loaded();
         }
@@ -346,7 +349,7 @@
             window.addEventListener("keydown", keyAction, false);
         }
 
-        if (!intervalId && isLoad && imgUnLoadCount == 0) {
+        if (isLoad && imgUnLoadCount == 0) {
             loaded();
         }
     }
@@ -3361,7 +3364,7 @@
 
             // 読み完了
             imgUnLoadCount--;
-            if (!intervalId && isLoad && imgUnLoadCount == 0) {
+            if (isLoad && player.stopFlag && imgUnLoadCount == 0) {
                 loaded();
             }
         };
@@ -9901,7 +9904,6 @@
     function loaded()
     {
         // reset
-        _clearInterval(intervalId);
         cacheStore.reset();
         buttonHits = [];
         touchActions = [];
@@ -9930,7 +9932,7 @@
 
         // start
         swf2js.play();
-        intervalId = _setInterval(onEnterFrame, player.fps);
+        requestAnimationFrame(onEnterFrame, player.fps);
 
         if (controllerMode) {
             swf2js$controller.call(window, player.parent);
@@ -10576,10 +10578,18 @@
      */
     function onEnterFrame()
     {
+        var fps = player.fps;
+        requestAnimationFrame(onEnterFrame, fps);
+
         if (isLoad && !player.stopFlag) {
-            clearMain();
-            context.drawImage(preContext.canvas, 0, 0);
-            _setTimeout(buffer, 0);
+            var now = _Date.now();
+            var check = now - startTime;
+            if ((check / fps) >= 1) {
+                startTime = _Date.now();
+                clearMain();
+                context.drawImage(preContext.canvas, 0, 0);
+                _setTimeout(buffer, 0);
+            }
         }
     }
 
@@ -10673,7 +10683,7 @@
                             case 200:
                                 parse(xmlHttpRequest.responseText, player.parent);
                                 isLoad = true;
-                                if (intervalId == 0 && imgUnLoadCount == 0) {
+                                if (player.stopFlag && imgUnLoadCount == 0) {
                                     loaded();
                                 }
                                 break;
@@ -10721,12 +10731,10 @@
         swf2js.reload = function(url, options)
         {
             // stop
-            _clearInterval(intervalId);
             swf2js.stop();
 
             // reset
             isLoad = false;
-            intervalId = 0;
             instanceId = 0;
             backgroundColor = null;
             optionWidth = 0;
@@ -10749,14 +10757,16 @@
                 return false;
             }
 
-            // stop
-            _clearInterval(intervalId);
             isLoad = false;
             swf2js.stop();
 
             var mc = player.parent;
             mc.reset(true, 1);
             loaded();
+
+            // stop
+            isLoad = false;
+            swf2js.stop();
 
             var xmlHttpRequest = new XMLHttpRequest();
             xmlHttpRequest.open('POST', path);

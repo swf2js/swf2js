@@ -103,6 +103,7 @@ WebGL
 Release Notes  
 ======
 --[ swf2js 0.2.26 ] Release Date: 23 Apr 2015  
+* [UPDATE] refactoring rendering speed  
 * [BUGFIX] ActionScript  
 
 
