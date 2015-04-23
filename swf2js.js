@@ -11,7 +11,6 @@
  * コピーも改変もご自由にどうぞ。
  */
 (function(window) {
-    'use strict';
     var _document = window.document;
     var _min = Math.min;
     var _max = Math.max;
@@ -29,7 +28,6 @@
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
     var _isNaN = isNaN;
-    var _Audio = Audio;
     var _setInterval = setInterval;
     var _clearInterval = clearInterval;
     var _setTimeout = setTimeout;
@@ -5116,7 +5114,7 @@
         character[obj.SoundId] = obj;
 
         var sound = sounds[obj.SoundId];
-        var audio = new _Audio();
+        var audio = _document.createElement('audio');
         audio.onload = function()
         {
             this.load();
@@ -5165,7 +5163,7 @@
                     var tag = tags[idx];
                     if (tag.ButtonStateHitTest && ButtonSoundChar3) {
                         var sound = sounds[ButtonSoundChar3];
-                        var audio = new _Audio();
+                        var audio = _document.createElement('audio');
                         audio.onload = function()
                         {
                             this.load();
@@ -7894,7 +7892,7 @@
         if (!(soundId in character)) {
             return 0;
         }
-        
+
         var tag = character[soundId];
         var soundInfo = tag.SoundInfo;
         var audio = sound.Audio;
