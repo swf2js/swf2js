@@ -30,7 +30,7 @@ http://gamebiz.jp/?p=131364
 ~~~
 
 
-##API  
+## API  
 
 https://swf2js.wordpress.com/api/  
 
