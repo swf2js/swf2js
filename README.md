@@ -102,6 +102,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.27 ] Release Date: 21 May 2015  
+* [UPDATE] refactoring CacheStore  
+
+
 --[ swf2js 0.2.26 ] Release Date: 23 Apr 2015  
 * [UPDATE] refactoring rendering speed  
 * [BUGFIX] ActionScript  

@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.26)
+ * swf2js (version 0.2.27)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -211,9 +211,9 @@
     var version = 0;
     var totalFrame = 0;
     var instanceId = 0;
-    var cacheMode = false;
     var shapeCount = 0;
     var startTime = _Date.now();
+    var cacheWait = false;
 
     // Alpha Bug
     var isAlphaBug = isAndroid;
@@ -8662,7 +8662,7 @@
                     case 22: // DefineShape2
                     case 32: // DefineShape3
                     case 83: // DefineShape4
-                        cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj);
+                        cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, false);
                         break;
                     case 7: // DefineButton
                     case 34: // DefineButton2
@@ -8724,11 +8724,8 @@
             var _executeRenderShape = _this.executeRenderShape;
             var _setTransform = ctx.setTransform;
 
-            var isCache = false;
-
-            cache = ctx;
             _setTransform.call(
-                cache,
+                ctx,
                 matrix[0],
                 matrix[1],
                 matrix[2],
@@ -8737,42 +8734,48 @@
                 matrix[5]
             );
 
-            if (cacheMode && !tag.isClipDepth) {
+            if (!cacheWait && !tag.isClipDepth) {
                 var _renderBoundMatrix = _this.renderBoundMatrix;
                 var rBound = _renderBoundMatrix.call(_this, char, matrix);
                 var W = _ceil(rBound[2]);
                 var H = _ceil(rBound[3]);
 
                 if (width > W && height > H) {
-                    isCache = true;
+                    cacheWait = true;
+                    var cacheFunc = function ()
+                    {
+                        var canvas = cacheStore.getCanvas();
+                        canvas.width = W;
+                        canvas.height = H;
 
-                    var canvas = cacheStore.getCanvas();
-                    canvas.width = W;
-                    canvas.height = H;
-                    cache = canvas.getContext("2d");
-                    cache.offsetX = rBound[0];
-                    cache.offsetY = rBound[1];
-                    _setTransform.call(
-                        cache,
-                        matrix[0],
-                        matrix[1],
-                        matrix[2],
-                        matrix[3],
-                        -rBound[0],
-                        -rBound[1]
-                    );
+                        var cache = canvas.getContext("2d");
+                        cache.offsetX = rBound[0];
+                        cache.offsetY = rBound[1];
+
+                        _setTransform.call(
+                            cache,
+                            matrix[0],
+                            matrix[1],
+                            matrix[2],
+                            matrix[3],
+                            -rBound[0],
+                            -rBound[1]
+                        );
+
+                        cacheStore.set(cacheKey, _executeRenderShape.call(
+                            _this, cache, matrix, colorTransform, char.data, tag.isClipDepth
+                        ));
+
+                        _setTimeout(cacheEnd, 0);
+                    };
+
+                    _setTimeout(cacheFunc, 0);
                 }
             }
 
             // 実行
-            cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, char.data, tag.isClipDepth);
-
-            // cache
-            if (!tag.isClipDepth && isCache) {
-                cacheStore.set(cacheKey, cache);
-            } else {
-                cache = null;
-            }
+            _executeRenderShape.call(_this, ctx, matrix, colorTransform, char.data, tag.isClipDepth);
+            cache = null;
         }
 
         return cache;
@@ -9025,14 +9028,12 @@
         );
 
         var cache = cacheStore.get(cacheKey);
-        if (cache == undefined) {
-            var isCache = false;
+        if (!cache) {
             var _executeRenderShape = _this.executeRenderShape;
             var _setTransform = ctx.setTransform;
 
-            cache = ctx;
             _setTransform.call(
-                cache,
+                ctx,
                 matrix[0],
                 matrix[1],
                 matrix[2],
@@ -9041,42 +9042,51 @@
                 matrix[5]
             );
 
-            if (cacheMode) {
+            if (!cacheWait) {
                 var _renderBoundMatrix = _this.renderBoundMatrix;
                 var rBound = _renderBoundMatrix.call(_this, tag, matrix);
                 var W = _ceil(rBound[2]);
                 var H = _ceil(rBound[3]);
-                if (width > W && height > H) {
-                    isCache = true;
 
-                    var canvas = cacheStore.getCanvas();
-                    canvas.width = _ceil(rBound[2]);
-                    canvas.height = _ceil(rBound[3]);
-                    cache = canvas.getContext("2d");
-                    cache.offsetX = rBound[0];
-                    cache.offsetY = rBound[1];
-                    _setTransform.call(
-                        cache,
-                        matrix[0],
-                        matrix[1],
-                        matrix[2],
-                        matrix[3],
-                        -rBound[0],
-                        -rBound[1]
-                    );
+                if (width > W && height > H) {
+                    cacheWait = true;
+                    var cacheFunc = function ()
+                    {
+                        var canvas = cacheStore.getCanvas();
+                        canvas.width = W;
+                        canvas.height = H;
+
+                        var cache = canvas.getContext("2d");
+                        cache.offsetX = rBound[0];
+                        cache.offsetY = rBound[1];
+
+                        _setTransform.call(
+                            cache,
+                            matrix[0],
+                            matrix[1],
+                            matrix[2],
+                            matrix[3],
+                            -rBound[0],
+                            -rBound[1]
+                        );
+
+                        cacheStore.set(cacheKey, _executeRenderShape.call(
+                            _this, cache, matrix, colorTransform, tag.data, false
+                        ));
+
+                        _setTimeout(cacheEnd, 0);
+                    };
+
+                    _setTimeout(cacheFunc, 0);
                 }
             }
 
             // 実行
-            cache = _executeRenderShape.call(_this, cache, matrix, colorTransform, tag.data, false);
-
-            if (isCache) {
-                cacheStore.set(cacheKey, cache);
-            } else {
-                cache = null;
-            }
+            _executeRenderShape.call(_this, ctx, matrix, colorTransform, tag.data, false);
 
             ctx.globalAlpha = 1;
+
+            cache = null;
         }
 
         return cache;
@@ -9856,7 +9866,6 @@
         // swfを分解してbuild
         var tags = swftag.parse(mc);
         swftag.build(tags, mc);
-        cacheMode = (shapeCount > 250);
 
         // clear
         bitio = null;
@@ -10619,6 +10628,14 @@
         var obj = {};
         execute(src, obj);
         return obj;
+    }
+
+    /**
+     * cacheStart
+     */
+    function cacheEnd()
+    {
+        cacheWait = false;
     }
 
     /**
