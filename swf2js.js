@@ -44,6 +44,8 @@
     var optionWidth = 0;
     var optionHeight = 0;
     var isSpriteSheet = false;
+    var cacheStore;
+    var cacheMode = true;
     var cacheSize = 73400320; // 70M
     var controllerMode = false;
     var renderMode = window.WebGLRenderingContext && _document.createElement('canvas').getContext('webgl') ? 'webgl' : '2d';
@@ -176,7 +178,6 @@
         }
         return key;
     };
-    var cacheStore = new CacheStore();
 
     // params
     var context, preContext, tmpContext;
@@ -10631,7 +10632,7 @@
     }
 
     /**
-     * cacheStart
+     * cacheEnd
      */
     function cacheEnd()
     {
@@ -10668,6 +10669,7 @@
                 optionHeight = options.height || 0;
                 renderMode = options.mode || renderMode;
                 tagId = options.tagId || null;
+                cacheMode = options.cacheMode || cacheMode;
                 cacheSize = options.cacheSize || cacheSize;
                 isSpriteSheet = options.isSpriteSheet || false;
                 controllerMode = options.controllerMode || false;
@@ -10698,6 +10700,8 @@
                         var status = xmlHttpRequest.status;
                         switch (status) {
                             case 200:
+                                cacheStore = new CacheStore();
+
                                 parse(xmlHttpRequest.responseText, player.parent);
                                 isLoad = true;
                                 if (player.stopFlag && imgUnLoadCount == 0) {
