@@ -5826,6 +5826,11 @@
                     var value = stack.pop() + '';
                     var splitData = value.split(':');
                     if (splitData.length > 1) {
+
+                        if (movieClip == null) {
+                            break;
+                        }
+
                         var targetMc = movieClip.getMovieClip(splitData[0]);
                         if (targetMc != null) {
                             if (typeof splitData[1] == 'number') {
@@ -5846,6 +5851,11 @@
                         if (typeof splitData[0] == 'number') {
                             var frame = splitData[0];
                         } else {
+
+                            if (movieClip == null) {
+                                break;
+                            }
+
                             var frame = movieClip.getLabel(splitData[0]);
                         }
 
@@ -6111,15 +6121,17 @@
                     var target = stack.pop();
                     var value = null;
 
-                    var targetMc = movieClip;
-                    if (target != null) {
-                        targetMc = movieClip.getMovieClip(target);
-                        if (targetMc == null) {
-                            break;
+                    if (movieClip != null) {
+                        var targetMc = movieClip;
+                        if (target != null) {
+                            targetMc = movieClip.getMovieClip(target);
+                            if (targetMc == null) {
+                                break;
+                            }
                         }
-                    }
 
-                    stack[stack.length] = targetMc.getProperty(index);
+                        stack[stack.length] = targetMc.getProperty(index);
+                    }
 
                     break;
                 // GoToFrame2
@@ -6186,15 +6198,17 @@
                     var index  = _floor(stack.pop());
                     var target = stack.pop();
 
-                    var targetMc = movieClip;
-                    if (target != null) {
-                        targetMc = movieClip.getMovieClip(target);
-                        if (targetMc == null) {
-                            break;
+                    if (movieClip != null) {
+                        var targetMc = movieClip;
+                        if (target != null) {
+                            targetMc = movieClip.getMovieClip(target);
+                            if (targetMc == null) {
+                                break;
+                            }
                         }
-                    }
 
-                    targetMc.setProperty(index, value);
+                        targetMc.setProperty(index, value);
+                    }
 
                     break;
                 // StartDrag
