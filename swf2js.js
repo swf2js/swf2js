@@ -9552,9 +9552,8 @@
                     btnChar.ColorTransform
                 );
 
-                if (actions != undefined
-                    && btnChar.ButtonStateHitTest
-                ) {
+                if (btnChar.ButtonStateHitTest) {
+
                     var cacheKey = cacheStore.generateKey(
                         'ButtonHit',
                         tag.characterId,
@@ -10241,15 +10240,16 @@
                 continue;
             }
 
-            var char = character[hitObj.characterId];
-            if (char.actions == undefined) {
-                continue;
-            }
-
             if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
                 && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
             ){
+
                 touchObj = hitObj;
+                var char = character[hitObj.characterId];
+                if (char.actions == undefined) {
+                    break;
+                }
+
                 var actions = char.actions;
                 var aLen = actions.length
                 for (var idx = 0; idx < aLen; idx++) {
