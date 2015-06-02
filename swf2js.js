@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.27)
+ * swf2js (version 0.2.28)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -178,6 +178,7 @@
         }
         return key;
     };
+    cacheStore = new CacheStore();
 
     // params
     var context, preContext, tmpContext;
@@ -10673,6 +10674,8 @@
                 cacheSize = options.cacheSize || cacheSize;
                 isSpriteSheet = options.isSpriteSheet || false;
                 controllerMode = options.controllerMode || false;
+
+                cacheStore.size = cacheSize;
             }
 
             // TODO 開発用
@@ -10700,8 +10703,6 @@
                         var status = xmlHttpRequest.status;
                         switch (status) {
                             case 200:
-                                cacheStore = new CacheStore();
-
                                 parse(xmlHttpRequest.responseText, player.parent);
                                 isLoad = true;
                                 if (player.stopFlag && imgUnLoadCount == 0) {

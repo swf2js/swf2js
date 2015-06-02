@@ -102,6 +102,10 @@ WebGL
 
 Release Notes  
 ======
+--[ swf2js 0.2.28 ] Release Date: 02 Jun 2015  
+* [BUGFIX] CacheStore  
+
+
 --[ swf2js 0.2.27 ] Release Date: 22 May 2015  
 * [UPDATE] refactoring CacheStore  
 
