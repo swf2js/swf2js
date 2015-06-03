@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.28)
+ * swf2js (version 0.2.29)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -216,6 +216,7 @@
     var shapeCount = 0;
     var startTime = _Date.now();
     var cacheWait = false;
+    var isXHR2 = false;
 
     // Alpha Bug
     var isAlphaBug = isAndroid;
@@ -5469,9 +5470,13 @@
                         var level = _parseFloat(urls[1].substr(7));
                         var xmlHttpRequest = new XMLHttpRequest();
                         xmlHttpRequest.open('GET', urlString);
-                        xmlHttpRequest.overrideMimeType(
-                            'text/plain; charset=x-user-defined'
-                        );
+                        if (isXHR2) {
+                            xmlHttpRequest.responseType = 'arraybuffer';
+                        } else {
+                            xmlHttpRequest.overrideMimeType(
+                                'text/plain; charset=x-user-defined'
+                            );
+                        }
                         xmlHttpRequest.send(null);
                         xmlHttpRequest.onreadystatechange = function()
                         {
@@ -5485,7 +5490,11 @@
                                         mc.characterId = 0;
                                     }
 
-                                    parse(xmlHttpRequest.responseText, mc);
+                                    var swf = (isXHR2)
+                                        ? new Uint8Array(xmlHttpRequest.response)
+                                        : xmlHttpRequest.responseText;
+
+                                    parse(swf, mc);
 
                                     // 入れ替え
                                     if (level == 0) {
@@ -6049,9 +6058,15 @@
 
                             var xmlHttpRequest = new XMLHttpRequest();
                             xmlHttpRequest.open(method, targetUrl);
-                            xmlHttpRequest.overrideMimeType(
-                                'text/plain; charset=x-user-defined'
-                            );
+
+                            if (isXHR2) {
+                                xmlHttpRequest.responseType = 'arraybuffer';
+                            } else {
+                                xmlHttpRequest.overrideMimeType(
+                                    'text/plain; charset=x-user-defined'
+                                );
+                            }
+
                             xmlHttpRequest.send(body);
                             xmlHttpRequest.onreadystatechange = function()
                             {
@@ -6062,7 +6077,12 @@
                                         var mc = new MovieClip();
                                         mc.characterId = targetMc.characterId;
                                         mc.instanceId = targetMc.instanceId;
-                                        parse(xmlHttpRequest.responseText, mc);
+
+
+                                        var swf = (isXHR2)
+                                            ? new Uint8Array(xmlHttpRequest.response)
+                                            : xmlHttpRequest.responseText;
+                                        parse(swf, mc);
 
                                         // 入れ替え
                                         if (targetMc.characterId == 0) {
@@ -9873,7 +9893,11 @@
         bitio = new BitIO();
 
         // swfデータをセット
-        bitio.init(swf);
+        if (isXHR2) {
+            bitio.setData(swf);
+        } else {
+            bitio.init(swf);
+        }
 
         // Header
         setSwfHeader(mc);
@@ -10706,9 +10730,16 @@
 
                 var xmlHttpRequest = new XMLHttpRequest();
                 xmlHttpRequest.open('GET', url);
-                xmlHttpRequest.overrideMimeType(
-                    'text/plain; charset=x-user-defined'
-                );
+                isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
+
+                if (isXHR2) {
+                    xmlHttpRequest.responseType = 'arraybuffer';
+                } else {
+                    xmlHttpRequest.overrideMimeType(
+                        'text/plain; charset=x-user-defined'
+                    );
+                }
+
                 xmlHttpRequest.send(null);
                 xmlHttpRequest.onreadystatechange = function()
                 {
@@ -10717,7 +10748,12 @@
                         var status = xmlHttpRequest.status;
                         switch (status) {
                             case 200:
-                                parse(xmlHttpRequest.responseText, player.parent);
+                                var swf = (isXHR2)
+                                    ? new Uint8Array(xmlHttpRequest.response)
+                                    : xmlHttpRequest.responseText;
+
+                                parse(swf, player.parent);
+
                                 isLoad = true;
                                 if (player.stopFlag && imgUnLoadCount == 0) {
                                     loaded();
