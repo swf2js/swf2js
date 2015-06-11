@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.2.29)
+ * swf2js (version 0.3.0)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -10,7 +10,8 @@
  * Copyright (c) 2013 Toshiyuki Ienaga. Licensed under the MIT License.
  * コピーも改変もご自由にどうぞ。
  */
-(function(window) {
+if (window['swf2js'] == undefined) { (function(window)
+{
     var _document = window.document;
     var _min = Math.min;
     var _max = Math.max;
@@ -28,6 +29,7 @@
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
     var _isNaN = isNaN;
+    var resizeId = 0;
     var _setTimeout = setTimeout;
     var _clearTimeout = clearTimeout;
     var _Date = Date;
@@ -38,18 +40,1095 @@
                                 || window.webkitRequestAnimationFrame
                                 || window.mozRequestAnimationFrame
                                 || window.setTimeout;
-    window.requestAnimationFrame = requestAnimationFrame;
 
-    // options
-    var optionWidth = 0;
-    var optionHeight = 0;
-    var isSpriteSheet = false;
-    var cacheStore;
-    var cacheMode = true;
-    var cacheSize = 73400320; // 70M
-    var controllerMode = false;
-    var renderMode = window.WebGLRenderingContext && _document.createElement('canvas').getContext('webgl') ? 'webgl' : '2d';
-    var tagId = null;
+    var isWebGL = (window.WebGLRenderingContext
+        && _document.createElement('canvas').getContext('webgl')) ? true : false;
+
+    // params
+    var playerId = 0;
+    var players = [];
+    var instanceId = 0;
+    var tmpContext;
+    var startDate = new _Date();
+    var _navigator = window.navigator;
+    var ua = _navigator.userAgent;
+    var isAndroid = (ua.indexOf('Android') > 0);
+    var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
+    var isChrome = (ua.indexOf('Chrome') > 0);
+    var isTouch = (isAndroid || isiOS);
+    var isXHR2 = false;
+    var devicePixelRatio = window.devicePixelRatio || 1;
+    var _devicePixelRatio = (isTouch) ? devicePixelRatio * 0.8 : devicePixelRatio;
+
+    var startEvent = 'mousedown';
+    var moveEvent  = 'mousemove';
+    var endEvent   = 'mouseup';
+    if (isTouch) {
+        startEvent = 'touchstart';
+        moveEvent  = 'touchmove';
+        endEvent   = 'touchend';
+    }
+
+    // Alpha Bug
+    var isAlphaBug = isAndroid;
+    if (isAndroid) {
+        var chkCanvas = _document.createElement('canvas');
+        chkCanvas.width = 1;
+        chkCanvas.height = 1;
+        var chkCtx = chkCanvas.getContext('2d');
+        var imageData = chkCtx.createImageData(1, 1);
+        var pixelArray = imageData.data;
+        pixelArray[0] = 128;
+        pixelArray[3] = 128;
+
+        chkCtx.putImageData(imageData, 0, 0);
+        imageData = chkCtx.getImageData(0, 0, 1, 1);
+        pixelArray = imageData.data;
+        isAlphaBug = (pixelArray[0] == 255);
+        chkCtx = null;
+        imageData = null;
+        pixelArray = null;
+    }
+
+    if (isAndroid && isChrome) {
+        tmpContext = chkCanvas.getContext('2d')
+    }
+
+    // shift-jis
+    var JCT11280 = new Function('var a="zKV33~jZ4zN=~ji36XazM93y!{~k2y!o~k0ZlW6zN?3Wz3W?{EKzK[33[`y|;-~j^YOTz$!~kNy|L1$353~jV3zKk3~k-4P4zK_2+~jY4y!xYHR~jlz$_~jk4z$e3X5He<0y!wy|X3[:~l|VU[F3VZ056Hy!nz/m1XD61+1XY1E1=1y|bzKiz!H034zKj~mEz#c5ZA3-3X$1~mBz$$3~lyz#,4YN5~mEz#{ZKZ3V%7Y}!J3X-YEX_J(3~mAz =V;kE0/y|F3y!}~m>z/U~mI~j_2+~mA~jp2;~m@~k32;~m>V}2u~mEX#2x~mBy+x2242(~mBy,;2242(~may->2&XkG2;~mIy-_2&NXd2;~mGz,{4<6:.:B*B:XC4>6:.>B*BBXSA+A:X]E&E<~r#z+625z s2+zN=`HXI@YMXIAXZYUM8X4K/:Q!Z&33 3YWX[~mB`{zKt4z (zV/z 3zRw2%Wd39]S11z$PAXH5Xb;ZQWU1ZgWP%3~o@{Dgl#gd}T){Uo{y5_d{e@}C(} WU9|cB{w}bzvV|)[} H|zT}d||0~{]Q|(l{|x{iv{dw}(5}[Z|kuZ }cq{{y|ij}.I{idbof%cu^d}Rj^y|-M{ESYGYfYsZslS`?ZdYO__gLYRZ&fvb4oKfhSf^d<Yeasc1f&a=hnYG{QY{D`Bsa|u,}Dl|_Q{C%xK|Aq}C>|c#ryW=}eY{L+`)][YF_Ub^h4}[X|?r|u_ex}TL@YR]j{SrXgo*|Gv|rK}B#mu{R1}hs|dP{C7|^Qt3|@P{YVV |8&}#D}ef{e/{Rl|>Hni}R1{Z#{D[}CQlQ||E}[s{SG_+i8eplY[=[|ec[$YXn#`hcm}YR|{Ci(_[ql|?8p3]-}^t{wy}4la&pc|3e{Rp{LqiJ],] `kc(]@chYnrM`O^,ZLYhZB]ywyfGY~aex!_Qww{a!|)*lHrM{N+n&YYj~Z b c#e_[hZSon|rOt`}hBXa^i{lh|<0||r{KJ{kni)|x,|0auY{D!^Sce{w;|@S|cA}Xn{C1h${E]Z-XgZ*XPbp]^_qbH^e[`YM|a||+=]!Lc}]vdBc=j-YSZD]YmyYLYKZ9Z>Xcczc2{Yh}9Fc#Z.l{}(D{G{{mRhC|L3b#|xK[Bepj#ut`H[,{E9Yr}1b{[e]{ZFk7[ZYbZ0XL]}Ye[(`d}c!|*y`Dg=b;gR]Hm=hJho}R-[n}9;{N![7k_{UbmN]rf#pTe[x8}!Qcs_rs[m`|>N}^V})7{^r|/E}),}HH{OYe2{Skx)e<_.cj.cjoMhc^d}0uYZd!^J_@g,[[[?{i@][|3S}Yl3|!1|eZ|5IYw|1D}e7|Cv{OHbnx-`wvb[6[4} =g+k:{C:}ed{S]|2M]-}WZ|/q{LF|dYu^}Gs^c{Z=}h>|/i|{W]:|ip{N:|zt|S<{DH[p_tvD{N<[8Axo{X4a.^o^X>Yfa59`#ZBYgY~_t^9`jZHZn`>G[oajZ;X,i)Z.^~YJe ZiZF^{][[#Zt^|]Fjx]&_5dddW]P0C[-]}]d|y {C_jUql] |OpaA[Z{lp|rz}:Mu#]_Yf6{Ep?f5`$[6^D][^u[$[6^.Z8]]ePc2U/=]K^_+^M{q*|9tYuZ,s(dS{i=|bNbB{uG}0jZOa:[-]dYtu3]:]<{DJ_SZIqr_`l=Yt`gkTnXb3d@kiq0a`Z{|!B|}e}Ww{Sp,^Z|0>_Z}36|]A|-t}lt{R6pi|v8hPu#{C>YOZHYmg/Z4nicK[}hF_Bg|YRZ7c|crkzYZY}_iXcZ.|)U|L5{R~qi^Uga@Y[xb}&qdbd6h5|Btw[}c<{Ds53[Y7]?Z<|e0{L[ZK]mXKZ#Z2^tavf0`PE[OSOaP`4gi`qjdYMgys/?[nc,}EEb,eL]g[n{E_b/vcvgb.{kcwi`~v%|0:|iK{Jh_vf5lb}KL|(oi=LrzhhY_^@`zgf[~g)[J_0fk_V{T)}I_{D&_/d9W/|MU[)f$xW}?$xr4<{Lb{y4}&u{XJ|cm{Iu{jQ}CMkD{CX|7A}G~{kt)nB|d5|<-}WJ}@||d@|Iy}Ts|iL|/^|no|0;}L6{Pm]7}$zf:|r2}?C_k{R(}-w|`G{Gy[g]bVje=_0|PT{^Y^yjtT[[[l!Ye_`ZN]@[n_)j3nEgMa]YtYpZy].d-Y_cjb~Y~[nc~sCi3|zg}B0}do{O^{|$`_|D{}U&|0+{J3|8*]iayx{a{xJ_9|,c{Ee]QXlYb]$[%YMc*]w[aafe]aVYi[fZEii[xq2YQZHg]Y~h#|Y:thre^@^|_F^CbTbG_1^qf7{L-`VFx Zr|@EZ;gkZ@slgko`[e}T:{Cu^pddZ_`yav^Ea+[#ZBbSbO`elQfLui}.F|txYcbQ`XehcGe~fc^RlV{D_0ZAej[l&jShxG[ipB_=u:eU}3e8[=j|{D(}dO{Do[BYUZ0/]AYE]ALYhZcYlYP/^-^{Yt_1_-;YT`P4BZG=IOZ&]H[e]YYd[9^F[1YdZxZ?Z{Z<]Ba2[5Yb[0Z4l?]d_;_)a?YGEYiYv`_XmZs4ZjY^Zb]6gqGaX^9Y}dXZr[g|]Y}K aFZp^k^F]M`^{O1Ys]ZCgCv4|E>}8eb7}l`{L5[Z_faQ|c2}Fj}hw^#|Ng|B||w2|Sh{v+[G}aB|MY}A{|8o}X~{E8paZ:]i^Njq]new)`-Z>haounWhN}c#{DfZ|fK]KqGZ=:u|fqoqcv}2ssm}.r{]{nIfV{JW)[K|,Z{Uxc|]l_KdCb%]cfobya3`p}G^|LZiSC]U|(X|kBlVg[kNo({O:g:|-N|qT}9?{MBiL}Sq{`P|3a|u.{Uaq:{_o|^S}jX{Fob0`;|#y_@[V[K|cw[<_ }KU|0F}d3|et{Q7{LuZttsmf^kYZ`Af`}$x}U`|Ww}d]| >}K,r&|XI|*e{C/a-bmr1fId4[;b>tQ_:]hk{b-pMge]gfpo.|(w[jgV{EC1Z,YhaY^q,_G[c_g[J0YX]`[h^hYK^_Yib,` {i6vf@YM^hdOKZZn(jgZ>bzSDc^Z%[[o9[2=/YHZ(_/Gu_`*|8z{DUZxYt^vuvZjhi^lc&gUd4|<UiA`z]$b/Z?l}YI^jaHxe|;F}l${sQ}5g}hA|e4}?o{ih}Uz{C)jPe4]H^J[Eg[|AMZMlc}:,{iz}#*|gc{Iq|/:|zK{l&}#u|myd{{M&v~nV};L|(g|I]ogddb0xsd7^V})$uQ{HzazsgxtsO^l}F>ZB]r|{7{j@cU^{{CbiYoHlng]f+nQ[bkTn/}<-d9q {KXadZYo+n|l[|lc}V2{[a{S4Zam~Za^`{HH{xx_SvF|ak=c^[v^7_rYT`ld@]:_ub%[$[m](Shu}G2{E.ZU_L_R{tz`vj(f?^}hswz}GdZ}{S:h`aD|?W|`dgG|if{a8|J1{N,}-Ao3{H#{mfsP|[ bzn+}_Q{MT{u4kHcj_q`eZj[8o0jy{p7}C|[}l){MuYY{|Ff!Ykn3{rT|m,^R|,R}$~Ykgx{P!]>iXh6[l[/}Jgcg{JYZ.^qYfYIZl[gZ#Xj[Pc7YyZD^+Yt;4;`e8YyZVbQ7YzZxXja.7SYl[s]2^/Ha$[6ZGYrb%XiYdf2]H]kZkZ*ZQ[ZYS^HZXcCc%Z|[(bVZ]]:OJQ_DZCg<[,]%Zaa [g{C00HY[c%[ChyZ,Z_`PbXa+eh`^&jPi0a[ggvhlekL]w{Yp^v}[e{~;k%a&k^|nR_z_Qng}[E}*Wq:{k^{FJZpXRhmh3^p>de^=_7`|ZbaAZtdhZ?n4ZL]u`9ZNc3g%[6b=e.ZVfC[ZZ^^^hD{E(9c(kyZ=bb|Sq{k`|vmr>izlH[u|e`}49}Y%}FT{[z{Rk}Bz{TCc/lMiAqkf(m$hDc;qooi[}^o:c^|Qm}a_{mrZ(pA`,}<2sY| adf_%|}`}Y5U;}/4|D>|$X{jw{C<|F.hK|*A{MRZ8Zsm?imZm_?brYWZrYx`yVZc3a@f?aK^ojEd {bN}/3ZH]/$YZhm^&j 9|(S|b]mF}UI{q&aM]LcrZ5^.|[j`T_V_Gak}9J[ ZCZD|^h{N9{~&[6Zd{}B}2O|cv]K}3s}Uy|l,fihW{EG`j_QOp~Z$F^zexS`dcISfhZBXP|.vn|_HYQ|)9|cr]<`&Z6]m_(ZhPcSg>`Z]5`~1`0Xcb4k1{O!bz|CN_T{LR|a/gFcD|j<{Z._[f)mPc:1`WtIaT1cgYkZOaVZOYFrEe[}T$}Ch}mk{K-^@]fH{Hdi`c*Z&|Kt{if[C{Q;{xYB`dYIX:ZB[}]*[{{p9|4GYRh2ao{DS|V+[zd$`F[ZXKadb*A] Ys]Maif~a/Z2bmclb8{Jro_rz|x9cHojbZ{GzZx_)]:{wAayeDlx}<=`g{H1{l#}9i|)=|lP{Qq}.({La|!Y{i2EZfp=c*}Cc{EDvVB|;g}2t{W4av^Bn=]ri,|y?|3+}T*ckZ*{Ffr5e%|sB{lx^0]eZb]9[SgAjS_D|uHZx]dive[c.YPkcq/}db{EQh&hQ|eg}G!ljil|BO]X{Qr_GkGl~YiYWu=c3eb}29v3|D|}4i||.{Mv})V{SP1{FX}CZW6{cm|vO{pS|e#}A~|1i}81|Mw}es|5[}3w{C`h9aL]o{}p[G`>i%a1Z@`Ln2bD[$_h`}ZOjhdTrH{[j_:k~kv[Sdu]CtL}41{I |[[{]Zp$]XjxjHt_eThoa#h>sSt8|gK|TVi[Y{t=}Bs|b7Zpr%{gt|Yo{CS[/{iteva|cf^hgn}($_c^wmb^Wm+|55jrbF|{9^ q6{C&c+ZKdJkq_xOYqZYSYXYl`8]-cxZAq/b%b*_Vsa[/Ybjac/OaGZ4fza|a)gY{P?| I|Y |,pi1n7}9bm9ad|=d{aV|2@[(}B`d&|Uz}B}{`q|/H|!JkM{FU|CB|.{}Az}#P|lk}K{|2rk7{^8^?`/|k>|Ka{Sq}Gz}io{DxZh[yK_#}9<{TRdgc]`~Z>JYmYJ]|`!ZKZ]gUcx|^E[rZCd`f9oQ[NcD_$ZlZ;Zr}mX|=!|$6ZPZYtIo%fj}CpcN|B,{VDw~gb}@hZg`Q{LcmA[(bo`<|@$|o1|Ss}9Z_}tC|G`{F/|9nd}i=}V-{L8aaeST]daRbujh^xlpq8|}zs4bj[S`J|]?G{P#{rD{]I`OlH{Hm]VYuSYUbRc*6[j`8]pZ[bt_/^Jc*[<Z?YE|Xb|?_Z^Vcas]h{t9|Uwd)_(=0^6Zb{Nc} E[qZAeX[a]P^|_J>e8`W^j_Y}R{{Jp__]Ee#e:iWb9q_wKbujrbR}CY`,{mJ}gz{Q^{t~N|? gSga`V_||:#mi}3t|/I`X{N*|ct|2g{km}gi|{={jC}F;|E}{ZZjYf*frmu}8Tdroi{T[|+~}HG{cJ}DM{Lp{Ctd&}$hi3|FZ| m}Kr|38}^c|m_|Tr{Qv|36}?Up>|;S{DV{k_as}BK{P}}9p|t`jR{sAm4{D=b4pWa[}Xi{EjwEkI}3S|E?u=X0{jf} S|NM|JC{qo^3cm]-|JUx/{Cj{s>{Crt[UXuv|D~|j|d{YXZR}Aq}0r}(_{pJfi_z}0b|-vi)Z mFe,{f4|q`b{}^Z{HM{rbeHZ|^x_o|XM|L%|uFXm}@C_{{Hhp%a7|0p[Xp+^K}9U{bP}: tT}B|}+$|b2|[^|~h{FAby[`{}xgygrt~h1[li`c4vz|,7p~b(|mviN}^pg[{N/|g3|^0c,gE|f%|7N{q[|tc|TKA{LU}I@|AZp(}G-sz{F |qZ{}F|f-}RGn6{Z]_5})B}UJ{FFb2]4ZI@v=k,]t_Dg5Bj]Z-]L]vrpdvdGlk|gF}G]|IW}Y0[G| /bo|Te^,_B}#n^^{QHYI[?hxg{[`]D^IYRYTb&kJ[cri[g_9]Ud~^_]<p@_e_XdNm-^/|5)|h_{J;{kacVopf!q;asqd}n)|.m|bf{QW|U)}b+{tL|w``N|to{t ZO|T]jF}CB|0Q{e5Zw|k |We}5:{HO{tPwf_uajjBfX}-V_C_{{r~gg|Ude;s+}KNXH}! `K}eW{Upwbk%ogaW}9EYN}YY|&v|SL{C3[5s.]Y]I]u{M6{pYZ`^,`ZbCYR[1mNg>rsk0Ym[jrE]RYiZTr*YJ{Ge|%-lf|y(`=[t}E6{k!|3)}Zk} ][G{E~cF{u3U.rJ|a9p#o#ZE|?|{sYc#vv{E=|LC}cu{N8`/`3`9rt[4|He{cq|iSYxY`}V |(Q|t4{C?]k_Vlvk)BZ^r<{CL}#h}R+[<|i=}X|{KAo]|W<`K{NW|Zx}#;|fe{IMr<|K~tJ_x}AyLZ?{GvbLnRgN}X&{H7|x~}Jm{]-| GpNu0}.ok>|c4{PYisrDZ|fwh9|hfo@{H~XSbO]Odv]%`N]b1Y]]|eIZ}_-ZA]aj,>eFn+j[aQ_+]h[J_m_g]%_wf.`%k1e#Z?{CvYu_B^|gk`Xfh^M3`afGZ-Z|[m{L}|k3cp[it ^>YUi~d>{T*}YJ{Q5{Jxa$hg|%4`}|LAgvb }G}{P=|<;Ux{_skR{cV|-*|s-{Mp|XP|$G|_J}c6cM{_=_D|*9^$ec{V;|4S{qO|w_|.7}d0|/D}e}|0G{Dq]Kdp{}dfDi>}B%{Gd|nl}lf{C-{y}|ANZr}#={T~|-(}c&{pI|ft{lsVP}){|@u}!W|bcmB{d?|iW|:dxj{PSkO|Hl]Li:}VYk@|2={fnWt{M3`cZ6|)}|Xj}BYa?vo{e4|L7|B7{L7|1W|lvYO}W8nJ|$Vih|{T{d*_1|:-n2dblk``fT{Ky|-%}m!|Xy|-a{Pz}[l{kFjz|iH}9N{WE{x,|jz}R {P|{D)c=nX|Kq|si}Ge{sh|[X{RF{t`|jsr*fYf,rK|/9}$}}Nf{y!1|<Std}4Wez{W${Fd_/^O[ooqaw_z[L`Nbv[;l7V[ii3_PeM}.h^viqYjZ*j1}+3{bt{DR[;UG}3Og,rS{JO{qw{d<_zbAh<R[1_r`iZTbv^^a}c{iEgQZ<exZFg.^Rb+`Uj{a+{z<[~r!]`[[|rZYR|?F|qppp]L|-d|}K}YZUM|=Y|ktm*}F]{D;g{uI|7kg^}%?Z%ca{N[_<q4xC]i|PqZC]n}.bDrnh0Wq{tr|OMn6tM|!6|T`{O`|>!]ji+]_bTeU}Tq|ds}n|{Gm{z,f)}&s{DPYJ`%{CGd5v4tvb*hUh~bf]z`jajiFqAii]bfy^U{Or|m+{I)cS|.9k:e3`^|xN}@Dnlis`B|Qo{`W|>||kA}Y}{ERYuYx`%[exd`]|OyiHtb}HofUYbFo![5|+]gD{NIZR|Go}.T{rh^4]S|C9_}xO^i`vfQ}C)bK{TL}cQ|79iu}9a];sj{P.o!f[Y]pM``Jda^Wc9ZarteBZClxtM{LW}l9|a.mU}KX}4@{I+f1}37|8u}9c|v${xGlz}jP{Dd1}e:}31}%3X$|22i<v+r@~mf{sN{C67G97855F4YL5}8f{DT|xy{sO{DXB334@55J1)4.G9A#JDYtXTYM4, YQD9;XbXm9SX]IB^4UN=Xn<5(;(F3YW@XkH-X_VM[DYM:5XP!T&Y`6|,^{IS-*D.H>:LXjYQ0I3XhAF:9:(==.F*3F1189K/7163D,:@|e2{LS36D4hq{Lw/84443@4.933:0307::6D7}&l{Mx657;89;,K5678H&93D(H<&<>0B90X^I;}Ag1{P%3A+>><975}[S{PZE453?4|T2{Q+5187;>447:81{C=hL6{Me^:=7ii{R=.=F<81;48?|h8}Uh{SE|,VxL{ST,7?9Y_5Xk3A#:$%YSYdXeKXOD8+TXh7(@>(YdXYHXl9J6X_5IXaL0N?3YK7Xh!1?XgYz9YEXhXaYPXhC3X`-YLY_XfVf[EGXZ5L8BXL9YHX]SYTXjLXdJ: YcXbQXg1PX]Yx4|Jr{Ys4.8YU+XIY`0N,<H%-H;:0@,74/:8546I=9177154870UC]d<C3HXl7ALYzXFXWP<<?E!88E5@03YYXJ?YJ@6YxX-YdXhYG|9o{`iXjY_>YVXe>AYFX[/(I@0841?):-B=14337:8=|14{c&93788|di{cW-0>0<097/A;N{FqYpugAFT%X/Yo3Yn,#=XlCYHYNX[Xk3YN:YRT4?)-YH%A5XlYF3C1=NWyY}>:74-C673<69545v {iT85YED=64=.F4..9878/D4378?48B3:7:7/1VX[f4{D,{l<5E75{dAbRB-8-@+;DBF/$ZfW8S<4YhXA.(5@*11YV8./S95C/0R-A4AXQYI7?68167B95HA1*<M3?1/@;/=54XbYP36}lc{qzSS38:19?,/39193574/66878Yw1X-87E6=;964X`T734:>86>1/=0;(I-1::7ALYGXhF+Xk[@W%TYbX7)KXdYEXi,H-XhYMRXfYK?XgXj.9HX_SX]YL1XmYJ>Y}WwIXiI-3-GXcYyXUYJ$X`Vs[7;XnYEZ;XF! 3;%8;PXX(N3Y[)Xi1YE&/ :;74YQ6X`33C;-(>Xm0(TYF/!YGXg8 9L5P01YPXO-5%C|qd{{/K/E6,=0144:361:955;6443@?B7*7:F89&F35YaX-CYf,XiFYRXE_e{}sF 0*7XRYPYfXa5YXXY8Xf8Y~XmA[9VjYj*#YMXIYOXk,HHX40YxYMXU8OXe;YFXLYuPXP?EB[QV0CXfY{:9XV[FWE0D6X^YVP*$4%OXiYQ(|xp|%c3{}V`1>Y`XH00:8/M6XhQ1:;3414|TE|&o@1*=81G8<3}6<|(f6>>>5-5:8;093B^3U*+*^*UT30XgYU&7*O1953)5@E78--F7YF*B&0:%P68W9Zn5974J9::3}Vk|-,C)=)1AJ4+<3YGXfY[XQXmT1M-XcYTYZXCYZXEYXXMYN,17>XIG*SaS|/eYJXbI?XdNZ+WRYP<F:R PXf;0Xg`$|1GX9YdXjLYxWX!ZIXGYaXNYm6X9YMX?9EXmZ&XZ#XQ>YeXRXfAY[4 ;0X!Zz0XdN$XhYL XIY^XGNXUYS/1YFXhYk.TXn4DXjB{jg|4DEX]:XcZMW=A.+QYL<LKXc[vV$+&PX*Z3XMYIXUQ:ZvW< YSXFZ,XBYeXMM)?Xa XiZ4/EXcP3%}&-|6~:1(-+YT$@XIYRBC<}&,|7aJ6}bp|8)K1|Xg|8C}[T|8Q.89;-964I38361<=/;883651467<7:>?1:.}le|:Z=39;1Y^)?:J=?XfLXbXi=Q0YVYOXaXiLXmJXO5?.SFXiCYW}-;|=u&D-X`N0X^,YzYRXO(QX_YW9`I|>hZ:N&X)DQXP@YH#XmNXi$YWX^=!G6YbYdX>XjY|XlX^XdYkX>YnXUXPYF)FXT[EVTMYmYJXmYSXmNXi#GXmT3X8HOX[ZiXN]IU2>8YdX1YbX<YfWuZ8XSXcZU%0;1XnXkZ_WTG,XZYX5YSX Yp 05G?XcYW(IXg6K/XlYP4XnI @XnO1W4Zp-9C@%QDYX+OYeX9>--YSXkD.YR%Q/Yo YUX].Xi<HYEZ2WdCE6YMXa7F)=,D>-@9/8@5=?7164;35387?N<618=6>7D+C50<6B03J0{Hj|N9$D,9I-,.KB3}m |NzE0::/81YqXjMXl7YG; [.W=Z0X4XQY]:MXiR,XgM?9$9>:?E;YE77VS[Y564760391?14941:0=:8B:;/1DXjFA-564=0B3XlH1+D85:0Q!B#:-6&N/:9<-R3/7Xn<*3J4.H:+334B.=>30H.;3833/76464665755:/83H6633:=;.>5645}&E|Y)?1/YG-,93&N3AE@5 <L1-G/8A0D858/30>8<549=@B8] V0[uVQYlXeD(P#ID&7T&7;Xi0;7T-$YE)E=1:E1GR):--0YI7=E<}n9|aT6783A>D7&4YG7=391W;Zx<5+>F#J39}o/|cc;6=A050EQXg8A1-}D-|d^5548083563695D?-.YOXd37I$@LYLWeYlX<Yd+YR A$;3-4YQ-9XmA0!9/XLY_YT(=5XdDI>YJ5XP1ZAW{9>X_6R(XhYO65&J%DA)C-!B:97#A9;@?F;&;(9=11/=657/H,<8}bz|j^5446>.L+&Y^8Xb6?(CYOXb*YF(8X`FYR(XPYVXmPQ%&DD(XmZXW??YOXZXfCYJ79,O)XnYF7K0!QXmXi4IYFRXS,6<%-:YO(+:-3Q!1E1:W,Zo}Am|n~;3580534*?3Zc4=9334361693:30C<6/717:<1/;>59&:4}6!|rS36=1?75<8}[B|s809983579I.A.>84758=108564741H*9E{L{|u%YQ<%6XfH.YUXe4YL@,>N}Tv|ve*G0X)Z;/)3@A74(4P&A1X:YVH97;,754*A66:1 D739E3553545558E4?-?K17/770843XAYf838A7K%N!YW4.$T19Z`WJ*0XdYJXTYOXNZ 1XaN1A+I&Xi.Xk3Z3GB&5%WhZ1+5#Y[X<4YMXhQYoQXVXbYQ8XSYUX4YXBXWDMG0WxZA[8V+Z8X;D],Va$%YeX?FXfX[XeYf<X:Z[WsYz8X_Y]%XmQ(!7BXIZFX]&YE3F$(1XgYgYE& +[+W!<YMYFXc;+PXCYI9YrWxGXY9DY[!GXiI7::)OC;*$.>N*HA@{C|}&k=:<TB83X`3YL+G4XiK]i}(fYK<=5$.FYE%4*5*H*6XkCYL=*6Xi6!Yi1KXR4YHXbC8Xj,B9ZbWx/XbYON#5B}Ue}+QKXnF1&YV5XmYQ0!*3IXBYb71?1B75XmF;0B976;H/RXU:YZX;BG-NXj;XjI>A#D3B636N;,*%<D:0;YRXY973H5)-4FXOYf0:0;/7759774;7;:/855:543L43<?6=E,.A4:C=L)%4YV!1(YE/4YF+ F3%;S;&JC:%/?YEXJ4GXf/YS-EXEYW,9;E}X$}547EXiK=51-?71C%?57;5>463553Zg90;6447?<>4:9.7538XgN{|!}9K/E&3-:D+YE1)YE/3;37/:05}n<}:UX8Yj4Yt864@JYK..G=.(A Q3%6K>3(P3#AYE$-6H/456*C=.XHY[#S.<780191;057C)=6HXj?955B:K1 E>-B/9,;5.!L?:0>/.@//:;7833YZ56<4:YE=/:7Z_WGC%3I6>XkC*&NA16X=Yz2$X:Y^&J48<99k8}CyB-61<18K946YO4{|N}E)YIB9K0L>4=46<1K0+R;6-=1883:478;4,S+3YJX`GJXh.Yp+Xm6MXcYpX(>7Yo,/:X=Z;Xi0YTYHXjYmXiXj;*;I-8S6N#XgY}.3XfYGO3C/$XjL$*NYX,1 6;YH&<XkK9C#I74.>}Hd`A748X[T450[n75<4439:18A107>|ET}Rf<1;14876/Yb983E<5.YNXd4149>,S=/4E/<306443G/06}0&}UkYSXFYF=44=-5095=88;63844,9E6644{PL}WA8:>)7+>763>>0/B3A545CCnT}Xm|dv}Xq1L/YNXk/H8;;.R63351YY747@15YE4J8;46;.38.>4A369.=-83,;Ye3?:3@YE.4-+N353;/;@(X[YYD>@/05-I*@.:551741Yf5>6A443<3535;.58/86=D4753442$635D1>0359NQ @73:3:>><Xn?;43C14 ?Y|X611YG1&<+,4<*,YLXl<1/AIXjF*N89A4Z576K1XbJ5YF.ZOWN.YGXO/YQ01:4G38Xl1;KI0YFXB=R<7;D/,/4>;$I,YGXm94@O35Yz66695385.>:6A#5}W7n^4336:4157597434433<3|XA}m`>=D>:4A.337370?-6Q96{`E|4A}C`|Qs{Mk|J+~r>|o,wHv>Vw}!c{H!|Gb|*Ca5}J||,U{t+{CN[!M65YXOY_*B,Y[Z9XaX[QYJYLXPYuZ%XcZ8LY[SYPYKZM<LMYG9OYqSQYM~[e{UJXmQYyZM_)>YjN1~[f3{aXFY|Yk:48YdH^NZ0|T){jVFYTZNFY^YTYN~[h{nPYMYn3I]`EYUYsYIZEYJ7Yw)YnXPQYH+Z.ZAZY]^Z1Y`YSZFZyGYHXLYG 8Yd#4~[i|+)YH9D?Y^F~Y7|-eYxZ^WHYdYfZQ~[j|3>~[k|3oYmYqY^XYYO=Z*4[]Z/OYLXhZ1YLZIXgYIHYEYK,<Y`YEXIGZI[3YOYcB4SZ!YHZ*&Y{Xi3~[l|JSY`Zz?Z,~[m|O=Yi>??XnYWXmYS617YVYIHZ(Z4[~L4/=~[n|Yu{P)|];YOHHZ}~[o33|a>~[r|aE]DH~[s|e$Zz~[t|kZFY~XhYXZB[`Y}~[u|{SZ&OYkYQYuZ2Zf8D~[v}% ~[w3},Q[X]+YGYeYPIS~[y}4aZ!YN^!6PZ*~[z}?E~[{3}CnZ=~[}}EdDZz/9A3(3S<,YR8.D=*XgYPYcXN3Z5 4)~[~}JW=$Yu.XX~] }KDX`PXdZ4XfYpTJLY[F5]X~[2Yp}U+DZJ::<446[m@~]#3}]1~]%}^LZwZQ5Z`/OT<Yh^ -~]&}jx[ ~m<z!%2+~ly4VY-~o>}p62yz!%2+Xf2+~ly4VY-zQ`z (=] 2z~o2",C={" ":0,"!":1},c=34,i=2,p,s="",u=String.fromCharCode,t=u(12539);while(++c<127)C[u(c)]=c^39&&c^92?i++:0;i=0;while(0<=(c=C[a.charAt(i++)]))if(16==c)if((c=C[a.charAt(i++)])<87){if(86==c)c=1879;while(c--)s+=u(++p)}else s+=s.substr(8272,360);else if(c<86)s+=u(p+=c<51?c-16:(c-55)*92+C[a.charAt(i++)]);else if((c=((c-86)*92+C[a.charAt(i++)])*92+C[a.charAt(i++)])<49152)s+=u(p=c<40960?c:c|57344);else{c&=511;while(c--)s+=t;p=12539}return s')();
+    function decodeToShiftJis(str)
+    {
+        return str.replace(/%(8[1-9A-F]|[9E][0-9A-F]|F[0-9A-C])(%[4-689A-F][0-9A-F]|%7[0-9A-E]|[@-~])|%([0-7][0-9A-F]|A[1-9A-F]|[B-D][0-9A-F])/ig,
+            function(s)
+            {
+                var c = _parseInt(s.substring(1, 3), 16);
+                var l = s.length;
+                return 3==l?_fromCharCode(c<160?c:c+65216):JCT11280.charAt((c<160?c-129:c-193)*188+(4==l?s.charCodeAt(3)-64:(c=_parseInt(s.substring(4),16))<127?c-64:c-65));
+            }
+        );
+    }
+
+    /**
+     * clone
+     * @param src
+     * @returns {{}}
+     */
+    function clone(src)
+    {
+        var execute = function(src, obj)
+        {
+            for(var prop in src) {
+                var value = src[prop];
+                if(value instanceof Array) {
+                    obj[prop] = [];
+                    execute(value, obj[prop]);
+                } else if(value instanceof Object) {
+                    obj[prop] = {};
+                    execute(value, obj[prop]);
+                } else {
+                    obj[prop] = value;
+                }
+            }
+        };
+
+        var obj = {};
+        execute(src, obj);
+        return obj;
+    }
+
+    /**
+     * リサイズ
+     */
+    function onResizeCanvas()
+    {
+        var length = players.length;
+        for (var i = 0; i < length; i++) {
+            if (!(i in players)) {
+                continue;
+            }
+
+            var player = players[i];
+            player.resize();
+            player.loaded();
+        }
+    }
+
+    /**
+     * addEventListener
+     */
+    window.addEventListener('resize', function(event)
+    {
+        _clearTimeout(resizeId);
+        resizeId = _setTimeout(onResizeCanvas, 300);
+    }, false);
+
+    /**
+     * tmp canvas clear
+     */
+    function clearTmp()
+    {
+        var canvas = tmpContext.canvas;
+        tmpContext.setTransform(1, 0, 0, 1, 0, 0);
+        tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height);
+    }
+
+    /**
+     * @constructor
+     */
+    var VectorToCanvas = function() {};
+
+    /**
+     * vectorToCanvas
+     * @param shapes
+     * @returns {*}
+     */
+    VectorToCanvas.prototype.execute = function(shapes)
+    {
+        var _this = this;
+        var i = 0;
+        var depth = 0;
+        var lineStyle = shapes.lineStyles.lineStyles;
+        var fillStyle = shapes.fillStyles.fillStyles;
+        var records = shapes.ShapeRecords;
+        var AnchorX = 0;
+        var AnchorY = 0;
+        var ControlX = 0;
+        var ControlY = 0;
+
+        var canvasF0Array = [[]];
+        var canvasF1Array = [[]];
+        var canvasLArray = [[]];
+
+        var fillFlag0 = false;
+        var fillFlag1 = false;
+        var lineFlag = false;
+
+        var f0Idx = 0;
+        var f1Idx = 0;
+
+        var StartX = 0;
+        var StartY = 0;
+
+        // 重なり番号
+        var stack = 0;
+
+        while (true) {
+            var record = records[i];
+            if (records[i] == 0) {
+                break;
+            }
+
+            if (record.isChange) {
+                // 移動判定
+                if (record.StateMoveTo) {
+                    StartX = record.MoveX;
+                    StartY = record.MoveY;
+                } else {
+                    StartX = AnchorX;
+                    StartY = AnchorY;
+                }
+
+                // 新しい色をセット
+                var StateFillStyle0 = record.StateFillStyle0;
+                var FillStyle0 = record.FillStyle0;
+                var StateFillStyle1 = record.StateFillStyle1;
+                var FillStyle1 = record.FillStyle1;
+                var StateLineStyle = record.StateLineStyle;
+                var LineStyle = record.LineStyle;
+
+                if (record.StateNewStyles == 1) {
+                    // fillStyle
+                    if (record.NumFillBits > 0) {
+                        var FillStyles = record.FillStyles;
+                        fillStyle = FillStyles.fillStyles;
+                    }
+
+                    // lineStyle
+                    if (record.NumLineBits > 0) {
+                        var LineStyles = record.LineStyles;
+                        lineStyle = LineStyles.lineStyles;
+                    }
+
+                    // fillFlag0
+                    if (StateFillStyle0 == 1 && FillStyle0 == 0) {
+                        fillFlag0 = false;
+                    }
+
+                    // fillFlag1
+                    if (StateFillStyle1 == 1 && FillStyle1 == 0) {
+                        fillFlag1 = false;
+                    }
+
+                    // lineFlag
+                    if (StateLineStyle == 1 && LineStyle == 0) {
+                        lineFlag = false;
+                    }
+
+                    // 上に加算
+                    stack++;
+                    canvasF0Array[stack] = [];
+                    canvasF1Array[stack] = [];
+                    canvasLArray[stack] = [];
+
+                    AnchorX = 0;
+                    AnchorY = 0;
+
+                    i++;
+                    continue;
+                }
+
+                // 深度
+                depth++;
+
+                // fill0
+                fillFlag0 = ((StateFillStyle0 > 0 && FillStyle0 > 0)
+                    || (fillFlag0 && StateFillStyle0 == 0)
+                );
+                if (fillFlag0) {
+                    // 色の算出
+                    if (FillStyle0) {
+                        f0Idx = (FillStyle0 - 1);
+                        var f0ColorObj = fillStyle[f0Idx];
+                        var fillStyleType = f0ColorObj.fillStyleType;
+                    }
+
+                    // 初期設定
+                    var f0Base = canvasF0Array[stack];
+                    if (!(depth in f0Base)) {
+                        f0Base[depth] = {
+                            StartX: StartX,
+                            StartY: StartY,
+                            Depth: depth,
+                            Color: (fillStyleType == 0x00) ? f0ColorObj.Color : f0ColorObj,
+                            ColorIdx: f0Idx,
+                            styleType: fillStyleType,
+                            cArray: [],
+                            fArray: []
+                        };
+
+                        var f0cArray = f0Base[depth].fArray;
+                        var aLen = f0cArray.length;
+                        f0cArray[aLen++] = 'moveTo';
+                        f0cArray[aLen++] = StartX;
+                        f0cArray[aLen] = StartY;
+                    }
+                }
+
+                // fill1
+                fillFlag1 = ((StateFillStyle1 > 0 && FillStyle1 > 0)
+                    || (fillFlag1 && StateFillStyle1 == 0)
+                );
+                if (fillFlag1) {
+                    // 色の算出
+                    if (FillStyle1) {
+                        f1Idx = (FillStyle1 - 1);
+                        var f1ColorObj = fillStyle[f1Idx];
+                        var fillStyleType = f1ColorObj.fillStyleType;
+                    }
+
+                    // 初期設定
+                    var f1Base = canvasF1Array[stack];
+                    if (!(depth in f1Base)) {
+                        f1Base[depth] = {
+                            StartX: StartX,
+                            StartY: StartY,
+                            Depth: depth,
+                            Color: (fillStyleType == 0x00) ? f1ColorObj.Color : f1ColorObj,
+                            ColorIdx: f1Idx,
+                            styleType: fillStyleType,
+                            cArray: [],
+                            fArray: []
+                        };
+
+                        var f1cArray = f1Base[depth].fArray;
+                        var aLen = f1cArray.length;
+                        f1cArray[aLen++] = 'moveTo';
+                        f1cArray[aLen++] = StartX;
+                        f1cArray[aLen] = StartY;
+                    }
+                }
+
+                // line
+                lineFlag  = ((StateLineStyle > 0 && LineStyle > 0)
+                    || (lineFlag && StateLineStyle == 0)
+                );
+                if (lineFlag) {
+                    if (LineStyle) {
+                        var nKey   = (LineStyle - 1);
+                        var colorObj = lineStyle[nKey];
+                        var Width  = lineStyle[nKey].Width;
+                    }
+
+                    // 初期設定
+                    if (Width > 0) {
+                        var lBase = canvasLArray[stack];
+                        if (!(depth in lBase)) {
+                            lBase[depth] = {
+                                StartX: StartX,
+                                StartY: StartY,
+                                Depth: depth,
+                                Width:  Width,
+                                merge: false,
+                                Color: colorObj.Color,
+                                styleType: 0,
+                                cArray: [],
+                                fArray: []
+                            };
+
+                            var lcArray = lBase[depth].fArray;
+                            var aLen = lcArray.length;
+                            lcArray[aLen++] = 'moveTo';
+                            lcArray[aLen++] = StartX;
+                            lcArray[aLen] = StartY;
+                        }
+                    } else {
+                        lineFlag = false;
+                    }
+                }
+            } else {
+                AnchorX  = record.AnchorX;
+                AnchorY  = record.AnchorY;
+                ControlX = record.ControlX;
+                ControlY = record.ControlY;
+
+                // 描画データ
+                var isCurved = record.isCurved;
+
+                // fill0
+                if (fillFlag0) {
+                    var obj = canvasF0Array[stack][depth];
+                    obj.EndX = AnchorX;
+                    obj.EndY = AnchorY;
+                    obj.cArray[obj.cArray.length] = {
+                        isCurved: isCurved,
+                        AnchorX:  AnchorX,
+                        AnchorY:  AnchorY,
+                        ControlX: ControlX,
+                        ControlY: ControlY
+                    };
+
+                    var fArray = obj.fArray;
+                    var aLen = fArray.length;
+                    if (isCurved) {
+                        fArray[aLen++] = 'quadraticCurveTo';
+                        fArray[aLen++] = ControlX;
+                        fArray[aLen++] = ControlY;
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    } else {
+                        fArray[aLen++] = 'lineTo';
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    }
+                }
+
+                // fill1
+                if (fillFlag1) {
+                    var obj = canvasF1Array[stack][depth];
+                    obj.EndX = AnchorX;
+                    obj.EndY = AnchorY;
+                    obj.cArray[obj.cArray.length] = {
+                        isCurved: isCurved,
+                        AnchorX:  AnchorX,
+                        AnchorY:  AnchorY,
+                        ControlX: ControlX,
+                        ControlY: ControlY
+                    };
+
+                    var fArray = obj.fArray;
+                    var aLen = fArray.length;
+                    if (isCurved) {
+                        fArray[aLen++] = 'quadraticCurveTo';
+                        fArray[aLen++] = ControlX;
+                        fArray[aLen++] = ControlY;
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    } else {
+                        fArray[aLen++] = 'lineTo';
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    }
+                }
+
+                // line
+                if (lineFlag) {
+                    var obj = canvasLArray[stack][depth];
+                    obj.EndX = AnchorX;
+                    obj.EndY = AnchorY;
+                    obj.cArray[obj.cArray.length] = {
+                        isCurved: isCurved,
+                        AnchorX:  AnchorX,
+                        AnchorY:  AnchorY,
+                        ControlX: ControlX,
+                        ControlY: ControlY
+                    };
+
+                    var fArray = obj.fArray;
+                    var aLen = fArray.length;
+                    if (isCurved) {
+                        fArray[aLen++] = 'quadraticCurveTo';
+                        fArray[aLen++] = ControlX;
+                        fArray[aLen++] = ControlY;
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    } else {
+                        fArray[aLen++] = 'lineTo';
+                        fArray[aLen++] = AnchorX;
+                        fArray[aLen] = AnchorY;
+                    }
+                }
+            }
+
+            i++;
+        }
+
+        var _generateForColor = _this.generateForColor;
+        var F0Array = _generateForColor.call(_this, canvasF0Array);
+        var F1Array = _generateForColor.call(_this, canvasF1Array);
+
+        // 反転してマージ
+        var len = F0Array.length;
+        var _fillReverse = _this.fillReverse;
+        if (len) {
+            for (var s = len; s--;) {
+                if (!(s in F1Array)) {
+                    continue;
+                }
+
+                var f1ColorArray = F1Array[s];
+                var colorArray = F0Array[s];
+                var cLen = colorArray.length;
+                for (var c = cLen; c--;) {
+                    if (!(c in f1ColorArray)) {
+                        continue;
+                    }
+
+                    if (!(c in colorArray)) {
+                        continue;
+                    }
+
+                    var f1Colors = f1ColorArray[c];
+                    var array = colorArray[c];
+                    var aLen = array.length;
+                    for (var d = aLen; d--;) {
+                        if (!(d in array)) {
+                            continue;
+                        }
+
+                        var obj = array[d];
+                        if (!(d in f1Colors)) {
+                            f1Colors[d] = _fillReverse(obj);
+                            delete F0Array[s][c][d];
+                        } else {
+                            delete F1Array[s][c][d];
+                            delete F0Array[s][c][d];
+                        }
+                    }
+                }
+            }
+        }
+
+        // 座標調整
+        var _fillMerge = _this.fillMerge;
+        _fillMerge.call(_this, F0Array, canvasLArray);
+        _fillMerge.call(_this, F1Array, canvasLArray);
+
+        // 色で集約
+        var canvasArray = _this.bundle(F0Array, F1Array);
+
+        // line
+        var len = canvasLArray.length;
+        var _buildCommand = _this.buildCommand;
+        for (var s = 0; s < len; s++) {
+            var array = canvasLArray[s];
+            var aLen = array.length;
+            for (var d = 0; d < aLen; d++) {
+                if (!(d in array)) {
+                    continue;
+                }
+
+                var obj = array[d];
+                if (obj == null || obj.cArray == null || obj.fArray == null) {
+                    continue;
+                }
+
+                if (!(d in canvasArray)) {
+                    canvasArray[d] = [];
+                }
+
+                var l = canvasArray[d].length;
+                canvasArray[d][l] = {
+                    Color: obj.Color,
+                    Width: obj.Width,
+                    styleType: obj.styleType,
+                    cmd: _buildCommand(obj.fArray)
+                };
+
+                obj = null;
+            }
+        }
+
+        return canvasArray;
+    };
+
+
+    /**
+     * fillReverse
+     * @param obj
+     * @returns {*}
+     */
+    VectorToCanvas.prototype.fillReverse = function(obj)
+    {
+        var rsX = 0;
+        var rsY = 0;
+        var copyObj = obj;
+        var rnX = copyObj.StartX;
+        var rnY = copyObj.StartY;
+        var cArray = copyObj.cArray;
+        var len = cArray.length;
+        var count = len;
+
+        while (count--) {
+            var shiftObj = cArray.shift();
+            if (shiftObj == null) {
+                continue;
+            }
+
+            rsX = shiftObj.AnchorX;
+            rsY = shiftObj.AnchorY;
+            shiftObj.AnchorX = rnX;
+            shiftObj.AnchorY = rnY;
+            rnX = rsX;
+            rnY = rsY;
+
+            // set
+            cArray[cArray.length] = shiftObj;
+        }
+
+        // 開始と終了地点を入れ替える
+        var StartX = obj.StartX;
+        var StartY = obj.StartY;
+        var EndX   = obj.EndX;
+        var EndY   = obj.EndY;
+
+        obj.StartX = EndX;
+        obj.StartY = EndY;
+        obj.EndX   = StartX;
+        obj.EndY   = StartY;
+
+        // 描画の入れ替え
+        var fCArray = [];
+        var fLen = 0;
+        fCArray[fLen++] = 'moveTo';
+        fCArray[fLen++] = obj.StartX;
+        fCArray[fLen++] = obj.StartY;
+
+        // 並べ替え
+        for (var i = len; i--;) {
+            var data = cArray[i];
+            if (data.isCurved) {
+                fCArray[fLen++] = 'quadraticCurveTo';
+                fCArray[fLen++] = data.ControlX;
+                fCArray[fLen++] = data.ControlY;
+                fCArray[fLen++] = data.AnchorX;
+                fCArray[fLen++] = data.AnchorY;
+            } else {
+                fCArray[fLen++] = 'lineTo';
+                fCArray[fLen++] = data.AnchorX;
+                fCArray[fLen++] = data.AnchorY;
+            }
+        }
+        obj.fArray = fCArray;
+
+        return obj;
+    };
+
+    /**
+     * fillMerge
+     * @param fillArray
+     * @param canvasLArray
+     */
+    VectorToCanvas.prototype.fillMerge = function(fillArray, canvasLArray)
+    {
+        var sLen = fillArray.length;
+        var _fillReverse = this.fillReverse;
+
+        for (var s = 0; s < sLen; s++) {
+            var colorArray = fillArray[s];
+            var lineArray = canvasLArray[s];
+
+            var cLen = colorArray.length;
+            for (var c = 0; c < cLen; c++) {
+                var array = colorArray[c];
+                if (array == undefined) {
+                    continue;
+                }
+
+                var preFill = [];
+                var aLen = array.length;
+                for (var key = 0; key < aLen; key++) {
+                    var obj = array[key];
+                    if (obj == undefined
+                        || obj == null
+                        || obj.cArray == null
+                        || (obj.StartX == obj.EndX
+                            && obj.StartY == obj.EndY)
+                    ) {
+                       continue;
+                    }
+
+                    preFill[preFill.length] = obj;
+                }
+
+                // preLine
+                var preLine = [];
+                if (lineArray != undefined) {
+                    var len = lineArray.length;
+                    for (var i = 0; i < len; i++) {
+                        if (!(i in lineArray)) {
+                            continue;
+                        }
+
+                        var obj = lineArray[i];
+                        preLine[preLine.length] = obj;
+                    }
+                }
+                var lineLength = preLine.length;
+
+                var cArray = [];
+                var lArray = [];
+                var cfArray = [];
+                var cflArray = [];
+                var preCount = preFill.length;
+                if (preCount > 1) {
+                    var base  = null;
+                    var copy  = null;
+                    var total = 0;
+                    var count = 0;
+                    var limit = 0;
+                    var limitCount = 0;
+
+                    while (true) {
+                        count++;
+
+                        // 判定元のobject
+                        if (base == null) {
+                            base  = preFill.shift();
+                            total = preFill.length;
+
+                            var sX = base.StartX;
+                            var sY = base.StartY;
+                            var eX = base.EndX;
+                            var eY = base.EndY;
+
+                            // 次が無ければ終了
+                            if (total == 0) {
+                                break;
+                            }
+                        }
+
+                        // 判定するobject
+                        copy = preFill.shift();
+
+                        // 開始・終了地点からそれぞれ判定してマージ
+                        if (eX == copy.StartX && eY == copy.StartY) {
+                            eX = copy.EndX;
+                            eY = copy.EndY;
+
+                            var copyArray = copy.cArray;
+                            var len = copyArray.length;
+                            for (var i = 0; i < len; i++) {
+                                cArray[cArray.length] = copyArray[i];
+                            }
+
+                            var copyFArray = copy.fArray;
+                            copyFArray.shift();
+                            copyFArray.shift();
+                            copyFArray.shift();
+                            var len = copyFArray.length;
+                            for (var i = 0; i < len; i++) {
+                                cfArray[cfArray.length] = copyFArray[i];
+                            }
+
+                            // lineがあればマージ
+                            var depth = copy.Depth;
+                            if (lineLength > 0 && depth in lineArray) {
+                                var lObj = lineArray[depth];
+                                lObj.merge = true;
+
+                                var lineCArray = lObj.cArray;
+                                var len = lineCArray.length;
+                                for (var i = 0; i < len; i++) {
+                                    lArray[lArray.length] = lineCArray[i];
+                                }
+
+                                var lineFArray = lObj.fArray;
+                                var len = lineFArray.length;
+                                for (var i = 0; i < len; i++) {
+                                    cflArray[cflArray.length] = lineFArray[i];
+                                }
+                            }
+
+                            copy.cArray = null;
+                            copy.fArray = null;
+                            limit = 0;
+                            count = 0;
+                        } else if (total <= count &&
+                            (eX == copy.EndX && eY == copy.EndY
+                            || sX == copy.StartX && sY == copy.StartY)
+                        ) {
+                            eX = copy.StartX;
+                            eY = copy.StartY;
+
+                            _fillReverse(copy);
+                            var copyArray = copy.cArray;
+                            var len = copyArray.length;
+                            for (var i = 0; i < len; i++) {
+                                cArray[cArray.length] = copyArray[i];
+                            }
+
+                            var copyFArray = copy.fArray;
+                            copyFArray.shift();
+                            copyFArray.shift();
+                            copyFArray.shift();
+                            var len = copyFArray.length;
+                            for (var i = 0; i < len; i++) {
+                                cfArray[cfArray.length] = copyFArray[i];
+                            }
+
+                            // lineがあればマージ
+                            var depth = copy.Depth;
+                            if (lineLength > 0
+                                && lineArray[depth] != undefined
+                            ) {
+                                var lObj = lineArray[depth];
+                                lObj.merge = true;
+                                _fillReverse(lObj);
+
+                                var lineCArray = lObj.cArray;
+                                var len = lineCArray.length;
+                                for (var i = 0; i < len; i++) {
+                                    lArray[lArray.length] = lineCArray[i];
+                                }
+
+                                var lineFArray = lObj.fArray;
+                                var len = lineFArray.length;
+                                for (var i = 0; i < len; i++) {
+                                    cflArray[cflArray.length] = lineFArray[i];
+                                }
+                            }
+
+                            copy.cArray = null;
+                            copy.fArray = null;
+                            limit = 0;
+                            count = 0;
+                        } else {
+                            limit++;
+                            if (limit > preCount) {
+                                limitCount++;
+                                preFill[preFill.length] = base;
+
+                                base = copy;
+                                sX = base.StartX;
+                                sY = base.StartY;
+                                eX = base.EndX;
+                                eY = base.EndY;
+                                limit = 0;
+                                count = 0;
+
+                                // limit
+                                if (limitCount > preCount) {
+                                    break;
+                                }
+                            } else {
+                                preFill[preFill.length] = copy;
+                            }
+
+                            copy = null;
+                        }
+
+                        // 判定が終了したらセットして初期化
+                        if (sX == eX && sY == eY) {
+                            var bCArray = base.cArray;
+                            var len = cArray.length;
+                            for (var i = 0; i < len; i++) {
+                                bCArray[bCArray.length] = cArray[i];
+                            }
+
+                            var bFArray = base.fArray;
+                            var len = cfArray.length;
+                            for (var i = 0; i < len; i++) {
+                                bFArray[bFArray.length] = cfArray[i];
+                            }
+
+                            // line
+                            var len = lArray.length;
+                            if (len) {
+                                var lObj = lineArray[base.Depth];
+                                if (lObj == undefined) {
+                                    lObj = preLine.shift();
+                                    lObj.merge = false;
+                                }
+
+                                var lCArray = lObj.cArray;
+                                for (var i = 0; i < len; i++) {
+                                    lCArray[lCArray.length] = lArray[i];
+                                }
+
+                                var lFArray = lObj.fArray;
+                                var len = cflArray.length;
+                                for (var i = 0; i < len; i++) {
+                                    lFArray[lFArray.length] = cflArray[i];
+                                }
+                            }
+
+                            // fill
+                            cArray = [];
+                            cfArray = [];
+
+                            // line
+                            lArray = [];
+                            cflArray = [];
+
+                            // params
+                            count = 0;
+                            limit = 0;
+                            limitCount = 0;
+                            base  = null;
+                        }
+
+                        // 終了
+                        if (!preFill.length) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     * generateForColor
+     * @param fillArray
+     * @returns {Array}
+     */
+    VectorToCanvas.prototype.generateForColor = function(fillArray)
+    {
+        var array = [];
+        var len = fillArray.length;
+        for (var i = len; i--;) {
+            var stackArray = fillArray[i];
+            if (array[i] == undefined) {
+                array[i] = [];
+            }
+
+            var sLen = stackArray.length;
+            for (var s = sLen; s--;) {
+                var obj = stackArray[s];
+                if (obj == undefined) {
+                    continue;
+                }
+
+                var idx = obj.ColorIdx;
+                if (array[i][idx] == undefined) {
+                    array[i][idx] = [];
+                }
+                array[i][idx][s] = obj;
+            }
+        }
+        return array;
+    };
+
+    /**
+     * buildCommand
+     * @param array
+     * @returns {Array}
+     */
+    VectorToCanvas.prototype.buildCommand = function(array)
+    {
+        var length = array.length;
+        var str = '';
+        for (var i = 0; i < length; i++) {
+            if (!(i in array)) {
+                continue;
+            }
+
+            var value = array[i];
+            switch (value) {
+                case 'lineTo':
+                    str += 'ctx.lineTo('+ array[++i] +', '+ array[++i] +');';
+                    break;
+                case 'quadraticCurveTo':
+                    str += 'ctx.quadraticCurveTo('+ array[++i] +', '+ array[++i] +', '+ array[++i] +', '+ array[++i] +');';
+                    break;
+                case 'moveTo':
+                    str += 'ctx.moveTo('+ array[++i] +', '+ array[++i] +');';
+                    break;
+            }
+        }
+
+        return new Function('ctx', str);
+    };
+
+    /**
+     * bundle
+     * @param fill0Array
+     * @param fill1Array
+     * @returns {Array}
+     */
+    VectorToCanvas.prototype.bundle = function(fill0Array, fill1Array)
+    {
+        var _this = this;
+        var fArray = [];
+        for (var r = 0; r < 2; r++) {
+            if (r == 0) {
+                fArray = fill0Array;
+            } else {
+                fArray = fill1Array;
+            }
+
+            var sLen = fArray.length;
+            for (var s = 0; s < sLen; s++) {
+                if (!(s in fArray)) {
+                    continue;
+                }
+
+                var colorArray = fArray[s];
+                var cLen = colorArray.length;
+                for (var key = 0; key < cLen; key++) {
+                    if (!(key in colorArray)) {
+                        continue;
+                    }
+
+                    var array = colorArray[key];
+                    var depth = null;
+                    var dLen = array.length;
+                    for (var d = 0; d < dLen; d++) {
+                        if (!(d in array)) {
+                            continue;
+                        }
+
+                        var obj = array[d];
+                        if (obj == null || obj.cArray == null) {
+                            delete fArray[s][key][d];
+                            continue;
+                        }
+
+                        if (depth == null) {
+                            depth = obj.Depth;
+                            continue;
+                        }
+
+                        var cArray = obj.cArray;
+                        var length = cArray.length;
+                        for (var i = 0; i < length; i++) {
+                            if (!(i in cArray)) {
+                                continue;
+                            }
+                            var value = cArray[i];
+                            var len = array[depth].cArray.length;
+                            array[depth].cArray[len] = value;
+                        }
+
+                        var fCArray = obj.fArray;
+                        var length = fCArray.length;
+                        for (var i = 0; i < length; i++) {
+                            if (!(i in fCArray)) {
+                                continue;
+                            }
+
+                            var baseArray = array[depth].fArray;
+                            baseArray[baseArray.length] = fCArray[i];
+                        }
+
+                        // 使ったので削除
+                        fArray[s][key][d] = null;
+                    }
+                }
+            }
+        }
+
+        var results = [];
+        var _buildCommand = _this.buildCommand;
+        for (r = 0; r < 2; r++) {
+            if (r == 0) {
+                fArray = fill0Array;
+            } else {
+                fArray = fill1Array;
+            }
+
+            var sLen = fArray.length;
+            for (var s = 0; s < sLen; s++) {
+                if (!(s in fArray)) {
+                    continue;
+                }
+                var stackArray = fArray[s];
+
+                if (!(s in results)) {
+                    results[s] = [];
+                }
+
+                var cLen = stackArray.length;
+                for (var c = 0; c < cLen; c++) {
+                    if (!(c in stackArray)) {
+                        continue;
+                    }
+                    var array = stackArray[c];
+
+                    var aLen = array.length;
+                    depth = 0;
+                    for (var key = 0; key < aLen; key++) {
+                        if (!(key in array)) {
+                            continue;
+                        }
+
+                        var obj = array[key];
+                        if (obj == null) {
+                            continue;
+                        }
+
+                        var Depth = obj.Depth;
+                        if (!(Depth in results[s])) {
+                            results[s][Depth] = [];
+                        }
+
+                        var len = results[s][Depth].length;
+                        results[s][Depth][len] = {
+                            Color: obj.Color,
+                            styleType: obj.styleType,
+                            cmd: _buildCommand.call(_this, obj.fArray)
+                        };
+
+                        obj = null;
+                    }
+                }
+            }
+        }
+
+        var hash = [];
+        var length = results.length;
+        for (var s = 0; s < length; s++) {
+            if (!(s in results)) {
+                continue;
+            }
+
+            var result = results[s];
+            var len = result.length;
+            for (var d = 0; d < len; d++) {
+                if (!(d in result)) {
+                    continue;
+                }
+
+                hash[d] = null;
+                hash[d] = result[d];
+            }
+        }
+
+        results = null;
+
+        return hash;
+    };
+    var vtc = new VectorToCanvas();
 
     /**
      * CacheStore
@@ -59,7 +1138,7 @@
     {
         this.store = {};
         this.pool = [];
-        this.size = cacheSize;
+        this.size = 73400320; // 70M
     };
 
     /**
@@ -70,20 +1149,15 @@
         var _this = this;
         var _destroy = _this.destroy;
         for (var cacheKey in _this.store) {
-            var index = cacheKey.indexOf('Bitmap');
-            if (index != -1) {
-                continue;
-            }
-
             var deleteCtx = _this.store[cacheKey];
-            if (!(deleteCtx instanceof CanvasRenderingContext2D)) {
+            if (!(deleteCtx instanceof CanvasRenderingContext2D))
                 continue;
-            }
+
             var deleteCanvas = deleteCtx.canvas;
             _destroy.call(_this, deleteCanvas);
         }
         this.store = {};
-        this.size = cacheSize;
+        this.size = 73400320;
     };
 
     /**
@@ -134,23 +1208,20 @@
             var _destroy = _this.destroy;
             for (var cacheKey in _this.store) {
                 var index = cacheKey.indexOf('Bitmap');
-                if (index != -1) {
+                if (index != -1)
                     continue;
-                }
 
                 var deleteCtx = _this.store[cacheKey];
-                if (!(deleteCtx instanceof CanvasRenderingContext2D)) {
+                if (!(deleteCtx instanceof CanvasRenderingContext2D))
                     continue;
-                }
 
                 var deleteCanvas = deleteCtx.canvas;
                 _this.size += (deleteCanvas.width * deleteCanvas.height);
                 _destroy.call(_this, deleteCanvas);
 
                 delete _this.store[cacheKey];
-                if (_this.size > 0) {
+                if (_this.size > 0)
                     break;
-                }
             }
         }
 
@@ -162,298 +1233,23 @@
      * @param name
      * @param id
      * @param matrix
-     * @param colorTransform
+     * @param cxForm
      * @returns {string}
      */
     CacheStore.prototype.generateKey = function(name, id, matrix, cxForm)
     {
         var key = name +"_"+ id;
-        if (matrix != undefined) {
-            key += "_"+ matrix[0] +"_"+ matrix[1] +"_"+ matrix[2] +"_"+ matrix[3];
-        }
 
-        if (cxForm != undefined) {
+        if (matrix != undefined)
+            key += "_"+ matrix[0] +"_"+ matrix[1] +"_"+ matrix[2] +"_"+ matrix[3];
+
+        if (cxForm != undefined)
             key += "_"+ cxForm[0] +"_"+ cxForm[1] +"_"+ cxForm[2] +"_"+ cxForm[3]
                 +"_"+ cxForm[4] +"_"+ cxForm[5] +"_"+ cxForm[6] +"_"+ cxForm[7];
-        }
+
         return key;
     };
-    cacheStore = new CacheStore();
-
-    // params
-    var context, preContext, tmpContext;
-    var swftag, bitio;
-    var timeoutId = 0;
-    var character = [];
-    var buttonHits = [];
-    var sounds = [];
-    var loadSounds = [];
-    var actions = [];
-    var touchActions = [];
-    var initActions = [];
-    var touchObj = null;
-    var touchEndAction = null;
-    var imgUnLoadCount = 0;
-    var devicePixelRatio = window.devicePixelRatio || 1;
-    var scale = 1;
-    var width = 0;
-    var height = 0;
-    var startDate = new _Date();
-    var _navigator = window.navigator;
-    var ua = _navigator.userAgent;
-    var isAndroid = (ua.indexOf('Android') > 0);
-    var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
-    var isChrome = (ua.indexOf('Chrome') > 0);
-    var isTouch = (isAndroid || isiOS);
-    var isTouchEvent = false;
-    var isLoad = false;
-    var jpegTables = null;
-    var signature = '';
-    var backgroundColor = null;
-    var version = 0;
-    var totalFrame = 0;
-    var instanceId = 0;
-    var shapeCount = 0;
-    var startTime = _Date.now();
-    var cacheWait = false;
-    var isXHR2 = false;
-
-    // Alpha Bug
-    var isAlphaBug = isAndroid;
-    if (isAndroid) {
-        var chkCanvas = cacheStore.getCanvas();
-        chkCanvas.width = 1;
-        chkCanvas.height = 1;
-        var chkCtx = chkCanvas.getContext('2d');
-        var imageData = chkCtx.createImageData(1, 1);
-        var pixelArray = imageData.data;
-        pixelArray[0] = 128;
-        pixelArray[3] = 128;
-
-        chkCtx.putImageData(imageData, 0, 0);
-        imageData = chkCtx.getImageData(0, 0, 1, 1);
-        pixelArray = imageData.data;
-        isAlphaBug = (pixelArray[0] == 255);
-        chkCtx = null;
-        imageData = null;
-        pixelArray = null;
-        cacheStore.destroy(chkCanvas);
-    }
-
-    // shift-jis
-    var JCT11280 = new Function('var a="zKV33~jZ4zN=~ji36XazM93y!{~k2y!o~k0ZlW6zN?3Wz3W?{EKzK[33[`y|;-~j^YOTz$!~kNy|L1$353~jV3zKk3~k-4P4zK_2+~jY4y!xYHR~jlz$_~jk4z$e3X5He<0y!wy|X3[:~l|VU[F3VZ056Hy!nz/m1XD61+1XY1E1=1y|bzKiz!H034zKj~mEz#c5ZA3-3X$1~mBz$$3~lyz#,4YN5~mEz#{ZKZ3V%7Y}!J3X-YEX_J(3~mAz =V;kE0/y|F3y!}~m>z/U~mI~j_2+~mA~jp2;~m@~k32;~m>V}2u~mEX#2x~mBy+x2242(~mBy,;2242(~may->2&XkG2;~mIy-_2&NXd2;~mGz,{4<6:.:B*B:XC4>6:.>B*BBXSA+A:X]E&E<~r#z+625z s2+zN=`HXI@YMXIAXZYUM8X4K/:Q!Z&33 3YWX[~mB`{zKt4z (zV/z 3zRw2%Wd39]S11z$PAXH5Xb;ZQWU1ZgWP%3~o@{Dgl#gd}T){Uo{y5_d{e@}C(} WU9|cB{w}bzvV|)[} H|zT}d||0~{]Q|(l{|x{iv{dw}(5}[Z|kuZ }cq{{y|ij}.I{idbof%cu^d}Rj^y|-M{ESYGYfYsZslS`?ZdYO__gLYRZ&fvb4oKfhSf^d<Yeasc1f&a=hnYG{QY{D`Bsa|u,}Dl|_Q{C%xK|Aq}C>|c#ryW=}eY{L+`)][YF_Ub^h4}[X|?r|u_ex}TL@YR]j{SrXgo*|Gv|rK}B#mu{R1}hs|dP{C7|^Qt3|@P{YVV |8&}#D}ef{e/{Rl|>Hni}R1{Z#{D[}CQlQ||E}[s{SG_+i8eplY[=[|ec[$YXn#`hcm}YR|{Ci(_[ql|?8p3]-}^t{wy}4la&pc|3e{Rp{LqiJ],] `kc(]@chYnrM`O^,ZLYhZB]ywyfGY~aex!_Qww{a!|)*lHrM{N+n&YYj~Z b c#e_[hZSon|rOt`}hBXa^i{lh|<0||r{KJ{kni)|x,|0auY{D!^Sce{w;|@S|cA}Xn{C1h${E]Z-XgZ*XPbp]^_qbH^e[`YM|a||+=]!Lc}]vdBc=j-YSZD]YmyYLYKZ9Z>Xcczc2{Yh}9Fc#Z.l{}(D{G{{mRhC|L3b#|xK[Bepj#ut`H[,{E9Yr}1b{[e]{ZFk7[ZYbZ0XL]}Ye[(`d}c!|*y`Dg=b;gR]Hm=hJho}R-[n}9;{N![7k_{UbmN]rf#pTe[x8}!Qcs_rs[m`|>N}^V})7{^r|/E}),}HH{OYe2{Skx)e<_.cj.cjoMhc^d}0uYZd!^J_@g,[[[?{i@][|3S}Yl3|!1|eZ|5IYw|1D}e7|Cv{OHbnx-`wvb[6[4} =g+k:{C:}ed{S]|2M]-}WZ|/q{LF|dYu^}Gs^c{Z=}h>|/i|{W]:|ip{N:|zt|S<{DH[p_tvD{N<[8Axo{X4a.^o^X>Yfa59`#ZBYgY~_t^9`jZHZn`>G[oajZ;X,i)Z.^~YJe ZiZF^{][[#Zt^|]Fjx]&_5dddW]P0C[-]}]d|y {C_jUql] |OpaA[Z{lp|rz}:Mu#]_Yf6{Ep?f5`$[6^D][^u[$[6^.Z8]]ePc2U/=]K^_+^M{q*|9tYuZ,s(dS{i=|bNbB{uG}0jZOa:[-]dYtu3]:]<{DJ_SZIqr_`l=Yt`gkTnXb3d@kiq0a`Z{|!B|}e}Ww{Sp,^Z|0>_Z}36|]A|-t}lt{R6pi|v8hPu#{C>YOZHYmg/Z4nicK[}hF_Bg|YRZ7c|crkzYZY}_iXcZ.|)U|L5{R~qi^Uga@Y[xb}&qdbd6h5|Btw[}c<{Ds53[Y7]?Z<|e0{L[ZK]mXKZ#Z2^tavf0`PE[OSOaP`4gi`qjdYMgys/?[nc,}EEb,eL]g[n{E_b/vcvgb.{kcwi`~v%|0:|iK{Jh_vf5lb}KL|(oi=LrzhhY_^@`zgf[~g)[J_0fk_V{T)}I_{D&_/d9W/|MU[)f$xW}?$xr4<{Lb{y4}&u{XJ|cm{Iu{jQ}CMkD{CX|7A}G~{kt)nB|d5|<-}WJ}@||d@|Iy}Ts|iL|/^|no|0;}L6{Pm]7}$zf:|r2}?C_k{R(}-w|`G{Gy[g]bVje=_0|PT{^Y^yjtT[[[l!Ye_`ZN]@[n_)j3nEgMa]YtYpZy].d-Y_cjb~Y~[nc~sCi3|zg}B0}do{O^{|$`_|D{}U&|0+{J3|8*]iayx{a{xJ_9|,c{Ee]QXlYb]$[%YMc*]w[aafe]aVYi[fZEii[xq2YQZHg]Y~h#|Y:thre^@^|_F^CbTbG_1^qf7{L-`VFx Zr|@EZ;gkZ@slgko`[e}T:{Cu^pddZ_`yav^Ea+[#ZBbSbO`elQfLui}.F|txYcbQ`XehcGe~fc^RlV{D_0ZAej[l&jShxG[ipB_=u:eU}3e8[=j|{D(}dO{Do[BYUZ0/]AYE]ALYhZcYlYP/^-^{Yt_1_-;YT`P4BZG=IOZ&]H[e]YYd[9^F[1YdZxZ?Z{Z<]Ba2[5Yb[0Z4l?]d_;_)a?YGEYiYv`_XmZs4ZjY^Zb]6gqGaX^9Y}dXZr[g|]Y}K aFZp^k^F]M`^{O1Ys]ZCgCv4|E>}8eb7}l`{L5[Z_faQ|c2}Fj}hw^#|Ng|B||w2|Sh{v+[G}aB|MY}A{|8o}X~{E8paZ:]i^Njq]new)`-Z>haounWhN}c#{DfZ|fK]KqGZ=:u|fqoqcv}2ssm}.r{]{nIfV{JW)[K|,Z{Uxc|]l_KdCb%]cfobya3`p}G^|LZiSC]U|(X|kBlVg[kNo({O:g:|-N|qT}9?{MBiL}Sq{`P|3a|u.{Uaq:{_o|^S}jX{Fob0`;|#y_@[V[K|cw[<_ }KU|0F}d3|et{Q7{LuZttsmf^kYZ`Af`}$x}U`|Ww}d]| >}K,r&|XI|*e{C/a-bmr1fId4[;b>tQ_:]hk{b-pMge]gfpo.|(w[jgV{EC1Z,YhaY^q,_G[c_g[J0YX]`[h^hYK^_Yib,` {i6vf@YM^hdOKZZn(jgZ>bzSDc^Z%[[o9[2=/YHZ(_/Gu_`*|8z{DUZxYt^vuvZjhi^lc&gUd4|<UiA`z]$b/Z?l}YI^jaHxe|;F}l${sQ}5g}hA|e4}?o{ih}Uz{C)jPe4]H^J[Eg[|AMZMlc}:,{iz}#*|gc{Iq|/:|zK{l&}#u|myd{{M&v~nV};L|(g|I]ogddb0xsd7^V})$uQ{HzazsgxtsO^l}F>ZB]r|{7{j@cU^{{CbiYoHlng]f+nQ[bkTn/}<-d9q {KXadZYo+n|l[|lc}V2{[a{S4Zam~Za^`{HH{xx_SvF|ak=c^[v^7_rYT`ld@]:_ub%[$[m](Shu}G2{E.ZU_L_R{tz`vj(f?^}hswz}GdZ}{S:h`aD|?W|`dgG|if{a8|J1{N,}-Ao3{H#{mfsP|[ bzn+}_Q{MT{u4kHcj_q`eZj[8o0jy{p7}C|[}l){MuYY{|Ff!Ykn3{rT|m,^R|,R}$~Ykgx{P!]>iXh6[l[/}Jgcg{JYZ.^qYfYIZl[gZ#Xj[Pc7YyZD^+Yt;4;`e8YyZVbQ7YzZxXja.7SYl[s]2^/Ha$[6ZGYrb%XiYdf2]H]kZkZ*ZQ[ZYS^HZXcCc%Z|[(bVZ]]:OJQ_DZCg<[,]%Zaa [g{C00HY[c%[ChyZ,Z_`PbXa+eh`^&jPi0a[ggvhlekL]w{Yp^v}[e{~;k%a&k^|nR_z_Qng}[E}*Wq:{k^{FJZpXRhmh3^p>de^=_7`|ZbaAZtdhZ?n4ZL]u`9ZNc3g%[6b=e.ZVfC[ZZ^^^hD{E(9c(kyZ=bb|Sq{k`|vmr>izlH[u|e`}49}Y%}FT{[z{Rk}Bz{TCc/lMiAqkf(m$hDc;qooi[}^o:c^|Qm}a_{mrZ(pA`,}<2sY| adf_%|}`}Y5U;}/4|D>|$X{jw{C<|F.hK|*A{MRZ8Zsm?imZm_?brYWZrYx`yVZc3a@f?aK^ojEd {bN}/3ZH]/$YZhm^&j 9|(S|b]mF}UI{q&aM]LcrZ5^.|[j`T_V_Gak}9J[ ZCZD|^h{N9{~&[6Zd{}B}2O|cv]K}3s}Uy|l,fihW{EG`j_QOp~Z$F^zexS`dcISfhZBXP|.vn|_HYQ|)9|cr]<`&Z6]m_(ZhPcSg>`Z]5`~1`0Xcb4k1{O!bz|CN_T{LR|a/gFcD|j<{Z._[f)mPc:1`WtIaT1cgYkZOaVZOYFrEe[}T$}Ch}mk{K-^@]fH{Hdi`c*Z&|Kt{if[C{Q;{xYB`dYIX:ZB[}]*[{{p9|4GYRh2ao{DS|V+[zd$`F[ZXKadb*A] Ys]Maif~a/Z2bmclb8{Jro_rz|x9cHojbZ{GzZx_)]:{wAayeDlx}<=`g{H1{l#}9i|)=|lP{Qq}.({La|!Y{i2EZfp=c*}Cc{EDvVB|;g}2t{W4av^Bn=]ri,|y?|3+}T*ckZ*{Ffr5e%|sB{lx^0]eZb]9[SgAjS_D|uHZx]dive[c.YPkcq/}db{EQh&hQ|eg}G!ljil|BO]X{Qr_GkGl~YiYWu=c3eb}29v3|D|}4i||.{Mv})V{SP1{FX}CZW6{cm|vO{pS|e#}A~|1i}81|Mw}es|5[}3w{C`h9aL]o{}p[G`>i%a1Z@`Ln2bD[$_h`}ZOjhdTrH{[j_:k~kv[Sdu]CtL}41{I |[[{]Zp$]XjxjHt_eThoa#h>sSt8|gK|TVi[Y{t=}Bs|b7Zpr%{gt|Yo{CS[/{iteva|cf^hgn}($_c^wmb^Wm+|55jrbF|{9^ q6{C&c+ZKdJkq_xOYqZYSYXYl`8]-cxZAq/b%b*_Vsa[/Ybjac/OaGZ4fza|a)gY{P?| I|Y |,pi1n7}9bm9ad|=d{aV|2@[(}B`d&|Uz}B}{`q|/H|!JkM{FU|CB|.{}Az}#P|lk}K{|2rk7{^8^?`/|k>|Ka{Sq}Gz}io{DxZh[yK_#}9<{TRdgc]`~Z>JYmYJ]|`!ZKZ]gUcx|^E[rZCd`f9oQ[NcD_$ZlZ;Zr}mX|=!|$6ZPZYtIo%fj}CpcN|B,{VDw~gb}@hZg`Q{LcmA[(bo`<|@$|o1|Ss}9Z_}tC|G`{F/|9nd}i=}V-{L8aaeST]daRbujh^xlpq8|}zs4bj[S`J|]?G{P#{rD{]I`OlH{Hm]VYuSYUbRc*6[j`8]pZ[bt_/^Jc*[<Z?YE|Xb|?_Z^Vcas]h{t9|Uwd)_(=0^6Zb{Nc} E[qZAeX[a]P^|_J>e8`W^j_Y}R{{Jp__]Ee#e:iWb9q_wKbujrbR}CY`,{mJ}gz{Q^{t~N|? gSga`V_||:#mi}3t|/I`X{N*|ct|2g{km}gi|{={jC}F;|E}{ZZjYf*frmu}8Tdroi{T[|+~}HG{cJ}DM{Lp{Ctd&}$hi3|FZ| m}Kr|38}^c|m_|Tr{Qv|36}?Up>|;S{DV{k_as}BK{P}}9p|t`jR{sAm4{D=b4pWa[}Xi{EjwEkI}3S|E?u=X0{jf} S|NM|JC{qo^3cm]-|JUx/{Cj{s>{Crt[UXuv|D~|j|d{YXZR}Aq}0r}(_{pJfi_z}0b|-vi)Z mFe,{f4|q`b{}^Z{HM{rbeHZ|^x_o|XM|L%|uFXm}@C_{{Hhp%a7|0p[Xp+^K}9U{bP}: tT}B|}+$|b2|[^|~h{FAby[`{}xgygrt~h1[li`c4vz|,7p~b(|mviN}^pg[{N/|g3|^0c,gE|f%|7N{q[|tc|TKA{LU}I@|AZp(}G-sz{F |qZ{}F|f-}RGn6{Z]_5})B}UJ{FFb2]4ZI@v=k,]t_Dg5Bj]Z-]L]vrpdvdGlk|gF}G]|IW}Y0[G| /bo|Te^,_B}#n^^{QHYI[?hxg{[`]D^IYRYTb&kJ[cri[g_9]Ud~^_]<p@_e_XdNm-^/|5)|h_{J;{kacVopf!q;asqd}n)|.m|bf{QW|U)}b+{tL|w``N|to{t ZO|T]jF}CB|0Q{e5Zw|k |We}5:{HO{tPwf_uajjBfX}-V_C_{{r~gg|Ude;s+}KNXH}! `K}eW{Upwbk%ogaW}9EYN}YY|&v|SL{C3[5s.]Y]I]u{M6{pYZ`^,`ZbCYR[1mNg>rsk0Ym[jrE]RYiZTr*YJ{Ge|%-lf|y(`=[t}E6{k!|3)}Zk} ][G{E~cF{u3U.rJ|a9p#o#ZE|?|{sYc#vv{E=|LC}cu{N8`/`3`9rt[4|He{cq|iSYxY`}V |(Q|t4{C?]k_Vlvk)BZ^r<{CL}#h}R+[<|i=}X|{KAo]|W<`K{NW|Zx}#;|fe{IMr<|K~tJ_x}AyLZ?{GvbLnRgN}X&{H7|x~}Jm{]-| GpNu0}.ok>|c4{PYisrDZ|fwh9|hfo@{H~XSbO]Odv]%`N]b1Y]]|eIZ}_-ZA]aj,>eFn+j[aQ_+]h[J_m_g]%_wf.`%k1e#Z?{CvYu_B^|gk`Xfh^M3`afGZ-Z|[m{L}|k3cp[it ^>YUi~d>{T*}YJ{Q5{Jxa$hg|%4`}|LAgvb }G}{P=|<;Ux{_skR{cV|-*|s-{Mp|XP|$G|_J}c6cM{_=_D|*9^$ec{V;|4S{qO|w_|.7}d0|/D}e}|0G{Dq]Kdp{}dfDi>}B%{Gd|nl}lf{C-{y}|ANZr}#={T~|-(}c&{pI|ft{lsVP}){|@u}!W|bcmB{d?|iW|:dxj{PSkO|Hl]Li:}VYk@|2={fnWt{M3`cZ6|)}|Xj}BYa?vo{e4|L7|B7{L7|1W|lvYO}W8nJ|$Vih|{T{d*_1|:-n2dblk``fT{Ky|-%}m!|Xy|-a{Pz}[l{kFjz|iH}9N{WE{x,|jz}R {P|{D)c=nX|Kq|si}Ge{sh|[X{RF{t`|jsr*fYf,rK|/9}$}}Nf{y!1|<Std}4Wez{W${Fd_/^O[ooqaw_z[L`Nbv[;l7V[ii3_PeM}.h^viqYjZ*j1}+3{bt{DR[;UG}3Og,rS{JO{qw{d<_zbAh<R[1_r`iZTbv^^a}c{iEgQZ<exZFg.^Rb+`Uj{a+{z<[~r!]`[[|rZYR|?F|qppp]L|-d|}K}YZUM|=Y|ktm*}F]{D;g{uI|7kg^}%?Z%ca{N[_<q4xC]i|PqZC]n}.bDrnh0Wq{tr|OMn6tM|!6|T`{O`|>!]ji+]_bTeU}Tq|ds}n|{Gm{z,f)}&s{DPYJ`%{CGd5v4tvb*hUh~bf]z`jajiFqAii]bfy^U{Or|m+{I)cS|.9k:e3`^|xN}@Dnlis`B|Qo{`W|>||kA}Y}{ERYuYx`%[exd`]|OyiHtb}HofUYbFo![5|+]gD{NIZR|Go}.T{rh^4]S|C9_}xO^i`vfQ}C)bK{TL}cQ|79iu}9a];sj{P.o!f[Y]pM``Jda^Wc9ZarteBZClxtM{LW}l9|a.mU}KX}4@{I+f1}37|8u}9c|v${xGlz}jP{Dd1}e:}31}%3X$|22i<v+r@~mf{sN{C67G97855F4YL5}8f{DT|xy{sO{DXB334@55J1)4.G9A#JDYtXTYM4, YQD9;XbXm9SX]IB^4UN=Xn<5(;(F3YW@XkH-X_VM[DYM:5XP!T&Y`6|,^{IS-*D.H>:LXjYQ0I3XhAF:9:(==.F*3F1189K/7163D,:@|e2{LS36D4hq{Lw/84443@4.933:0307::6D7}&l{Mx657;89;,K5678H&93D(H<&<>0B90X^I;}Ag1{P%3A+>><975}[S{PZE453?4|T2{Q+5187;>447:81{C=hL6{Me^:=7ii{R=.=F<81;48?|h8}Uh{SE|,VxL{ST,7?9Y_5Xk3A#:$%YSYdXeKXOD8+TXh7(@>(YdXYHXl9J6X_5IXaL0N?3YK7Xh!1?XgYz9YEXhXaYPXhC3X`-YLY_XfVf[EGXZ5L8BXL9YHX]SYTXjLXdJ: YcXbQXg1PX]Yx4|Jr{Ys4.8YU+XIY`0N,<H%-H;:0@,74/:8546I=9177154870UC]d<C3HXl7ALYzXFXWP<<?E!88E5@03YYXJ?YJ@6YxX-YdXhYG|9o{`iXjY_>YVXe>AYFX[/(I@0841?):-B=14337:8=|14{c&93788|di{cW-0>0<097/A;N{FqYpugAFT%X/Yo3Yn,#=XlCYHYNX[Xk3YN:YRT4?)-YH%A5XlYF3C1=NWyY}>:74-C673<69545v {iT85YED=64=.F4..9878/D4378?48B3:7:7/1VX[f4{D,{l<5E75{dAbRB-8-@+;DBF/$ZfW8S<4YhXA.(5@*11YV8./S95C/0R-A4AXQYI7?68167B95HA1*<M3?1/@;/=54XbYP36}lc{qzSS38:19?,/39193574/66878Yw1X-87E6=;964X`T734:>86>1/=0;(I-1::7ALYGXhF+Xk[@W%TYbX7)KXdYEXi,H-XhYMRXfYK?XgXj.9HX_SX]YL1XmYJ>Y}WwIXiI-3-GXcYyXUYJ$X`Vs[7;XnYEZ;XF! 3;%8;PXX(N3Y[)Xi1YE&/ :;74YQ6X`33C;-(>Xm0(TYF/!YGXg8 9L5P01YPXO-5%C|qd{{/K/E6,=0144:361:955;6443@?B7*7:F89&F35YaX-CYf,XiFYRXE_e{}sF 0*7XRYPYfXa5YXXY8Xf8Y~XmA[9VjYj*#YMXIYOXk,HHX40YxYMXU8OXe;YFXLYuPXP?EB[QV0CXfY{:9XV[FWE0D6X^YVP*$4%OXiYQ(|xp|%c3{}V`1>Y`XH00:8/M6XhQ1:;3414|TE|&o@1*=81G8<3}6<|(f6>>>5-5:8;093B^3U*+*^*UT30XgYU&7*O1953)5@E78--F7YF*B&0:%P68W9Zn5974J9::3}Vk|-,C)=)1AJ4+<3YGXfY[XQXmT1M-XcYTYZXCYZXEYXXMYN,17>XIG*SaS|/eYJXbI?XdNZ+WRYP<F:R PXf;0Xg`$|1GX9YdXjLYxWX!ZIXGYaXNYm6X9YMX?9EXmZ&XZ#XQ>YeXRXfAY[4 ;0X!Zz0XdN$XhYL XIY^XGNXUYS/1YFXhYk.TXn4DXjB{jg|4DEX]:XcZMW=A.+QYL<LKXc[vV$+&PX*Z3XMYIXUQ:ZvW< YSXFZ,XBYeXMM)?Xa XiZ4/EXcP3%}&-|6~:1(-+YT$@XIYRBC<}&,|7aJ6}bp|8)K1|Xg|8C}[T|8Q.89;-964I38361<=/;883651467<7:>?1:.}le|:Z=39;1Y^)?:J=?XfLXbXi=Q0YVYOXaXiLXmJXO5?.SFXiCYW}-;|=u&D-X`N0X^,YzYRXO(QX_YW9`I|>hZ:N&X)DQXP@YH#XmNXi$YWX^=!G6YbYdX>XjY|XlX^XdYkX>YnXUXPYF)FXT[EVTMYmYJXmYSXmNXi#GXmT3X8HOX[ZiXN]IU2>8YdX1YbX<YfWuZ8XSXcZU%0;1XnXkZ_WTG,XZYX5YSX Yp 05G?XcYW(IXg6K/XlYP4XnI @XnO1W4Zp-9C@%QDYX+OYeX9>--YSXkD.YR%Q/Yo YUX].Xi<HYEZ2WdCE6YMXa7F)=,D>-@9/8@5=?7164;35387?N<618=6>7D+C50<6B03J0{Hj|N9$D,9I-,.KB3}m |NzE0::/81YqXjMXl7YG; [.W=Z0X4XQY]:MXiR,XgM?9$9>:?E;YE77VS[Y564760391?14941:0=:8B:;/1DXjFA-564=0B3XlH1+D85:0Q!B#:-6&N/:9<-R3/7Xn<*3J4.H:+334B.=>30H.;3833/76464665755:/83H6633:=;.>5645}&E|Y)?1/YG-,93&N3AE@5 <L1-G/8A0D858/30>8<549=@B8] V0[uVQYlXeD(P#ID&7T&7;Xi0;7T-$YE)E=1:E1GR):--0YI7=E<}n9|aT6783A>D7&4YG7=391W;Zx<5+>F#J39}o/|cc;6=A050EQXg8A1-}D-|d^5548083563695D?-.YOXd37I$@LYLWeYlX<Yd+YR A$;3-4YQ-9XmA0!9/XLY_YT(=5XdDI>YJ5XP1ZAW{9>X_6R(XhYO65&J%DA)C-!B:97#A9;@?F;&;(9=11/=657/H,<8}bz|j^5446>.L+&Y^8Xb6?(CYOXb*YF(8X`FYR(XPYVXmPQ%&DD(XmZXW??YOXZXfCYJ79,O)XnYF7K0!QXmXi4IYFRXS,6<%-:YO(+:-3Q!1E1:W,Zo}Am|n~;3580534*?3Zc4=9334361693:30C<6/717:<1/;>59&:4}6!|rS36=1?75<8}[B|s809983579I.A.>84758=108564741H*9E{L{|u%YQ<%6XfH.YUXe4YL@,>N}Tv|ve*G0X)Z;/)3@A74(4P&A1X:YVH97;,754*A66:1 D739E3553545558E4?-?K17/770843XAYf838A7K%N!YW4.$T19Z`WJ*0XdYJXTYOXNZ 1XaN1A+I&Xi.Xk3Z3GB&5%WhZ1+5#Y[X<4YMXhQYoQXVXbYQ8XSYUX4YXBXWDMG0WxZA[8V+Z8X;D],Va$%YeX?FXfX[XeYf<X:Z[WsYz8X_Y]%XmQ(!7BXIZFX]&YE3F$(1XgYgYE& +[+W!<YMYFXc;+PXCYI9YrWxGXY9DY[!GXiI7::)OC;*$.>N*HA@{C|}&k=:<TB83X`3YL+G4XiK]i}(fYK<=5$.FYE%4*5*H*6XkCYL=*6Xi6!Yi1KXR4YHXbC8Xj,B9ZbWx/XbYON#5B}Ue}+QKXnF1&YV5XmYQ0!*3IXBYb71?1B75XmF;0B976;H/RXU:YZX;BG-NXj;XjI>A#D3B636N;,*%<D:0;YRXY973H5)-4FXOYf0:0;/7759774;7;:/855:543L43<?6=E,.A4:C=L)%4YV!1(YE/4YF+ F3%;S;&JC:%/?YEXJ4GXf/YS-EXEYW,9;E}X$}547EXiK=51-?71C%?57;5>463553Zg90;6447?<>4:9.7538XgN{|!}9K/E&3-:D+YE1)YE/3;37/:05}n<}:UX8Yj4Yt864@JYK..G=.(A Q3%6K>3(P3#AYE$-6H/456*C=.XHY[#S.<780191;057C)=6HXj?955B:K1 E>-B/9,;5.!L?:0>/.@//:;7833YZ56<4:YE=/:7Z_WGC%3I6>XkC*&NA16X=Yz2$X:Y^&J48<99k8}CyB-61<18K946YO4{|N}E)YIB9K0L>4=46<1K0+R;6-=1883:478;4,S+3YJX`GJXh.Yp+Xm6MXcYpX(>7Yo,/:X=Z;Xi0YTYHXjYmXiXj;*;I-8S6N#XgY}.3XfYGO3C/$XjL$*NYX,1 6;YH&<XkK9C#I74.>}Hd`A748X[T450[n75<4439:18A107>|ET}Rf<1;14876/Yb983E<5.YNXd4149>,S=/4E/<306443G/06}0&}UkYSXFYF=44=-5095=88;63844,9E6644{PL}WA8:>)7+>763>>0/B3A545CCnT}Xm|dv}Xq1L/YNXk/H8;;.R63351YY747@15YE4J8;46;.38.>4A369.=-83,;Ye3?:3@YE.4-+N353;/;@(X[YYD>@/05-I*@.:551741Yf5>6A443<3535;.58/86=D4753442$635D1>0359NQ @73:3:>><Xn?;43C14 ?Y|X611YG1&<+,4<*,YLXl<1/AIXjF*N89A4Z576K1XbJ5YF.ZOWN.YGXO/YQ01:4G38Xl1;KI0YFXB=R<7;D/,/4>;$I,YGXm94@O35Yz66695385.>:6A#5}W7n^4336:4157597434433<3|XA}m`>=D>:4A.337370?-6Q96{`E|4A}C`|Qs{Mk|J+~r>|o,wHv>Vw}!c{H!|Gb|*Ca5}J||,U{t+{CN[!M65YXOY_*B,Y[Z9XaX[QYJYLXPYuZ%XcZ8LY[SYPYKZM<LMYG9OYqSQYM~[e{UJXmQYyZM_)>YjN1~[f3{aXFY|Yk:48YdH^NZ0|T){jVFYTZNFY^YTYN~[h{nPYMYn3I]`EYUYsYIZEYJ7Yw)YnXPQYH+Z.ZAZY]^Z1Y`YSZFZyGYHXLYG 8Yd#4~[i|+)YH9D?Y^F~Y7|-eYxZ^WHYdYfZQ~[j|3>~[k|3oYmYqY^XYYO=Z*4[]Z/OYLXhZ1YLZIXgYIHYEYK,<Y`YEXIGZI[3YOYcB4SZ!YHZ*&Y{Xi3~[l|JSY`Zz?Z,~[m|O=Yi>??XnYWXmYS617YVYIHZ(Z4[~L4/=~[n|Yu{P)|];YOHHZ}~[o33|a>~[r|aE]DH~[s|e$Zz~[t|kZFY~XhYXZB[`Y}~[u|{SZ&OYkYQYuZ2Zf8D~[v}% ~[w3},Q[X]+YGYeYPIS~[y}4aZ!YN^!6PZ*~[z}?E~[{3}CnZ=~[}}EdDZz/9A3(3S<,YR8.D=*XgYPYcXN3Z5 4)~[~}JW=$Yu.XX~] }KDX`PXdZ4XfYpTJLY[F5]X~[2Yp}U+DZJ::<446[m@~]#3}]1~]%}^LZwZQ5Z`/OT<Yh^ -~]&}jx[ ~m<z!%2+~ly4VY-~o>}p62yz!%2+Xf2+~ly4VY-zQ`z (=] 2z~o2",C={" ":0,"!":1},c=34,i=2,p,s="",u=String.fromCharCode,t=u(12539);while(++c<127)C[u(c)]=c^39&&c^92?i++:0;i=0;while(0<=(c=C[a.charAt(i++)]))if(16==c)if((c=C[a.charAt(i++)])<87){if(86==c)c=1879;while(c--)s+=u(++p)}else s+=s.substr(8272,360);else if(c<86)s+=u(p+=c<51?c-16:(c-55)*92+C[a.charAt(i++)]);else if((c=((c-86)*92+C[a.charAt(i++)])*92+C[a.charAt(i++)])<49152)s+=u(p=c<40960?c:c|57344);else{c&=511;while(c--)s+=t;p=12539}return s')();
-    function decodeToShiftJis(str)
-    {
-        return str.replace(/%(8[1-9A-F]|[9E][0-9A-F]|F[0-9A-C])(%[4-689A-F][0-9A-F]|%7[0-9A-E]|[@-~])|%([0-7][0-9A-F]|A[1-9A-F]|[B-D][0-9A-F])/ig,
-            function(s)
-            {
-                var c = _parseInt(s.substring(1, 3), 16);
-                var l = s.length;
-                return 3==l?_fromCharCode(c<160?c:c+65216):JCT11280.charAt((c<160?c-129:c-193)*188+(4==l?s.charCodeAt(3)-64:(c=_parseInt(s.substring(4),16))<127?c-64:c-65));
-            }
-        );
-    }
-
-    /**
-     * onresize
-     */
-    window.onresize = function()
-    {
-        if (!isSpriteSheet && isLoad) {
-            swf2js.stop();
-            changeScreenSize();
-            loaded();
-        }
-    };
-
-    /**
-     * init
-     */
-    function init()
-    {
-        window.removeEventListener("DOMContentLoaded", init, false);
-
-        var div = _document.getElementById('swf2js');
-
-        // 場所指定
-        var containerDom = null;
-        if (tagId != null) {
-            containerDom = _document.getElementById(tagId);
-            if (!containerDom) {
-                alert('Not Found Tag Id');
-                return 0;
-            }
-            div = _document.createElement('div');
-            div.id = 'swf2js';
-            containerDom.appendChild(div);
-        }
-
-        var parent = div.parentNode;
-        if (parent.tagName == 'BODY') {
-            width  = (optionWidth > 0) ? optionWidth : window.innerWidth;
-            height = (optionHeight > 0) ? optionHeight : window.innerHeight;
-        } else {
-            width  = (optionWidth > 0) ? optionWidth : parent.clientWidth;
-            height = (optionHeight > 0) ? optionHeight : parent.clientHeight;
-        }
-
-        var minSize = _min(width, height);
-        var style = div.style;
-        style.position = 'relative';
-        style.top = '0';
-        style.left = _floor((width / 2) - (minSize / 2)) +'px';
-        style.width = minSize + 'px';
-        style.height = minSize + 'px';
-        style.backgroundColor = '#000000';
-        style.overflow = 'hidden';
-        style['-webkit-user-select'] = 'none';
-
-        // loading
-        loading();
-
-        // main canvasをセット
-        var canvas = _document.createElement('canvas');
-        canvas.width = (width * devicePixelRatio);
-        canvas.height = (height * devicePixelRatio);
-        style = canvas.style;
-        style.zIndex = 0;
-        style.position = 'absolute';
-        style.zoom = 100 / devicePixelRatio + '%';
-        style['-webkit-tap-highlight-color'] = 'rgba(0,0,0,0)';
-        context = canvas.getContext('2d');
-
-        var preCanvas = _document.createElement('canvas');
-        preCanvas.width = canvas.width;
-        preCanvas.height = canvas.height;
-        preContext = preCanvas.getContext('2d');
-
-        if (isAndroid && isChrome) {
-            var tmpCanvas = _document.createElement('canvas');
-            tmpCanvas.width = canvas.width;
-            tmpCanvas.height = canvas.height;
-            tmpContext = tmpCanvas.getContext('2d');
-        }
-
-        if (isTouch) {
-            var startEvent = 'touchstart';
-            var moveEvent  = 'touchmove';
-            var endEvent   = 'touchend';
-        } else {
-            var startEvent = 'mousedown';
-            var moveEvent  = 'mousemove';
-            var endEvent   = 'mouseup';
-        }
-
-        canvas.addEventListener(startEvent, touchStart, false);
-        canvas.addEventListener(moveEvent, touchMove, false);
-        canvas.addEventListener(endEvent, touchEnd, false);
-
-        if (!isTouch) {
-            window.addEventListener("keydown", keyAction, false);
-        }
-
-        if (isLoad && imgUnLoadCount == 0) {
-            loaded();
-        }
-    }
-
-    /**
-     * loading
-     */
-    function loading()
-    {
-        var div = _document.getElementById('swf2js');
-        var css = '<style>';
-        css += '#swf2js_loading {\n';
-        css += 'z-index: 999;\n';
-        css += 'position: absolute;\n';
-        css += 'top: 50%;\n';
-        css += 'left: 50%;\n';
-        css += 'margin: -24px 0 0 -24px;\n';
-        css += 'width: 50px;\n';
-        css += 'height: 50px;\n';
-        css += 'border-radius: 50px;\n';
-        css += 'border: 8px solid #dcdcdc;\n';
-        css += 'border-right-color: transparent;\n';
-        css += 'box-sizing: border-box;\n';
-        css += '-webkit-animation: swf2js_loading 1s infinite linear;\n';
-        css += '} \n';
-
-        css += '@-webkit-keyframes swf2js_loading {\n';
-        css += '0% {-webkit-transform: rotate(0deg); opacity: 0.4;}\n';
-        css += '50% {-webkit-transform: rotate(180deg); opacity: 1;}\n';
-        css += '100% {-webkit-transform: rotate(360deg); opacity: 0.4;}\n';
-        css += '} \n';
-
-        css += '</style>';
-        div.innerHTML = css;
-
-        var loadingDiv = _document.createElement('div');
-        loadingDiv.id = 'swf2js_loading';
-        div.appendChild(loadingDiv);
-    }
-
-    /**
-     * changeScreenSize
-     */
-    function changeScreenSize()
-    {
-        var div = _document.getElementById('swf2js');
-        var parent = div.parentNode;
-        if (parent.tagName == 'BODY') {
-            var screenWidth  = (optionWidth > 0) ? optionWidth : window.innerWidth;
-            var screenHeight = (optionHeight > 0) ? optionHeight : window.innerHeight;
-        } else {
-            var screenWidth  = (optionWidth > 0) ? optionWidth : parent.clientWidth;
-            var screenHeight = (optionHeight > 0) ? optionHeight : parent.clientHeight;
-        }
-
-        var canvasWidth  = player.width;
-        var canvasHeight = player.height;
-        var minSize = _min(screenWidth, screenHeight);
-
-        // 条件に合わせてリサイズ
-        if(canvasWidth > canvasHeight){
-            scale = screenWidth / canvasWidth * devicePixelRatio;
-            width  = canvasWidth * scale;
-            height = canvasHeight * scale;
-        } else if (canvasWidth == canvasHeight) {
-            scale  = minSize / canvasWidth * devicePixelRatio;
-            width  = canvasWidth  * scale;
-            height = canvasHeight * scale;
-        } else {
-            scale = _min(
-                (screenWidth / canvasWidth) * devicePixelRatio,
-                (screenHeight / canvasHeight) * devicePixelRatio
-            );
-            width  = canvasWidth * scale;
-            height = canvasHeight * scale;
-        }
-
-        // divの設定
-        var style = div.style;
-        style.width = (width / devicePixelRatio) + 'px';
-        style.height = (height / devicePixelRatio) + 'px';
-        style.top = 0;
-        style.left =  ((screenWidth / 2) - ((width / devicePixelRatio) / 2)) + 'px';
-
-        // main
-        var canvas = context.canvas;
-        canvas.width = width;
-        canvas.height = height;
-
-        // pre
-        var preCanvas = preContext.canvas;
-        preCanvas.width = width;
-        preCanvas.height = height;
-
-        // tmp
-        if (isAndroid && isChrome) {
-            var tmpCanvas = tmpContext.canvas;
-            tmpCanvas.width = width;
-            tmpCanvas.height = height;
-        }
-    }
+    var cacheStore = new CacheStore();
 
     /**
      * BitIO
@@ -473,12 +1269,10 @@
      */
     BitIO.prototype.init = function(binary)
     {
-        var _this = this;
         var length = binary.length;
-        var array = _this.createArray(length);
-        var key = 0;
-        for (; length--;) {
-            array[key] = binary.charCodeAt(key++) & 0xff;
+        var array = this.createArray(length);
+        for (var key = 0; length--; key++) {
+            array[key] = binary.charCodeAt(key) & 0xff;
         }
         this.data = array;
     };
@@ -509,19 +1303,29 @@
     {
         var _this = this;
         var str = '';
-        str += _fromCharCode(_this.getUI8());
-        str += _fromCharCode(_this.getUI8());
-        str += _fromCharCode(_this.getUI8());
+        var count = 3;
+        while (count) {
+            var code = _this.getUI8();
+            // trim
+            switch (code) {
+                case 32:
+                case 96:
+                case 127:
+                    continue;
+                    break;
+            }
+            str += _fromCharCode(code);
+            count--;
+        }
         return str;
     };
 
     /**
-     * バージョン情報
      * @returns {number}
      */
-    BitIO.prototype.setVersion = function()
+    BitIO.prototype.getVersion = function()
     {
-        version = this.getUI8();
+        return this.getUI8();
     };
 
     /**
@@ -575,9 +1379,9 @@
         } else {
             var length = data.length;
             while (true) {
-                var value = data[bo + offset];
+                var val = data[bo + offset];
                 offset++;
-                if (value == 0 || (bo + offset) >= length) {
+                if (val == 0 || (bo + offset) >= length) {
                     break;
                 }
             }
@@ -593,8 +1397,9 @@
         var array = [];
         var ret = '';
         var _join = Array.prototype.join;
+        var i = 0;
         if (value != null) {
-            for (var i = 0; i < n; i++) {
+            for (i = 0; i < n; i++) {
                 var code = data[bo + i];
                 if (code == 10 || code == 13) {
                     array[array.length] = '@LFCR';
@@ -616,12 +1421,13 @@
                 ret = ret.slice(0, -5);
             }
         } else {
-            for (var i = 0; i < n; i++) {
+            for (i = 0; i < n; i++) {
                 ret += _fromCharCode(data[bo + i]);
             }
         }
 
         _this.byte_offset = bo + n;
+
         return ret;
     };
 
@@ -932,18 +1738,18 @@
      */
     BitIO.prototype.deCompress = function(length)
     {
-        var _this = bitio;
+        var _this = this;
         var key = 0;
-        var i = 0;
         var bo = _this.byte_offset;
         var data = _this.getData(bo);
 
         var deCompress = unzip(_this.data, true);
         var array = _this.createArray(length);
+        _this.data = null;
 
         // header
         var dataLength = data.length;
-        for (i = 0; i < dataLength; i++) {
+        for (var i = 0; i < dataLength; i++) {
             array[key++] = data[i];
         }
 
@@ -958,11 +1764,16 @@
     };
 
     /**
-     * SwfTag
+     * @param player
+     * @param bitio
+     * @constructor
      */
-    var SwfTag = function()
+    var SwfTag = function(player, bitio)
     {
+        this.player = player;
+        this.bitio = bitio;
         this.currentPosition = {x:0, y:0};
+        this.jpegTables = null;
     };
 
     /**
@@ -971,19 +1782,18 @@
      */
     SwfTag.prototype.parse = function(mc)
     {
-        var _this = swftag;
+        var _this = this;
+        var length = _this.bitio.data.length;
 
         // parse tag
-        var tags = _this.parseTags(
-            bitio.data.length,
-            mc.CharacterId
-        );
+        var tags = _this.parseTags(length, mc.CharacterId);
 
         // load sound
         if (isTouch) {
+            var loadSounds = _this.player.loadSounds;
             var sLen = loadSounds.length;
             if (sLen) {
-                var canvas = context.canvas;
+                var canvas = _this.player.context.canvas;
                 var loadSound = function ()
                 {
                     canvas.removeEventListener('touchstart', loadSound, false);
@@ -1009,13 +1819,14 @@
      */
     SwfTag.prototype.build = function(tags, parent)
     {
+        var _this = this;
         var len = tags.length;
-        var _showFrame = swftag.showFrame;
+        var _showFrame = _this.showFrame;
         for (var frame = 1; frame < len; frame++) {
             if (!(frame in tags)) {
                 continue;
             }
-            _showFrame(tags[frame], parent);
+            _showFrame.call(_this, tags[frame], parent);
         }
     };
 
@@ -1026,13 +1837,12 @@
      */
     SwfTag.prototype.showFrame = function(obj, mc)
     {
-        var _this = swftag;
+        var _this = this;
         var _buildTag = _this.buildTag;
 
         var newDepth = [];
         var length = 0;
         var frame = obj.frame;
-        totalFrame = _max(mc.getTotalFrames(), frame);
         mc.setTotalFrames(_max(mc.getTotalFrames(), frame));
 
         // add ActionScript
@@ -1082,7 +1892,7 @@
 
                 var tag = cTags[i];
                 newDepth[tag.Depth] = true;
-                _buildTag(frame, tag, mc);
+                _buildTag.call(_this, frame, tag, mc);
             }
         }
 
@@ -1142,7 +1952,8 @@
      */
     SwfTag.prototype.buildTag = function(frame, tag, parent)
     {
-        var _this = swftag;
+        var _this = this;
+        var player = _this.player;
         var _build = _this.build;
         var obj = {};
         var _clone = clone;
@@ -1200,19 +2011,19 @@
             }
         }
 
-        var char = character[tag.CharacterId];
+        var char = player.getCharacter(tag.CharacterId);
         if (char instanceof Array) {
             if (tag.PlaceFlagMove && isCopy) {
                 var mc = parent.addTags[frame - 1][tag.Depth];
             } else {
-                var mc = new MovieClip();
+                var mc = new MovieClip(_this.player);
                 mc.setParent(parent);
                 mc.characterId = tag.CharacterId;
                 mc.setLevel(tag.Depth);
                 if (tag.PlaceFlagHasName) {
                     mc._name = tag.Name;
                 }
-                _build(char, mc);
+                _build.call(_this, char, mc);
             }
 
             obj = mc;
@@ -1242,16 +2053,16 @@
                             }
 
                             var bTag = btnTags[i];
-                            var btnChar = character[bTag.CharacterId];
+                            var btnChar = player.getCharacter(bTag.CharacterId);
                             if (btnChar instanceof Array) {
-                                var mc = new MovieClip();
+                                var mc = new MovieClip(_this.player);
                                 mc.setParent(parent);
                                 mc.characterId = tag.CharacterId;
                                 mc.setLevel(tag.Depth);
                                 if (tag.PlaceFlagHasName) {
                                     mc._name = tag.Name;
                                 }
-                                _build(btnChar, mc);
+                                _build.call(_this, btnChar, mc);
                                 characters[d].push(mc);
                             } else {
                                 characters[d].push({
@@ -1340,19 +2151,17 @@
      */
     SwfTag.prototype.parseTags = function(dataLength, characterId)
     {
-        var _this = swftag;
+        var _this = this;
         var _parseTag = _this.parseTag;
         var _addTag = _this.addTag;
         var _generateDefaultTagObj = _this.generateDefaultTagObj;
         var frame = 1;
         var tags = [];
         var tagType = 0;
+        var bitio = _this.bitio;
 
         // default set
-        tags[frame] = _generateDefaultTagObj(
-            frame,
-            characterId
-        );
+        tags[frame] = _generateDefaultTagObj.call(_this, frame, characterId);
 
         while (bitio.byte_offset < dataLength) {
             var tagStartOffset = bitio.byte_offset;
@@ -1378,14 +2187,11 @@
             if (tagType == 1) {
                 frame++;
                 if (dataLength > tagDataStartOffset + 2) {
-                    tags[frame] = _generateDefaultTagObj(
-                        frame,
-                        characterId
-                    );
+                    tags[frame] = _generateDefaultTagObj.call(_this, frame, characterId);
                 }
             }
 
-            var tag = _parseTag(tagType, length);
+            var tag = _parseTag.call(_this, tagType, length);
             var o = bitio.byte_offset - tagDataStartOffset;
             if (o != length) {
                 if (o < length) {
@@ -1397,7 +2203,7 @@
             }
 
             if (tag != null) {
-                tags = _addTag(tagType, tags, tag, frame);
+                tags = _addTag.call(_this, tagType, tags, tag, frame);
             }
             bitio.bit_offset = 0;
         }
@@ -1413,8 +2219,10 @@
      */
     SwfTag.prototype.parseTag = function(tagType, length)
     {
-        var _this = swftag;
+        var _this = this;
         var obj = null;
+        var bitio = _this.bitio;
+        var player = _this.player;
 
         switch (tagType) {
             case 0: // End
@@ -1430,19 +2238,13 @@
                 } else {
                     _this.parseDefineShape(tagType);
                 }
-                shapeCount++;
                 break;
             case 9: // BackgroundColor
                 var color = "rgb("
                     + bitio.getUI8() +","
                     + bitio.getUI8() +","
                     + bitio.getUI8() +")";
-                if (backgroundColor == null) {
-                    var canvas = context.canvas;
-                    var style = canvas.style;
-                    style.backgroundColor = color;
-                    backgroundColor = color;
-                }
+                player.backgroundColor = color;
                 break;
             case 10: // DefineFont
             case 48: // DefineFont2
@@ -1492,11 +2294,11 @@
             case 21: // DefineBitsJPEG2
             case 35: // DefineBitsJPEG3
             case 90: // DefineBitsJPEG4
-                _this.parseDefineBits(tagType, length, jpegTables);
-                jpegTables = null;
+                _this.parseDefineBits(tagType, length, _this.jpegTables);
+                _this.jpegTables = null;
                 break;
             case 8: // JPEGTables
-                jpegTables = _this.parseJPEGTables(length);
+                _this.jpegTables = _this.parseJPEGTables(length);
                 break;
             case 56: // ExportAssets
                 _this.parseExportAssets();
@@ -1617,7 +2419,8 @@
      * @param frame
      * @returns {*}
      */
-    SwfTag.prototype.addTag = function (tagType, tags, tag, frame) {
+    SwfTag.prototype.addTag = function (tagType, tags, tag, frame)
+    {
         var tagsArray = tags[frame];
         switch (tagType) {
             case 4:  // PlaceObject
@@ -1656,7 +2459,8 @@
      */
     SwfTag.prototype.parseDefineShape = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var characterId = bitio.getUI16();
         var shapeBounds = _this.rect();
 
@@ -1678,7 +2482,9 @@
      */
     SwfTag.prototype.rect = function()
     {
+        var bitio = this.bitio;
         bitio.byteAlign();
+
         var nBits = bitio.getUIBits(5);
         return {
             Xmin: bitio.getSIBits(nBits),
@@ -1695,7 +2501,8 @@
      */
     SwfTag.prototype.shapeWithStyle = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
 
         if (tagType == 46 || tagType == 84) {
             var fillStyles = null;
@@ -1729,7 +2536,8 @@
      */
     SwfTag.prototype.fillStyleArray = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var fillStyleCount = bitio.getUI8();
         if ((tagType > 2) && (fillStyleCount == 0xff)) {
             fillStyleCount = bitio.getUI16();
@@ -1753,7 +2561,8 @@
      */
     SwfTag.prototype.fillStyle = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         var bitType = bitio.getUI8();
         obj.fillStyleType = bitType;
@@ -1809,6 +2618,7 @@
      */
     SwfTag.prototype.rgb = function()
     {
+        var bitio = this.bitio;
         return {
             R: bitio.getUI8(),
             G: bitio.getUI8(),
@@ -1823,6 +2633,7 @@
      */
     SwfTag.prototype.rgba = function()
     {
+        var bitio = this.bitio;
         return {
             R: bitio.getUI8(),
             G: bitio.getUI8(),
@@ -1837,6 +2648,7 @@
      */
     SwfTag.prototype.matrix = function()
     {
+        var bitio = this.bitio;
         bitio.byteAlign();
         var HasScale = bitio.getUIBit();
         var ScaleX = 1;
@@ -1877,8 +2689,9 @@
      */
     SwfTag.prototype.gradient = function(tagType)
     {
+        var bitio = this.bitio;
         bitio.byteAlign();
-        var _this = swftag;
+        var _this = this;
         var SpreadMode = bitio.getUIBits(2);
         var InterpolationMode = bitio.getUIBits(2);
         var NumGradients = bitio.getUIBits(4);
@@ -1903,7 +2716,8 @@
      */
     SwfTag.prototype.gradientRecord = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var Ratio = bitio.getUI8();
         if (tagType < 32) {
             // DefineShape1or2
@@ -1926,8 +2740,9 @@
      */
     SwfTag.prototype.focalGradient = function(tagType)
     {
+        var bitio = this.bitio;
         bitio.byteAlign();
-        var _this = swftag;
+        var _this = this;
         var SpreadMode = bitio.getUIBits(2);
         var InterpolationMode = bitio.getUIBits(2);
         var numGradients = bitio.getUIBits(4);
@@ -1954,7 +2769,8 @@
      */
     SwfTag.prototype.lineStyleArray = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var lineStyleCount = bitio.getUI8();
         if ((tagType > 2) && (lineStyleCount == 0xff)) {
             lineStyleCount = bitio.getUI16();
@@ -1978,7 +2794,8 @@
      */
     SwfTag.prototype.lineStyles = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         if (tagType == 46) {
             obj = {
@@ -2055,7 +2872,8 @@
      */
     SwfTag.prototype.shapeRecords = function(tagType, currentNumBits)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var shapeRecords = [];
         _this.currentPosition = {x:0, y:0};
         var _straightEdgeRecord = _this.straightEdgeRecord;
@@ -2071,15 +2889,15 @@
                 var numBits = first6Bits & 0x0f;
                 if (first6Bits & 0x10) {
                     // StraigtEdge (11XXXX)
-                    shape = _straightEdgeRecord(tagType, numBits);
+                    shape = _straightEdgeRecord.call(_this, tagType, numBits);
                 } else {
                     // CurvedEdge (10XXXX)
-                    shape = _curvedEdgeRecord(tagType, numBits);
+                    shape = _curvedEdgeRecord.call(_this, tagType, numBits);
                 }
             } else if (first6Bits) {
                 // ChangeStyle (0XXXXX)
                 shape =
-                    _styleChangeRecord(tagType, first6Bits, currentNumBits);
+                    _styleChangeRecord.call(_this, tagType, first6Bits, currentNumBits);
             }
 
             shapeRecords[shapeRecords.length] = shape;
@@ -2099,7 +2917,8 @@
      */
     SwfTag.prototype.straightEdgeRecord = function(tagType, numBits)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var deltaX = 0;
         var deltaY = 0;
         var GeneralLineFlag = bitio.getUIBit();
@@ -2144,7 +2963,8 @@
      */
     SwfTag.prototype.curvedEdgeRecord = function(tagType, numBits)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var controlDeltaX = bitio.getSIBits(numBits + 2);
         var controlDeltaY = bitio.getSIBits(numBits + 2);
         var anchorDeltaX = bitio.getSIBits(numBits + 2);
@@ -2183,7 +3003,8 @@
      */
     SwfTag.prototype.styleChangeRecord = function(tagType, changeFlag, currentNumBits)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.StateNewStyles = (changeFlag >> 4) & 1;
         obj.StateLineStyle = (changeFlag >> 3) & 1;
@@ -2227,962 +3048,14 @@
      */
     SwfTag.prototype.appendShapeTag = function(characterId, shapeBounds, shapes, tagType)
     {
-        // フレームをセット
-        character[characterId] = {
+        this.player.setCharacter(characterId, {
             tagType: tagType,
-            data: swftag.vectorToCanvas(shapes),
+            data: vtc.execute(shapes),
             Xmax: shapeBounds.Xmax,
             Xmin: shapeBounds.Xmin,
             Ymax: shapeBounds.Ymax,
             Ymin: shapeBounds.Ymin
-        };
-    };
-
-    /**
-     * vectorToCanvas
-     * @param shapes
-     * @returns {*}
-     */
-    SwfTag.prototype.vectorToCanvas = function(shapes)
-    {
-        var _this = swftag;
-        var i = 0;
-        var depth = 0;
-        var lineStyle = shapes.lineStyles.lineStyles;
-        var fillStyle = shapes.fillStyles.fillStyles;
-        var records = shapes.ShapeRecords;
-        var AnchorX = 0;
-        var AnchorY = 0;
-        var ControlX = 0;
-        var ControlY = 0;
-
-        var canvasF0Array = [[]];
-        var canvasF1Array = [[]];
-        var canvasLArray = [[]];
-
-        var fillFlag0 = false;
-        var fillFlag1 = false;
-        var lineFlag = false;
-
-        var f0Idx = 0;
-        var f1Idx = 0;
-
-        var StartX = 0;
-        var StartY = 0;
-
-        // 重なり番号
-        var stack = 0;
-
-        while (true) {
-            var record = records[i];
-            if (records[i] == 0) {
-                break;
-            }
-
-            if (record.isChange) {
-                // 移動判定
-                if (record.StateMoveTo) {
-                    StartX = record.MoveX;
-                    StartY = record.MoveY;
-                } else {
-                    StartX = AnchorX;
-                    StartY = AnchorY;
-                }
-
-                // 新しい色をセット
-                var StateFillStyle0 = record.StateFillStyle0;
-                var FillStyle0 = record.FillStyle0;
-                var StateFillStyle1 = record.StateFillStyle1;
-                var FillStyle1 = record.FillStyle1;
-                var StateLineStyle = record.StateLineStyle;
-                var LineStyle = record.LineStyle;
-
-                if (record.StateNewStyles == 1) {
-                    // fillStyle
-                    if (record.NumFillBits > 0) {
-                        var FillStyles = record.FillStyles;
-                        fillStyle = FillStyles.fillStyles;
-                    }
-
-                    // lineStyle
-                    if (record.NumLineBits > 0) {
-                        var LineStyles = record.LineStyles;
-                        lineStyle = LineStyles.lineStyles;
-                    }
-
-                    // fillFlag0
-                    if (StateFillStyle0 == 1 && FillStyle0 == 0) {
-                        fillFlag0 = false;
-                    }
-
-                    // fillFlag1
-                    if (StateFillStyle1 == 1 && FillStyle1 == 0) {
-                        fillFlag1 = false;
-                    }
-
-                    // lineFlag
-                    if (StateLineStyle == 1 && LineStyle == 0) {
-                        lineFlag = false;
-                    }
-
-                    // 上に加算
-                    stack++;
-                    canvasF0Array[stack] = [];
-                    canvasF1Array[stack] = [];
-                    canvasLArray[stack] = [];
-
-                    AnchorX = 0;
-                    AnchorY = 0;
-
-                    i++;
-                    continue;
-                }
-
-                // 深度
-                depth++;
-
-                // fill0
-                fillFlag0 = ((StateFillStyle0 > 0 && FillStyle0 > 0)
-                    || (fillFlag0 && StateFillStyle0 == 0)
-                );
-                if (fillFlag0) {
-                    // 色の算出
-                    if (FillStyle0) {
-                        f0Idx = (FillStyle0 - 1);
-                        var f0ColorObj = fillStyle[f0Idx];
-                        var fillStyleType = f0ColorObj.fillStyleType;
-                    }
-
-                    // 初期設定
-                    var f0Base = canvasF0Array[stack];
-                    if (!(depth in f0Base)) {
-                        f0Base[depth] = {
-                            StartX: StartX,
-                            StartY: StartY,
-                            Depth: depth,
-                            Color: (fillStyleType == 0x00) ? f0ColorObj.Color : f0ColorObj,
-                            ColorIdx: f0Idx,
-                            styleType: fillStyleType,
-                            cArray: [],
-                            fArray: []
-                        };
-
-                        var f0cArray = f0Base[depth].fArray;
-                        var aLen = f0cArray.length;
-                        f0cArray[aLen++] = 'moveTo';
-                        f0cArray[aLen++] = StartX;
-                        f0cArray[aLen] = StartY;
-                    }
-                }
-
-                // fill1
-                fillFlag1 = ((StateFillStyle1 > 0 && FillStyle1 > 0)
-                    || (fillFlag1 && StateFillStyle1 == 0)
-                );
-                if (fillFlag1) {
-                    // 色の算出
-                    if (FillStyle1) {
-                        f1Idx = (FillStyle1 - 1);
-                        var f1ColorObj = fillStyle[f1Idx];
-                        var fillStyleType = f1ColorObj.fillStyleType;
-                    }
-
-                    // 初期設定
-                    var f1Base = canvasF1Array[stack];
-                    if (!(depth in f1Base)) {
-                        f1Base[depth] = {
-                            StartX: StartX,
-                            StartY: StartY,
-                            Depth: depth,
-                            Color: (fillStyleType == 0x00) ? f1ColorObj.Color : f1ColorObj,
-                            ColorIdx: f1Idx,
-                            styleType: fillStyleType,
-                            cArray: [],
-                            fArray: []
-                        };
-
-                        var f1cArray = f1Base[depth].fArray;
-                        var aLen = f1cArray.length;
-                        f1cArray[aLen++] = 'moveTo';
-                        f1cArray[aLen++] = StartX;
-                        f1cArray[aLen] = StartY;
-                    }
-                }
-
-                // line
-                lineFlag  = ((StateLineStyle > 0 && LineStyle > 0)
-                    || (lineFlag && StateLineStyle == 0)
-                );
-                if (lineFlag) {
-                    if (LineStyle) {
-                        var nKey   = (LineStyle - 1);
-                        var colorObj = lineStyle[nKey];
-                        var Width  = lineStyle[nKey].Width;
-                    }
-
-                    // 初期設定
-                    if (Width > 0) {
-                        var lBase = canvasLArray[stack];
-                        if (!(depth in lBase)) {
-                            lBase[depth] = {
-                                StartX: StartX,
-                                StartY: StartY,
-                                Depth: depth,
-                                Width:  Width,
-                                merge: false,
-                                Color: colorObj.Color,
-                                styleType: 0,
-                                cArray: [],
-                                fArray: []
-                            };
-
-                            var lcArray = lBase[depth].fArray;
-                            var aLen = lcArray.length;
-                            lcArray[aLen++] = 'moveTo';
-                            lcArray[aLen++] = StartX;
-                            lcArray[aLen] = StartY;
-                        }
-                    } else {
-                        lineFlag = false;
-                    }
-                }
-            } else {
-                AnchorX  = record.AnchorX;
-                AnchorY  = record.AnchorY;
-                ControlX = record.ControlX;
-                ControlY = record.ControlY;
-
-                // 描画データ
-                var isCurved = record.isCurved;
-
-                // fill0
-                if (fillFlag0) {
-                    var obj = canvasF0Array[stack][depth];
-                    obj.EndX = AnchorX;
-                    obj.EndY = AnchorY;
-                    obj.cArray[obj.cArray.length] = {
-                        isCurved: isCurved,
-                        AnchorX:  AnchorX,
-                        AnchorY:  AnchorY,
-                        ControlX: ControlX,
-                        ControlY: ControlY
-                    };
-
-                    var fArray = obj.fArray;
-                    var aLen = fArray.length;
-                    if (isCurved) {
-                        fArray[aLen++] = 'quadraticCurveTo';
-                        fArray[aLen++] = ControlX;
-                        fArray[aLen++] = ControlY;
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    } else {
-                        fArray[aLen++] = 'lineTo';
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    }
-                }
-
-                // fill1
-                if (fillFlag1) {
-                    var obj = canvasF1Array[stack][depth];
-                    obj.EndX = AnchorX;
-                    obj.EndY = AnchorY;
-                    obj.cArray[obj.cArray.length] = {
-                        isCurved: isCurved,
-                        AnchorX:  AnchorX,
-                        AnchorY:  AnchorY,
-                        ControlX: ControlX,
-                        ControlY: ControlY
-                    };
-
-                    var fArray = obj.fArray;
-                    var aLen = fArray.length;
-                    if (isCurved) {
-                        fArray[aLen++] = 'quadraticCurveTo';
-                        fArray[aLen++] = ControlX;
-                        fArray[aLen++] = ControlY;
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    } else {
-                        fArray[aLen++] = 'lineTo';
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    }
-                }
-
-                // line
-                if (lineFlag) {
-                    var obj = canvasLArray[stack][depth];
-                    obj.EndX = AnchorX;
-                    obj.EndY = AnchorY;
-                    obj.cArray[obj.cArray.length] = {
-                        isCurved: isCurved,
-                        AnchorX:  AnchorX,
-                        AnchorY:  AnchorY,
-                        ControlX: ControlX,
-                        ControlY: ControlY
-                    };
-
-                    var fArray = obj.fArray;
-                    var aLen = fArray.length;
-                    if (isCurved) {
-                        fArray[aLen++] = 'quadraticCurveTo';
-                        fArray[aLen++] = ControlX;
-                        fArray[aLen++] = ControlY;
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    } else {
-                        fArray[aLen++] = 'lineTo';
-                        fArray[aLen++] = AnchorX;
-                        fArray[aLen] = AnchorY;
-                    }
-                }
-            }
-
-            i++;
-        }
-
-        // 色でまとめる
-        var F0Array = _this.generateForColor(canvasF0Array);
-        var F1Array = _this.generateForColor(canvasF1Array);
-
-        // 反転してマージ
-        var len = F0Array.length;
-        var _fillReverse = _this.fillReverse;
-        if (len) {
-            for (var s = len; s--;) {
-                if (!(s in F1Array)) {
-                    continue;
-                }
-
-                var f1ColorArray = F1Array[s];
-                var colorArray = F0Array[s];
-                var cLen = colorArray.length;
-                for (var c = cLen; c--;) {
-                    if (!(c in f1ColorArray)) {
-                        continue;
-                    }
-
-                    if (!(c in colorArray)) {
-                        continue;
-                    }
-
-                    var f1Colors = f1ColorArray[c];
-                    var array = colorArray[c];
-                    var aLen = array.length;
-                    for (var d = aLen; d--;) {
-                        if (!(d in array)) {
-                            continue;
-                        }
-
-                        var obj = array[d];
-                        if (!(d in f1Colors)) {
-                            f1Colors[d] = _fillReverse.call(_this, obj);
-                            delete F0Array[s][c][d];
-                        } else {
-                            delete F1Array[s][c][d];
-                            delete F0Array[s][c][d];
-                        }
-                    }
-                }
-            }
-        }
-
-        // 座標調整
-        _this.fillMerge(F0Array, canvasLArray);
-        _this.fillMerge(F1Array, canvasLArray);
-
-        // 色で集約
-        var canvasArray = _this.bundle(F0Array, F1Array);
-
-        // line
-        var len = canvasLArray.length;
-        var _buildCommand = _this.buildCommand;
-        for (var s = 0; s < len; s++) {
-            var array = canvasLArray[s];
-            var aLen = array.length;
-            for (var d = 0; d < aLen; d++) {
-                if (!(d in array)) {
-                    continue;
-                }
-
-                var obj = array[d];
-                if (obj == null || obj.cArray == null || obj.fArray == null) {
-                    continue;
-                }
-
-                if (!(d in canvasArray)) {
-                    canvasArray[d] = [];
-                }
-
-                var l = canvasArray[d].length;
-                canvasArray[d][l] = {
-                    Color: obj.Color,
-                    Width: obj.Width,
-                    styleType: obj.styleType,
-                    cmd: _buildCommand.call(_this, obj.fArray)
-                };
-
-                obj = null;
-            }
-        }
-
-        return canvasArray;
-    };
-
-    /**
-     * buildCommand
-     * @param array
-     * @returns {Array}
-     */
-    SwfTag.prototype.buildCommand = function(array)
-    {
-        var length = array.length;
-        var str = '';
-        for (var i = 0; i < length; i++) {
-            if (!(i in array)) {
-                continue;
-            }
-
-            var value = array[i];
-            switch (value) {
-                case 'lineTo':
-                    str += 'ctx.lineTo('+ array[++i] +', '+ array[++i] +');';
-                    break;
-                case 'quadraticCurveTo':
-                    str += 'ctx.quadraticCurveTo('+ array[++i] +', '+ array[++i] +', '+ array[++i] +', '+ array[++i] +');';
-                    break;
-                case 'moveTo':
-                    str += 'ctx.moveTo('+ array[++i] +', '+ array[++i] +');';
-                    break;
-            }
-        }
-
-        return new Function('ctx', str);
-    };
-
-    /**
-     * bundle
-     * @param fill0Array
-     * @param fill1Array
-     * @returns {Array}
-     */
-    SwfTag.prototype.bundle = function(fill0Array, fill1Array)
-    {
-        var _this = swftag;
-        for (var r = 0; r < 2; r++) {
-            if (r == 0) {
-                var fArray = fill0Array;
-            } else {
-                var fArray = fill1Array;
-            }
-
-            var sLen = fArray.length;
-            for (var s = 0; s < sLen; s++) {
-                if (!(s in fArray)) {
-                    continue;
-                }
-
-                var colorArray = fArray[s];
-                var cLen = colorArray.length;
-                for (var key = 0; key < cLen; key++) {
-                    if (!(key in colorArray)) {
-                        continue;
-                    }
-
-                    var array = colorArray[key];
-                    var depth = null;
-                    var dLen = array.length;
-                    for (var d = 0; d < dLen; d++) {
-                        if (!(d in array)) {
-                            continue;
-                        }
-
-                        var obj = array[d];
-                        if (obj == null || obj.cArray == null) {
-                            delete fArray[s][key][d];
-                            continue;
-                        }
-
-                        if (depth == null) {
-                            depth = obj.Depth;
-                            continue;
-                        }
-
-                        var cArray = obj.cArray;
-                        var length = cArray.length;
-                        for (var i = 0; i < length; i++) {
-                            if (!(i in cArray)) {
-                                continue;
-                            }
-                            var value = cArray[i];
-                            var len = array[depth].cArray.length;
-                            array[depth].cArray[len] = value;
-                        }
-
-                        var fCArray = obj.fArray;
-                        var length = fCArray.length;
-                        for (var i = 0; i < length; i++) {
-                            if (!(i in fCArray)) {
-                                continue;
-                            }
-
-                            var baseArray = array[depth].fArray;
-                            baseArray[baseArray.length] = fCArray[i];
-                        }
-
-                        // 使ったので削除
-                        fArray[s][key][d] = null;
-                    }
-                }
-            }
-        }
-
-        var results = [];
-        var _buildCommand = _this.buildCommand;
-        for (var r = 0; r < 2; r++) {
-            if (r == 0) {
-                var fArray = fill0Array;
-            } else {
-                var fArray = fill1Array;
-            }
-
-            var sLen = fArray.length;
-            for (var s = 0; s < sLen; s++) {
-                if (!(s in fArray)) {
-                    continue;
-                }
-                var stackArray = fArray[s];
-
-                if (!(s in results)) {
-                    results[s] = [];
-                }
-
-                var cLen = stackArray.length;
-                for (var c = 0; c < cLen; c++) {
-                    if (!(c in stackArray)) {
-                        continue;
-                    }
-                    var array = stackArray[c];
-
-                    var aLen = array.length;
-                    depth = 0;
-                    for (var key = 0; key < aLen; key++) {
-                        if (!(key in array)) {
-                            continue;
-                        }
-
-                        var obj = array[key];
-                        if (obj == null) {
-                            continue;
-                        }
-
-                        var Depth = obj.Depth;
-                        if (!(Depth in results[s])) {
-                            results[s][Depth] = [];
-                        }
-
-                        var len = results[s][Depth].length;
-                        results[s][Depth][len] = {
-                            Color: obj.Color,
-                            styleType: obj.styleType,
-                            cmd: _buildCommand.call(_this, obj.fArray)
-                        };
-
-                        obj = null;
-                    }
-                }
-            }
-        }
-
-        var hash = [];
-        var length = results.length;
-        for (var s = 0; s < length; s++) {
-            if (!(s in results)) {
-                continue;
-            }
-
-            var result = results[s];
-            var len = result.length;
-            for (var d = 0; d < len; d++) {
-                if (!(d in result)) {
-                    continue;
-                }
-
-                hash[d] = null;
-                hash[d] = result[d];
-            }
-        }
-
-        results = null;
-        return hash;
-    };
-
-    /**
-     * generateForColor
-     * @param fillArray
-     * @returns {Array}
-     */
-    SwfTag.prototype.generateForColor = function(fillArray)
-    {
-        var array = [];
-        var len = fillArray.length;
-        for (var i = len; i--;) {
-            var stackArray = fillArray[i];
-            if (array[i] == undefined) {
-                array[i] = [];
-            }
-
-            var sLen = stackArray.length;
-            for (var s = sLen; s--;) {
-                var obj = stackArray[s];
-                if (obj == undefined) {
-                    continue;
-                }
-
-                var idx = obj.ColorIdx;
-                if (array[i][idx] == undefined) {
-                    array[i][idx] = [];
-                }
-                array[i][idx][s] = obj;
-            }
-        }
-        return array;
-    };
-
-    /**
-     * fillMerge
-     * @param fillArray
-     * @param canvasLArray
-     */
-    SwfTag.prototype.fillMerge = function(fillArray, canvasLArray)
-    {
-        var _this = swftag;
-        var sLen = fillArray.length;
-        for (var s = 0; s < sLen; s++) {
-            var colorArray = fillArray[s];
-            var lineArray = canvasLArray[s];
-
-            var cLen = colorArray.length;
-            for (var c = 0; c < cLen; c++) {
-                var array = colorArray[c];
-                if (array == undefined) {
-                    continue;
-                }
-
-                var preFill = [];
-                var aLen = array.length;
-                for (var key = 0; key < aLen; key++) {
-                    var obj = array[key];
-                    if (obj == undefined
-                        || obj == null
-                        || obj.cArray == null
-                        || (obj.StartX == obj.EndX
-                            && obj.StartY == obj.EndY)
-                    ) {
-                       continue;
-                    }
-
-                    preFill[preFill.length] = obj;
-                }
-
-                // preLine
-                var preLine = [];
-                if (lineArray != undefined) {
-                    var len = lineArray.length;
-                    for (var i = 0; i < len; i++) {
-                        if (!(i in lineArray)) {
-                            continue;
-                        }
-
-                        var obj = lineArray[i];
-                        preLine[preLine.length] = obj;
-                    }
-                }
-                var lineLength = preLine.length;
-
-                var cArray = [];
-                var lArray = [];
-                var cfArray = [];
-                var cflArray = [];
-                var preCount = preFill.length;
-                if (preCount > 1) {
-                    var base  = null;
-                    var copy  = null;
-                    var total = 0;
-                    var count = 0;
-                    var limit = 0;
-                    var limitCount = 0;
-
-                    while (true) {
-                        count++;
-
-                        // 判定元のobject
-                        if (base == null) {
-                            base  = preFill.shift();
-                            total = preFill.length;
-
-                            var sX = base.StartX;
-                            var sY = base.StartY;
-                            var eX = base.EndX;
-                            var eY = base.EndY;
-
-                            // 次が無ければ終了
-                            if (total == 0) {
-                                break;
-                            }
-                        }
-
-                        // 判定するobject
-                        copy = preFill.shift();
-
-                        // 開始・終了地点からそれぞれ判定してマージ
-                        if (eX == copy.StartX && eY == copy.StartY) {
-                            eX = copy.EndX;
-                            eY = copy.EndY;
-
-                            var copyArray = copy.cArray;
-                            var len = copyArray.length;
-                            for (var i = 0; i < len; i++) {
-                                cArray[cArray.length] = copyArray[i];
-                            }
-
-                            var copyFArray = copy.fArray;
-                            copyFArray.shift();
-                            copyFArray.shift();
-                            copyFArray.shift();
-                            var len = copyFArray.length;
-                            for (var i = 0; i < len; i++) {
-                                cfArray[cfArray.length] = copyFArray[i];
-                            }
-
-                            // lineがあればマージ
-                            var depth = copy.Depth;
-                            if (lineLength > 0 && depth in lineArray) {
-                                var lObj = lineArray[depth];
-                                lObj.merge = true;
-
-                                var lineCArray = lObj.cArray;
-                                var len = lineCArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    lArray[lArray.length] = lineCArray[i];
-                                }
-
-                                var lineFArray = lObj.fArray;
-                                var len = lineFArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    cflArray[cflArray.length] = lineFArray[i];
-                                }
-                            }
-
-                            copy.cArray = null;
-                            copy.fArray = null;
-                            limit = 0;
-                            count = 0;
-                        } else if (total <= count &&
-                            (eX == copy.EndX && eY == copy.EndY
-                            || sX == copy.StartX && sY == copy.StartY)
-                        ) {
-                            eX = copy.StartX;
-                            eY = copy.StartY;
-
-                            _this.fillReverse(copy);
-                            var copyArray = copy.cArray;
-                            var len = copyArray.length;
-                            for (var i = 0; i < len; i++) {
-                                cArray[cArray.length] = copyArray[i];
-                            }
-
-                            var copyFArray = copy.fArray;
-                            copyFArray.shift();
-                            copyFArray.shift();
-                            copyFArray.shift();
-                            var len = copyFArray.length;
-                            for (var i = 0; i < len; i++) {
-                                cfArray[cfArray.length] = copyFArray[i];
-                            }
-
-                            // lineがあればマージ
-                            var depth = copy.Depth;
-                            if (lineLength > 0
-                                && lineArray[depth] != undefined
-                            ) {
-                                var lObj = lineArray[depth];
-                                lObj.merge = true;
-                                _this.fillReverse(lObj);
-
-                                var lineCArray = lObj.cArray;
-                                var len = lineCArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    lArray[lArray.length] = lineCArray[i];
-                                }
-
-                                var lineFArray = lObj.fArray;
-                                var len = lineFArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    cflArray[cflArray.length] = lineFArray[i];
-                                }
-                            }
-
-                            copy.cArray = null;
-                            copy.fArray = null;
-                            limit = 0;
-                            count = 0;
-                        } else {
-                            limit++;
-                            if (limit > preCount) {
-                                limitCount++;
-                                preFill[preFill.length] = base;
-
-                                base = copy;
-                                sX = base.StartX;
-                                sY = base.StartY;
-                                eX = base.EndX;
-                                eY = base.EndY;
-                                limit = 0;
-                                count = 0;
-
-                                // limit
-                                if (limitCount > preCount) {
-                                    break;
-                                }
-                            } else {
-                                preFill[preFill.length] = copy;
-                            }
-
-                            copy = null;
-                        }
-
-                        // 判定が終了したらセットして初期化
-                        if (sX == eX && sY == eY) {
-                            var bCArray = base.cArray;
-                            var len = cArray.length;
-                            for (var i = 0; i < len; i++) {
-                                bCArray[bCArray.length] = cArray[i];
-                            }
-
-                            var bFArray = base.fArray;
-                            var len = cfArray.length;
-                            for (var i = 0; i < len; i++) {
-                                bFArray[bFArray.length] = cfArray[i];
-                            }
-
-                            // line
-                            var len = lArray.length;
-                            if (len) {
-                                var lObj = lineArray[base.Depth];
-                                if (lObj == undefined) {
-                                    lObj = preLine.shift();
-                                    lObj.merge = false;
-                                }
-
-                                var lCArray = lObj.cArray;
-                                for (var i = 0; i < len; i++) {
-                                    lCArray[lCArray.length] = lArray[i];
-                                }
-
-                                var lFArray = lObj.fArray;
-                                var len = cflArray.length;
-                                for (var i = 0; i < len; i++) {
-                                    lFArray[lFArray.length] = cflArray[i];
-                                }
-                            }
-
-                            // fill
-                            cArray = [];
-                            cfArray = [];
-
-                            // line
-                            lArray = [];
-                            cflArray = [];
-
-                            // params
-                            count = 0;
-                            limit = 0;
-                            limitCount = 0;
-                            base  = null;
-                        }
-
-                        // 終了
-                        if (!preFill.length) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    /**
-     * fillReverse
-     * @param obj
-     * @returns {*}
-     */
-    SwfTag.prototype.fillReverse = function(obj)
-    {
-        var rsX = 0;
-        var rsY = 0;
-        var copyObj = obj;
-        var rnX = copyObj.StartX;
-        var rnY = copyObj.StartY;
-        var cArray = copyObj.cArray;
-        var len = cArray.length;
-        var count = len;
-
-        while (count--) {
-            var shiftObj = cArray.shift();
-            if (shiftObj == null) {
-                continue;
-            }
-
-            rsX = shiftObj.AnchorX;
-            rsY = shiftObj.AnchorY;
-            shiftObj.AnchorX = rnX;
-            shiftObj.AnchorY = rnY;
-            rnX = rsX;
-            rnY = rsY;
-
-            // set
-            cArray[cArray.length] = shiftObj;
-        }
-
-        // 開始と終了地点を入れ替える
-        var StartX = obj.StartX;
-        var StartY = obj.StartY;
-        var EndX   = obj.EndX;
-        var EndY   = obj.EndY;
-
-        obj.StartX = EndX;
-        obj.StartY = EndY;
-        obj.EndX   = StartX;
-        obj.EndY   = StartY;
-
-        // 描画の入れ替え
-        var fCArray = [];
-        var fLen = 0;
-        fCArray[fLen++] = 'moveTo';
-        fCArray[fLen++] = obj.StartX;
-        fCArray[fLen++] = obj.StartY;
-
-        // 並べ替え
-        for (var i = len; i--;) {
-            var data = cArray[i];
-            if (data.isCurved) {
-                fCArray[fLen++] = 'quadraticCurveTo';
-                fCArray[fLen++] = data.ControlX;
-                fCArray[fLen++] = data.ControlY;
-                fCArray[fLen++] = data.AnchorX;
-                fCArray[fLen++] = data.AnchorY;
-            } else {
-                fCArray[fLen++] = 'lineTo';
-                fCArray[fLen++] = data.AnchorX;
-                fCArray[fLen++] = data.AnchorY;
-            }
-        }
-        obj.fArray = fCArray;
-
-        return obj;
+        });
     };
 
     /**
@@ -3192,6 +3065,9 @@
      */
     SwfTag.prototype.parseDefineBitsLossLess = function(tagType, length)
     {
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var startOffset = bitio.byte_offset;
         var CharacterId = bitio.getUI16();
         var format = bitio.getUI8();
@@ -3216,11 +3092,16 @@
         var imageContext = canvas.getContext('2d');
         var imgData = imageContext.createImageData(width, height);
         var pxData = imgData.data;
+
+        var idx = 0;
+        var pxIdx = 0;
+        var x = width;
+        var y = height;
         if (format == 5 && !isAlpha) {
-            var idx = 0;
-            var pxIdx = 0;
-            for (var y = height; y--;) {
-                for (var x = width; x--;) {
+            idx = 0;
+            pxIdx = 0;
+            for (y = height; y--;) {
+                for (x = width; x--;) {
                     idx++;
                     pxData[pxIdx++] = data[idx++];
                     pxData[pxIdx++] = data[idx++];
@@ -3230,15 +3111,14 @@
             }
         } else {
             var bpp = (isAlpha) ? 4 : 3;
-            var pxIdx = 0;
             var cmIdx = colorTableSize * bpp;
             var pad = (colorTableSize)
                 ? ((width + 3) & ~3) - width
                 : 0;
 
-            for (var y = height; y--;) {
-                for (var x = width; x--;) {
-                    var idx = (colorTableSize)
+            for (y = height; y--;) {
+                for (x = width; x--;) {
+                    idx = (colorTableSize)
                         ? data[cmIdx++] * bpp
                         : cmIdx++ * bpp;
 
@@ -3274,7 +3154,8 @@
         }
 
         imageContext.putImageData(imgData, 0, 0);
-        character[CharacterId] = imageContext;
+
+        player.setCharacter(CharacterId, imageContext);
     };
 
     /**
@@ -3284,6 +3165,7 @@
     SwfTag.prototype.parseExportAssets = function()
     {
         var obj = {};
+        var bitio = this.bitio;
         var count = bitio.getUI16();
 
         obj.Tag = [];
@@ -3302,7 +3184,7 @@
      */
     SwfTag.prototype.parseJPEGTables = function(length)
     {
-        return bitio.getData(length);
+        return this.bitio.getData(length);
     };
 
     /**
@@ -3313,6 +3195,8 @@
      */
     SwfTag.prototype.parseDefineBits = function(tagType, length, jpegTables)
     {
+        var _this = this;
+        var bitio = _this.bitio;
         var startOffset = bitio.byte_offset;
         var CharacterId = bitio.getUI16();
         var sub = bitio.byte_offset - startOffset;
@@ -3335,7 +3219,8 @@
         bitio.byte_offset = startOffset + length;
 
         // render
-        imgUnLoadCount++;
+        var player = _this.player;
+        player.imgUnLoadCount++;
         var image = _document.createElement('img');
         image.onload = function()
         {
@@ -3363,13 +3248,10 @@
                 imageContext.putImageData(imgData, 0, 0);
             }
 
-            character[CharacterId] = imageContext;
+            player.setCharacter(CharacterId, imageContext);
 
             // 読み完了
-            imgUnLoadCount--;
-            if (isLoad && player.stopFlag && imgUnLoadCount == 0) {
-                loaded();
-            }
+            player.imgUnLoadCount--;
         };
 
         if (jpegTables != null && jpegTables.length > 4) {
@@ -3388,7 +3270,7 @@
         }
 
         image.src = "data:image/jpeg;base64,"
-            + swftag.base64encode(swftag.parseJpegData(JPEGData));
+            + _this.base64encode(_this.parseJpegData(JPEGData));
 
         _setTimeout(function() {}, 0);
     };
@@ -3493,7 +3375,9 @@
      */
     SwfTag.prototype.parseDefineFont = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var obj = {};
         obj.FontId = bitio.getUI16();
 
@@ -3668,7 +3552,7 @@
             }
         }
 
-        character[obj.FontId] = obj;
+        player.setCharacter(obj.FontId, obj);
     };
 
     /**
@@ -3676,6 +3560,7 @@
      */
     SwfTag.prototype.parseDefineFontName = function()
     {
+        var bitio = this.bitio;
         var FontId = bitio.getUI16();
         var FontName = bitio.getDataUntil("\0");
         var FontCopyright = bitio.getDataUntil("\0");
@@ -3687,7 +3572,10 @@
      */
     SwfTag.prototype.parseDefineText = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
+
         var obj = {};
         obj.tagType = tagType;
 
@@ -3699,7 +3587,7 @@
         obj.TextRecords = _this.getTextRecords(
             tagType, GlyphBits, AdvanceBits
         );
-        character[characterId] = obj;
+        player.setCharacter(characterId, obj);
     };
 
     /**
@@ -3710,7 +3598,8 @@
      */
     SwfTag.prototype.getTextRecords = function(tagType, GlyphBits, AdvanceBits)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var array = [];
         while (bitio.getUI8() != 0) {
             // 1 byte back
@@ -3767,6 +3656,7 @@
      */
     SwfTag.prototype.getGlyphEntries = function(count, GlyphBits, AdvanceBits)
     {
+        var bitio = this.bitio;
         var array = [];
         for (var i = count; i--;) {
             array[array.length] = {
@@ -3783,7 +3673,9 @@
      */
     SwfTag.prototype.parseDefineEditText = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var obj = {};
         var isJis = true;
 
@@ -3812,7 +3704,7 @@
 
         if (obj.HasFont) {
             obj.FontID = bitio.getUI16();
-            var fontData = character[obj.FontID];
+            var fontData = player.getCharacter(obj.FontID);
             isJis = (fontData.FontFlagsShiftJIS) ? true : false;
 
             if (obj.HasFontClass) {
@@ -3853,10 +3745,10 @@
             }
         }
 
-        character[obj.CharacterId] = {
+        player.setCharacter(obj.CharacterId, {
             data: obj,
             tagType: tagType
-        };
+        });
     };
 
     /**
@@ -3865,7 +3757,9 @@
      */
     SwfTag.prototype.parseDefineMorphShape = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var obj = {};
         obj.tagType = tagType;
         obj.CharacterId = bitio.getUI16();
@@ -4059,7 +3953,7 @@
             diff++;
         }
 
-        character[obj.CharacterId] = obj;
+        player.setCharacter(obj.CharacterId, obj);
     };
 
     /**
@@ -4070,7 +3964,7 @@
      */
     SwfTag.prototype.buildMorphShape = function(char, ratio)
     {
-        var _this = swftag;
+        var _this = this;
         var per = (ratio == undefined) ? 0 : ratio / 65535;
         var startPer = 1 - per;
         var newShapeRecords = [];
@@ -4258,7 +4152,7 @@
         };
 
         return {
-            data: _this.vectorToCanvas(shapes),
+            data: vtc.execute(shapes),
             Xmax: bounds.Xmax,
             Xmin: bounds.Xmin,
             Ymax: bounds.Ymax,
@@ -4273,7 +4167,7 @@
     SwfTag.prototype.parseFrameLabel = function()
     {
         return {
-            name: bitio.getDataUntil("\0"),
+            name: this.bitio.getDataUntil("\0"),
             frame: 0
         };
     };
@@ -4286,6 +4180,7 @@
     SwfTag.prototype.parseRemoveObject = function(tagType)
     {
         // RemoveObject
+        var bitio = this.bitio;
         if (tagType == 5) {
             return {
                 CharacterId: bitio.getUI16(),
@@ -4308,7 +4203,9 @@
         var obj = {};
         obj.tagType = tagType;
 
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var endOffset = bitio.byte_offset + length;
         obj.ButtonId = bitio.getUI16();
 
@@ -4329,7 +4226,7 @@
         }
 
         // set layer
-        character[obj.ButtonId] = obj;
+        player.setCharacter(obj.ButtonId, obj);
         if (bitio.byte_offset != endOffset) {
             bitio.byte_offset = endOffset;
         }
@@ -4344,7 +4241,8 @@
     SwfTag.prototype.buttonCharacters = function()
     {
         var characters = [];
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         while (bitio.getUI8() != 0) {
             // 1 byte back
             bitio.incrementOffset(-1, 0);
@@ -4360,12 +4258,13 @@
     };
 
     /**
-     *
+     * buttonRecord
      * @returns {{}}
      */
     SwfTag.prototype.buttonRecord = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
 
         obj.ButtonReserved = bitio.getUIBits(2);
@@ -4408,7 +4307,8 @@
      */
     SwfTag.prototype.buttonActions = function(length)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var array = [];
         while (true) {
             var obj = {};
@@ -4462,11 +4362,14 @@
     /**
      * parsePlaceObject
      * @param tagType
+     * @param length
      * @returns {{}}
      */
     SwfTag.prototype.parsePlaceObject = function(tagType, length)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var obj = {};
         obj.tagType = tagType;
         var startOffset = bitio.byte_offset;
@@ -4475,7 +4378,13 @@
             obj.CharacterId = bitio.getUI16();
             obj.Depth = bitio.getUI16();
             obj.Matrix = _this.matrix();
-            obj.ColorTransform = _this.colorTransform();
+            obj.PlaceFlagHasMatrix = 1;
+
+            bitio.byteAlign();
+            if ((bitio.byte_offset - startOffset) < length) {
+                obj.ColorTransform = _this.colorTransform();
+                obj.PlaceFlagHasColorTransform = 1;
+            }
         } else {
             var placeFlag = bitio.getUI8();
             obj.PlaceFlagHasClipActions = (placeFlag >> 7) & 0x01;
@@ -4546,7 +4455,7 @@
                     actionRecords[actionRecords.length] =
                         _this.parseClipActionRecord(tagType);
 
-                    if (version <= 5) {
+                    if (player.version <= 5) {
                         endFlag = bitio.getUI16();
                     } else {
                         endFlag = bitio.getUI32();
@@ -4557,6 +4466,8 @@
                     }
                 }
                 obj.ClipActionRecords = actionRecords;
+
+                console.log(obj)
             }
         }
 
@@ -4571,7 +4482,8 @@
      */
     SwfTag.prototype.parseClipActionRecord = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.EventFlags = _this.parseClipEventFlags();
         var ActionRecordSize = bitio.getUI32();
@@ -4588,7 +4500,11 @@
      */
     SwfTag.prototype.parseClipEventFlags = function()
     {
+        var _this = this;
         var obj = {};
+        var bitio = _this.bitio;
+        var player = _this.player;
+
         obj.ClipEventKeyUp = bitio.getUIBits(1);
         obj.ClipEventKeyDown = bitio.getUIBits(1);
         obj.ClipEventMouseUp = bitio.getUIBits(1);
@@ -4605,7 +4521,7 @@
         obj.ClipEventPress = bitio.getUIBits(1);
         obj.ClipEventInitialize = bitio.getUIBits(1);
         obj.ClipEventData = bitio.getUIBits(1);
-        if (version >= 6) {
+        if (player.version >= 6) {
             var Reserved = bitio.getUIBits(5);
             obj.ClipEventConstruct = bitio.getUIBits(1);
             obj.ClipEventKeyPress = bitio.getUIBits(1);
@@ -4621,12 +4537,13 @@
      */
     SwfTag.prototype.getFilterList = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var result = [];
         var _getFilter = _this.getFilter;
         var NumberOfFilters = bitio.getUI8();
         for (var i = 0; i < NumberOfFilters; i++) {
-            result[i] = _getFilter();
+            result[i] = _getFilter.call(_this);
         }
         return result;
     };
@@ -4636,7 +4553,8 @@
      */
     SwfTag.prototype.getFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.FilterID = bitio.getUI8();
         var filter;
@@ -4676,7 +4594,8 @@
      */
     SwfTag.prototype.dropShadowFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.color = _this.rgba();
         obj.BlurX = bitio.getUI32();
@@ -4698,6 +4617,7 @@
     SwfTag.prototype.blurFilter = function()
     {
         var obj = {};
+        var bitio = this.bitio;
         obj.BlurX = bitio.getUI32();
         obj.BlurY = bitio.getUI32();
         obj.Passes = bitio.getUIBits(5);
@@ -4711,7 +4631,8 @@
      */
     SwfTag.prototype.glowFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.color = _this.rgba();
         obj.BlurX = bitio.getUI32();
@@ -4730,7 +4651,8 @@
      */
     SwfTag.prototype.bevelFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.ShadowColor = _this.rgba();
         obj.HighlightColor = _this.rgba();
@@ -4753,7 +4675,8 @@
      */
     SwfTag.prototype.gradientGlowFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         var NumColors = bitio.getUI8();
 
@@ -4785,7 +4708,7 @@
      */
     SwfTag.prototype.convolutionFilter = function()
     {
-        var _this = swftag;
+        var _this = this;
         var obj = {};
         obj.MatrixX = bitio.getUI8();
         obj.MatrixY = bitio.getUI8();
@@ -4812,6 +4735,7 @@
     SwfTag.prototype.colorMatrixFilter = function()
     {
         var obj = {};
+        var bitio = this.bitio;
         var MatrixArr = [];
         for (var i = 0; i < 20; i++) {
             MatrixArr[MatrixArr.length] = bitio.getUI32();
@@ -4825,8 +4749,8 @@
      */
     SwfTag.prototype.gradientBevelFilter = function()
     {
-        var _this = swftag;
-        var obj = {};
+        var _this = this;
+        var bitio = _this.bitio;
         var NumColors = bitio.getUI8();
         var colors = [];
         for (; NumColors--;) {
@@ -4836,6 +4760,7 @@
             };
         }
 
+        var obj = {};
         obj.Colors = colors;
         obj.BlurX = bitio.getUI32();
         obj.BlurY = bitio.getUI32();
@@ -4857,8 +4782,9 @@
      */
     SwfTag.prototype.colorTransform = function()
     {
-        var obj = {};
+        var bitio = this.bitio;
         bitio.byteAlign();
+
         var first6bits = bitio.getUIBits(6);
         var HasAddTerms = first6bits >> 5;
         var HasMultiTerms = (first6bits >> 4) & 1;
@@ -4903,10 +4829,12 @@
      */
     SwfTag.prototype.parseDefineSprite = function(dataLength)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var characterId = bitio.getUI16();
         var FrameCount = bitio.getUI16();
-        character[characterId] = _this.parseTags(dataLength, characterId);
+        var player = _this.player;
+        player.setCharacter(characterId, _this.parseTags(dataLength, characterId));
     };
 
     /**
@@ -4916,7 +4844,7 @@
      */
     SwfTag.prototype.parseDoAction = function(length)
     {
-        return new ActionScript(bitio.getData(length));
+        return new ActionScript(this.bitio.getData(length));
     };
 
     /**
@@ -4925,8 +4853,9 @@
      */
     SwfTag.prototype.parseDoInitAction = function(length)
     {
-        var spriteId = bitio.getUI16();
-        initActions[spriteId] = this.parseDoAction(length - 2);
+        var _this = this;
+        var spriteId = _this.bitio.getUI16();
+        _this.player.initActions[spriteId] = _this.parseDoAction(length - 2);
     };
 
     /**
@@ -4935,6 +4864,8 @@
      */
     SwfTag.prototype.parseDefineSceneAndFrameLabelData = function ()
     {
+        var bitio = this.bitio;
+
         var obj = {};
         obj.SceneCount = bitio.getEncodedU32();
 
@@ -4967,6 +4898,8 @@
     SwfTag.prototype.parseSoundStreamHead = function(tagType)
     {
         var obj = {};
+        var bitio = this.bitio;
+
         obj.Reserved = bitio.getUIBits(4);
 
         // 0 = 5.5kHz, 1 = 11kHz, 2 = 22kHz, 3 = 44kHz
@@ -5015,6 +4948,7 @@
     SwfTag.prototype.parseDoABC = function(tagType, length)
     {
         var obj = {};
+        var bitio = this.bitio;
         obj.Flags = bitio.getUI32();
         obj.Name = bitio.getDataUntil('\0');
         obj.ABCData = null;
@@ -5028,6 +4962,8 @@
     SwfTag.prototype.parseSymbolClass = function()
     {
         var obj = {};
+        var bitio = this.bitio;
+
         obj.NumSymbols = bitio.getUI16();
 
         obj.class2tag = {
@@ -5058,7 +4994,11 @@
     SwfTag.prototype.parseDefineSound = function (tagType, length)
     {
         var obj = {};
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var startOffset = bitio.byte_offset;
+
         obj.tagType = tagType;
         obj.SoundId = bitio.getUI16();
         obj.SoundFormat = bitio.getUIBits(4);
@@ -5099,7 +5039,8 @@
         }
 
         obj.base64 = 'data:audio/'+ mimeType +';base64,' + window.btoa(SoundData);
-        sounds[obj.SoundId] = obj;
+
+        player.sounds[obj.SoundId] = obj;
     };
 
     /**
@@ -5108,8 +5049,11 @@
      */
     SwfTag.prototype.parseStartSound = function(tagType)
     {
-        var _this = swftag;
+        var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
+        var player = _this.player;
+
         obj.tagType = tagType;
         obj.SoundId = bitio.getUI16();
         if (tagType == 89) {
@@ -5117,9 +5061,9 @@
         }
 
         obj.SoundInfo = _this.parseSoundInfo();
-        character[obj.SoundId] = obj;
+        player.setCharacter(obj.SoundId, obj);
 
-        var sound = sounds[obj.SoundId];
+        var sound = player.sounds[obj.SoundId];
         var audio = _document.createElement('audio');
         audio.onload = function()
         {
@@ -5130,6 +5074,7 @@
         };
         audio.src = sound.base64;
 
+        var loadSounds = player.loadSounds
         loadSounds[loadSounds.length] = audio;
 
         return {
@@ -5144,13 +5089,16 @@
      */
     SwfTag.prototype.parseDefineButtonSound = function()
     {
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         var buttonId = bitio.getUI16();
         var ButtonSoundChar0 = bitio.getUI16();
         var ButtonSoundChar1 = bitio.getUI16();
         var ButtonSoundChar2 = bitio.getUI16();
         var ButtonSoundChar3 = bitio.getUI16();
 
-        var btnObj = character[buttonId];
+        var btnObj = player.getCharacter(buttonId);
         if (btnObj != undefined) {
             var characters = btnObj.characters;
             var length = characters.length;
@@ -5168,7 +5116,7 @@
 
                     var tag = tags[idx];
                     if (tag.ButtonStateHitTest && ButtonSoundChar3) {
-                        var sound = sounds[ButtonSoundChar3];
+                        var sound = player.sounds[ButtonSoundChar3];
                         var audio = _document.createElement('audio');
                         audio.onload = function()
                         {
@@ -5178,6 +5126,7 @@
                             this.loop = false;
                         };
                         audio.src = sound.base64;
+                        var loadSounds = player.loadSounds;
                         loadSounds[loadSounds.length] = audio;
                         tag.Sound = audio;
                     }
@@ -5193,6 +5142,7 @@
     SwfTag.prototype.parseSoundInfo = function()
     {
         var obj = {};
+        var bitio = this.bitio;
         obj.Reserved = bitio.getUIBits(2);
         obj.SyncStop = bitio.getUIBit();
         obj.SyncNoMultiple = bitio.getUIBit();
@@ -5236,11 +5186,14 @@
     SwfTag.prototype.parseDefineFontAlignZones = function(tagType, length)
     {
         var obj = {};
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
         obj.FontId = bitio.getUI16();
         obj.CSMTableHint = bitio.getUIBits(2);
         var Reserved = bitio.getUIBits(6);
 
-        var tag = character[obj.FontId];
+        var tag = player.getCharacter(obj.FontId);
         var NumGlyphs = tag.NumGlyphs;
         var ZoneTable = [];
         for (var i = 0; i < NumGlyphs; i++) {
@@ -5273,7 +5226,10 @@
      */
     SwfTag.prototype.parseCSMTextSettings = function(tagType, length)
     {
+        var _this = this;
         var obj = {};
+        var bitio = _this.bitio;
+        var player = _this.player;
         obj.tagType = tagType;
         obj.TextID = bitio.getUI16();
         obj.UseFlashType = bitio.getUIBits(2);
@@ -5282,7 +5238,7 @@
         obj.Thickness = bitio.getUI32();
         obj.Sharpness = bitio.getUI32();
         Reserved = bitio.getUI8();
-        character[obj.TextID] = obj;
+        player.setCharacter(obj.TextID, obj);
     };
 
     /**
@@ -5320,6 +5276,8 @@
         var pBitio = _this.pBitio;
         pBitio.setOffset(0, 0);
 
+        var player = mc.getPlayer();
+        var initActions = player.initActions;
         if (characterId in initActions) {
             var initAction = initActions[characterId];
             _execute.call(initAction, mc);
@@ -5440,88 +5398,37 @@
                     break;
                 // GetUrl
                 case 0x83:
-                    var len = payload.length - 1;
-                    var urls = [[]];
-                    var idx = 0;
-                    for (var i = 0; i < len; i++) {
-                        var str = _fromCharCode(payload[i]);
-                        if (payload[i] == 0) {
-                            idx++;
-                            urls[idx] = [];
+                    if (movieClip != null) {
+                        var len = payload.length - 1;
+                        var urls = [[]];
+                        var idx = 0;
+                        for (var i = 0; i < len; i++) {
+                            var str = _fromCharCode(payload[i]);
+                            if (payload[i] == 0) {
+                                idx++;
+                                urls[idx] = [];
+                                continue;
+                            }
+
+                            urls[idx] += str;
                         }
-                        urls[idx] += str;
-                    }
 
-                    var urlString = urls[0];
-                    var splitUrl = urlString.split('?');
-                    var query = '';
+                        var urlString = urls[0];
+                        if (typeof urlString == 'string') {
+                            var splitUrl = urlString.split('?');
 
-                    // 分解してチェック
-                    if (2 in splitUrl) {
-                        var urlString = splitUrl[0];
-                        urlString += '?' + splitUrl[1];
-                        var paramLength = splitUrl.length;
-                        for (var i = 2; i < paramLength; i++) {
-                            urlString += '&' + splitUrl[i];
-                        }
-                    }
-
-                    if (urls.length > 1) {
-                        var level = _parseFloat(urls[1].substr(7));
-                        var xmlHttpRequest = new XMLHttpRequest();
-                        xmlHttpRequest.open('GET', urlString);
-                        if (isXHR2) {
-                            xmlHttpRequest.responseType = 'arraybuffer';
-                        } else {
-                            xmlHttpRequest.overrideMimeType(
-                                'text/plain; charset=x-user-defined'
-                            );
-                        }
-                        xmlHttpRequest.send(null);
-                        xmlHttpRequest.onreadystatechange = function()
-                        {
-                            var readyState = xmlHttpRequest.readyState;
-                            if (readyState == 4) {
-                                var status = xmlHttpRequest.status;
-                                if (status == 200) {
-                                    var mc = new MovieClip();
-                                    mc.characterId = '';
-                                    if (level == 0) {
-                                        mc.characterId = 0;
-                                    }
-
-                                    var swf = (isXHR2)
-                                        ? new Uint8Array(xmlHttpRequest.response)
-                                        : xmlHttpRequest.responseText;
-
-                                    parse(swf, mc);
-
-                                    // 入れ替え
-                                    if (level == 0) {
-                                        player.parent = mc;
-                                        loaded();
-                                    } else {
-                                        var parent = movieClip.getParent();
-                                        if (parent == null) {
-                                            parent = player.parent;
-                                        }
-                                        mc.setParent(parent);
-                                        mc.setLevel(level);
-                                        var addTags = movieClip.getAddTags();
-                                        addTags[level] = mc;
-                                    }
-
-                                    cacheStore.reset();
-                                } else {
-                                    return 0;
+                            // 分解してチェック
+                            if (2 in splitUrl) {
+                                var urlString = splitUrl[0];
+                                urlString += '?' + splitUrl[1];
+                                var paramLength = splitUrl.length;
+                                for (var i = 2; i < paramLength; i++) {
+                                    urlString += '&' + splitUrl[i];
                                 }
                             }
                         }
-                    } else {
-                        var func = new Function(
-                            "location.href = '"+ urlString +"';"
-                        );
-                        func();
+
+                        movieClip.getURL(urlString, urls[1]);
                     }
 
                     break;
@@ -5938,199 +5845,69 @@
                 // ムービー制御 ***********************************
                 // GetURL2
                 case 0x9A:
-                    pBitio.setData(payload);
-                    pBitio.setOffset(0, 0);
-
-                    var LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
-                    var LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
-
-                    var Reserved = pBitio.getUIBits(4);
-                    var SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
-
                     var target = stack.pop();
                     var urlString = stack.pop();
 
-                    if (urlString) {
-                        // 分解してチェック
-                        var urls = urlString.split('?');
-                        var uLen = urls.length;
+                    pBitio.setData(payload);
+                    pBitio.setOffset(0, 0);
 
-                        var query = '';
-                        if (uLen == 1) {
-                            query = '?';
-                        }
+                    var LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
+                    var LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
+                    var Reserved = pBitio.getUIBits(4);
+                    var SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
 
-                        if (uLen > 2) {
-                            var url = urls[0] + '?';
-                            url = url + urls[1];
-                            for (var u = 2; u < uLen; u++) {
-                                var params = urls[u];
-                                url = url +'&'+ params
+                    var method = 'GET';
+                    if (SendVarsMethod == 2) {
+                        method = 'POST';
+                    }
+
+                    if (movieClip instanceof MovieClip) {
+                        if (urlString) {
+                            // 分解してチェック
+                            var urls = urlString.split('?');
+                            var uLen = urls.length;
+
+                            var query = '';
+                            if (uLen == 1) {
+                                query = '?';
+                            }
+
+                            if (uLen > 2) {
+                                var url = urls[0] + '?';
+                                url = url + urls[1];
+                                for (var u = 2; u < uLen; u++) {
+                                    var params = urls[u];
+                                    url = url + '&' + params
+                                }
+                            } else {
+                                var url = urlString;
+                            }
+
+                            // local variables
+                            if (SendVarsMethod) {
+                                var variables = movieClip.variables;
+                                var queryString = '';
+                                for (var key in variables) {
+                                    var value = variables[key];
+                                    if (value == null) {
+                                        value = '';
+                                    }
+                                    queryString += '&' + key + '=' + value;
+                                }
+
+                                if (query != '' && queryString != '') {
+                                    queryString = query + queryString.slice(1);
+                                }
+                                url += queryString;
+                            }
+
+                            if (LoadVariablesFlag) {
+                                movieClip.loadVariables(url, target, method);
+                            } else {
+                                movieClip.getURL(url, target, method);
                             }
                         } else {
-                            var url = urlString;
-                        }
-
-                        // local variables
-                        if (SendVarsMethod) {
-                            var variables = movieClip.variables;
-                            var queryString = '';
-                            for (var key in variables) {
-                                var value = variables[key];
-                                if (value == null) {
-                                    value = '';
-                                }
-                                queryString += '&'+ key +'='+ value;
-                            }
-
-                            if (query != '' && queryString != '') {
-                                queryString = query + queryString.slice(1);
-                            }
-                            url += queryString;
-                        }
-
-                        if (LoadVariablesFlag && LoadTargetFlag) {
-                            var xmlHttpRequest = new XMLHttpRequest();
-                            var method = 'GET';
-                            var body = null;
-                            var targetUrl = url;
-                            var path = target;
-                            if (SendVarsMethod == 2) {
-                                method = 'POST';
-                                xmlHttpRequest.setRequestHeader(
-                                    'Content-Type',
-                                    'application/x-www-form-urlencoded'
-                                );
-
-                                urls = url.split('?');
-                                if (urls[1] != undefined) {
-                                    body = urls[1];
-                                }
-                                targetUrl =  urls[0];
-                            }
-
-                            xmlHttpRequest.open(method, targetUrl);
-                            xmlHttpRequest.send(body);
-                            xmlHttpRequest.onreadystatechange = function()
-                            {
-                                var readyState = xmlHttpRequest.readyState;
-                                if (readyState == 4) {
-                                    var status = xmlHttpRequest.status;
-                                    if (status == 200) {
-                                        var responseText = decodeURIComponent(xmlHttpRequest.responseText);
-                                        var pairs = responseText.split('&');
-                                        var length = pairs.length;
-                                        var targetMc = movieClip;
-                                        if (LoadTargetFlag) {
-                                            targetMc = movieClip.getMovieClip(path);
-                                        }
-
-                                        for (var idx = 0; idx < length; idx++) {
-                                            var pair = pairs[idx];
-                                            var values = pair.split('=');
-                                            targetMc.setVariable(values[0], values[1]);
-                                        }
-                                    }
-                                }
-                            }
-                        } else if (LoadVariablesFlag && !LoadTargetFlag) {
-                            var targetMc = movieClip.getMovieClip(target);
-                            if (targetMc == null) {
-                                break;
-                            }
-
-                            var method = 'GET';
-                            var targetUrl = url;
-                            var body = null;
-                            if (SendVarsMethod == 2) {
-                                method = 'POST';
-                                xmlHttpRequest.setRequestHeader(
-                                    'Content-Type',
-                                    'application/x-www-form-urlencoded'
-                                );
-
-                                urls = url.split('?');
-                                if (urls[1] != undefined) {
-                                    body = urls[1];
-                                }
-                                targetUrl =  urls[0];
-                            }
-
-                            var xmlHttpRequest = new XMLHttpRequest();
-                            xmlHttpRequest.open(method, targetUrl);
-
-                            if (isXHR2) {
-                                xmlHttpRequest.responseType = 'arraybuffer';
-                            } else {
-                                xmlHttpRequest.overrideMimeType(
-                                    'text/plain; charset=x-user-defined'
-                                );
-                            }
-
-                            xmlHttpRequest.send(body);
-                            xmlHttpRequest.onreadystatechange = function()
-                            {
-                                var readyState = xmlHttpRequest.readyState;
-                                if (readyState == 4) {
-                                    var status = xmlHttpRequest.status;
-                                    if (status == 200) {
-                                        var mc = new MovieClip();
-                                        mc.characterId = targetMc.characterId;
-                                        mc.instanceId = targetMc.instanceId;
-
-
-                                        var swf = (isXHR2)
-                                            ? new Uint8Array(xmlHttpRequest.response)
-                                            : xmlHttpRequest.responseText;
-                                        parse(swf, mc);
-
-                                        // 入れ替え
-                                        if (targetMc.characterId == 0) {
-                                            player.parent = mc;
-                                        } else {
-                                            var parent = targetMc.getParent();
-                                            mc.setParent(parent);
-                                            mc.setName(targetMc.getName());
-                                            mc.setLevel(targetMc.getLevel());
-                                            var addTags = parent.getAddTags();
-                                            addTags[targetMc.getLevel()] = mc;
-                                        }
-
-                                        cacheStore.reset();
-                                    } else {
-                                        return 0;
-                                    }
-                                }
-                            }
-                        } else {
-                            if (SendVarsMethod == 2) {
-                                // form
-                                var form = _document.createElement('form');
-                                form.action = url;
-                                form.method = 'POST';
-
-                                urls = url.split('?');
-                                if (urls.length > 1) {
-                                    var pears = urls[1].split('&');
-                                    var pLen = pears.length;
-                                    for (var pIdx = 0; pIdx < pLen; pIdx++) {
-                                        var pear = pears[pIdx].split('=');
-                                        var input = _document.createElement('input');
-                                        input.type = 'hidden';
-                                        input.name = pear[0];
-                                        input.value = encodeURI(pear[1]||'');
-                                        form.appendChild(input);
-                                    }
-                                }
-                                _document.body.appendChild(form);
-
-                                form.submit();
-                            } else {
-                                func = new Function(
-                                    "location.href = '"+ url +"';"
-                                );
-                                func();
-                            }
+                            movieClip.unloadMovie(target);
                         }
                     }
 
@@ -6268,84 +6045,16 @@
                     var target = stack.pop() + '';
                     var source = stack.pop() + '';
 
-                    // clone
-                    var targetMc = movieClip.getMovieClip(source);
-                    if (targetMc != null && targetMc.characterId != 0) {
-                        var cloneMc = new MovieClip();
-                        var parent = targetMc.getParent();
-                        if (parent == null) {
-                            parent = player.parent;
-                        }
-                        cloneMc.characterId = targetMc.characterId;
-                        cloneMc.setParent(parent);
-                        cloneMc.setName(target);
-                        cloneMc.setLevel(depth);
-                        cloneMc.setTotalFrames(targetMc.getTotalFrames());
-
-                        var char = character[targetMc.characterId];
-                        swftag.build(char, cloneMc);
-
-                        var level = targetMc.getLevel();
-                        var totalFrame = parent.getTotalFrames() + 1;
-                        var addTags = parent.addTags;
-                        for (var frame = 1; frame < totalFrame; frame++) {
-                            if (!(frame in addTags)) {
-                                addTags[frame] = [];
-                            }
-                            addTags[frame][depth] = cloneMc;
-                        }
-
-                        var cTags = parent.controlTags;
-                        var oTags = parent.originTags;
-                        totalFrame = parent.getTotalFrames();
-
-                        var _clone = clone;
-                        for (frame = 1; frame < totalFrame; frame++) {
-                            if (!(frame in cTags)
-                                || !(level in cTags[frame])
-                            ) {
-                                if (frame in oTags) {
-                                    oTags[frame][depth] =
-                                        oTags[frame - 1][depth];
-                                }
-                                continue;
-                            }
-
-                            var tags = cTags[frame];
-                            oTags[frame][depth] = _clone(oTags[frame][level]);
-                            tags[depth] = {
-                                _Matrix: _clone(tags[level]._Matrix),
-                                _ColorTransform: _clone(tags[level]._ColorTransform)
-                            }
-                        }
-
-                        cloneMc.setNextFrame(1);
+                    if (movieClip != null) {
+                        movieClip.duplicateMovieClip(target, source, depth);
                     }
 
                     break;
                 // RemoveSprite
                 case 0x25:
                     var target = stack.pop() + '';
-                    var targetMc = movieClip.getMovieClip(target);
-                    if (targetMc != null) {
-                        var depth = targetMc.getLevel();
-                        var parent = targetMc.getParent();
-                        var addTags = parent.addTags;
-                        for (var frame = parent.getTotalFrames() + 1; --frame;) {
-                            delete addTags[frame][depth];
-                        }
-
-                        var cTags = parent.controlTags;
-                        var oTags = parent.originTags;
-                        for (frame = parent.getTotalFrames(); --frame;) {
-                            if (frame in oTags && depth in oTags[frame]) {
-                                delete oTags[frame][depth];
-                            }
-
-                            if (frame in cTags && depth in cTags[frame]) {
-                                delete cTags[frame][depth];
-                            }
-                        }
+                    if (movieClip != null) {
+                        movieClip.removeMovieClip(target);
                     }
 
                     break;
@@ -7065,10 +6774,14 @@
 
     /**
      * MovieClip
+     * @param player
      * @constructor
      */
-    var MovieClip = function()
+    var MovieClip = function(player)
     {
+        this.player = player;
+        this.loadPlayer = null;
+
         // param
         this.characterId = 0;
         this.instanceId = instanceId++;
@@ -7114,6 +6827,17 @@
 
         // event
         this.event = {};
+    };
+
+    /**
+     * @returns {*}
+     */
+    MovieClip.prototype.getPlayer = function()
+    {
+        var _this = this;
+        return (_this.loadPlayer == null)
+            ? _this.player
+            : _this.loadPlayer;
     };
 
     /**
@@ -7168,9 +6892,6 @@
             for (var i = length; i--;) {
                 var as = event[name][i];
                 if (!(as instanceof ActionScript)) {
-                    if (controllerMode) {
-                        as[name].apply();
-                    }
                     continue;
                 }
                 _execute.call(as, _this);
@@ -7185,13 +6906,38 @@
      */
     MovieClip.prototype.getMovieClip = function(path)
     {
+        var mc = this;
+        var player = mc.getPlayer();
         var _path = path + '';
+        if (_path.substr(0, 6) == '_level') {
+            var level = _path.substr(6);
+            if (level == 0) {
+                return player.getParent();
+            } else {
+                var parent = mc.getParent();
+                if (parent == null) {
+                    parent = player.getParent();
+                }
+
+                var addTags = parent.getAddTags();
+                var tag = addTags[level];
+
+                if (tag instanceof Player) {
+                    tag = tag.getParent();
+                }
+
+                if (tag instanceof MovieClip) {
+                    return tag;
+                } else {
+                    return null;
+                }
+            }
+        }
+
         var splitData = _path.split('/');
         var len = splitData.length;
-
-        var mc = this;
         if (splitData[0] == '') {
-            mc = player.parent;
+            mc = player.getParent();
         }
 
         var _getAddTags = mc.getAddTags;
@@ -7204,7 +6950,7 @@
             }
 
             if (name == '_root') {
-                mc = player.parent;
+                mc = player.getParent();
                 continue;
             }
 
@@ -7227,6 +6973,10 @@
                 }
 
                 var tag = tags[idx];
+                if (tag instanceof Player) {
+                    tag = tag.getParent();
+                }
+
                 if (!(tag instanceof MovieClip)) {
                     continue;
                 }
@@ -7307,16 +7057,371 @@
     };
 
     /**
+     *
+     * @param url
+     * @param target
+     * @param SendVarsMethod
+     * @returns {number}
+     */
+    MovieClip.prototype.loadMovie = function(url, target, SendVarsMethod)
+    {
+        var _this = this;
+        var player = _this.getPlayer();
+        var targetMc = null;
+        _this.unloadMovie(target);
+
+        var _level = target.substr(0, 6);
+        if (_level == "_level") {
+            target = _parseFloat(target.substr(6));
+        }
+
+        if (typeof target == 'number') {
+            targetMc = player.getParent();
+        } else {
+            targetMc = _this.getMovieClip(target);
+        }
+
+        if (targetMc == null) {
+            return 0;
+        }
+
+        var xmlHttpRequest = new XMLHttpRequest();
+        var method = 'GET';
+        var targetUrl = url;
+        var body = null;
+        if (SendVarsMethod == 2) {
+            method = 'POST';
+            var urls = url.split('?');
+            if (urls[1] != undefined) {
+                body = urls[1];
+            }
+            targetUrl =  urls[0];
+            xmlHttpRequest.open(method, targetUrl);
+            xmlHttpRequest.setRequestHeader(
+                'Content-Type',
+                'application/x-www-form-urlencoded'
+            );
+        } else {
+            xmlHttpRequest.open(method, targetUrl);
+        }
+
+        if (isXHR2) {
+            xmlHttpRequest.responseType = 'arraybuffer';
+        } else {
+            xmlHttpRequest.overrideMimeType(
+                'text/plain; charset=x-user-defined'
+            );
+        }
+
+        xmlHttpRequest.send(body);
+        xmlHttpRequest.onreadystatechange = function()
+        {
+            var readyState = xmlHttpRequest.readyState;
+            if (readyState == 4) {
+                var status = xmlHttpRequest.status;
+
+                if (status == 200) {
+                    var loadPlayer = new Player();
+
+                    loadPlayer.parse(isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText);
+
+                    // 入れ替え
+                    if (target == 0 || typeof target != 'number' && targetMc.characterId == 0) {
+                        loadPlayer.setId(player.getId());
+                        loadPlayer.setName(player.getName());
+                        loadPlayer.backgroundColor = player.backgroundColor;
+                        loadPlayer.init();
+                        loadPlayer.loadEvent();
+                        players[player.getId()] = loadPlayer;
+                    } else {
+                        var parent = targetMc.getParent();
+                        if (parent == null) {
+                            parent = player.getParent();
+                        }
+                        var mc = loadPlayer.getParent();
+
+                        mc.loadPlayer = loadPlayer;
+                        mc.characterId = targetMc.characterId;
+                        mc.instanceId = targetMc.instanceId;
+                        mc.setParent(parent);
+                        mc.setName(targetMc.getName());
+
+                        var level = targetMc.getLevel();
+                        var addTags = parent.getAddTags();
+                        if (typeof target == 'number') {
+                            level = target;
+                        }
+
+                        addTags[level] = loadPlayer;
+                        mc.setLevel(level);
+                    }
+                }
+
+                cacheStore.reset();
+            }
+        }
+    };
+
+    /**
+     *
+     * @param target
+     * @returns {number}
+     */
+    MovieClip.prototype.unloadMovie = function(target)
+    {
+        var _this = this;
+        var targetMc = _this.getMovieClip(target);
+        if (targetMc == null) {
+            return 0;
+        }
+
+        var parent = targetMc.getParent();
+        if (parent == null) {
+            return 0;
+        }
+
+        var addTags = parent.getAddTags();
+        var mc = addTags[targetMc.getLevel()];
+        if (mc instanceof Player) {
+            mc = mc.getParent();
+        }
+
+        // 削除
+        mc.loadPlayer = null;
+        mc.player = _this.getPlayer();
+        mc.addTags = [];
+        mc.actions = [];
+        mc.controlTags = [];
+        mc.labels = [];
+        mc.sounds = [];
+
+        addTags[targetMc.getLevel()] = mc;
+
+        cacheStore.reset();
+    };
+
+    /**
+     *
+     * @param url
+     * @param target
+     * @param method
+     * @returns {number}
+     */
+    MovieClip.prototype.getURL = function(url, target, method)
+    {
+        var _this = this;
+
+        if (target) {
+            switch (target.toLowerCase()) {
+                case '_self':
+                case '_blank':
+                case '_parent':
+                case '_top':
+                    break;
+                case 'post':
+                    target = '_self';
+                    method = 'GET';
+                    break;
+                case 'get':
+                    target = '_self';
+                    method = 'GET';
+                    break;
+                default:
+                    if (!method) {
+                        method = 'GET';
+                    }
+
+                    _this.loadMovie(url, target, method);
+                    return 0;
+                    break;
+            }
+        }
+
+        // form
+        if (method == 'POST') {
+            var form = _document.createElement('form');
+            form.action = url;
+            form.method = method;
+            form.target = target;
+
+            var urls = url.split('?');
+            if (urls.length > 1) {
+                var pears = urls[1].split('&');
+                var pLen = pears.length;
+                var _encodeURI = encodeURI;
+                for (var pIdx = 0; pIdx < pLen; pIdx++) {
+                    var pear = pears[pIdx].split('=');
+                    var input = _document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = pear[0];
+                    input.value = _encodeURI(pear[1]||'');
+                    form.appendChild(input);
+                }
+            }
+            _document.body.appendChild(form);
+
+            form.submit();
+        } else {
+            var func = new Function(
+                "location.href = '"+ url +"';"
+            );
+            func();
+        }
+    };
+
+    /**
+     *
+     * @param url
+     * @param target
+     * @param method
+     */
+    MovieClip.prototype.loadVariables = function(url, target, method)
+    {
+        var _this = this;
+        var xmlHttpRequest = new XMLHttpRequest();
+        var body = null;
+        if (method == 'POST') {
+            var urls = url.split('?');
+            if (urls[1] != undefined) {
+                body = urls[1];
+            }
+
+            xmlHttpRequest.open(method, urls[0]);
+            xmlHttpRequest.setRequestHeader(
+                'Content-Type',
+                'application/x-www-form-urlencoded'
+            );
+        } else {
+            xmlHttpRequest.open(method, url);
+        }
+
+        xmlHttpRequest.send(body);
+        xmlHttpRequest.onreadystatechange = function()
+        {
+            var readyState = xmlHttpRequest.readyState;
+            if (readyState == 4) {
+                var status = xmlHttpRequest.status;
+                if (status == 200) {
+                    var responseText = _decodeURIComponent(xmlHttpRequest.responseText);
+                    var pairs = responseText.split('&');
+                    var length = pairs.length;
+                    var targetMc = _this.getMovieClip(target);
+                    if (targetMc != null) {
+                        for (var idx = 0; idx < length; idx++) {
+                            var pair = pairs[idx];
+                            var values = pair.split('=');
+                            targetMc.setVariable(values[0], values[1]);
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    MovieClip.prototype.duplicateMovieClip = function(target, name, depth)
+    {
+        var targetMc = this.getMovieClip(name);
+        if (targetMc != null && targetMc.characterId != 0) {
+            var player = targetMc.getPlayer();
+            var cloneMc = new MovieClip(player);
+            var parent = targetMc.getParent();
+            if (parent == null) {
+                parent = player.getParent();
+            }
+
+            cloneMc.characterId = targetMc.characterId;
+            cloneMc.setParent(parent);
+            cloneMc.setName(target);
+            cloneMc.setLevel(depth);
+            cloneMc.setTotalFrames(targetMc.getTotalFrames());
+
+            var char = player.getCharacter(targetMc.characterId);
+            var swftag = new SwfTag(player);
+            swftag.build(char, cloneMc);
+            swftag = null;
+
+            var level = targetMc.getLevel();
+            var totalFrame = parent.getTotalFrames() + 1;
+            var addTags = parent.addTags;
+            for (var frame = 1; frame < totalFrame; frame++) {
+                if (!(frame in addTags)) {
+                    addTags[frame] = [];
+                }
+                addTags[frame][depth] = cloneMc;
+            }
+
+            var cTags = parent.controlTags;
+            var oTags = parent.originTags;
+            totalFrame = parent.getTotalFrames();
+
+            var _clone = clone;
+            for (frame = 1; frame < totalFrame; frame++) {
+                if (!(frame in cTags)
+                    || !(level in cTags[frame])
+                ) {
+                    if (frame in oTags) {
+                        oTags[frame][depth] =
+                            oTags[frame - 1][depth];
+                    }
+                    continue;
+                }
+
+                var tags = cTags[frame];
+                oTags[frame][depth] = _clone(oTags[frame][level]);
+                tags[depth] = {
+                    _Matrix: _clone(tags[level]._Matrix),
+                    _ColorTransform: _clone(tags[level]._ColorTransform)
+                }
+            }
+
+            cloneMc.setNextFrame(1);
+        }
+    };
+
+    /**
+     *
+     * @param name
+     */
+    MovieClip.prototype.removeMovieClip = function(name)
+    {
+        var targetMc = this.getMovieClip(name);
+        if (targetMc != null) {
+            var depth = targetMc.getLevel();
+            var parent = targetMc.getParent();
+            var addTags = parent.addTags;
+            for (var frame = parent.getTotalFrames() + 1; --frame;) {
+                delete addTags[frame][depth];
+            }
+
+            var cTags = parent.controlTags;
+            var oTags = parent.originTags;
+            for (frame = parent.getTotalFrames(); --frame;) {
+                if (frame in oTags && depth in oTags[frame]) {
+                    delete oTags[frame][depth];
+                }
+
+                if (frame in cTags && depth in cTags[frame]) {
+                    delete cTags[frame][depth];
+                }
+            }
+        }
+    };
+
+    /**
      * btnCallback
      * @param obj
      * @param callback
      */
     MovieClip.prototype.btnCallback = function(obj, callback)
     {
+        var _this = this;
+        var player = _this.getPlayer();
+        var touchObj = player.touchObj;
         var characters = obj.characters;
-        var btnTag = character[obj.characterId];
+        var btnTag = player.getCharacter(obj.characterId);
         var tagCharacters = btnTag.characters;
         var length = characters.length;
+
         for (var depth = 1; depth < length; depth++) {
             if (!(depth in characters)) {
                 continue;
@@ -7480,6 +7585,8 @@
             _this.setFrame(frame);
             _this.remove();
 
+            var player = _this.getPlayer();
+            var actions = player.actions;
             if (_this.instanceId in actions) {
                 actions[_this.instanceId] = null;
             }
@@ -7757,8 +7864,10 @@
      */
     MovieClip.prototype.setVariable = function(name, value)
     {
-        var variables = this.variables;
-        if (version < 7 && typeof name == 'string') {
+        var _this = this;
+        var variables = _this.variables;
+        var player = _this.getPlayer();
+        if (player.version < 7 && typeof name == 'string') {
             for (var key in variables) {
                 if (key.toLowerCase() == name.toLowerCase()) {
                     this.variables[key] = value;
@@ -7777,13 +7886,16 @@
      */
     MovieClip.prototype.getVariable = function(name)
     {
-        var variables = this.variables;
+        var _this = this;
+        var variables = _this.variables;
         var value;
 
         if (name in variables) {
             return variables[name];
         }
 
+        var player = _this.getPlayer();
+        var version = player.version;
         if (version < 7) {
             for (var key in variables) {
                 if (typeof key != 'string') {
@@ -7927,12 +8039,14 @@
      */
     MovieClip.prototype.executeSound = function(sound)
     {
+        var _this = this;
+        var player = _this.getPlayer();
         var soundId = sound.SoundId;
-        if (!(soundId in character)) {
+        var tag = player.getCharacter(soundId);
+        if (!tag) {
             return 0;
         }
 
-        var tag = character[soundId];
         var soundInfo = tag.SoundInfo;
         var audio = sound.Audio;
         if (soundInfo.SyncStop) {
@@ -8136,6 +8250,10 @@
             }
 
             var obj = addTags[length];
+            if (obj instanceof Player) {
+                obj = obj.getParent();
+            }
+
             if (obj instanceof MovieClip) {
                 _eventDispatcher.call(obj);
             } else if (obj.characters instanceof Array) {
@@ -8160,6 +8278,10 @@
             }
 
             var tag = frameTags[depth];
+            if (tag instanceof Player) {
+                tag = tag.getParent();
+            }
+
             if (tag instanceof MovieClip) {
                 _addActions.call(tag);
             } else if (tag.characters instanceof Array) {
@@ -8170,6 +8292,8 @@
         if (_this.isAction) {
             var as = _this.getActions(_this.getFrame());
             if (as != undefined) {
+                var player = _this.getPlayer();
+                var actions = player.actions;
                 actions[_this.instanceId] = {as: as, mc: _this};
             }
             _this.isAction = false;
@@ -8239,10 +8363,6 @@
     MovieClip.prototype.getMatrix = function()
     {
         var _this = this;
-        if (_this.instanceId == 0) {
-            return [scale,0,0,scale,0,0];
-        }
-
         _this.setMatrix();
         return _this.matrix;
     };
@@ -8254,17 +8374,23 @@
     {
         var _this = this;
         var parent = _this.getParent();
-        var oTags = parent.getOriginTag();
-        if (oTags != undefined) {
-            var level = _this.getLevel();
-            if (level in oTags) {
-                var oTag = oTags[level];
-                _this.matrix = oTag.Matrix;
+        if (!parent) {
+            var player = _this.getPlayer();
+            var scale = player.getScale();
+            _this.matrix = [scale, 0, 0, scale, 0, 0];
+        } else {
+            var oTags = parent.getOriginTag();
+            if (oTags != undefined) {
+                var level = _this.getLevel();
+                if (level in oTags) {
+                    var oTag = oTags[level];
+                    _this.matrix = oTag.Matrix;
+                }
             }
-        }
 
-        if (_this.matrix == undefined) {
-            _this.matrix = [1,0,0,1,0,0];
+            if (_this.matrix == undefined) {
+                _this.matrix = [1,0,0,1,0,0];
+            }
         }
     };
 
@@ -8275,10 +8401,6 @@
     MovieClip.prototype.getColorTransform = function()
     {
         var _this = this;
-        if (_this.instanceId == 0) {
-            return [1,1,1,1,0,0,0,0];
-        }
-
         _this.setColorTransform();
         return _this.colorTransform;
     };
@@ -8290,17 +8412,21 @@
     {
         var _this = this;
         var parent = _this.getParent();
-        var oTags = parent.getOriginTag();
-        if (oTags != undefined) {
-            var level = _this.getLevel();
-            if (level in oTags) {
-                var oTag = oTags[level];
-                _this.colorTransform = oTag.ColorTransform;
-            }
-        }
-
-        if (_this.colorTransform == undefined) {
+        if (!parent) {
             _this.colorTransform = [1,1,1,1,0,0,0,0];
+        } else {
+            var oTags = parent.getOriginTag();
+            if (oTags != undefined) {
+                var level = _this.getLevel();
+                if (level in oTags) {
+                    var oTag = oTags[level];
+                    _this.colorTransform = oTag.ColorTransform;
+                }
+            }
+
+            if (_this.colorTransform == undefined) {
+                _this.colorTransform = [1,1,1,1,0,0,0,0];
+            }
         }
     };
 
@@ -8356,6 +8482,7 @@
     MovieClip.prototype.getBounds = function(parentMatrix)
     {
         var _this = this;
+        var player = _this.getPlayer();
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var no = _Number.MAX_VALUE;
         var Xmax = -no;
@@ -8394,7 +8521,7 @@
                 }
                 continue;
             } else {
-                bounds = character[tag.characterId];
+                bounds = player.getCharacter(tag.characterId);
             }
 
             if (bounds) {
@@ -8426,10 +8553,10 @@
         var _this = this;
         var bounds = _this.getBounds(_this.getMatrix());
         var width = bounds.Xmax - bounds.Xmin;
-        if (width < 0) {
+        if (width < 0)
             width *= -1;
-        }
-        return width/20;
+
+        return width / 20;
     };
 
     /**
@@ -8452,10 +8579,10 @@
         var _this = this;
         var bounds = _this.getBounds(_this.getMatrix());
         var height = bounds.Ymax - bounds.Ymin;
-        if (height < 0) {
+        if (height < 0)
             height *= -1;
-        }
-        return height/20;
+
+        return height / 20;
     };
 
     /**
@@ -8643,6 +8770,10 @@
                 ctx.beginPath();
             }
 
+            if (obj instanceof Player) {
+                obj = obj.getParent();
+            }
+
             if (obj instanceof MovieClip) {
                 var renderMatrix = _multiplicationMatrix.call(
                     obj,
@@ -8663,11 +8794,12 @@
 
                 _render.call(obj, ctx, renderMatrix, renderColorTransform);
             } else {
-                if (!(obj.characterId in character)) {
+                var player = _this.getPlayer();
+                var char = player.getCharacter(obj.characterId);
+                if (!char) {
                     continue;
                 }
 
-                var char = character[obj.characterId];
                 var renderMatrix = matrix;
                 if (obj.matrix != undefined) {
                     renderMatrix = _multiplicationMatrix.call(
@@ -8747,37 +8879,31 @@
     MovieClip.prototype.renderShape = function(ctx, matrix, colorTransform, tag)
     {
         var _this = this;
+        var player = _this.getPlayer();
         var cacheKey = cacheStore.generateKey(
             'Shape',
-            tag.characterId,
+            tag.characterId +"_"+ player.getId(),
             matrix,
             colorTransform
         );
 
         var cache = cacheStore.get(cacheKey);
         if (!cache || tag.isClipDepth) {
-            var char = character[tag.characterId];
+
+            var char = player.getCharacter(tag.characterId);
             var _executeRenderShape = _this.executeRenderShape;
             var _setTransform = ctx.setTransform;
 
-            _setTransform.call(
-                ctx,
-                matrix[0],
-                matrix[1],
-                matrix[2],
-                matrix[3],
-                matrix[4],
-                matrix[5]
-            );
+            _setTransform.call(ctx, matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
 
-            if (!cacheWait && !tag.isClipDepth) {
+            if (!_this.cacheWait && !tag.isClipDepth) {
                 var _renderBoundMatrix = _this.renderBoundMatrix;
                 var rBound = _renderBoundMatrix.call(_this, char, matrix);
                 var W = _ceil(rBound[2]);
                 var H = _ceil(rBound[3]);
 
-                if (width > W && height > H) {
-                    cacheWait = true;
+                if (player.getWidth() > W && player.getHeight() > H) {
+                    _this.cacheWait = true;
                     var cacheFunc = function ()
                     {
                         var canvas = cacheStore.getCanvas();
@@ -8788,21 +8914,13 @@
                         cache.offsetX = rBound[0];
                         cache.offsetY = rBound[1];
 
-                        _setTransform.call(
-                            cache,
-                            matrix[0],
-                            matrix[1],
-                            matrix[2],
-                            matrix[3],
-                            -rBound[0],
-                            -rBound[1]
-                        );
+                        _setTransform.call(cache, matrix[0], matrix[1], matrix[2], matrix[3], -rBound[0], -rBound[1]);
 
                         cacheStore.set(cacheKey, _executeRenderShape.call(
                             _this, cache, matrix, colorTransform, char.data, tag.isClipDepth
                         ));
 
-                        _setTimeout(cacheEnd, 0);
+                        _setTimeout(function () { player.cacheEnd(); }, 0);
                     };
 
                     _setTimeout(cacheFunc, 0);
@@ -8829,6 +8947,7 @@
     MovieClip.prototype.executeRenderShape = function(ctx, matrix, colorTransform, shapes, isClipDepth)
     {
         var _this = this;
+        var player = _this.getPlayer();
         var shapeLength = shapes.length;
         var _generateColorTransform = _this.generateColorTransform;
         var _generateImageTransform = _this.generateImageTransform;
@@ -8892,18 +9011,10 @@
                     case 0x12:
                     case 0x13:
                         var gradientObj = styleObj.Color;
-                        var gradientMatrix = gradientObj.gradientMatrix;
+                        var gMatrix = gradientObj.gradientMatrix;
 
                         ctx.save();
-                        _transform.call(
-                            ctx,
-                            gradientMatrix[0],
-                            gradientMatrix[1],
-                            gradientMatrix[2],
-                            gradientMatrix[3],
-                            gradientMatrix[4],
-                            gradientMatrix[5]
-                        );
+                        _transform.call(ctx, gMatrix[0], gMatrix[1], gMatrix[2], gMatrix[3], gMatrix[4], gMatrix[5]);
 
                         var type = gradientObj.fillStyleType;
                         if (type == 18 || type == 19) {
@@ -8918,14 +9029,7 @@
                             var record = records[rIdx];
                             var color = record.Color;
                             color = _generateColorTransform.call(_this, color, colorTransform);
-                            css.addColorStop(
-                                record.Ratio,
-                                'rgba('
-                                    + color.R +', '
-                                    + color.G +', '
-                                    + color.B +', '
-                                    + color.A +')'
-                            );
+                            css.addColorStop(record.Ratio, 'rgba('+ color.R +', '+ color.G +', '+ color.B +', '+ color.A +')');
                         }
 
                         if (isStroke) {
@@ -8952,19 +9056,19 @@
                     case 0x43:
                         var bitmapObj = styleObj.Color;
                         var bitmapId = bitmapObj.bitmapId;
-                        var bitmapMatrix = bitmapObj.bitmapMatrix;
+                        var bMatrix = bitmapObj.bitmapMatrix;
                         var repeat = (styleType == 0x40 || styleType == 0x42) ? 'repeat' : 'no-repeat';
 
                         var bitmapCacheKey = cacheStore.generateKey(
                             'Bitmap',
-                            bitmapId + "_" + repeat,
+                            bitmapId +"_"+ player.getId() +"_"+ repeat,
                             undefined,
                             colorTransform
                         );
 
                         var image = cacheStore.get(bitmapCacheKey);
                         if (image == undefined) {
-                            image = character[bitmapId];
+                            image = player.getCharacter(bitmapId);
 
                             if (colorTransform[0] != 1
                                 || colorTransform[1] != 1
@@ -8990,27 +9094,11 @@
                         ctx.save();
                         if (styleType == 0x41 || styleType == 0x43) {
                             ctx.clip();
-                            _transform.call(
-                                ctx,
-                                bitmapMatrix[0],
-                                bitmapMatrix[1],
-                                bitmapMatrix[2],
-                                bitmapMatrix[3],
-                                bitmapMatrix[4],
-                                bitmapMatrix[5]
-                            );
+                            _transform.call(ctx, bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
                             _drawImage.call(ctx, image.canvas, 0, 0);
                         } else {
-                            ctx.fillStyle = context.createPattern(image.canvas, repeat);
-                            _transform.call(
-                                ctx,
-                                bitmapMatrix[0],
-                                bitmapMatrix[1],
-                                bitmapMatrix[2],
-                                bitmapMatrix[3],
-                                bitmapMatrix[4],
-                                bitmapMatrix[5]
-                            );
+                            ctx.fillStyle = player.context.createPattern(image.canvas, repeat);
+                            _transform.call(ctx, bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
                             ctx.fill();
                         }
                         ctx.restore();
@@ -9024,13 +9112,20 @@
             ctx.clip();
 
             if (isAndroid && isChrome) {
-                _drawImage.call(tmpContext, ctx.canvas, 0, 0);
+                var tmpCanvas = tmpContext.canvas;
+                var canvas = ctx.canvas;
+
+                tmpCanvas.width = canvas.width;
+                tmpCanvas.height = canvas.height;
+                _drawImage.call(tmpContext, canvas, 0, 0);
+
                 ctx.save();
                 ctx.setTransform(1,0,0,1,0,0);
                 ctx.beginPath();
-                ctx.clearRect(0, 0, ctx.canvas.width+1, ctx.canvas.height);
-                _drawImage.call(ctx, tmpContext.canvas, 0, 0);
+                ctx.clearRect(0, 0, canvas.width+1, canvas.height);
+                _drawImage.call(ctx, tmpCanvas, 0, 0);
                 ctx.restore();
+
                 clearTmp();
             }
         }
@@ -9055,10 +9150,11 @@
     MovieClip.prototype.renderMorphShape = function(ctx, matrix, colorTransform, tag, ratio)
     {
         var _this = this;
+        var player = _this.getPlayer();
         ratio = ratio | 0;
         var cacheKey = cacheStore.generateKey(
             'MorphShape',
-            tag.characterId +"_"+ ratio,
+            tag.characterId +"_"+ player.getId() +"_"+ ratio,
             matrix,
             colorTransform
         );
@@ -9078,14 +9174,14 @@
                 matrix[5]
             );
 
-            if (!cacheWait) {
+            if (!player.cacheWait) {
                 var _renderBoundMatrix = _this.renderBoundMatrix;
                 var rBound = _renderBoundMatrix.call(_this, tag, matrix);
                 var W = _ceil(rBound[2]);
                 var H = _ceil(rBound[3]);
 
-                if (width > W && height > H) {
-                    cacheWait = true;
+                if (player.getWidth() > W && player.getHeight() > H) {
+                    player.cacheWait = true;
                     var cacheFunc = function ()
                     {
                         var canvas = cacheStore.getCanvas();
@@ -9110,7 +9206,7 @@
                             _this, cache, matrix, colorTransform, tag.data, false
                         ));
 
-                        _setTimeout(cacheEnd, 0);
+                        _setTimeout(function () { player.cacheEnd(); }, 0);
                     };
 
                     _setTimeout(cacheFunc, 0);
@@ -9138,7 +9234,8 @@
     MovieClip.prototype.renderText = function(ctx, matrix, colorTransform, tag)
     {
         var _this = this;
-        var char = character[tag.characterId];
+        var player = _this.getPlayer();
+        var char = player.getCharacter(tag.characterId);
         var Matrix = char.Matrix;
         var TextRecords = char.TextRecords;
         var len = TextRecords.length;
@@ -9166,7 +9263,7 @@
 
             // font master
             if (textRecord.FontId != undefined) {
-                defineFont = character[textRecord.FontId];
+                defineFont = player.getCharacter(textRecord.FontId);
             }
 
             // text color
@@ -9227,7 +9324,7 @@
     MovieClip.prototype.renderGlyph = function (records, ctx)
     {
         if (records.data == undefined) {
-            records.data = swftag.vectorToCanvas(records);
+            records.data = vtc.execute(records);
         }
 
         var shapes = records.data;
@@ -9261,7 +9358,8 @@
     MovieClip.prototype.renderEditText = function(ctx, matrix, colorTransform, tag)
     {
         var _this = this;
-        var char = character[tag.characterId];
+        var player = _this.getPlayer();
+        var char = player.getCharacter(tag.characterId);
         var data = char.data;
         var _setTransform = ctx.setTransform;
 
@@ -9347,7 +9445,7 @@
         var fontType = '';
         var useOutlines = false;
         if (data.HasFont) {
-            var fontData = character[data.FontID];
+            var fontData = player.getCharacter(data.FontID);
             useOutlines = (
                 fontData.FontFlagsHasLayout
                 && data.UseOutlines
@@ -9519,8 +9617,11 @@
     MovieClip.prototype.renderButton = function(ctx, matrix, colorTransform, tag, depth)
     {
         var _this = this;
-        var char = character[tag.characterId];
+        var player = _this.getPlayer();
+        var char = player.getCharacter(tag.characterId);
+        var touchObj = player.touchObj;
         var characters = char.characters;
+        var buttonHits = player.buttonHits;
 
         // enter
         var actions = char.actions;
@@ -9534,9 +9635,9 @@
                 if (cond.CondKeyPress == 13) {
                     buttonHits[buttonHits.length] = {
                         characterId: tag.characterId,
-                        Xmax: width,
+                        Xmax: player.getWidth(),
                         Xmin: 0,
-                        Ymax: height,
+                        Ymax: player.getHeight(),
                         Ymin: 0,
                         CondKeyPress: cond.CondKeyPress,
                         parent: _this
@@ -9590,7 +9691,7 @@
 
                     var cacheKey = cacheStore.generateKey(
                         'ButtonHit',
-                        tag.characterId,
+                        tag.characterId +"_"+ player.getId(),
                         renderMatrix,
                         renderColorTransform
                     );
@@ -9600,7 +9701,7 @@
                         if (tagChar instanceof MovieClip) {
                             var bounds = _getBounds.call(tagChar, renderMatrix);
                         } else {
-                            var bounds = character[tagChar.characterId];
+                            var bounds = player.getCharacter(tagChar.characterId);
                         }
 
                         var no = _Number.MAX_VALUE;
@@ -9649,7 +9750,7 @@
                         tagChar._nextFrame = 0;
                         _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
                     } else {
-                        var obj = character[tagChar.characterId];
+                        var obj = player.getCharacter(tagChar.characterId);
                         switch (obj.tagType) {
                             case 46: // MorphShape
                             case 84: // MorphShape2
@@ -9685,7 +9786,7 @@
                         tagChar._nextFrame = 0;
                         _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
                     } else {
-                        var obj = character[tagChar.characterId];
+                        var obj = player.getCharacter(tagChar.characterId);
                         switch (obj.tagType) {
                             case 46: // MorphShape
                             case 84: // MorphShape2
@@ -9813,14 +9914,7 @@
      */
     MovieClip.prototype.multiplicationMatrix = function(a, b)
     {
-        return [
-            a[0] * b[0] + a[2] * b[1],
-            a[1] * b[0] + a[3] * b[1],
-            a[0] * b[2] + a[2] * b[3],
-            a[1] * b[2] + a[3] * b[3],
-            a[0] * b[4] + a[2] * b[5] + a[4],
-            a[1] * b[4] + a[3] * b[5] + a[5]
-        ];
+        return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
     };
 
     /**
@@ -9831,16 +9925,7 @@
      */
     MovieClip.prototype.multiplicationColor = function(a, b)
     {
-        return [
-            a[0] * b[0],
-            a[1] * b[1],
-            a[2] * b[2],
-            a[3] * b[3],
-            a[0] * b[4] + a[4],
-            a[1] * b[5] + a[5],
-            a[2] * b[6] + a[6],
-            a[3] * b[7] + a[7]
-        ];
+        return [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3], a[0] * b[4] + a[4], a[1] * b[5] + a[5], a[2] * b[6] + a[6], a[3] * b[7] + a[7]];
     };
 
     /**
@@ -9883,355 +9968,141 @@
     };
 
     /**
-     * parse
-     * @param swf
-     * @param mc
-     */
-    function parse(swf, mc)
-    {
-        swftag = new SwfTag();
-        bitio = new BitIO();
-
-        // swfデータをセット
-        if (isXHR2) {
-            bitio.setData(swf);
-        } else {
-            bitio.init(swf);
-        }
-
-        // Header
-        setSwfHeader(mc);
-
-        // swfを分解してbuild
-        var tags = swftag.parse(mc);
-        swftag.build(tags, mc);
-
-        // clear
-        bitio = null;
-    }
-
-    /**
-     * setSwfHeader
-     * @param mc
-     * @returns {number}
-     */
-    function setSwfHeader(mc)
-    {
-        // signature
-        signature = bitio.getHeaderSignature();
-
-        // version
-        bitio.setVersion();
-
-        // ファイルサイズ
-        var fileLength = bitio.getUI32();
-        if (signature == 'CWS') {
-            bitio.deCompress(fileLength); // ZLIB
-        } else if (signature == 'ZWS') {
-            alert('not supported by LZMA');
-            return 0;
-        }
-
-        // フレームサイズ
-        var frameSize = swftag.rect();
-
-        // フレーム
-        var frameRate  = bitio.getUI16() / 0x100;
-        var frameCount = bitio.getUI16();
-        if (mc.characterId == 0) {
-            player.width = _ceil(frameSize.Xmax - frameSize.Xmin);
-            player.height = _ceil(frameSize.Ymax - frameSize.Ymin);
-            player.fps = _floor(1000 / frameRate);
-            changeScreenSize();
-        }
-    }
-
-    /**
-     * loaded
-     */
-    function loaded()
-    {
-        // reset
-        cacheStore.reset();
-        buttonHits = [];
-        touchActions = [];
-        actions = [];
-
-        // _root
-        var mc = player.parent;
-
-        // action
-        var _executeAction = executeAction;
-        _executeAction(mc);
-        mc.eventDispatcher();
-        _executeAction(mc);
-
-        // render
-        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
-
-        // DOM
-        deleteNode();
-        var div = _document.getElementById('swf2js');
-        div.appendChild(context.canvas);
-
-        var canvas = preContext.canvas;
-        var _drawImage = context.drawImage;
-        _drawImage.call(context, canvas, 0, 0);
-
-        // start
-        swf2js.play();
-        requestAnimationFrame(onEnterFrame, player.fps);
-
-        if (controllerMode) {
-            swf2js$controller.call(window, player.parent);
-        }
-    }
-
-    /**
-     * buffer
-     */
-    function buffer()
-    {
-        // _root
-        var mc = player.parent;
-
-        // action
-        buttonAction(mc);
-
-        var _executeAction = executeAction;
-        _executeAction(mc);
-        mc.eventDispatcher();
-        _executeAction(mc);
-
-        // clear
-        clearPre();
-        buttonHits = [];
-
-        // render
-        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
-    }
-
-    /**
-     * executeAction
-     * @param mc
-     */
-    function executeAction(mc)
-    {
-        var _action = action;
-        var _addActions = mc.addActions;
-        _addActions.call(mc);
-        while (actions.length) {
-            _action();
-            _addActions.call(mc);
-        }
-    }
-
-    /**
-     * action
-     */
-    function action()
-    {
-        var length = actions.length;
-        var _execute = cacheAS.execute;
-        for (var i = 0; i < length; i++) {
-            if (!(i in actions)) {
-                continue;
-            }
-
-            var obj = actions[i];
-            if (obj == null) {
-                continue;
-            }
-
-            var as = obj.as;
-            var mc = obj.mc;
-            var aLen = as.length;
-            for (var idx = 0; idx < aLen; idx++) {
-                if (!(idx in as)) {
-                    continue;
-                }
-                _execute.call(as[idx], mc);
-            }
-        }
-        actions  = [];
-    }
-
-    /**
-     * buttonAction
-     * @param mc
-     */
-    function buttonAction(mc)
-    {
-        var length = touchActions.length;
-        var _execute = cacheAS.execute;
-        for (var i = 0; i < length; i++) {
-            if (!(i in touchActions)) {
-                continue;
-            }
-
-            var obj = touchActions[i];
-            var as = obj.as;
-            _execute.call(as, obj.mc);
-        }
-        touchActions = [];
-
-        if (length) {
-            executeAction(mc);
-        }
-    }
-
-    /*
-     * main canvas clear
-     */
-    function clearMain()
-    {
-        var canvas = context.canvas;
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, canvas.width + 1, canvas.height);
-    }
-
-    /*
-     * pre canvas clear
-     */
-    function clearPre()
-    {
-        var canvas = preContext.canvas;
-        preContext.setTransform(1, 0, 0, 1, 0, 0);
-        preContext.clearRect(0, 0, canvas.width + 1, canvas.height);
-    }
-
-    /**
-     * tmp canvas clear
-     */
-    function clearTmp()
-    {
-        var canvas = tmpContext.canvas;
-        tmpContext.setTransform(1, 0, 0, 1, 0, 0);
-        tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height);
-    }
-
-    /**
      * keyAction
      * @param event
      */
     function keyAction(event)
     {
         var keyCode = event.keyCode;
-        var len = buttonHits.length;
-        var isEnd = false;
+        var childNodes = _document.getElementsByTagName('canvas');
+        var length = childNodes.length;
 
-        if (96 <= keyCode && keyCode <= 105) {
-            var n = keyCode - 96;
-            switch (n) {
-                case 0:
-                    keyCode = 48;
-                    break;
-                case 1:
-                    keyCode = 49;
-                    break;
-                case 2:
-                    keyCode = 50;
-                    break;
-                case 3:
-                    keyCode = 51;
-                    break;
-                case 4:
-                    keyCode = 52;
-                    break;
-                case 5:
-                    keyCode = 53;
-                    break;
-                case 6:
-                    keyCode = 54;
-                    break;
-                case 7:
-                    keyCode = 55;
-                    break;
-                case 8:
-                    keyCode = 56;
-                    break;
-                case 9:
-                    keyCode = 57;
-                    break;
-            }
-        }
-
-        for (var i = len; i--;) {
-            if (!(i in buttonHits)) {
+        for (var nIdx = 0; nIdx < length; nIdx++) {
+            var node = childNodes[nIdx];
+            var playerId = node.parentElement.id.split('_')[1];
+            if (!(playerId in players)) {
                 continue;
             }
 
-            var hitObj = buttonHits[i];
-            if (hitObj == null) {
-                continue;
+            var player = players[playerId];
+            var buttonHits = player.buttonHits;
+            var len = buttonHits.length;
+            var isEnd = false;
+            var touchActions = player.touchActions;
+
+            if (96 <= keyCode && keyCode <= 105) {
+                var n = keyCode - 96;
+                switch (n) {
+                    case 0:
+                        keyCode = 48;
+                        break;
+                    case 1:
+                        keyCode = 49;
+                        break;
+                    case 2:
+                        keyCode = 50;
+                        break;
+                    case 3:
+                        keyCode = 51;
+                        break;
+                    case 4:
+                        keyCode = 52;
+                        break;
+                    case 5:
+                        keyCode = 53;
+                        break;
+                    case 6:
+                        keyCode = 54;
+                        break;
+                    case 7:
+                        keyCode = 55;
+                        break;
+                    case 8:
+                        keyCode = 56;
+                        break;
+                    case 9:
+                        keyCode = 57;
+                        break;
+                }
             }
 
-            var char = character[hitObj.characterId];
-            if (char.actions == undefined) {
-                continue;
-            }
-
-            var actions = char.actions;
-            var aLen = actions.length;
-            for (var idx = 0; idx < aLen; idx++) {
-                if (!(idx in actions)) {
+            for (var i = len; i--;) {
+                if (!(i in buttonHits)) {
                     continue;
                 }
 
-                var cond = actions[idx];
-                var CondKeyPress = cond.CondKeyPress;
-                switch (CondKeyPress) {
-                    case 1: // left arrow
-                        CondKeyPress = 37;
-                        break;
-                    case 2: // right arrow
-                        CondKeyPress = 39;
-                        break;
-                    case 3: // home
-                        CondKeyPress = 36;
-                        break;
-                    case 4: // end
-                        CondKeyPress = 35;
-                        break;
-                    case 5: // insert
-                        CondKeyPress = 45;
-                        break;
-                    case 6: // delete
-                        CondKeyPress = 46;
-                        break;
-                    case 14: // up arrow
-                        CondKeyPress = 38;
-                        break;
-                    case 15: // down arrow
-                        CondKeyPress = 40;
-                        break;
-                    case 16: // page up
-                        CondKeyPress = 33;
-                        break;
-                    case 17: // page down
-                        CondKeyPress = 34;
-                        break;
-                    case 18: // tab
-                        CondKeyPress = 9;
-                        break;
-                    case 19: // escape
-                        CondKeyPress = 27;
-                        break;
-                }
-
-                if (CondKeyPress != keyCode) {
+                var hitObj = buttonHits[i];
+                if (hitObj == null) {
                     continue;
                 }
 
-                var mc = hitObj.parent;
-                var as = cond.ActionScript;
-                touchActions[touchActions.length] = {as: as, mc: mc};
-                isEnd = true;
-                break;
-            }
+                var char = player.getCharacter(hitObj.characterId);
+                if (char.actions == undefined) {
+                    continue;
+                }
 
-            if (isEnd) {
-                break;
+                var actions = char.actions;
+                var aLen = actions.length;
+                for (var idx = 0; idx < aLen; idx++) {
+                    if (!(idx in actions)) {
+                        continue;
+                    }
+
+                    var cond = actions[idx];
+                    var CondKeyPress = cond.CondKeyPress;
+                    switch (CondKeyPress) {
+                        case 1: // left arrow
+                            CondKeyPress = 37;
+                            break;
+                        case 2: // right arrow
+                            CondKeyPress = 39;
+                            break;
+                        case 3: // home
+                            CondKeyPress = 36;
+                            break;
+                        case 4: // end
+                            CondKeyPress = 35;
+                            break;
+                        case 5: // insert
+                            CondKeyPress = 45;
+                            break;
+                        case 6: // delete
+                            CondKeyPress = 46;
+                            break;
+                        case 14: // up arrow
+                            CondKeyPress = 38;
+                            break;
+                        case 15: // down arrow
+                            CondKeyPress = 40;
+                            break;
+                        case 16: // page up
+                            CondKeyPress = 33;
+                            break;
+                        case 17: // page down
+                            CondKeyPress = 34;
+                            break;
+                        case 18: // tab
+                            CondKeyPress = 9;
+                            break;
+                        case 19: // escape
+                            CondKeyPress = 27;
+                            break;
+                    }
+
+                    if (CondKeyPress != keyCode) {
+                        continue;
+                    }
+
+                    var mc = hitObj.parent;
+                    var as = cond.ActionScript;
+                    touchActions[touchActions.length] = {as: as, mc: mc};
+                    isEnd = true;
+                    break;
+                }
+
+                if (isEnd) {
+                    break;
+                }
             }
         }
     }
@@ -10242,32 +10113,39 @@
      */
     function touchStart(event)
     {
+        var playerId = event.target.parentNode.id.split('_')[1];
+        var player = players[playerId];
+        var buttonHits = player.buttonHits;
         var len = buttonHits.length;
         if (!len) {
             return 0;
         }
 
-        var div = _document.getElementById('swf2js');
+        var div = _document.getElementById(player.getName());
         var bounds = div.getBoundingClientRect();
-        var x = bounds.left;
-        var y = bounds.top;
-
+        var docBody = _document.body;
+        var x = docBody.scrollLeft + bounds.left;
+        var y = docBody.scrollTop + bounds.top;
         var touchX = 0;
         var touchY = 0;
+
         if (isTouch) {
             var changedTouche = event.targetTouches[0];
-            touchX = changedTouche.pageX - x;
-            touchY = changedTouche.pageY - y;
+            touchX = changedTouche.pageX;
+            touchY = changedTouche.pageY;
         } else {
-            touchX = event.pageX - x;
-            touchY = event.pageY - y;
+            touchX = event.pageX;
+            touchY = event.pageY;
         }
 
-        touchX *= devicePixelRatio;
-        touchY *= devicePixelRatio;
+        touchX -= x;
+        touchY -= y;
 
-        touchObj = null;
-        touchEndAction = null;
+        touchX *= _devicePixelRatio;
+        touchY *= _devicePixelRatio;
+
+        player.touchObj = null;
+        player.touchEndAction = null;
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -10281,15 +10159,14 @@
             if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
                 && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
             ){
-
-                touchObj = hitObj;
-                var char = character[hitObj.characterId];
+                player.touchObj = hitObj;
+                var char = player.getCharacter(hitObj.characterId);
                 if (char.actions == undefined) {
                     break;
                 }
 
                 var actions = char.actions;
-                var aLen = actions.length
+                var aLen = actions.length;
                 for (var idx = 0; idx < aLen; idx++) {
                     if (!(idx in actions)) {
                         continue;
@@ -10297,7 +10174,7 @@
 
                     var cond = actions[idx];
                     if (cond.CondOverDownToOverUp) {
-                        touchEndAction = cond.ActionScript;
+                        player.touchEndAction = cond.ActionScript;
                         continue;
                     }
 
@@ -10318,7 +10195,7 @@
                             sound.play();
                         }
 
-                        touchObj.ActionScript = cond.ActionScript;
+                        player.touchObj.ActionScript = cond.ActionScript;
                         if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
                             touchEvent(event);
                             break;
@@ -10327,7 +10204,7 @@
                 }
             }
 
-            if (touchObj != null) {
+            if (player.touchObj != null) {
                 break;
             }
         }
@@ -10339,7 +10216,9 @@
      */
     function touchMove(event)
     {
-        if (!isTouchEvent && touchObj != null) {
+        var playerId = event.target.parentNode.id.split('_')[1];
+        var player = players[playerId];
+        if (!player.isTouchEvent && player.touchObj != null) {
             event.preventDefault();
             touchStart(event);
         }
@@ -10351,16 +10230,23 @@
      */
     function touchEnd(event)
     {
+        var playerId = event.target.parentNode.id.split('_')[1];
+        var player = players[playerId];
+
+        var touchObj = player.touchObj;
+        var touchEndAction = player.touchEndAction;
+
         if (touchObj != null && touchEndAction != null) {
             event.preventDefault();
+            var touchActions = player.touchActions;
             touchActions[touchActions.length] = {
                 as: touchEndAction,
                 mc: touchObj.parent
             };
         }
 
-        isTouchEvent = false;
-        touchObj = null;
+        player.isTouchEvent = false;
+        player.touchObj = null;
     }
 
     /**
@@ -10370,8 +10256,14 @@
     function touchEvent(event)
     {
         event.preventDefault();
+
+        var playerId = event.target.parentNode.id.split('_')[1];
+        var player = players[playerId];
+
+        var touchObj = player.touchObj;
         if (touchObj != null) {
-            isTouchEvent = true;
+            player.isTouchEvent = true;
+            var touchActions = player.touchActions;
             touchActions[touchActions.length] = {
                 as: touchObj.ActionScript,
                 mc: touchObj.parent
@@ -10387,77 +10279,12 @@
      */
     function unzip(compressed, isDeCompress)
     {
-        /**
-         * decodeSymbol
-         * @param b
-         * @param table
-         * @returns {*}
-         */
-        var _decodeSymbol = function (b, table)
-        {
-            var code = 0;
-            var len = 0;
-            while (true) {
-                code = (code << 1) | b.readUB(1);
-                len++;
-                if (!(code in table)) {
-                    continue;
-                }
-
-                var entry = table[code];
-                if (entry.length == len) {
-                    return entry.symbol;
-                }
-            }
-        };
-
-        /**
-         * buildHuffTable
-         * @param bitLengths
-         * @returns {{}}
-         */
-        var _buildHuffTable = function(bitLengths)
-        {
-            var numLengths = bitLengths.length;
-            var blCount = [];
-            var maxBits = _max.apply(Math, bitLengths) + 1;
-            var nextCode = [];
-            var code = 0;
-            var table = {};
-            var i = numLengths;
-
-            while (i--) {
-                var len = bitLengths[i];
-                blCount[len] = (blCount[len] || 0) + (len > 0);
-            }
-
-            for (i = 1; i < maxBits; i++) {
-                len = i - 1;
-                if (!(len in blCount)) {
-                    blCount[len] = 0;
-                }
-
-                code = (code + blCount[len]) << 1;
-                nextCode[i] = code;
-            }
-
-            for (i = 0; i < numLengths; i++) {
-                len = bitLengths[i];
-                if (len) {
-                    table[nextCode[len]] = {
-                        length: len,
-                        symbol: i
-                    };
-                    nextCode[len]++;
-                }
-            }
-            return table;
-        };
-
         var sym = 0;
         var i = 0;
         var buff = [];
         var bitLengths = [];
+        var _buildHuffTable = buildHuffTable;
+        var _decodeSymbol = decodeSymbol;
 
         var DEFLATE_CODE_LENGTH_ORDER =
             [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
@@ -10606,11 +10433,699 @@
     }
 
     /**
+     * buildHuffTable
+     * @param bitLengths
+     * @returns {{}}
+     */
+    function buildHuffTable(bitLengths)
+    {
+        var numLengths = bitLengths.length;
+        var blCount = [];
+        var maxBits = _max.apply(Math, bitLengths) + 1;
+        var nextCode = [];
+        var code = 0;
+        var table = {};
+        var i = numLengths;
+
+        while (i--) {
+            var len = bitLengths[i];
+            blCount[len] = (blCount[len] || 0) + (len > 0);
+        }
+
+        for (i = 1; i < maxBits; i++) {
+            len = i - 1;
+            if (!(len in blCount)) {
+                blCount[len] = 0;
+            }
+
+            code = (code + blCount[len]) << 1;
+            nextCode[i] = code;
+        }
+
+        for (i = 0; i < numLengths; i++) {
+            len = bitLengths[i];
+            if (len) {
+                table[nextCode[len]] = {
+                    length: len,
+                    symbol: i
+                };
+                nextCode[len]++;
+            }
+        }
+        return table;
+    };
+
+    /**
+     * decodeSymbol
+     * @param b
+     * @param table
+     * @returns {*}
+     */
+    function decodeSymbol(b, table)
+    {
+        var code = 0;
+        var len = 0;
+        while (true) {
+            code = (code << 1) | b.readUB(1);
+            len++;
+            if (!(code in table)) {
+                continue;
+            }
+
+            var entry = table[code];
+            if (entry.length == len) {
+                return entry.symbol;
+            }
+        }
+    };
+
+    /**
+     * Player
+     * @constructor
+     */
+    var Player = function()
+    {
+        this.id = playerId++;
+        this.name = 'swf2js_'+this.id;
+
+        this.stopFlag = true;
+        this.parent = new MovieClip(this);
+        this.fps = 0;
+
+        // options
+        this.optionWidth = 0;
+        this.optionHeight = 0;
+        this.isSpriteSheet = false;
+        this.cacheMode = true;
+        this.callback = null;
+        this.renderMode = isWebGL;
+        this.tagId = null;
+
+        // params
+        this.context = null;
+        this.preContext = null;
+        this.characters = [];
+        this.buttonHits = [];
+        this.sounds = [];
+        this.loadSounds = [];
+        this.actions = [];
+        this.touchActions = [];
+        this.initActions = [];
+        this.touchObj = null;
+        this.touchEndAction = null;
+        this.startTime = 0;
+        this.imgUnLoadCount = 0;
+        this.scale = 1;
+        this.baseWidth = 0;
+        this.baseHeight = 0;
+        this.width = 0;
+        this.height = 0;
+        this.isTouchEvent = false;
+        this.isLoad = false;
+        this.jpegTables = null;
+        this.backgroundColor = null;
+        this.version = 0;
+        this.cacheWait = false;
+        this.loadStatus = 0;
+
+        // parse
+        this.swftag = null;
+        this.bitio = null;
+    };
+
+    /**
+     *
+     * @returns {number|*}
+     */
+    Player.prototype.getId = function()
+    {
+        return this.id;
+    };
+
+    /**
+     *
+     * @param id
+     */
+    Player.prototype.setId = function(id)
+    {
+        this.id = id;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Player.prototype.getMoveClip = function(path)
+    {
+        return this.parent.getMoveClip(path);
+    };
+
+    /**
+     * @returns {*}
+     */
+    Player.prototype.getParent = function()
+    {
+        return this.parent;
+    };
+
+    /**
+     * @param parent
+     */
+    Player.prototype.setParent = function(parent)
+    {
+        this.parent = parent;
+    };
+
+    /**
+     * play
+     */
+    Player.prototype.play = function()
+    {
+        this.stopFlag = false;
+    };
+
+    /**
+     * stop
+     */
+    Player.prototype.stop = function()
+    {
+        this.stopFlag = true;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Player.prototype.getName = function()
+    {
+        return this.name;
+    };
+
+    /**
+     * @param name
+     */
+    Player.prototype.setName = function(name)
+    {
+        this.name = name;
+    };
+
+    /**
+     *
+     * @param options
+     */
+    Player.prototype.setOptions = function(options)
+    {
+        if (options != undefined) {
+            var _this = this;
+            _this.optionWidth = options.width || _this.optionWidth;
+            _this.optionHeight = options.height || _this.optionHeight;
+            _this.renderMode = options.renderMode || _this.renderMode;
+            _this.tagId = options.tagId || _this.tagId;
+            _this.cacheMode = options.cacheMode || _this.cacheMode;
+            _this.callback = options.callback || _this.callback;
+            _this.isSpriteSheet = options.isSpriteSheet || _this.isSpriteSheet;
+            _this.name = options.name || _this.name;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    Player.prototype.getBaseWidth = function()
+    {
+        return this.baseWidth;
+    };
+
+    /**
+     * @param baseWidth
+     */
+    Player.prototype.setBaseWidth = function(baseWidth)
+    {
+        this.baseWidth = baseWidth;
+    };
+
+    /**
+     *
+     * @returns {number}
+     */
+    Player.prototype.getBaseHeight = function()
+    {
+        return this.baseHeight;
+    };
+
+    /**
+     *
+     * @param baseHeight
+     */
+    Player.prototype.setBaseHeight = function(baseHeight)
+    {
+        this.baseHeight = baseHeight;
+    };
+
+    /**
+     *
+     * @returns {number}
+     */
+    Player.prototype.getWidth = function()
+    {
+        return this.width;
+    };
+
+    /**
+     *
+     * @param width
+     */
+    Player.prototype.setWidth = function(width)
+    {
+        if (width < 0)
+            width *= -1;
+
+        this.width = width;
+    };
+
+    /**
+     *
+     * @returns {number}
+     */
+    Player.prototype.getHeight = function()
+    {
+        return this.height;
+    };
+
+    /**
+     *
+     * @param height
+     */
+    Player.prototype.setHeight = function(height)
+    {
+        if (height < 0)
+            height *= -1;
+
+        this.height = height;
+    };
+
+    /**
+     * @returns {number}
+     */
+    Player.prototype.getScale = function()
+    {
+        return this.scale;
+    };
+
+    /**
+     * @param scale
+     */
+    Player.prototype.setScale = function(scale)
+    {
+        this.scale = scale;
+    };
+
+    /**
+     * @param id
+     * @returns {*}
+     */
+    Player.prototype.getCharacter = function(id)
+    {
+        return this.characters[id];
+    };
+
+    /**
+     * @param id
+     * @param obj
+     */
+    Player.prototype.setCharacter = function(id, obj)
+    {
+        this.characters[id] = obj;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Player.prototype.getFps = function()
+    {
+        return this.fps;
+    };
+
+    /**
+     * @param fps
+     */
+    Player.prototype.setFps = function(fps)
+    {
+        this.fps = fps;
+    };
+
+    /**
+     * loadStatusCountUp
+     */
+    Player.prototype.loadEvent = function()
+    {
+        var _this = this;
+        switch (_this.loadStatus) {
+            case 2:
+                _this.resize();
+                _this.loadStatus++;
+                break;
+            case 3:
+                if (_this.isLoad && _this.stopFlag && _this.imgUnLoadCount == 0) {
+                    _this.loaded();
+                    _this.loadStatus++;
+                }
+                break;
+        }
+
+        if (_this.loadStatus !== 4) {
+            _setTimeout(function (){ _this.loadEvent(); }, 0);
+        }
+    };
+
+    /**
+     * parse
+     * @param swf
+     */
+    Player.prototype.parse = function(swf)
+    {
+        var _this = this;
+        _this.bitio = new BitIO();
+        _this.swftag = new SwfTag(_this, _this.bitio);
+
+        // swfデータをセット
+        if (isXHR2) {
+            _this.bitio.setData(new Uint8Array(swf));
+        } else {
+            _this.bitio.init(swf);
+        }
+
+        // Header
+        if (_this.setSwfHeader()) {
+            // swfを分解してbuild
+            var mc = _this.parent;
+            var tags = _this.swftag.parse(mc);
+            _this.swftag.build(tags, mc);
+        }
+
+        // clear
+        _this.swftag = null;
+        _this.bitio = null;
+
+        _this.isLoad = true;
+    };
+
+    /**
+     *
+     * @returns {boolean}
+     */
+    Player.prototype.setSwfHeader = function()
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var swftag = _this.swftag;
+        var mc = this.parent;
+
+        // signature
+        var signature = bitio.getHeaderSignature();
+
+        // version
+        _this.version = bitio.getVersion();
+
+        // ファイルサイズ
+        var fileLength = bitio.getUI32();
+
+        // 圧縮データを解凍
+        if (signature == 'FWS') {
+            // No ZIP
+        } else if (signature == 'CWS') {
+            // ZLIB
+            bitio.deCompress(fileLength);
+        } else if (signature == 'ZWS') {
+            alert('not supported by LZMA');
+            return false;
+        } else {
+            _this.parseJPEG(bitio.data);
+            return false;
+        }
+
+        // フレームサイズ
+        var bounds = swftag.rect();
+
+        // フレーム
+        var frameRate  = bitio.getUI16() / 0x100;
+        var frameCount = bitio.getUI16();
+
+        _this.setBaseWidth(_ceil((bounds.Xmax - bounds.Xmin) / 20));
+        _this.setBaseHeight(_ceil((bounds.Ymax - bounds.Ymin) / 20));
+        _this.setFps(_floor(1000 / frameRate));
+        _this.loadStatus++;
+
+        return true;
+    };
+
+    /**
+     *
+     * @param data
+     */
+    Player.prototype.parseJPEG = function(data)
+    {
+        var _this = this;
+        var swftag = _this.swftag;
+
+        var image = _document.createElement('img');
+        image.onload = function()
+        {
+            var width = this.width;
+            var height = this.height;
+
+            var canvas = cacheStore.getCanvas();
+            canvas.width = width;
+            canvas.height = height;
+            var imageContext = canvas.getContext("2d");
+            var _drawImage = imageContext.drawImage;
+            _drawImage.call(imageContext, this, 0, 0);
+
+            _this.setCharacter(2, imageContext);
+
+            var shapeWidth = width * 20;
+            var shapeHeight = height * 20;
+
+            _this.setBaseWidth(width);
+            _this.setBaseHeight(height);
+
+            var shape = {
+                NumFillBits: 1,
+                NumLineBits: 0,
+                ShapeRecords: [
+                    {
+                        FillStyle1: 1,
+                        StateFillStyle0: 0,
+                        StateFillStyle1: 1,
+                        StateLineStyle: 0,
+                        StateMoveTo: 0,
+                        StateNewStyles: 0,
+                        isChange: true
+                    },
+                    {
+                        AnchorX: shapeWidth,
+                        AnchorY: 0,
+                        ControlX: 0,
+                        ControlY: 0,
+                        isChange: false,
+                        isCurved: false
+                    },
+                    {
+                        AnchorX: shapeWidth,
+                        AnchorY: shapeHeight,
+                        ControlX: 0,
+                        ControlY: 0,
+                        isChange: false,
+                        isCurved: false
+                    },
+                    {
+                        AnchorX: 0,
+                        AnchorY: shapeHeight,
+                        ControlX: 0,
+                        ControlY: 0,
+                        isChange: false,
+                        isCurved: false
+                    },
+                    {
+                        AnchorX: 0,
+                        AnchorY: 0,
+                        ControlX: 0,
+                        ControlY: 0,
+                        isChange: false,
+                        isCurved: false
+                    },
+                    0
+                ],
+                fillStyles: {
+                    fillStyleCount: 1,
+                    fillStyles: [{
+                        bitmapId: 2,
+                        bitmapMatrix: [20, 0, 0, 20, 0, 0],
+                        fillStyleType: 65
+                    }]
+                },
+                lineStyles: {
+                    lineStyleCount: 0,
+                    lineStyles: []
+                }
+            };
+
+            _this.setCharacter(1, {
+                tagType: 22,
+                data: vtc.execute(shape),
+                Xmin: 0,
+                Xmax: shapeWidth,
+                Ymin: 0,
+                Ymax: shapeHeight
+            });
+
+            _this.init();
+            _this.loadStatus++;
+        };
+
+        image.src = "data:image/jpeg;base64,"
+            + swftag.base64encode(swftag.parseJpegData(data));
+
+        var mc = _this.getParent();
+        var obj = {};
+        obj.characterId = 1;
+
+        mc.addTags[1] = [];
+        mc.addTags[1][1] = obj;
+    };
+
+    /**
+     * resize
+     */
+    Player.prototype.resize = function()
+    {
+        var _this = this;
+        var div = _document.getElementById(_this.getName());
+
+        var oWidth = _this.optionWidth;
+        var oHeight = _this.optionHeight;
+
+        var screenWidth = 0;
+        var screenHeight = 0;
+        var scale = 1;
+        var width = 0;
+        var height = 0;
+
+        var parent = div.parentNode;
+        if (parent.tagName == 'BODY') {
+            screenWidth  = (oWidth > 0) ? oWidth : window.innerWidth;
+            screenHeight = (oHeight > 0) ? oHeight : window.innerHeight;
+        } else {
+            screenWidth  = (oWidth > 0) ? oWidth : parent.offsetWidth;
+            screenHeight = (oHeight > 0) ? oHeight : parent.offsetHeight;
+        }
+
+        var baseWidth  = _this.getBaseWidth();
+        var baseHeight = _this.getBaseHeight();
+        var minSize = _min(screenWidth, screenHeight);
+
+        // 条件に合わせてリサイズ
+        if(baseWidth > baseHeight){
+            scale = (screenWidth / baseWidth);
+            width  = baseWidth * scale;
+            height = baseHeight * scale;
+        } else if (baseWidth == baseHeight) {
+            scale  = minSize / baseWidth;
+            width  = baseWidth * scale;
+            height = baseHeight * scale;
+        } else {
+            scale = _min(
+                (screenWidth / baseWidth),
+                (screenHeight / baseHeight)
+            );
+            width  = baseWidth * scale;
+            height = baseHeight * scale;
+        }
+
+        _this.setScale(scale * _devicePixelRatio / 20);
+        _this.setWidth(width * devicePixelRatio);
+        _this.setHeight(height * devicePixelRatio);
+
+        // divの設定
+        var style = div.style;
+        style.width = width + 'px';
+        style.height = height + 'px';
+        style.top = 0;
+        style.left =  ((screenWidth / 2) - (width / 2)) + 'px';
+
+        width *= devicePixelRatio;
+        height *= devicePixelRatio;
+
+        // main
+        var canvas = _this.context.canvas;
+        canvas.width = width;
+        canvas.height = height;
+
+        // pre
+        var preCanvas = _this.preContext.canvas;
+        preCanvas.width = width;
+        preCanvas.height = height;
+
+        // tmp
+        if (isAndroid && isChrome) {
+            var tmpCanvas = tmpContext.canvas;
+            tmpCanvas.width = width;
+            tmpCanvas.height = height;
+        }
+    };
+
+    /**
+     * loaded
+     */
+    Player.prototype.loaded = function()
+    {
+        // reset
+        var _this = this;
+        _this.buttonHits = [];
+        _this.touchActions = [];
+        _this.actions = [];
+
+        // _root
+        var mc = _this.parent;
+
+        // action
+        var _executeAction = _this.executeAction;
+        _executeAction.call(_this, mc);
+        mc.eventDispatcher();
+        _executeAction.call(_this, mc);
+
+        // render
+        var canvas = _this.context.canvas;
+        var style = canvas.style;
+        style.backgroundColor = _this.backgroundColor;
+
+        var preContext = _this.preContext;
+        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
+
+        // DOM
+        _this.deleteNode();
+        var div = _document.getElementById(_this.getName());
+        var context = _this.context;
+        div.appendChild(context.canvas);
+
+        canvas = preContext.canvas;
+        var _drawImage = context.drawImage;
+        _drawImage.call(context, canvas, 0, 0);
+
+        // start
+        _this.startTime = _Date.now();
+        _this.play();
+        requestAnimationFrame(function() {_this.onEnterFrame();}, _this.getFps());
+
+        if (_this.callback) {
+            _this.callback.call(window, _this.getParent());
+        }
+    };
+
+    /**
      * deleteNode
      */
-    function deleteNode()
+    Player.prototype.deleteNode = function()
     {
-        var div = _document.getElementById('swf2js');
+        var div = _document.getElementById(this.getName());
         if (div) {
             var childNodes = div.childNodes;
             var len = childNodes.length;
@@ -10620,252 +11135,492 @@
                 }
             }
         }
-    }
+    };
 
     /**
      * onEnterFrame
      */
-    function onEnterFrame()
+    Player.prototype.onEnterFrame = function()
     {
-        var fps = player.fps;
-        requestAnimationFrame(onEnterFrame, fps);
+        var _this = this;
+        var fps = _this.getFps();
 
-        if (isLoad && !player.stopFlag) {
+        if (_this.isLoad && !_this.stopFlag) {
             var now = _Date.now();
-            var check = now - startTime;
+            var check = now - _this.startTime;
             if ((check / fps) >= 1) {
-                startTime = _Date.now();
-                clearMain();
-                context.drawImage(preContext.canvas, 0, 0);
-                _setTimeout(buffer, 0);
+                _this.startTime = _Date.now();
+                _this.clearMain();
+                _this.context.drawImage(_this.preContext.canvas, 0, 0);
+
+                _setTimeout(function() { _this.buffer(); }, 0);
             }
         }
-    }
+
+        requestAnimationFrame(function() { _this.onEnterFrame(); }, fps);
+    };
 
     /**
-     * clone
-     * @param src
-     * @returns {{}}
+     * buffer
      */
-    function clone(src)
+    Player.prototype.buffer = function()
     {
-        var execute = function(src, obj)
-        {
-            for(var prop in src) {
-                var value = src[prop];
-                if(value instanceof Array) {
-                    obj[prop] = [];
-                    execute(value, obj[prop]);
-                } else if(value instanceof Object) {
-                    obj[prop] = {};
-                    execute(value, obj[prop]);
-                } else {
-                    obj[prop] = value;
-                }
-            }
-        };
+        var _this = this;
 
-        var obj = {};
-        execute(src, obj);
-        return obj;
-    }
+        // _root
+        var mc = _this.parent;
+
+        // action
+        _this.buttonAction(mc);
+
+        var _executeAction = _this.executeAction;
+        _executeAction.call(_this, mc);
+        mc.eventDispatcher();
+        _executeAction.call(_this, mc);
+
+        // clear
+        _this.clearPre();
+        _this.buttonHits = [];
+
+        // render
+        mc.render(_this.preContext, mc.getMatrix(), mc.getColorTransform());
+    };
+
+    /**
+     * executeAction
+     * @param mc
+     */
+    Player.prototype.executeAction = function(mc)
+    {
+        var _this = this;
+        var _action = _this.action;
+        var _addActions = mc.addActions;
+        _addActions.call(mc);
+        while (_this.actions.length) {
+            _action.call(_this);
+            _addActions.call(mc);
+        }
+    };
+
+    /**
+     * action
+     */
+    Player.prototype.action = function()
+    {
+        var _this = this;
+        var actions = _this.actions;
+        var length = actions.length;
+        var _execute = cacheAS.execute;
+        for (var i = 0; i < length; i++) {
+            if (!(i in actions)) {
+                continue;
+            }
+
+            var obj = actions[i];
+            if (obj == null) {
+                continue;
+            }
+
+            var as = obj.as;
+            var mc = obj.mc;
+            var aLen = as.length;
+            for (var idx = 0; idx < aLen; idx++) {
+                if (!(idx in as)) {
+                    continue;
+                }
+                _execute.call(as[idx], mc);
+            }
+        }
+
+        _this.actions  = [];
+    };
+
+    /**
+     * buttonAction
+     * @param mc
+     */
+    Player.prototype.buttonAction = function(mc)
+    {
+        var _this = this;
+        var touchActions = _this.touchActions;
+        var length = touchActions.length;
+        var _execute = cacheAS.execute;
+        for (var i = 0; i < length; i++) {
+            if (!(i in touchActions)) {
+                continue;
+            }
+
+            var obj = touchActions[i];
+            var as = obj.as;
+            _execute.call(as, obj.mc);
+        }
+        _this.touchActions = [];
+
+        if (length) {
+            _this.executeAction(mc);
+        }
+    };
+
+    /*
+     * main canvas clear
+     */
+    Player.prototype.clearMain = function()
+    {
+        var context = this.context;
+        var canvas = context.canvas;
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, canvas.width + 1, canvas.height);
+    };
+
+    /*
+     * pre canvas clear
+     */
+    Player.prototype.clearPre = function()
+    {
+        var preContext = this.preContext;
+        var canvas = preContext.canvas;
+        preContext.setTransform(1, 0, 0, 1, 0, 0);
+        preContext.clearRect(0, 0, canvas.width + 1, canvas.height);
+    };
 
     /**
      * cacheEnd
      */
-    function cacheEnd()
+    Player.prototype.cacheEnd = function()
     {
-        cacheWait = false;
-    }
-
-    /**
-     * player
-     * @type {{stopFlag: boolean, parent: MovieClip, fps: number}}
-     */
-    var player = {
-        stopFlag: true,
-        parent: new MovieClip(),
-        fps: 0
+        this.cacheWait = false;
     };
 
-    // swf2js
-    if (window['swf2js'] == undefined) {
-        /**
-         * swf2js
-         * @type {{}}
-         */
-        var swf2js = {};
+    /**
+     * init
+     */
+    Player.prototype.init = function()
+    {
+        var _this = this;
+        var tagId = _this.tagId;
 
-        /**
-         * load
-         * @param url
-         * @param options
-         */
-        swf2js.load = function(url, options)
-        {
-            if (options != undefined) {
-                optionWidth = options.width || 0;
-                optionHeight = options.height || 0;
-                renderMode = options.mode || renderMode;
-                tagId = options.tagId || null;
-                cacheMode = options.cacheMode || cacheMode;
-                cacheSize = options.cacheSize || cacheSize;
-                isSpriteSheet = options.isSpriteSheet || false;
-                controllerMode = options.controllerMode || false;
-
-                cacheStore.size = cacheSize;
-            }
-
-            // TODO 開発用
-            if (url == 'develop') {
-                url = location.search.substr(1).split('&')[0];
-            }
-
-            if (url) {
-                if (!tagId) {
-                    _document.open();
-                    _document.write('<div id="swf2js"></div>');
-                    _document.close();
-                }
-
-                var xmlHttpRequest = new XMLHttpRequest();
-                xmlHttpRequest.open('GET', url);
-                isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
-
-                if (isXHR2) {
-                    xmlHttpRequest.responseType = 'arraybuffer';
-                } else {
-                    xmlHttpRequest.overrideMimeType(
-                        'text/plain; charset=x-user-defined'
-                    );
-                }
-
-                xmlHttpRequest.send(null);
-                xmlHttpRequest.onreadystatechange = function()
+        if (tagId) {
+            if (_document.readyState == 'loading') {
+                var reStart = function()
                 {
-                    var readyState = xmlHttpRequest.readyState;
-                    if (readyState == 4) {
-                        var status = xmlHttpRequest.status;
-                        switch (status) {
-                            case 200:
-                                var swf = (isXHR2)
-                                    ? new Uint8Array(xmlHttpRequest.response)
-                                    : xmlHttpRequest.responseText;
+                    window.removeEventListener("DOMContentLoaded", reStart, false);
+                    _this.init();
+                };
 
-                                parse(swf, player.parent);
+                window.addEventListener("DOMContentLoaded", reStart, false);
 
-                                isLoad = true;
-                                if (player.stopFlag && imgUnLoadCount == 0) {
-                                    loaded();
-                                }
-                                break;
-                            case 404:
-                                alert('Swf Data Not Found');
-                                break;
-                            case 500:
-                                alert('Internal Server Error');
-                                break;
-                        }
-                    }
+                return 0;
+            }
+
+            var container = _document.getElementById(tagId);
+            if (!container) {
+                alert('Not Found Tag ID:' + tagId);
+                return 0;
+            }
+
+            var tags = container.getElementsByTagName('canvas');
+            var tagLength = tags.length;
+            for (var i = 0; i < tagLength; i++) {
+                container.removeChild(tags[i]);
+            }
+
+            div = _document.getElementById(_this.getName());
+            if (div) {
+                _this.deleteNode();
+            } else {
+                div = _document.createElement('div');
+                div.id = _this.getName();
+                container.appendChild(div);
+            }
+        }
+
+        var div = _document.getElementById(_this.getName());
+        if (div) {
+            var style = div.style;
+            style.position = 'relative';
+            style.top = '0';
+            style.backgroundColor = '#000000';
+            style.overflow = 'hidden';
+            style['-webkit-user-select'] = 'none';
+
+            // loading
+            _this.loading();
+        }
+
+        var canvas = _document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        var style = canvas.style;
+        style.zIndex = 0;
+        style.position = 'absolute';
+        style.zoom = 100 / _devicePixelRatio + '%';
+        style['-webkit-tap-highlight-color'] = 'rgba(0,0,0,0)';
+
+        canvas.addEventListener(startEvent, touchStart, false);
+        canvas.addEventListener(moveEvent, touchMove, false);
+        canvas.addEventListener(endEvent, touchEnd, false);
+
+        if (!isTouch) {
+            window.addEventListener("keydown", keyAction, false);
+        }
+        _this.context = canvas.getContext('2d');
+
+        var preCanvas = _document.createElement('canvas');
+        preCanvas.width = 1;
+        preCanvas.height = 1;
+        _this.preContext =  preCanvas.getContext('2d');
+
+        _this.loadStatus++;
+    };
+
+    /**
+     * loading
+     */
+    Player.prototype.loading = function()
+    {
+        var _this = this;
+        var div = _document.getElementById(_this.getName());
+        var loadingId = _this.getName() + '_loading';
+
+        var css = '<style>';
+        css += '#'+ loadingId +' {\n';
+        css += 'z-index: 999;\n';
+        css += 'position: absolute;\n';
+        css += 'top: 50%;\n';
+        css += 'left: 50%;\n';
+        css += 'margin: -24px 0 0 -24px;\n';
+        css += 'width: 50px;\n';
+        css += 'height: 50px;\n';
+        css += 'border-radius: 50px;\n';
+        css += 'border: 8px solid #dcdcdc;\n';
+        css += 'border-right-color: transparent;\n';
+        css += 'box-sizing: border-box;\n';
+        css += '-webkit-animation: '+ loadingId +' 1s infinite linear;\n';
+        css += '} \n';
+        css += '@-webkit-keyframes '+ loadingId +' {\n';
+        css += '0% {-webkit-transform: rotate(0deg); opacity: 0.4;}\n';
+        css += '50% {-webkit-transform: rotate(180deg); opacity: 1;}\n';
+        css += '100% {-webkit-transform: rotate(360deg); opacity: 0.4;}\n';
+        css += '} \n';
+        css += '</style>';
+        div.innerHTML = css;
+
+        var loadingDiv = _document.createElement('div');
+        loadingDiv.id = loadingId;
+        div.appendChild(loadingDiv);
+    };
+
+    /**
+     * reload
+     * @param url
+     * @param options
+     */
+    Player.prototype.reload = function(url, options)
+    {
+        cacheStore.reset();
+
+        var _this = this;
+        _this.loadStatus = 0;
+        _this.stop();
+        _this.deleteNode();
+
+        return swf2js.load(url, {
+            optionWidth: options.optionWidth | _this.optionWidth,
+            optionHeight: options.optionHeight | _this.optionHeight,
+            renderMode: options.renderMode | _this.renderMode,
+            tagId: options.tagId | _this.tagId,
+            cacheMode: options.cacheMode | _this.cacheMode,
+            isSpriteSheet: options.isSpriteSheet | _this.isSpriteSheet,
+            name: options.name | _this.name
+        });
+    };
+
+    /**
+     *
+     * @param outputPath
+     * @param frame
+     * @param width
+     * @param height
+     * @returns {boolean}
+     */
+    Player.prototype.output = function(outputPath, frame, width, height)
+    {
+        var _this = this;
+        if (!_this.isLoad || _this.stopFlag) {
+            _setTimeout(function ()
+            {
+                _this.output(outputPath, frame, width, height);
+            }, 500);
+            return false;
+        }
+
+        _this.stop();
+
+        if (!frame) {
+            frame = 1;
+        }
+
+        if (!width) {
+            width = _this.getWidth();
+        }
+
+        if (!height) {
+            height = _this.getHeight();
+        }
+
+        // tmp
+        var canvas = _this.preContext.canvas;
+        var tmp = cacheStore.getCanvas();
+        tmp.width = canvas.width;
+        tmp.height = canvas.height;
+        var tmpCtx = tmp.getContext('2d');
+        tmpCtx.drawImage(canvas, 0, 0);
+
+        // resize
+        var isResize = false;
+        if (width != _this.getWidth() || height != _this.getHeight()) {
+            isResize = true;
+
+            var tmpWidth = _this.optionWidth;
+            var tmpHeight = _this.optionHeight;
+
+            _this.optionWidth = width;
+            _this.optionHeight = height;
+
+            _this.resize();
+        }
+
+        var mc = _this.parent;
+        var currentFrame = mc.getFrame();
+        var stopFlag = mc.stopFlag;
+
+        mc.gotoAndStop(frame);
+        _this.buffer();
+        var base64 = canvas.toDataURL();
+        console.log(base64);
+
+        // reset
+        if (isResize) {
+            _this.optionWidth = tmpWidth;
+            _this.optionHeight = tmpHeight;
+            _this.resize();
+        }
+
+        mc.gotoAndStop(currentFrame);
+        mc.stopFlag = stopFlag;
+        var tmpCanvas = tmpCtx.canvas;
+        _this.context.drawImage(tmpCanvas, 0, 0);
+        _this.preContext.drawImage(tmpCanvas, 0, 0);
+
+        cacheStore.destroy(tmpCanvas);
+        _this.play();
+
+        var xmlHttpRequest = new XMLHttpRequest();
+        xmlHttpRequest.open('POST', outputPath);
+        xmlHttpRequest.setRequestHeader(
+            'Content-Type',
+            'application/x-www-form-urlencoded'
+        );
+
+        xmlHttpRequest.send('data='+ encodeURIComponent(base64));
+
+        // alert
+        xmlHttpRequest.onreadystatechange = function()
+        {
+            var readyState = xmlHttpRequest.readyState;
+            if (readyState == 4) {
+                var status = xmlHttpRequest.status;
+                if (status == 200) {
+                    //alert('OUTPUT SUCCESS');
+                    return true;
+                } else {
+                    //alert('[ERROR] HTTP STATUS: '+ status);
                 }
-            } else {
-                alert('please set swf url');
+            }
+        }
+    };
+
+    /**
+     * swf2js
+     * @type {{}}
+     */
+    var swf2js = {};
+
+    /**
+     * load
+     * @param url
+     * @param options
+     */
+    swf2js.load = function(url, options)
+    {
+        // TODO 開発用
+        if (url == 'develop') {
+            url = location.search.substr(1).split('&')[0];
+        }
+
+        if (url) {
+            var player = new Player();
+            player.setOptions(options);
+
+            if (!player.tagId) {
+                _document.open();
+                _document.write('<div id="'+ player.getName() +'"></div>');
+                _document.close();
             }
 
-            if (_document.readyState != 'complete') {
-                window.addEventListener("DOMContentLoaded", init, false);
-            } else {
-                init();
-            }
-        };
-
-        /**
-         * play
-         */
-        swf2js.play = function()
-        {
-            player.stopFlag = false;
-        };
-
-        /**
-         * stop
-         */
-        swf2js.stop = function()
-        {
-            player.stopFlag = true;
-        };
-
-        /**
-         * reload
-         * @param url
-         * @param options
-         */
-        swf2js.reload = function(url, options)
-        {
-            // stop
-            swf2js.stop();
-
-            // reset
-            isLoad = false;
-            instanceId = 0;
-            backgroundColor = null;
-            optionWidth = 0;
-            optionHeight = 0;
-            player.parent = new MovieClip();
-            deleteNode();
-
-            // execute
-            swf2js.load(url, options);
-        };
-
-        /**
-         * output
-         * @param path
-         */
-        swf2js.output = function(path)
-        {
-            if (!isLoad) {
-                _setTimeout(swf2js.output, 1000, path);
-                return false;
-            }
-
-            isLoad = false;
-            swf2js.stop();
-
-            var mc = player.parent;
-            mc.reset(true, 1);
-            loaded();
-
-            // stop
-            isLoad = false;
-            swf2js.stop();
+            player.init();
+            player.loadEvent();
+            players[player.getId()] = player;
 
             var xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open('POST', path);
-            xmlHttpRequest.setRequestHeader(
-                'Content-Type',
-                'application/x-www-form-urlencoded'
-            );
-            xmlHttpRequest.send('data='+ encodeURIComponent(
-                context.canvas.toDataURL())
-            );
+            xmlHttpRequest.open('GET', url);
+            isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
 
-            // alert
+            if (isXHR2) {
+                xmlHttpRequest.responseType = 'arraybuffer';
+            } else {
+                xmlHttpRequest.overrideMimeType(
+                    'text/plain; charset=x-user-defined'
+                );
+            }
+
+            xmlHttpRequest.send(null);
             xmlHttpRequest.onreadystatechange = function()
             {
                 var readyState = xmlHttpRequest.readyState;
                 if (readyState == 4) {
                     var status = xmlHttpRequest.status;
-                    if (status == 200) {
-                        alert('OUTPUT SUCCESS');
-                        return true;
-                    } else {
-                        alert('[ERROR] HTTP STATUS: '+ status);
+                    switch (status) {
+                        case 200:
+                            player.parse(isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText);
+                            break;
+                        case 404:
+                            alert('Not Found Swf');
+                            break;
+                        case 500:
+                            alert('Internal Server Error');
+                            break;
                     }
                 }
             }
-        };
+        } else {
+            alert('please set swf url');
+        }
 
-        window.swf2js = swf2js;
-    }
-})(this);
+        return player;
+    };
+
+    /**
+     * @param url
+     * @param options
+     * @returns {*}
+     */
+    swf2js.reload = function(url, options)
+    {
+        players = [];
+        return swf2js.load(url, options);
+    };
+
+    window.swf2js = swf2js;
+
+})(window);}
