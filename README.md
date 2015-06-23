@@ -62,8 +62,7 @@ SWF 9
 
 ##### *TAG*  
 FreeCharacter  
-DefineFontInfo  
-StopSound  
+StopSound
 SoundStreamBlock  
 DefineButtonCxform  
 PathsArePostScript  
@@ -85,8 +84,7 @@ ImportAssets
 EnableDebugger  
 DefineVideoStream  
 VideoFrame  
-DefineFontInfo2  
-DebugID  
+DebugID
 ScriptLimits  
 SetTabIndex  
 ImportAssets2  

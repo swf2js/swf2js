@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.3.2)
+ * swf2js (version 0.3.3)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -108,6 +108,15 @@ if (window['swf2js'] == undefined) { (function(window)
             }
         );
     }
+
+    var utf8uri = new RegExp(
+        "%[0-7][0-9A-F]|"+
+        "%C[2-9A-F]%[89AB][0-9A-F]|%D[0-9A-F]%[89AB][0-9A-F]|"+
+        "%E[0-F](?:%[89AB][0-9A-F]){2}|"+
+        "%F[0-7](?:%[89AB][0-9A-F]){3}|"+
+        "%F[89AB](?:%[89AB][0-9A-F]){4}|"+
+        "%F[CD](?:%[89AB][0-9A-F]){5}","ig"
+    );
 
     /**
      * clone
@@ -2248,6 +2257,10 @@ if (window['swf2js'] == undefined) { (function(window)
             case 75: // DefineFont3
                 _this.parseDefineFont(tagType);
                 break;
+            case 13: // DefineFontInfo
+            case 62: // DefineFontInfo2
+                _this.parseDefineFontInfo(tagType, length);
+                break;
             case 11: // DefineText
             case 33: // DefineText2
                 _this.parseDefineText(tagType);
@@ -2359,7 +2372,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             // TODO 未実装
             case 3:  // FreeCharacter
-            case 13: // DefineFontInfo
             case 16: // StopSound
             case 19: // SoundStreamBlock
             case 23: // DefineButtonCxform
@@ -2380,7 +2392,6 @@ if (window['swf2js'] == undefined) { (function(window)
             case 58: // EnableDebugger
             case 60: // DefineVideoStream
             case 61: // VideoFrame
-            case 62: // DefineFontInfo2
             case 63: // DebugID
             case 65: // ScriptLimits
             case 66: // SetTabIndex
@@ -3401,44 +3412,14 @@ if (window['swf2js'] == undefined) { (function(window)
                     str += _fromCharCode(data[i]);
                 }
 
-                if (!obj.FontFlagsShiftJIS) {
-                    str = _unescape(str);
-                    str = str.replace(/%(?:25)+([0-9A-F][0-9A-F])/g, function(whole, m1)
-                    {
-                        return "%"+m1;
-                    });
-                    var utf8uri = new RegExp(
-                        "%[0-7][0-9A-F]|"+
-                        "%C[2-9A-F]%[89AB][0-9A-F]|%D[0-9A-F]%[89AB][0-9A-F]|"+
-                        "%E[0-F](?:%[89AB][0-9A-F]){2}|"+
-                        "%F[0-7](?:%[89AB][0-9A-F]){3}|"+
-                        "%F[89AB](?:%[89AB][0-9A-F]){4}|"+
-                        "%F[CD](?:%[89AB][0-9A-F]){5}","ig"
-                    );
-
-                    var fontName = str.replace(utf8uri, function(whole)
-                    {
-                        return _decodeURIComponent(str);
-                    });
+                if (obj.FontFlagsShiftJIS || obj.LanguageCode == 1) {
+                    var fontName = decodeToShiftJis(str);
                 } else {
-                    var fontName = decodeToShiftJis(str)
+                    var fontName = _this.encodeToUtf8(str);
                 }
 
-                var switchName = fontName.substr(0, fontName.length - 1);
-                switch (switchName) {
-                    case '_sans':
-                        obj.FontName = 'sans-serif';
-                        break;
-                    case '_serif':
-                        obj.FontName = 'serif';
-                        break;
-                    case '_typewriter':
-                        obj.FontName = 'monospace';
-                        break;
-                    default:
-                        obj.FontName = switchName;
-                        break;
-                }
+                obj.FontName = _this.getFontName(fontName);
+
                 bitio.byte_offset = startOffset + obj.FontNameLen;
             }
 
@@ -3501,18 +3482,17 @@ if (window['swf2js'] == undefined) { (function(window)
             if (tagType == 48 || tagType == 75) {
                 // 文字情報
                 bitio.setOffset(obj.CodeTableOffset + offset, 0);
-                obj.CodeTable = [];
+                var CodeTable = [];
                 if (obj.FontFlagsWideCodes) {
                     for (var i = numGlyphs; i--;) {
-                        var len = obj.CodeTable.length;
-                        obj.CodeTable[len] = bitio.getUI16();
+                        CodeTable[CodeTable.length] = bitio.getUI16();
                     }
                 } else {
                     for (var i = numGlyphs; i--;) {
-                        var len = obj.CodeTable.length;
-                        obj.CodeTable[len] = bitio.getUI8();
+                        CodeTable[CodeTable.length] = bitio.getUI8();
                     }
                 }
+                obj.CodeTable = CodeTable;
 
                 if (obj.FontFlagsHasLayout) {
                     obj.FontAscent = bitio.getUI16();
@@ -3550,6 +3530,112 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         player.setCharacter(obj.FontId, obj);
+    };
+
+    /**
+     *
+     * @param str
+     * @returns {string}
+     */
+    SwfTag.prototype.encodeToUtf8 = function(str)
+    {
+        str = _unescape(str);
+        str = str.replace(/%(?:25)+([0-9A-F][0-9A-F])/g, function(whole, m1)
+        {
+            return "%"+m1;
+        });
+
+        return str.replace(utf8uri, function(whole)
+        {
+            return _decodeURIComponent(str);
+        });
+    };
+
+    /**
+     *
+     * @param tagType
+     * @param length
+     */
+    SwfTag.prototype.parseDefineFontInfo = function(tagType, length)
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
+        var endOffset = bitio.byte_offset + length;
+
+        var obj = {};
+        obj.FontId = bitio.getUI16();
+        var len = bitio.getUI8();
+        var data = bitio.getData(len);
+        var str = '';
+        for (var i = 0; i < len; i++) {
+            str += _fromCharCode(data[i]);
+        }
+
+        obj.FontFlagsReserved = bitio.getUIBits(2);
+        obj.FontFlagsSmallText = bitio.getUIBits(1);
+        obj.FontFlagsShiftJIS = bitio.getUIBits(1);
+        obj.FontFlagsANSI = bitio.getUIBits(1);
+        obj.FontFlagsItalic = bitio.getUIBits(1);
+        obj.FontFlagsBold = bitio.getUIBits(1);
+        obj.FontFlagsWideCodes = bitio.getUIBits(1);
+
+        if (tagType == 62) {
+            obj.LanguageCode = bitio.getUI8();
+        }
+
+        if (obj.FontFlagsShiftJIS || obj.LanguageCode == 1) {
+            var fontName = decodeToShiftJis(str);
+        } else {
+            var fontName = _this.encodeToUtf8(str);
+        }
+
+        obj.FontName = _this.getFontName(fontName);
+
+        var CodeTable = [];
+
+        var tLen = endOffset - bitio.byte_offset;
+
+        if (obj.FontFlagsWideCodes) {
+            for (; tLen;) {
+                CodeTable[CodeTable.length] = bitio.getUI16();
+                tLen--;
+                tLen--;
+            }
+        } else {
+            for (; tLen;) {
+                CodeTable[CodeTable.length] = bitio.getUI8();
+                tLen--;
+            }
+        }
+
+        obj.CodeTable = CodeTable;
+
+        player.setCharacter(obj.FontId, obj);
+    };
+
+    /**
+     *
+     * @param fontName
+     * @returns {string}
+     */
+    SwfTag.prototype.getFontName = function(fontName)
+    {
+        var switchName = fontName.substr(0, fontName.length - 1);
+        switch (switchName) {
+            case '_sans':
+                return 'sans-serif';
+                break;
+            case '_serif':
+                return 'serif';
+                break;
+            case '_typewriter':
+                return 'monospace';
+                break;
+            default:
+                return switchName;
+                break;
+        }
     };
 
     /**
@@ -5182,38 +5268,45 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     SwfTag.prototype.parseDefineFontAlignZones = function(tagType, length)
     {
-        var obj = {};
         var _this = this;
         var bitio = _this.bitio;
         var player = _this.player;
-        obj.FontId = bitio.getUI16();
-        obj.CSMTableHint = bitio.getUIBits(2);
+
+        var FontId = bitio.getUI16();
+        var tag = player.getCharacter(FontId);
+
+        tag.CSMTableHint = bitio.getUIBits(2);
         var Reserved = bitio.getUIBits(6);
 
-        var tag = player.getCharacter(obj.FontId);
         var NumGlyphs = tag.NumGlyphs;
         var ZoneTable = [];
         for (var i = 0; i < NumGlyphs; i++) {
             var NumZoneData  = bitio.getUI8();
             var ZoneData = [];
             for (var idx = 0; idx < NumZoneData; idx++) {
-                ZoneData[idx] = {
-                    AlignmentCoordinate: bitio.getFloat16(),
-                    Range: bitio.getFloat16()
-                }
+                ZoneData[idx] = bitio.getUI32();
+                //{
+                //    AlignmentCoordinate: bitio.getFloat16(),
+                //    Range: bitio.getFloat16()
+                //}
             }
 
-            Reserved = bitio.getUIBits(6);
-            ZoneTable[i] = {
+            //Reserved = bitio.getUIBits(6);
+            ZoneTable[i] =
+            {
                 ZoneData: ZoneData,
-                ZoneMaskY: bitio.getUIBits(1),
-                ZoneMaskX: bitio.getUIBits(1)
+                Mask: bitio.getUI8()
+                //    ZoneMaskY: bitio.getUIBits(1),
+                //    ZoneMaskX: bitio.getUIBits(1)
             }
         }
 
         bitio.byteAlign();
-        obj.ZoneTable = ZoneTable;
-        console.log(obj);
+        tag.ZoneTable = ZoneTable;
+
+        player.setCharacter(FontId, tag);
+
+        console.log(tag);
     };
 
     /**
@@ -9247,6 +9340,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var textHeight = 0;
         var YOffset = 0;
         var XOffset = 0;
+        var isZoneTable = false;
 
         var _generateColorTransform = _this.generateColorTransform;
         var _renderGlyph = _this.renderGlyph;
@@ -9260,6 +9354,10 @@ if (window['swf2js'] == undefined) { (function(window)
             // font master
             if (textRecord.FontId != undefined) {
                 defineFont = player.getCharacter(textRecord.FontId);
+                isZoneTable = false;
+                if (defineFont.ZoneTable) {
+                    isZoneTable = true;
+                }
             }
 
             // text color
@@ -9273,7 +9371,11 @@ if (window['swf2js'] == undefined) { (function(window)
             // text height
             if (textRecord.TextHeight != undefined) {
                 textHeight = textRecord.TextHeight;
+                if (isZoneTable) {
+                    textHeight /= 20;
+                }
             }
+
 
             var glyphEntries = textRecord.GlyphEntries;
             var count = textRecord.GlyphCount;
@@ -10373,6 +10475,10 @@ if (window['swf2js'] == undefined) { (function(window)
                     var numDistLengths = zBitio.readUB(5) + 1;
                     var numCodeLengths = zBitio.readUB(4) + 4;
                     var codeLengths = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                    if (isArrayBuffer) {
+                        codeLengths = new Uint8Array(codeLengths);
+                    }
+
                     for(i = 0; i < numCodeLengths; i++){
                         codeLengths[ORDER[i]] = zBitio.readUB(3);
                     }
