@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.3.3)
+ * swf2js (version 0.3.4)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -158,8 +158,10 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             var player = players[i];
-            player.resize();
-            player.loaded();
+            if (player.isLoad) {
+                player.resize();
+                player.loaded();
+            }
         }
     }
 
@@ -8386,10 +8388,10 @@ if (window['swf2js'] == undefined) { (function(window)
             }
         }
 
+        var player = _this.getPlayer();
         if (_this.isAction) {
             var as = _this.getActions(_this.getFrame());
             if (as != undefined) {
-                var player = _this.getPlayer();
                 var actions = player.actions;
                 actions[_this.instanceId] = {as: as, mc: _this};
             }
@@ -11322,9 +11324,11 @@ if (window['swf2js'] == undefined) { (function(window)
         var _action = _this.action;
         var _addActions = mc.addActions;
         _addActions.call(mc);
-        for (; _this.actions.length; ) {
-            _action.call(_this);
-            _addActions.call(mc);
+        if (_this.actions.length) {
+            for (; _this.actions.length; ) {
+                _action.call(_this);
+                _addActions.call(mc);
+            }
         }
     };
 
@@ -11358,7 +11362,9 @@ if (window['swf2js'] == undefined) { (function(window)
             }
         }
 
-        _this.actions  = [];
+        _this.actions = null;
+        _this.actions = [];
+        _this.actions.length = 0;
     };
 
     /**
