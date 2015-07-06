@@ -1,9 +1,9 @@
 FlashをHTML5に変換してiPhone、Androidで再生可能にする「swf2js」
 ======
 
-swfファイルをJavaScriptでバイナリ分解してcanvas出力!!  
-iPhoneでもAndroidでもswfを再生可能に  
-対応バージョン：SWF6以下(Flash Lite 1.x, Flash Lite 2.x)  
+swfをJavaScriptで直接バイナリ分解してcanvas出力  
+変換と再生をリアルタイムで行っているので動的なswfも再生可能。  
+対応バージョン：SWF6以下(FlashLite 1.x, 2.x)  
   
   
 output in the canvas with swf binary decomposition in JavaScript.  
