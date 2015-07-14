@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.3.4)
+ * swf2js (version 0.3.5)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -59,8 +59,8 @@ if (window['swf2js'] == undefined) { (function(window)
     var isXHR2 = false;
     var isArrayBuffer = window.ArrayBuffer;
     var devicePixelRatio = window.devicePixelRatio || 1;
-    var _devicePixelRatio = (isTouch) ? devicePixelRatio * 0.8 : devicePixelRatio;
-
+    var _devicePixelRatio = devicePixelRatio * 0.65;
+    var _event = null;
     var startEvent = 'mousedown';
     var moveEvent  = 'mousemove';
     var endEvent   = 'mouseup';
@@ -173,6 +173,16 @@ if (window['swf2js'] == undefined) { (function(window)
         _clearTimeout(resizeId);
         resizeId = _setTimeout(onResizeCanvas, 300);
     }, false);
+
+    /**
+     *
+     */
+    function unload()
+    {
+        players = null;
+        window.removeEventListener('unload', unload, false);
+    }
+    window.addEventListener('unload', unload, false);
 
     /**
      * tmp canvas clear
@@ -1803,7 +1813,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 var canvas = _this.player.context.canvas;
                 var loadSound = function ()
                 {
-                    canvas.removeEventListener('touchstart', loadSound, false);
+                    canvas.removeEventListener(startEvent, loadSound, false);
                     for (var i = sLen; i--;) {
                         if (!(i in loadSounds)) {
                             continue;
@@ -1812,7 +1822,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         audio.load();
                     }
                 };
-                canvas.addEventListener('touchstart', loadSound, false);
+                canvas.addEventListener(startEvent, loadSound, false);
             }
         }
 
@@ -4535,10 +4545,10 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 var endLength = startOffset + length;
                 var actionRecords = [];
-                var endFlag;
-                for (; bitio.byte_offset <= endLength; ) {
+                var endFlag = 0;
+                for (; bitio.byte_offset < endLength; ) {
                     actionRecords[actionRecords.length] =
-                        _this.parseClipActionRecord(tagType);
+                        _this.parseClipActionRecord();
 
                     if (player.version <= 5) {
                         endFlag = bitio.getUI16();
@@ -4546,11 +4556,19 @@ if (window['swf2js'] == undefined) { (function(window)
                         endFlag = bitio.getUI32();
                     }
 
-                    if (endFlag == 0) {
+                    if (!endFlag) {
                         break;
+                    }
+
+                    if (player.version <= 5) {
+                        bitio.byte_offset -= 2;
+                    } else {
+                        bitio.byte_offset -= 4;
                     }
                 }
                 obj.ClipActionRecords = actionRecords;
+
+                console.log(obj)
             }
         }
 
@@ -4564,17 +4582,21 @@ if (window['swf2js'] == undefined) { (function(window)
      * parseClipActionRecord
      * @returns {{}}
      */
-    SwfTag.prototype.parseClipActionRecord = function(tagType)
+    SwfTag.prototype.parseClipActionRecord = function()
     {
         var _this = this;
         var bitio = _this.bitio;
         var obj = {};
+
         obj.EventFlags = _this.parseClipEventFlags();
+
         var ActionRecordSize = bitio.getUI32();
         if (obj.EventFlags.ClipEventKeyPress) {
             obj.KeyCode = bitio.getUI8();
         }
+
         obj.Actions = _this.parseDoAction(ActionRecordSize);
+
         return obj;
     };
 
@@ -4597,13 +4619,17 @@ if (window['swf2js'] == undefined) { (function(window)
         obj.ClipEventUnload = bitio.getUIBits(1);
         obj.ClipEventEnterFrame = bitio.getUIBits(1);
         obj.ClipEventLoad = bitio.getUIBits(1);
-        obj.ClipEventDragOver = bitio.getUIBits(1);
-        obj.ClipEventRollOut = bitio.getUIBits(1);
-        obj.ClipEventRollOver = bitio.getUIBits(1);
-        obj.ClipEventReleaseOutside = bitio.getUIBits(1);
-        obj.ClipEventRelease = bitio.getUIBits(1);
-        obj.ClipEventPress = bitio.getUIBits(1);
-        obj.ClipEventInitialize = bitio.getUIBits(1);
+
+        if (player.version >= 6) {
+            obj.ClipEventDragOver = bitio.getUIBits(1);
+            obj.ClipEventRollOut = bitio.getUIBits(1);
+            obj.ClipEventRollOver = bitio.getUIBits(1);
+            obj.ClipEventReleaseOutside = bitio.getUIBits(1);
+            obj.ClipEventRelease = bitio.getUIBits(1);
+            obj.ClipEventPress = bitio.getUIBits(1);
+            obj.ClipEventInitialize = bitio.getUIBits(1);
+        }
+
         obj.ClipEventData = bitio.getUIBits(1);
         if (player.version >= 6) {
             var Reserved = bitio.getUIBits(5);
@@ -4612,6 +4638,9 @@ if (window['swf2js'] == undefined) { (function(window)
             obj.ClipEventDragOut = bitio.getUIBits(1);
             Reserved = bitio.getUIBits(8);
         }
+
+        bitio.byteAlign();
+
         return obj;
     };
 
@@ -5177,11 +5206,35 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var bitio = _this.bitio;
         var player = _this.player;
+
+
         var buttonId = bitio.getUI16();
         var ButtonSoundChar0 = bitio.getUI16();
+        if (ButtonSoundChar0) {
+            var obj = {};
+            obj.SoundInfo = _this.parseSoundInfo();
+            player.setCharacter(obj.SoundId, obj);
+        }
         var ButtonSoundChar1 = bitio.getUI16();
+        if (ButtonSoundChar1) {
+            var obj = {};
+            obj.SoundInfo = _this.parseSoundInfo();
+            player.setCharacter(obj.SoundId, obj);
+        }
+
         var ButtonSoundChar2 = bitio.getUI16();
+        if (ButtonSoundChar2) {
+            var obj = {};
+            obj.SoundInfo = _this.parseSoundInfo();
+            player.setCharacter(obj.SoundId, obj);
+        }
+
         var ButtonSoundChar3 = bitio.getUI16();
+        if (ButtonSoundChar3) {
+            var obj = {};
+            obj.SoundInfo = _this.parseSoundInfo();
+            player.setCharacter(obj.SoundId, obj);
+        }
 
         var btnObj = player.getCharacter(buttonId);
         if (btnObj != undefined) {
@@ -5200,7 +5253,24 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     var tag = tags[idx];
-                    if (tag.ButtonStateHitTest && ButtonSoundChar3) {
+
+                    if (tag.ButtonStateDown && ButtonSoundChar2) {
+                        var sound = player.sounds[ButtonSoundChar2];
+                        var audio = _document.createElement('audio');
+                        audio.onload = function()
+                        {
+                            this.load();
+                            this.preload = 'auto';
+                            this.autoplay = false;
+                            this.loop = false;
+                        };
+                        audio.src = sound.base64;
+                        var loadSounds = player.loadSounds;
+                        loadSounds[loadSounds.length] = audio;
+                        tag.Sound = audio;
+                    }
+
+                    if (tag.ButtonStateUp && ButtonSoundChar3) {
                         var sound = player.sounds[ButtonSoundChar3];
                         var audio = _document.createElement('audio');
                         audio.onload = function()
@@ -7139,6 +7209,7 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     MovieClip.prototype.stopAllSounds = function()
     {
+        var loadSounds = this.player.loadSounds;
         var sLen = loadSounds.length;
         for (; sLen--;) {
             if (!(sLen in loadSounds)) {
@@ -7355,9 +7426,11 @@ if (window['swf2js'] == undefined) { (function(window)
             }
             _document.body.appendChild(form);
 
+            players = null;
             form.submit();
         } else {
             var func = new Function("location.href = '"+ url +"';");
+            players = null;
             func();
         }
     };
@@ -7515,6 +7588,7 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var player = _this.getPlayer();
+        var isHit = player.isHit;
         var touchObj = player.touchObj;
         var characters = obj.characters;
         var btnTag = player.getCharacter(obj.characterId);
@@ -7539,7 +7613,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 }
 
                 var cTag = tagCharacters[depth][idx];
-                if (touchObj != null
+                if (isHit && touchObj != null
                     && touchObj.characterId == tag.characterId
                 ) {
                     if (!cTag.ButtonStateDown) {
@@ -8964,7 +9038,7 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         _this._nextFrame = 0;
-        _this.putFrame();
+        _setTimeout(function() { _this.putFrame(); }, 0);
     };
 
     /**
@@ -9719,6 +9793,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var player = _this.getPlayer();
         var char = player.getCharacter(tag.characterId);
+        var isHit = player.isHit;
         var touchObj = player.touchObj;
         var characters = char.characters;
         var buttonHits = player.buttonHits;
@@ -9838,7 +9913,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     buttonHits[buttonHits.length] = hitObj;
                 }
 
-                if (touchObj != null
+                if (isHit && touchObj != null
                     && touchObj.characterId == tag.characterId
                 ) {
                     if (!btnChar.ButtonStateDown) {
@@ -10208,170 +10283,6 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
-     * タッチイベント
-     * @param event
-     */
-    function touchStart(event)
-    {
-        var playerId = event.target.parentNode.id.split('_')[1];
-        var player = players[playerId];
-        var buttonHits = player.buttonHits;
-        var len = buttonHits.length;
-        if (!len) {
-            return 0;
-        }
-
-        var div = _document.getElementById(player.getName());
-        var bounds = div.getBoundingClientRect();
-        var docBody = _document.body;
-        var x = docBody.scrollLeft + bounds.left;
-        var y = docBody.scrollTop + bounds.top;
-        var touchX = 0;
-        var touchY = 0;
-
-        if (isTouch) {
-            var changedTouche = event.targetTouches[0];
-            touchX = changedTouche.pageX;
-            touchY = changedTouche.pageY;
-        } else {
-            touchX = event.pageX;
-            touchY = event.pageY;
-        }
-
-        touchX -= x;
-        touchY -= y;
-
-        touchX *= _devicePixelRatio;
-        touchY *= _devicePixelRatio;
-
-        player.touchObj = null;
-        player.touchEndAction = null;
-        for (var i = len; i--;) {
-            if (!(i in buttonHits)) {
-                continue;
-            }
-
-            var hitObj = buttonHits[i];
-            if (hitObj == undefined) {
-                continue;
-            }
-
-            if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
-                && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
-            ){
-                player.touchObj = hitObj;
-                var char = player.getCharacter(hitObj.characterId);
-                if (char.actions == undefined) {
-                    break;
-                }
-
-                var actions = char.actions;
-                var aLen = actions.length;
-                for (var idx = 0; idx < aLen; idx++) {
-                    if (!(idx in actions)) {
-                        continue;
-                    }
-
-                    var cond = actions[idx];
-                    if (cond.CondOverDownToOverUp) {
-                        player.touchEndAction = cond.ActionScript;
-                        continue;
-                    }
-
-                    // enter
-                    if (hitObj.CondKeyPress == 13
-                        && hitObj.CondKeyPress != cond.CondKeyPress
-                    ) {
-                        continue;
-                    }
-
-                    var keyPress = cond.CondKeyPress;
-                    if (keyPress == 0 || keyPress == 13
-                        || (keyPress >= 48 && keyPress <= 57)
-                    ) {
-                        var sound = hitObj.Sound;
-                        if (sound != null) {
-                            sound.currentTime = 0;
-                            sound.play();
-                        }
-
-                        player.touchObj.ActionScript = cond.ActionScript;
-                        if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
-                            touchEvent(event);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (player.touchObj != null) {
-                break;
-            }
-        }
-    }
-
-    /**
-     * 移動イベント
-     * @param event
-     */
-    function touchMove(event)
-    {
-        var playerId = event.target.parentNode.id.split('_')[1];
-        var player = players[playerId];
-        if (!player.isTouchEvent && player.touchObj != null) {
-            event.preventDefault();
-            touchStart(event);
-        }
-    }
-
-    /**
-     * タッチイベント終了
-     * @param event
-     */
-    function touchEnd(event)
-    {
-        var playerId = event.target.parentNode.id.split('_')[1];
-        var player = players[playerId];
-
-        var touchObj = player.touchObj;
-        var touchEndAction = player.touchEndAction;
-
-        if (touchObj != null && touchEndAction != null) {
-            event.preventDefault();
-            var touchActions = player.touchActions;
-            touchActions[touchActions.length] = {
-                as: touchEndAction,
-                mc: touchObj.parent
-            };
-        }
-
-        player.isTouchEvent = false;
-        player.touchObj = null;
-    }
-
-    /**
-     * イベント実行
-     * @param event
-     */
-    function touchEvent(event)
-    {
-        event.preventDefault();
-
-        var playerId = event.target.parentNode.id.split('_')[1];
-        var player = players[playerId];
-
-        var touchObj = player.touchObj;
-        if (touchObj != null) {
-            player.isTouchEvent = true;
-            var touchActions = player.touchActions;
-            touchActions[touchActions.length] = {
-                as: touchObj.ActionScript,
-                mc: touchObj.parent
-            };
-        }
-    }
-
-    /**
      * unzip
      * @param compressed
      * @param isDeCompress
@@ -10653,6 +10564,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
         // params
         this.context = null;
+        this.canvas = null;
         this.preContext = null;
         this.characters = [];
         this.buttonHits = [];
@@ -10670,6 +10582,7 @@ if (window['swf2js'] == undefined) { (function(window)
         this.baseHeight = 0;
         this.width = 0;
         this.height = 0;
+        this.isHit = false;
         this.isTouchEvent = false;
         this.isLoad = false;
         this.jpegTables = null;
@@ -11127,6 +11040,9 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var div = _document.getElementById(_this.getName());
+        if (!div) {
+            return 0;
+        }
 
         var oWidth = _this.optionWidth;
         var oHeight = _this.optionHeight;
@@ -11235,17 +11151,19 @@ if (window['swf2js'] == undefined) { (function(window)
         // DOM
         _this.deleteNode();
         var div = _document.getElementById(_this.getName());
-        var context = _this.context;
-        div.appendChild(context.canvas);
+        if (div) {
+            var context = _this.context;
+            div.appendChild(context.canvas);
 
-        canvas = preContext.canvas;
-        var _drawImage = context.drawImage;
-        _drawImage.call(context, canvas, 0, 0);
+            canvas = preContext.canvas;
+            var _drawImage = context.drawImage;
+            _drawImage.call(context, canvas, 0, 0);
 
-        // start
-        _this.startTime = _Date.now();
-        _this.play();
-        requestAnimationFrame(function() {_this.onEnterFrame();}, _this.getFps());
+            // start
+            _this.startTime = _Date.now();
+            _this.play();
+            requestAnimationFrame(function() {_this.onEnterFrame();}, _this.getFps());
+        }
     };
 
     /**
@@ -11305,6 +11223,17 @@ if (window['swf2js'] == undefined) { (function(window)
         _executeAction.call(_this, mc);
         mc.eventDispatcher();
         _executeAction.call(_this, mc);
+
+        _setTimeout(function() { _this.render(); }, 0);
+    };
+
+    /**
+     * render
+     */
+    Player.prototype.render = function()
+    {
+        var _this = this;
+        var mc = _this.parent;
 
         // clear
         _this.clearPre();
@@ -11496,25 +11425,52 @@ if (window['swf2js'] == undefined) { (function(window)
         var canvas = _document.createElement('canvas');
         canvas.width = 1;
         canvas.height = 1;
+
         var style = canvas.style;
         style.zIndex = 0;
         style.position = 'absolute';
         style.zoom = 100 / _devicePixelRatio + '%';
         style['-webkit-tap-highlight-color'] = 'rgba(0,0,0,0)';
 
-        canvas.addEventListener(startEvent, touchStart, false);
-        canvas.addEventListener(moveEvent, touchMove, false);
-        canvas.addEventListener(endEvent, touchEnd, false);
+        style.MozTransformOrigin = '0 0';
+        style.MozTransform = 'scale('+1/_devicePixelRatio+')';
+
+        canvas.addEventListener(startEvent, function(event)
+        {
+            _event = event;
+            _this.touchStart(event);
+        });
+
+        canvas.addEventListener(moveEvent, function(event)
+        {
+            _event = event;
+            _this.touchMove(event);
+        });
+
+        canvas.addEventListener(endEvent, function(event)
+        {
+            _this.touchEnd(event);
+        });
+
+        canvas.addEventListener('touchcancel', function(event)
+        {
+            _this.touchEnd(_event);
+        });
+
 
         if (!isTouch) {
             window.addEventListener("keydown", keyAction, false);
         }
         _this.context = canvas.getContext('2d');
+        _this.canvas = canvas;
+
+        canvas = null;
 
         var preCanvas = _document.createElement('canvas');
         preCanvas.width = 1;
         preCanvas.height = 1;
         _this.preContext =  preCanvas.getContext('2d');
+        preCanvas = null;
 
         _this.loadStatus++;
     };
@@ -11683,6 +11639,186 @@ if (window['swf2js'] == undefined) { (function(window)
                     alert('[ERROR] HTTP STATUS: '+ status);
                 }
             }
+        }
+    };
+
+    /**
+     *
+     * @param event
+     */
+    Player.prototype.hitCheck = function(event)
+    {
+        var _this = this;
+
+        var buttonHits = _this.buttonHits;
+        var len = buttonHits.length;
+        if (!len) {
+            return 0;
+        }
+
+        var div = _document.getElementById(_this.getName());
+        var bounds = div.getBoundingClientRect();
+        var docBody = _document.body;
+        var x = docBody.scrollLeft + bounds.left;
+        var y = docBody.scrollTop + bounds.top;
+        var touchX = 0;
+        var touchY = 0;
+
+        if (isTouch) {
+            var changedTouche = event.targetTouches[0];
+            touchX = changedTouche.pageX;
+            touchY = changedTouche.pageY;
+        } else {
+            touchX = event.pageX;
+            touchY = event.pageY;
+        }
+
+        touchX -= x;
+        touchY -= y;
+
+        touchX *= _devicePixelRatio;
+        touchY *= _devicePixelRatio;
+
+        _this.isHit = false;
+
+        if (!_this.isTouchEvent) {
+            _this.touchObj = null;
+            _this.touchEndAction = null;
+        }
+
+        for (var i = len; i--;) {
+            if (!(i in buttonHits)) {
+                continue;
+            }
+
+            var hitObj = buttonHits[i];
+            if (hitObj == undefined) {
+                continue;
+            }
+
+            if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
+                && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
+            ){
+                _this.isHit = true;
+                if (_this.isTouchEvent) {
+                    break;
+                }
+
+                _this.touchObj = hitObj;
+                var char = _this.getCharacter(hitObj.characterId);
+                if (char.actions == undefined) {
+                    break;
+                }
+
+                var actions = char.actions;
+                var aLen = actions.length;
+                for (var idx = 0; idx < aLen; idx++) {
+                    if (!(idx in actions)) {
+                        continue;
+                    }
+
+                    var cond = actions[idx];
+                    if (cond.CondOverDownToOverUp) {
+                        _this.touchEndAction = cond.ActionScript;
+                        continue;
+                    }
+
+                    // enter
+                    if (hitObj.CondKeyPress == 13
+                        && hitObj.CondKeyPress != cond.CondKeyPress
+                    ) {
+                        continue;
+                    }
+
+                    var keyPress = cond.CondKeyPress;
+                    if (keyPress == 0 || keyPress == 13
+                        || (keyPress >= 48 && keyPress <= 57)
+                    ) {
+                        event.preventDefault();
+                        _this.touchObj.ActionScript = cond.ActionScript;
+                        if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
+                            var sound = hitObj.Sound;
+                            if (sound != null) {
+                                sound.currentTime = 0;
+                                sound.play();
+                            }
+
+                            _this.touchEvent(event);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     *
+     * @param event
+     */
+    Player.prototype.touchStart = function(event)
+    {
+        this.hitCheck(event);
+    };
+
+    /**
+     *
+     * @param event
+     */
+    Player.prototype.touchMove = function(event)
+    {
+        var _this = this;
+        if (_this.isHit) {
+            _this.hitCheck(event);
+        }
+    };
+
+    /**
+     *
+     * @param event
+     */
+    Player.prototype.touchEnd = function(event)
+    {
+        var _this = this;
+        var touchObj = _this.touchObj;
+        var touchEndAction = _this.touchEndAction;
+
+        if (touchObj != null && touchEndAction != null) {
+            event.preventDefault();
+
+            var sound = touchObj.Sound;
+            if (sound != null) {
+                sound.currentTime = 0;
+                sound.play();
+            }
+
+            var touchActions = _this.touchActions;
+            touchActions[touchActions.length] = {
+                as: touchEndAction,
+                mc: touchObj.parent
+            };
+        }
+
+        _this.isTouchEvent = false;
+        _this.touchObj = null;
+        _event = null;
+    };
+
+    /**
+     *
+     * @param event
+     */
+    Player.prototype.touchEvent = function(event)
+    {
+        var _this = this;
+        var touchObj = _this.touchObj;
+        if (touchObj != null) {
+            _this.isTouchEvent = true;
+            var touchActions = _this.touchActions;
+            touchActions[touchActions.length] = {
+                as: touchObj.ActionScript,
+                mc: touchObj.parent
+            };
         }
     };
 
