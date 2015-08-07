@@ -5336,7 +5336,7 @@ if (window['swf2js'] == undefined) { (function(window)
         this.data = data;
         this.constantPool = constantPool == undefined ? [] : constantPool;
         this.params = [];
-        this.register = [];
+        this.register = register == undefined ? [] : register;
         this.preRegister = register == undefined ? [] : register;
         this.cache = [];
         this.init(data);
@@ -5620,10 +5620,14 @@ if (window['swf2js'] == undefined) { (function(window)
 
                     // 固定の変数
                     for (var idx = 1; idx < RegisterCount; idx++) {
+                        var rIdx = idx-1;
+                        if (!(rIdx in values))
+                            continue;
+
                         register[register.length] = {
                             register: idx,
                             name: null,
-                            value: values[idx-1]
+                            value: values[rIdx]
                         };
                     }
 
@@ -5639,7 +5643,6 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     var codeSize = pBitio.getUI16();
-
                     obj.as = new ActionScript(bitio.getData(codeSize), constantPool, register);
 
                     break;
