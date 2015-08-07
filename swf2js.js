@@ -5328,14 +5328,16 @@ if (window['swf2js'] == undefined) { (function(window)
     /**
      * @param data
      * @param constantPool
+     * @param register
      * @constructor
      */
-    var ActionScript = function (data, constantPool)
+    var ActionScript = function (data, constantPool, register)
     {
         this.data = data;
         this.constantPool = constantPool == undefined ? [] : constantPool;
         this.params = [];
         this.register = [];
+        this.preRegister = register == undefined ? [] : register;
         this.cache = [];
         this.init(data);
     };
@@ -5345,16 +5347,26 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     ActionScript.prototype.init = function(data)
     {
+        var _this = this;
         var isEnd = false;
         var cache = [];
         var indexes = [];
 
-        var register = this.register;
+        var register = _this.preRegister;
         var length = register.length;
         if (length) {
             for (var i = 0; i < length; i++) {
                 var obj = register[i];
-                this.params[obj.register] = obj.value;
+                _this.params[obj.register] = obj.value;
+            }
+        }
+
+        register = _this.register;
+        length = register.length;
+        if (length) {
+            for (var i = 0; i < length; i++) {
+                var obj = register[i];
+                _this.params[obj.register] = obj.value;
             }
         }
 
@@ -5432,7 +5444,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     obj.target = urls[1];
 
                     break;
-                // PUSH
+                // Push
                 case 0x96:
                     var values = [];
                     for (; pBitio.byte_offset < payloadLength; ) {
@@ -5563,7 +5575,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x87:
                     console.log('ActionStoreRegister');
                     obj.RegisterNumber = pBitio.getUI8();
-                    console.log('-------> '+ obj.RegisterNumber);
                     break;
 
 
@@ -5571,10 +5582,12 @@ if (window['swf2js'] == undefined) { (function(window)
                 // ActionDefineFunction2
                 case 0x8e:
                     console.log('ActionDefineFunction2');
+                    var register = [];
+                    var values = [];
 
                     obj.FunctionName = pBitio.getDataUntil("\0");
                     var NumParams = pBitio.getUI16();
-                    obj.RegisterCount = pBitio.getUI8();
+                    var RegisterCount = pBitio.getUI8();
                     obj.PreloadParentFlag = pBitio.getUIBits(1);
                     obj.PreloadRootFlag = pBitio.getUIBits(1);
                     obj.SuppressSuperFlag = pBitio.getUIBits(1);
@@ -5586,7 +5599,35 @@ if (window['swf2js'] == undefined) { (function(window)
                     var Reserved = pBitio.getUIBits(7);
                     obj.PreloadGlobalFlag = pBitio.getUIBits(1);
 
-                    var register = [];
+
+                    if (obj.PreloadThisFlag)
+                        values[values.length] = 'this';
+
+                    if (obj.PreloadArgumentsFlag)
+                        values[values.length] = 'arguments';
+
+                    if (obj.PreloadSuperFlag)
+                        values[values.length] = 'super';
+
+                    if (obj.PreloadGlobalFlag)
+                        values[values.length] = '_global';
+
+                    if (obj.PreloadRootFlag)
+                        values[values.length] = '_root';
+
+                    if (obj.PreloadParentFlag)
+                        values[values.length] = '_parent';
+
+                    // 固定の変数
+                    for (var idx = 1; idx < RegisterCount; idx++) {
+                        register[register.length] = {
+                            register: idx,
+                            name: null,
+                            value: values[idx-1]
+                        };
+                    }
+
+                    // 可変の変数
                     for (; NumParams--;) {
                         var Register = pBitio.getUI8();
                         var ParamName = pBitio.getDataUntil("\0");
@@ -5598,8 +5639,8 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     var codeSize = pBitio.getUI16();
-                    obj.as = new ActionScript(bitio.getData(codeSize), constantPool);
-                    obj.as.register = register;
+
+                    obj.as = new ActionScript(bitio.getData(codeSize), constantPool, register);
 
                     break;
                 // ActionTry
@@ -6564,6 +6605,8 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x4e:
                     var name = stack.pop();
                     var object = stack.pop();
+                    if (typeof object == 'string')
+                        object = movieClip.getMovieClip(object);
 
                     var property = null;
                     if (object instanceof MovieClip) {
@@ -6793,7 +6836,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x87:
                     console.log('ActionStoreRegister');
                     var RegisterNumber = aScript.RegisterNumber;
-                    console.log(stack)
+                    console.log(stack);
                     break;
 
                 // SWF 6 ***********************************
@@ -8426,7 +8469,6 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         _this.addAction();
-        _this.addTouchEvent();
     };
 
     /**
@@ -8533,13 +8575,11 @@ if (window['swf2js'] == undefined) { (function(window)
             }
         } else {
             var as = clipEvent.enterFrame;
-            if (as != undefined) {
-                _this.setActionQueue(as);
-            }
+            _this.setActionQueue(as);
         }
 
         // onEnterFrame
-        var variables = _this.variables
+        var variables = _this.variables;
         var as = variables['onEnterFrame'];
         if (as instanceof ActionScript) {
             _this.setActionQueue([as]);
@@ -8553,6 +8593,8 @@ if (window['swf2js'] == undefined) { (function(window)
             }
             _this.isAction = false;
         }
+
+        _this.addTouchEvent();
     };
 
     /**
@@ -11154,7 +11196,9 @@ if (window['swf2js'] == undefined) { (function(window)
 
             // action
             mc.addActions();
-            mc.shiftActions();
+            _this.downEventHits.reverse();
+            _this.moveEventHits.reverse();
+            _this.upEventHits.reverse();
             _this.executeAction();
 
             // API
