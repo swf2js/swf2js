@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.3.6)
+ * swf2js (version 0.3.7)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -23,6 +23,9 @@ if (window['swf2js'] == undefined) { (function(window)
     var _sqrt = Math.sqrt;
     var _cos = Math.cos;
     var _sin = Math.sin;
+    var _log = Math.log;
+    var _SQRT2 = Math.SQRT2;
+    var _LN2 = Math.LN2;
     var _PI = Math.PI;
     var _Number = Number;
     var _fromCharCode = String.fromCharCode;
@@ -32,17 +35,18 @@ if (window['swf2js'] == undefined) { (function(window)
     var resizeId = 0;
     var _setTimeout = setTimeout;
     var _clearTimeout = clearTimeout;
+    var _setInterval = setInterval;
+    var _clearInterval = clearInterval;
     var _Date = Date;
     var _escape = escape;
     var _unescape = unescape;
     var _decodeURIComponent = decodeURIComponent;
+    var isWebGL = (window.WebGLRenderingContext
+    && _document.createElement('canvas').getContext('webgl')) ? true : false;
     var requestAnimationFrame = window.requestAnimationFrame
         || window.webkitRequestAnimationFrame
         || window.mozRequestAnimationFrame
         || window.setTimeout;
-
-    var isWebGL = (window.WebGLRenderingContext
-    && _document.createElement('canvas').getContext('webgl')) ? true : false;
 
     // params
     var playerId = 0;
@@ -53,6 +57,7 @@ if (window['swf2js'] == undefined) { (function(window)
     var _navigator = window.navigator;
     var ua = _navigator.userAgent;
     var isAndroid = (ua.indexOf('Android') > 0);
+    var isAndroid4x =(ua.indexOf('Android 4.') > 0);
     var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
     var isChrome = (ua.indexOf('Chrome') > 0);
     var isTouch = (isAndroid || isiOS);
@@ -99,7 +104,6 @@ if (window['swf2js'] == undefined) { (function(window)
     var JCT11280 = new Function('var a="zKV33~jZ4zN=~ji36XazM93y!{~k2y!o~k0ZlW6zN?3Wz3W?{EKzK[33[`y|;-~j^YOTz$!~kNy|L1$353~jV3zKk3~k-4P4zK_2+~jY4y!xYHR~jlz$_~jk4z$e3X5He<0y!wy|X3[:~l|VU[F3VZ056Hy!nz/m1XD61+1XY1E1=1y|bzKiz!H034zKj~mEz#c5ZA3-3X$1~mBz$$3~lyz#,4YN5~mEz#{ZKZ3V%7Y}!J3X-YEX_J(3~mAz =V;kE0/y|F3y!}~m>z/U~mI~j_2+~mA~jp2;~m@~k32;~m>V}2u~mEX#2x~mBy+x2242(~mBy,;2242(~may->2&XkG2;~mIy-_2&NXd2;~mGz,{4<6:.:B*B:XC4>6:.>B*BBXSA+A:X]E&E<~r#z+625z s2+zN=`HXI@YMXIAXZYUM8X4K/:Q!Z&33 3YWX[~mB`{zKt4z (zV/z 3zRw2%Wd39]S11z$PAXH5Xb;ZQWU1ZgWP%3~o@{Dgl#gd}T){Uo{y5_d{e@}C(} WU9|cB{w}bzvV|)[} H|zT}d||0~{]Q|(l{|x{iv{dw}(5}[Z|kuZ }cq{{y|ij}.I{idbof%cu^d}Rj^y|-M{ESYGYfYsZslS`?ZdYO__gLYRZ&fvb4oKfhSf^d<Yeasc1f&a=hnYG{QY{D`Bsa|u,}Dl|_Q{C%xK|Aq}C>|c#ryW=}eY{L+`)][YF_Ub^h4}[X|?r|u_ex}TL@YR]j{SrXgo*|Gv|rK}B#mu{R1}hs|dP{C7|^Qt3|@P{YVV |8&}#D}ef{e/{Rl|>Hni}R1{Z#{D[}CQlQ||E}[s{SG_+i8eplY[=[|ec[$YXn#`hcm}YR|{Ci(_[ql|?8p3]-}^t{wy}4la&pc|3e{Rp{LqiJ],] `kc(]@chYnrM`O^,ZLYhZB]ywyfGY~aex!_Qww{a!|)*lHrM{N+n&YYj~Z b c#e_[hZSon|rOt`}hBXa^i{lh|<0||r{KJ{kni)|x,|0auY{D!^Sce{w;|@S|cA}Xn{C1h${E]Z-XgZ*XPbp]^_qbH^e[`YM|a||+=]!Lc}]vdBc=j-YSZD]YmyYLYKZ9Z>Xcczc2{Yh}9Fc#Z.l{}(D{G{{mRhC|L3b#|xK[Bepj#ut`H[,{E9Yr}1b{[e]{ZFk7[ZYbZ0XL]}Ye[(`d}c!|*y`Dg=b;gR]Hm=hJho}R-[n}9;{N![7k_{UbmN]rf#pTe[x8}!Qcs_rs[m`|>N}^V})7{^r|/E}),}HH{OYe2{Skx)e<_.cj.cjoMhc^d}0uYZd!^J_@g,[[[?{i@][|3S}Yl3|!1|eZ|5IYw|1D}e7|Cv{OHbnx-`wvb[6[4} =g+k:{C:}ed{S]|2M]-}WZ|/q{LF|dYu^}Gs^c{Z=}h>|/i|{W]:|ip{N:|zt|S<{DH[p_tvD{N<[8Axo{X4a.^o^X>Yfa59`#ZBYgY~_t^9`jZHZn`>G[oajZ;X,i)Z.^~YJe ZiZF^{][[#Zt^|]Fjx]&_5dddW]P0C[-]}]d|y {C_jUql] |OpaA[Z{lp|rz}:Mu#]_Yf6{Ep?f5`$[6^D][^u[$[6^.Z8]]ePc2U/=]K^_+^M{q*|9tYuZ,s(dS{i=|bNbB{uG}0jZOa:[-]dYtu3]:]<{DJ_SZIqr_`l=Yt`gkTnXb3d@kiq0a`Z{|!B|}e}Ww{Sp,^Z|0>_Z}36|]A|-t}lt{R6pi|v8hPu#{C>YOZHYmg/Z4nicK[}hF_Bg|YRZ7c|crkzYZY}_iXcZ.|)U|L5{R~qi^Uga@Y[xb}&qdbd6h5|Btw[}c<{Ds53[Y7]?Z<|e0{L[ZK]mXKZ#Z2^tavf0`PE[OSOaP`4gi`qjdYMgys/?[nc,}EEb,eL]g[n{E_b/vcvgb.{kcwi`~v%|0:|iK{Jh_vf5lb}KL|(oi=LrzhhY_^@`zgf[~g)[J_0fk_V{T)}I_{D&_/d9W/|MU[)f$xW}?$xr4<{Lb{y4}&u{XJ|cm{Iu{jQ}CMkD{CX|7A}G~{kt)nB|d5|<-}WJ}@||d@|Iy}Ts|iL|/^|no|0;}L6{Pm]7}$zf:|r2}?C_k{R(}-w|`G{Gy[g]bVje=_0|PT{^Y^yjtT[[[l!Ye_`ZN]@[n_)j3nEgMa]YtYpZy].d-Y_cjb~Y~[nc~sCi3|zg}B0}do{O^{|$`_|D{}U&|0+{J3|8*]iayx{a{xJ_9|,c{Ee]QXlYb]$[%YMc*]w[aafe]aVYi[fZEii[xq2YQZHg]Y~h#|Y:thre^@^|_F^CbTbG_1^qf7{L-`VFx Zr|@EZ;gkZ@slgko`[e}T:{Cu^pddZ_`yav^Ea+[#ZBbSbO`elQfLui}.F|txYcbQ`XehcGe~fc^RlV{D_0ZAej[l&jShxG[ipB_=u:eU}3e8[=j|{D(}dO{Do[BYUZ0/]AYE]ALYhZcYlYP/^-^{Yt_1_-;YT`P4BZG=IOZ&]H[e]YYd[9^F[1YdZxZ?Z{Z<]Ba2[5Yb[0Z4l?]d_;_)a?YGEYiYv`_XmZs4ZjY^Zb]6gqGaX^9Y}dXZr[g|]Y}K aFZp^k^F]M`^{O1Ys]ZCgCv4|E>}8eb7}l`{L5[Z_faQ|c2}Fj}hw^#|Ng|B||w2|Sh{v+[G}aB|MY}A{|8o}X~{E8paZ:]i^Njq]new)`-Z>haounWhN}c#{DfZ|fK]KqGZ=:u|fqoqcv}2ssm}.r{]{nIfV{JW)[K|,Z{Uxc|]l_KdCb%]cfobya3`p}G^|LZiSC]U|(X|kBlVg[kNo({O:g:|-N|qT}9?{MBiL}Sq{`P|3a|u.{Uaq:{_o|^S}jX{Fob0`;|#y_@[V[K|cw[<_ }KU|0F}d3|et{Q7{LuZttsmf^kYZ`Af`}$x}U`|Ww}d]| >}K,r&|XI|*e{C/a-bmr1fId4[;b>tQ_:]hk{b-pMge]gfpo.|(w[jgV{EC1Z,YhaY^q,_G[c_g[J0YX]`[h^hYK^_Yib,` {i6vf@YM^hdOKZZn(jgZ>bzSDc^Z%[[o9[2=/YHZ(_/Gu_`*|8z{DUZxYt^vuvZjhi^lc&gUd4|<UiA`z]$b/Z?l}YI^jaHxe|;F}l${sQ}5g}hA|e4}?o{ih}Uz{C)jPe4]H^J[Eg[|AMZMlc}:,{iz}#*|gc{Iq|/:|zK{l&}#u|myd{{M&v~nV};L|(g|I]ogddb0xsd7^V})$uQ{HzazsgxtsO^l}F>ZB]r|{7{j@cU^{{CbiYoHlng]f+nQ[bkTn/}<-d9q {KXadZYo+n|l[|lc}V2{[a{S4Zam~Za^`{HH{xx_SvF|ak=c^[v^7_rYT`ld@]:_ub%[$[m](Shu}G2{E.ZU_L_R{tz`vj(f?^}hswz}GdZ}{S:h`aD|?W|`dgG|if{a8|J1{N,}-Ao3{H#{mfsP|[ bzn+}_Q{MT{u4kHcj_q`eZj[8o0jy{p7}C|[}l){MuYY{|Ff!Ykn3{rT|m,^R|,R}$~Ykgx{P!]>iXh6[l[/}Jgcg{JYZ.^qYfYIZl[gZ#Xj[Pc7YyZD^+Yt;4;`e8YyZVbQ7YzZxXja.7SYl[s]2^/Ha$[6ZGYrb%XiYdf2]H]kZkZ*ZQ[ZYS^HZXcCc%Z|[(bVZ]]:OJQ_DZCg<[,]%Zaa [g{C00HY[c%[ChyZ,Z_`PbXa+eh`^&jPi0a[ggvhlekL]w{Yp^v}[e{~;k%a&k^|nR_z_Qng}[E}*Wq:{k^{FJZpXRhmh3^p>de^=_7`|ZbaAZtdhZ?n4ZL]u`9ZNc3g%[6b=e.ZVfC[ZZ^^^hD{E(9c(kyZ=bb|Sq{k`|vmr>izlH[u|e`}49}Y%}FT{[z{Rk}Bz{TCc/lMiAqkf(m$hDc;qooi[}^o:c^|Qm}a_{mrZ(pA`,}<2sY| adf_%|}`}Y5U;}/4|D>|$X{jw{C<|F.hK|*A{MRZ8Zsm?imZm_?brYWZrYx`yVZc3a@f?aK^ojEd {bN}/3ZH]/$YZhm^&j 9|(S|b]mF}UI{q&aM]LcrZ5^.|[j`T_V_Gak}9J[ ZCZD|^h{N9{~&[6Zd{}B}2O|cv]K}3s}Uy|l,fihW{EG`j_QOp~Z$F^zexS`dcISfhZBXP|.vn|_HYQ|)9|cr]<`&Z6]m_(ZhPcSg>`Z]5`~1`0Xcb4k1{O!bz|CN_T{LR|a/gFcD|j<{Z._[f)mPc:1`WtIaT1cgYkZOaVZOYFrEe[}T$}Ch}mk{K-^@]fH{Hdi`c*Z&|Kt{if[C{Q;{xYB`dYIX:ZB[}]*[{{p9|4GYRh2ao{DS|V+[zd$`F[ZXKadb*A] Ys]Maif~a/Z2bmclb8{Jro_rz|x9cHojbZ{GzZx_)]:{wAayeDlx}<=`g{H1{l#}9i|)=|lP{Qq}.({La|!Y{i2EZfp=c*}Cc{EDvVB|;g}2t{W4av^Bn=]ri,|y?|3+}T*ckZ*{Ffr5e%|sB{lx^0]eZb]9[SgAjS_D|uHZx]dive[c.YPkcq/}db{EQh&hQ|eg}G!ljil|BO]X{Qr_GkGl~YiYWu=c3eb}29v3|D|}4i||.{Mv})V{SP1{FX}CZW6{cm|vO{pS|e#}A~|1i}81|Mw}es|5[}3w{C`h9aL]o{}p[G`>i%a1Z@`Ln2bD[$_h`}ZOjhdTrH{[j_:k~kv[Sdu]CtL}41{I |[[{]Zp$]XjxjHt_eThoa#h>sSt8|gK|TVi[Y{t=}Bs|b7Zpr%{gt|Yo{CS[/{iteva|cf^hgn}($_c^wmb^Wm+|55jrbF|{9^ q6{C&c+ZKdJkq_xOYqZYSYXYl`8]-cxZAq/b%b*_Vsa[/Ybjac/OaGZ4fza|a)gY{P?| I|Y |,pi1n7}9bm9ad|=d{aV|2@[(}B`d&|Uz}B}{`q|/H|!JkM{FU|CB|.{}Az}#P|lk}K{|2rk7{^8^?`/|k>|Ka{Sq}Gz}io{DxZh[yK_#}9<{TRdgc]`~Z>JYmYJ]|`!ZKZ]gUcx|^E[rZCd`f9oQ[NcD_$ZlZ;Zr}mX|=!|$6ZPZYtIo%fj}CpcN|B,{VDw~gb}@hZg`Q{LcmA[(bo`<|@$|o1|Ss}9Z_}tC|G`{F/|9nd}i=}V-{L8aaeST]daRbujh^xlpq8|}zs4bj[S`J|]?G{P#{rD{]I`OlH{Hm]VYuSYUbRc*6[j`8]pZ[bt_/^Jc*[<Z?YE|Xb|?_Z^Vcas]h{t9|Uwd)_(=0^6Zb{Nc} E[qZAeX[a]P^|_J>e8`W^j_Y}R{{Jp__]Ee#e:iWb9q_wKbujrbR}CY`,{mJ}gz{Q^{t~N|? gSga`V_||:#mi}3t|/I`X{N*|ct|2g{km}gi|{={jC}F;|E}{ZZjYf*frmu}8Tdroi{T[|+~}HG{cJ}DM{Lp{Ctd&}$hi3|FZ| m}Kr|38}^c|m_|Tr{Qv|36}?Up>|;S{DV{k_as}BK{P}}9p|t`jR{sAm4{D=b4pWa[}Xi{EjwEkI}3S|E?u=X0{jf} S|NM|JC{qo^3cm]-|JUx/{Cj{s>{Crt[UXuv|D~|j|d{YXZR}Aq}0r}(_{pJfi_z}0b|-vi)Z mFe,{f4|q`b{}^Z{HM{rbeHZ|^x_o|XM|L%|uFXm}@C_{{Hhp%a7|0p[Xp+^K}9U{bP}: tT}B|}+$|b2|[^|~h{FAby[`{}xgygrt~h1[li`c4vz|,7p~b(|mviN}^pg[{N/|g3|^0c,gE|f%|7N{q[|tc|TKA{LU}I@|AZp(}G-sz{F |qZ{}F|f-}RGn6{Z]_5})B}UJ{FFb2]4ZI@v=k,]t_Dg5Bj]Z-]L]vrpdvdGlk|gF}G]|IW}Y0[G| /bo|Te^,_B}#n^^{QHYI[?hxg{[`]D^IYRYTb&kJ[cri[g_9]Ud~^_]<p@_e_XdNm-^/|5)|h_{J;{kacVopf!q;asqd}n)|.m|bf{QW|U)}b+{tL|w``N|to{t ZO|T]jF}CB|0Q{e5Zw|k |We}5:{HO{tPwf_uajjBfX}-V_C_{{r~gg|Ude;s+}KNXH}! `K}eW{Upwbk%ogaW}9EYN}YY|&v|SL{C3[5s.]Y]I]u{M6{pYZ`^,`ZbCYR[1mNg>rsk0Ym[jrE]RYiZTr*YJ{Ge|%-lf|y(`=[t}E6{k!|3)}Zk} ][G{E~cF{u3U.rJ|a9p#o#ZE|?|{sYc#vv{E=|LC}cu{N8`/`3`9rt[4|He{cq|iSYxY`}V |(Q|t4{C?]k_Vlvk)BZ^r<{CL}#h}R+[<|i=}X|{KAo]|W<`K{NW|Zx}#;|fe{IMr<|K~tJ_x}AyLZ?{GvbLnRgN}X&{H7|x~}Jm{]-| GpNu0}.ok>|c4{PYisrDZ|fwh9|hfo@{H~XSbO]Odv]%`N]b1Y]]|eIZ}_-ZA]aj,>eFn+j[aQ_+]h[J_m_g]%_wf.`%k1e#Z?{CvYu_B^|gk`Xfh^M3`afGZ-Z|[m{L}|k3cp[it ^>YUi~d>{T*}YJ{Q5{Jxa$hg|%4`}|LAgvb }G}{P=|<;Ux{_skR{cV|-*|s-{Mp|XP|$G|_J}c6cM{_=_D|*9^$ec{V;|4S{qO|w_|.7}d0|/D}e}|0G{Dq]Kdp{}dfDi>}B%{Gd|nl}lf{C-{y}|ANZr}#={T~|-(}c&{pI|ft{lsVP}){|@u}!W|bcmB{d?|iW|:dxj{PSkO|Hl]Li:}VYk@|2={fnWt{M3`cZ6|)}|Xj}BYa?vo{e4|L7|B7{L7|1W|lvYO}W8nJ|$Vih|{T{d*_1|:-n2dblk``fT{Ky|-%}m!|Xy|-a{Pz}[l{kFjz|iH}9N{WE{x,|jz}R {P|{D)c=nX|Kq|si}Ge{sh|[X{RF{t`|jsr*fYf,rK|/9}$}}Nf{y!1|<Std}4Wez{W${Fd_/^O[ooqaw_z[L`Nbv[;l7V[ii3_PeM}.h^viqYjZ*j1}+3{bt{DR[;UG}3Og,rS{JO{qw{d<_zbAh<R[1_r`iZTbv^^a}c{iEgQZ<exZFg.^Rb+`Uj{a+{z<[~r!]`[[|rZYR|?F|qppp]L|-d|}K}YZUM|=Y|ktm*}F]{D;g{uI|7kg^}%?Z%ca{N[_<q4xC]i|PqZC]n}.bDrnh0Wq{tr|OMn6tM|!6|T`{O`|>!]ji+]_bTeU}Tq|ds}n|{Gm{z,f)}&s{DPYJ`%{CGd5v4tvb*hUh~bf]z`jajiFqAii]bfy^U{Or|m+{I)cS|.9k:e3`^|xN}@Dnlis`B|Qo{`W|>||kA}Y}{ERYuYx`%[exd`]|OyiHtb}HofUYbFo![5|+]gD{NIZR|Go}.T{rh^4]S|C9_}xO^i`vfQ}C)bK{TL}cQ|79iu}9a];sj{P.o!f[Y]pM``Jda^Wc9ZarteBZClxtM{LW}l9|a.mU}KX}4@{I+f1}37|8u}9c|v${xGlz}jP{Dd1}e:}31}%3X$|22i<v+r@~mf{sN{C67G97855F4YL5}8f{DT|xy{sO{DXB334@55J1)4.G9A#JDYtXTYM4, YQD9;XbXm9SX]IB^4UN=Xn<5(;(F3YW@XkH-X_VM[DYM:5XP!T&Y`6|,^{IS-*D.H>:LXjYQ0I3XhAF:9:(==.F*3F1189K/7163D,:@|e2{LS36D4hq{Lw/84443@4.933:0307::6D7}&l{Mx657;89;,K5678H&93D(H<&<>0B90X^I;}Ag1{P%3A+>><975}[S{PZE453?4|T2{Q+5187;>447:81{C=hL6{Me^:=7ii{R=.=F<81;48?|h8}Uh{SE|,VxL{ST,7?9Y_5Xk3A#:$%YSYdXeKXOD8+TXh7(@>(YdXYHXl9J6X_5IXaL0N?3YK7Xh!1?XgYz9YEXhXaYPXhC3X`-YLY_XfVf[EGXZ5L8BXL9YHX]SYTXjLXdJ: YcXbQXg1PX]Yx4|Jr{Ys4.8YU+XIY`0N,<H%-H;:0@,74/:8546I=9177154870UC]d<C3HXl7ALYzXFXWP<<?E!88E5@03YYXJ?YJ@6YxX-YdXhYG|9o{`iXjY_>YVXe>AYFX[/(I@0841?):-B=14337:8=|14{c&93788|di{cW-0>0<097/A;N{FqYpugAFT%X/Yo3Yn,#=XlCYHYNX[Xk3YN:YRT4?)-YH%A5XlYF3C1=NWyY}>:74-C673<69545v {iT85YED=64=.F4..9878/D4378?48B3:7:7/1VX[f4{D,{l<5E75{dAbRB-8-@+;DBF/$ZfW8S<4YhXA.(5@*11YV8./S95C/0R-A4AXQYI7?68167B95HA1*<M3?1/@;/=54XbYP36}lc{qzSS38:19?,/39193574/66878Yw1X-87E6=;964X`T734:>86>1/=0;(I-1::7ALYGXhF+Xk[@W%TYbX7)KXdYEXi,H-XhYMRXfYK?XgXj.9HX_SX]YL1XmYJ>Y}WwIXiI-3-GXcYyXUYJ$X`Vs[7;XnYEZ;XF! 3;%8;PXX(N3Y[)Xi1YE&/ :;74YQ6X`33C;-(>Xm0(TYF/!YGXg8 9L5P01YPXO-5%C|qd{{/K/E6,=0144:361:955;6443@?B7*7:F89&F35YaX-CYf,XiFYRXE_e{}sF 0*7XRYPYfXa5YXXY8Xf8Y~XmA[9VjYj*#YMXIYOXk,HHX40YxYMXU8OXe;YFXLYuPXP?EB[QV0CXfY{:9XV[FWE0D6X^YVP*$4%OXiYQ(|xp|%c3{}V`1>Y`XH00:8/M6XhQ1:;3414|TE|&o@1*=81G8<3}6<|(f6>>>5-5:8;093B^3U*+*^*UT30XgYU&7*O1953)5@E78--F7YF*B&0:%P68W9Zn5974J9::3}Vk|-,C)=)1AJ4+<3YGXfY[XQXmT1M-XcYTYZXCYZXEYXXMYN,17>XIG*SaS|/eYJXbI?XdNZ+WRYP<F:R PXf;0Xg`$|1GX9YdXjLYxWX!ZIXGYaXNYm6X9YMX?9EXmZ&XZ#XQ>YeXRXfAY[4 ;0X!Zz0XdN$XhYL XIY^XGNXUYS/1YFXhYk.TXn4DXjB{jg|4DEX]:XcZMW=A.+QYL<LKXc[vV$+&PX*Z3XMYIXUQ:ZvW< YSXFZ,XBYeXMM)?Xa XiZ4/EXcP3%}&-|6~:1(-+YT$@XIYRBC<}&,|7aJ6}bp|8)K1|Xg|8C}[T|8Q.89;-964I38361<=/;883651467<7:>?1:.}le|:Z=39;1Y^)?:J=?XfLXbXi=Q0YVYOXaXiLXmJXO5?.SFXiCYW}-;|=u&D-X`N0X^,YzYRXO(QX_YW9`I|>hZ:N&X)DQXP@YH#XmNXi$YWX^=!G6YbYdX>XjY|XlX^XdYkX>YnXUXPYF)FXT[EVTMYmYJXmYSXmNXi#GXmT3X8HOX[ZiXN]IU2>8YdX1YbX<YfWuZ8XSXcZU%0;1XnXkZ_WTG,XZYX5YSX Yp 05G?XcYW(IXg6K/XlYP4XnI @XnO1W4Zp-9C@%QDYX+OYeX9>--YSXkD.YR%Q/Yo YUX].Xi<HYEZ2WdCE6YMXa7F)=,D>-@9/8@5=?7164;35387?N<618=6>7D+C50<6B03J0{Hj|N9$D,9I-,.KB3}m |NzE0::/81YqXjMXl7YG; [.W=Z0X4XQY]:MXiR,XgM?9$9>:?E;YE77VS[Y564760391?14941:0=:8B:;/1DXjFA-564=0B3XlH1+D85:0Q!B#:-6&N/:9<-R3/7Xn<*3J4.H:+334B.=>30H.;3833/76464665755:/83H6633:=;.>5645}&E|Y)?1/YG-,93&N3AE@5 <L1-G/8A0D858/30>8<549=@B8] V0[uVQYlXeD(P#ID&7T&7;Xi0;7T-$YE)E=1:E1GR):--0YI7=E<}n9|aT6783A>D7&4YG7=391W;Zx<5+>F#J39}o/|cc;6=A050EQXg8A1-}D-|d^5548083563695D?-.YOXd37I$@LYLWeYlX<Yd+YR A$;3-4YQ-9XmA0!9/XLY_YT(=5XdDI>YJ5XP1ZAW{9>X_6R(XhYO65&J%DA)C-!B:97#A9;@?F;&;(9=11/=657/H,<8}bz|j^5446>.L+&Y^8Xb6?(CYOXb*YF(8X`FYR(XPYVXmPQ%&DD(XmZXW??YOXZXfCYJ79,O)XnYF7K0!QXmXi4IYFRXS,6<%-:YO(+:-3Q!1E1:W,Zo}Am|n~;3580534*?3Zc4=9334361693:30C<6/717:<1/;>59&:4}6!|rS36=1?75<8}[B|s809983579I.A.>84758=108564741H*9E{L{|u%YQ<%6XfH.YUXe4YL@,>N}Tv|ve*G0X)Z;/)3@A74(4P&A1X:YVH97;,754*A66:1 D739E3553545558E4?-?K17/770843XAYf838A7K%N!YW4.$T19Z`WJ*0XdYJXTYOXNZ 1XaN1A+I&Xi.Xk3Z3GB&5%WhZ1+5#Y[X<4YMXhQYoQXVXbYQ8XSYUX4YXBXWDMG0WxZA[8V+Z8X;D],Va$%YeX?FXfX[XeYf<X:Z[WsYz8X_Y]%XmQ(!7BXIZFX]&YE3F$(1XgYgYE& +[+W!<YMYFXc;+PXCYI9YrWxGXY9DY[!GXiI7::)OC;*$.>N*HA@{C|}&k=:<TB83X`3YL+G4XiK]i}(fYK<=5$.FYE%4*5*H*6XkCYL=*6Xi6!Yi1KXR4YHXbC8Xj,B9ZbWx/XbYON#5B}Ue}+QKXnF1&YV5XmYQ0!*3IXBYb71?1B75XmF;0B976;H/RXU:YZX;BG-NXj;XjI>A#D3B636N;,*%<D:0;YRXY973H5)-4FXOYf0:0;/7759774;7;:/855:543L43<?6=E,.A4:C=L)%4YV!1(YE/4YF+ F3%;S;&JC:%/?YEXJ4GXf/YS-EXEYW,9;E}X$}547EXiK=51-?71C%?57;5>463553Zg90;6447?<>4:9.7538XgN{|!}9K/E&3-:D+YE1)YE/3;37/:05}n<}:UX8Yj4Yt864@JYK..G=.(A Q3%6K>3(P3#AYE$-6H/456*C=.XHY[#S.<780191;057C)=6HXj?955B:K1 E>-B/9,;5.!L?:0>/.@//:;7833YZ56<4:YE=/:7Z_WGC%3I6>XkC*&NA16X=Yz2$X:Y^&J48<99k8}CyB-61<18K946YO4{|N}E)YIB9K0L>4=46<1K0+R;6-=1883:478;4,S+3YJX`GJXh.Yp+Xm6MXcYpX(>7Yo,/:X=Z;Xi0YTYHXjYmXiXj;*;I-8S6N#XgY}.3XfYGO3C/$XjL$*NYX,1 6;YH&<XkK9C#I74.>}Hd`A748X[T450[n75<4439:18A107>|ET}Rf<1;14876/Yb983E<5.YNXd4149>,S=/4E/<306443G/06}0&}UkYSXFYF=44=-5095=88;63844,9E6644{PL}WA8:>)7+>763>>0/B3A545CCnT}Xm|dv}Xq1L/YNXk/H8;;.R63351YY747@15YE4J8;46;.38.>4A369.=-83,;Ye3?:3@YE.4-+N353;/;@(X[YYD>@/05-I*@.:551741Yf5>6A443<3535;.58/86=D4753442$635D1>0359NQ @73:3:>><Xn?;43C14 ?Y|X611YG1&<+,4<*,YLXl<1/AIXjF*N89A4Z576K1XbJ5YF.ZOWN.YGXO/YQ01:4G38Xl1;KI0YFXB=R<7;D/,/4>;$I,YGXm94@O35Yz66695385.>:6A#5}W7n^4336:4157597434433<3|XA}m`>=D>:4A.337370?-6Q96{`E|4A}C`|Qs{Mk|J+~r>|o,wHv>Vw}!c{H!|Gb|*Ca5}J||,U{t+{CN[!M65YXOY_*B,Y[Z9XaX[QYJYLXPYuZ%XcZ8LY[SYPYKZM<LMYG9OYqSQYM~[e{UJXmQYyZM_)>YjN1~[f3{aXFY|Yk:48YdH^NZ0|T){jVFYTZNFY^YTYN~[h{nPYMYn3I]`EYUYsYIZEYJ7Yw)YnXPQYH+Z.ZAZY]^Z1Y`YSZFZyGYHXLYG 8Yd#4~[i|+)YH9D?Y^F~Y7|-eYxZ^WHYdYfZQ~[j|3>~[k|3oYmYqY^XYYO=Z*4[]Z/OYLXhZ1YLZIXgYIHYEYK,<Y`YEXIGZI[3YOYcB4SZ!YHZ*&Y{Xi3~[l|JSY`Zz?Z,~[m|O=Yi>??XnYWXmYS617YVYIHZ(Z4[~L4/=~[n|Yu{P)|];YOHHZ}~[o33|a>~[r|aE]DH~[s|e$Zz~[t|kZFY~XhYXZB[`Y}~[u|{SZ&OYkYQYuZ2Zf8D~[v}% ~[w3},Q[X]+YGYeYPIS~[y}4aZ!YN^!6PZ*~[z}?E~[{3}CnZ=~[}}EdDZz/9A3(3S<,YR8.D=*XgYPYcXN3Z5 4)~[~}JW=$Yu.XX~] }KDX`PXdZ4XfYpTJLY[F5]X~[2Yp}U+DZJ::<446[m@~]#3}]1~]%}^LZwZQ5Z`/OT<Yh^ -~]&}jx[ ~m<z!%2+~ly4VY-~o>}p62yz!%2+Xf2+~ly4VY-zQ`z (=] 2z~o2",C={" ":0,"!":1},c=34,i=2,p,s="",u=String.fromCharCode,t=u(12539);for(;++c<127;)C[u(c)]=c^39&&c^92?i++:0;i=0;for(;0<=(c=C[a.charAt(i++)]);)if(16==c)if((c=C[a.charAt(i++)])<87){if(86==c)c=1879;for(;c--;)s+=u(++p)}else s+=s.substr(8272,360);else if(c<86)s+=u(p+=c<51?c-16:(c-55)*92+C[a.charAt(i++)]);else if((c=((c-86)*92+C[a.charAt(i++)])*92+C[a.charAt(i++)])<49152)s+=u(p=c<40960?c:c|57344);else{c&=511;for(;c--;)s+=t;p=12539}return s')();
 
     /**
-     * 
      * @param str
      * @returns {XML|string|void|*}
      */
@@ -125,7 +129,6 @@ if (window['swf2js'] == undefined) { (function(window)
     );
 
     /**
-     * clone
      * @param src
      * @returns {{}}
      */
@@ -133,9 +136,12 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var execute = function(src, obj)
         {
+            var _cloneArray = cloneArray;
             for(var prop in src) {
                 var value = src[prop];
-                if(value instanceof Array) {
+                if (prop == 'Matrix' || prop == 'ColorTransform') {
+                    obj[prop] = _cloneArray(value);
+                } else if(value instanceof Array) {
                     obj[prop] = [];
                     execute(value, obj[prop]);
                 } else if(value instanceof Object) {
@@ -153,6 +159,25 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
+     * @param src
+     * @returns {number[]}
+     */
+    function cloneArray(src)
+    {
+        var clone = [];
+        var length = src.length;
+
+        if (isArrayBuffer)
+            clone = new Float32Array(length);
+
+        for (var i = 0; i < length; i++) {
+            clone[i] = src[i];
+        }
+
+        return clone;
+    }
+
+    /**
      * リサイズ
      */
     function onResizeCanvas()
@@ -165,7 +190,6 @@ if (window['swf2js'] == undefined) { (function(window)
             var player = players[i];
             if (player.isLoad) {
                 player.resize();
-                //player.loaded();
             }
         }
     }
@@ -180,7 +204,7 @@ if (window['swf2js'] == undefined) { (function(window)
     }, false);
 
     /**
-     *
+     * unload
      */
     function unload()
     {
@@ -196,7 +220,7 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var canvas = tmpContext.canvas;
         tmpContext.setTransform(1, 0, 0, 1, 0, 0);
-        tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height);
+        tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
     }
 
     /**
@@ -205,7 +229,6 @@ if (window['swf2js'] == undefined) { (function(window)
     var VectorToCanvas = function() {};
 
     /**
-     * vectorToCanvas
      * @param shapes
      * @returns {*}
      */
@@ -309,7 +332,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 // fill0
                 fillFlag0 = ((StateFillStyle0 > 0 && FillStyle0 > 0)
-                || (fillFlag0 && StateFillStyle0 == 0)
+                    || (fillFlag0 && StateFillStyle0 == 0)
                 );
                 if (fillFlag0) {
                     // 色の算出
@@ -343,7 +366,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 // fill1
                 fillFlag1 = ((StateFillStyle1 > 0 && FillStyle1 > 0)
-                || (fillFlag1 && StateFillStyle1 == 0)
+                    || (fillFlag1 && StateFillStyle1 == 0)
                 );
                 if (fillFlag1) {
                     // 色の算出
@@ -377,7 +400,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 // line
                 lineFlag  = ((StateLineStyle > 0 && LineStyle > 0)
-                || (lineFlag && StateLineStyle == 0)
+                    || (lineFlag && StateLineStyle == 0)
                 );
                 if (lineFlag) {
                     if (LineStyle) {
@@ -600,7 +623,6 @@ if (window['swf2js'] == undefined) { (function(window)
 
 
     /**
-     * fillReverse
      * @param obj
      * @returns {*}
      */
@@ -671,7 +693,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * fillMerge
      * @param fillArray
      * @param canvasLArray
      */
@@ -935,7 +956,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * generateForColor
      * @param fillArray
      * @returns {Array}
      */
@@ -967,7 +987,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buildCommand
      * @param array
      * @returns {Array}
      */
@@ -998,7 +1017,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * bundle
      * @param fill0Array
      * @param fill1Array
      * @returns {Array}
@@ -1158,7 +1176,6 @@ if (window['swf2js'] == undefined) { (function(window)
     var vtc = new VectorToCanvas();
 
     /**
-     * CacheStore
      * @constructor
      */
     var CacheStore = function ()
@@ -1188,7 +1205,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * destroy
      * @param canvas
      */
     CacheStore.prototype.destroy = function(canvas)
@@ -1201,7 +1217,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getCanvas
      * @returns {*}
      */
     CacheStore.prototype.getCanvas = function()
@@ -1210,7 +1225,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * get
      * @param key
      * @returns {*}
      */
@@ -1220,35 +1234,36 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * set
      * @param key
      * @param value
      */
     CacheStore.prototype.set = function(key, value)
     {
         var _this = this;
-        var canvas = value.canvas;
-        _this.size -= (canvas.width * canvas.height);
+        if (value instanceof CanvasRenderingContext2D) {
+            var canvas = value.canvas;
+            _this.size -= (canvas.width * canvas.height);
 
-        // reset
-        if (_this.size < 0) {
-            var _destroy = _this.destroy;
-            for (var cacheKey in _this.store) {
-                var index = cacheKey.indexOf('Bitmap');
-                if (index != -1)
-                    continue;
+            // reset
+            if (_this.size < 0) {
+                var _destroy = _this.destroy;
+                for (var cacheKey in _this.store) {
+                    var index = cacheKey.indexOf('Bitmap');
+                    if (index != -1)
+                        continue;
 
-                var deleteCtx = _this.store[cacheKey];
-                if (!(deleteCtx instanceof CanvasRenderingContext2D))
-                    continue;
+                    var deleteCtx = _this.store[cacheKey];
+                    if (!(deleteCtx instanceof CanvasRenderingContext2D))
+                        continue;
 
-                var deleteCanvas = deleteCtx.canvas;
-                _this.size += (deleteCanvas.width * deleteCanvas.height);
-                _destroy.call(_this, deleteCanvas);
+                    var deleteCanvas = deleteCtx.canvas;
+                    _this.size += (deleteCanvas.width * deleteCanvas.height);
+                    _destroy.call(_this, deleteCanvas);
 
-                delete _this.store[cacheKey];
-                if (_this.size > 0)
-                    break;
+                    delete _this.store[cacheKey];
+                    if (_this.size > 0)
+                        break;
+                }
             }
         }
 
@@ -1256,7 +1271,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * generateKey
      * @param name
      * @param id
      * @param matrix
@@ -1267,19 +1281,24 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var key = name +"_"+ id;
 
-        if (matrix != undefined)
-            key += "_"+ matrix[0] +"_"+ matrix[1] +"_"+ matrix[2] +"_"+ matrix[3];
+        if (matrix != undefined) {
+            for (var i = 0; i < 4; i++) {
+                if (!(i in matrix))
+                    continue;
+                key += "_"+ matrix[i];
+            }
+        }
+        //key += "_"+ matrix[0] +"_"+ matrix[1] +"_"+ matrix[2] +"_"+ matrix[3];
 
         if (cxForm != undefined)
             key += "_"+ cxForm[0] +"_"+ cxForm[1] +"_"+ cxForm[2] +"_"+ cxForm[3]
-            +"_"+ cxForm[4] +"_"+ cxForm[5] +"_"+ cxForm[6] +"_"+ cxForm[7];
+                +"_"+ cxForm[4] +"_"+ cxForm[5] +"_"+ cxForm[6] +"_"+ cxForm[7];
 
         return key;
     };
     var cacheStore = new CacheStore();
 
     /**
-     * BitIO
      * @constructor
      */
     var BitIO = function()
@@ -1291,7 +1310,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * init
      * @param binary
      */
     BitIO.prototype.init = function(binary)
@@ -1305,7 +1323,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * createArray
      * @param length
      * @returns {Array}
      */
@@ -1323,7 +1340,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * Signature
      * @returns {string}
      */
     BitIO.prototype.getHeaderSignature = function()
@@ -1368,7 +1384,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getData
      * @param length
      * @returns {Array}
      */
@@ -1388,7 +1403,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * DataUntil
      * @param value
      * @param isJis
      * @returns {string}
@@ -1476,7 +1490,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 次以降のフィールドで使われるビット長を取得
      * @param n
      * @returns {number}
      */
@@ -1493,7 +1506,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getUIBitsで指定されたbitの個別取得
      * @returns {number}
      */
     BitIO.prototype.getUIBit = function()
@@ -1505,7 +1517,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 符号付き整数
      * @param n
      * @returns {number}
      */
@@ -1522,7 +1533,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 符号無し 8-bit 整数
      * @returns {number}
      */
     BitIO.prototype.getUI8 = function()
@@ -1533,7 +1543,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 符号無し 16-bit 整数
      * @returns {number}
      */
     BitIO.prototype.getUI16 = function()
@@ -1546,7 +1555,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @returns {number}
      */
     BitIO.prototype.getUI16BE = function()
@@ -1559,7 +1567,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 符号無し 32-bit 整数
      * @returns {number}
      */
     BitIO.prototype.getUI32 = function()
@@ -1575,7 +1582,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getFloat16
      * @returns {*}
      */
     BitIO.prototype.getFloat16 = function()
@@ -1589,7 +1595,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getFloat32
      * @returns {*}
      */
     BitIO.prototype.getFloat32 = function()
@@ -1610,15 +1615,14 @@ if (window['swf2js'] == undefined) { (function(window)
             float = 0;
         } else {
             float = (sign ? -1 : 1)
-            * (fraction | 0x800000)
-            *  _pow(2, (exp - 127 - 23));
+                * (fraction | 0x800000)
+                *  _pow(2, (exp - 127 - 23));
         }
 
         return _parseFloat(float);
     };
 
     /**
-     * getFloat64(Double)
      * @returns {number}
      */
     BitIO.prototype.getFloat64 = function()
@@ -1649,7 +1653,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 符号無し 16-bit 整数
      * @param data
      * @returns {number}
      */
@@ -1659,7 +1662,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * toSI16LE
      * @param data
      * @returns {number}
      */
@@ -1674,7 +1676,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * increment
      * @param byteInt
      * @param bitInt
      */
@@ -1687,7 +1688,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setOffset
      * @param byteInt
      * @param bitInt
      */
@@ -1699,7 +1699,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getEncodedU32
      * @returns {number}
      */
     BitIO.prototype.getEncodedU32 = function()
@@ -1718,7 +1717,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * readUB
      * @param length
      * @returns {number}
      */
@@ -1737,7 +1735,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * readNumber
      * @returns {number}
      */
     BitIO.prototype.readNumber = function(n)
@@ -1754,7 +1751,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * 圧縮swf対応
      * @returns {*}
      */
     BitIO.prototype.deCompress = function(length)
@@ -1781,7 +1777,6 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         _this.data = array;
-
         _this.byte_offset = bo;
     };
 
@@ -1799,43 +1794,16 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parse
      * @returns {Array}
      */
     SwfTag.prototype.parse = function(mc)
     {
         var _this = this;
         var length = _this.bitio.data.length;
-
-        // parse tag
-        var tags = _this.parseTags(length, mc.CharacterId);
-
-        // load sound
-        if (isTouch) {
-            var loadSounds = _this.player.loadSounds;
-            var sLen = loadSounds.length;
-            if (sLen) {
-                var canvas = _this.player.context.canvas;
-                var loadSound = function ()
-                {
-                    canvas.removeEventListener(startEvent, loadSound, false);
-                    for (var i = sLen; i--;) {
-                        if (!(i in loadSounds)) {
-                            continue;
-                        }
-                        var audio = loadSounds[i];
-                        audio.load();
-                    }
-                };
-                canvas.addEventListener(startEvent, loadSound, false);
-            }
-        }
-
-        return tags;
+        return _this.parseTags(length, mc.CharacterId);
     };
 
     /**
-     * build
      * @param tags
      * @param parent
      */
@@ -1853,7 +1821,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * showFrame
      * @param obj
      * @param mc
      */
@@ -1871,11 +1838,10 @@ if (window['swf2js'] == undefined) { (function(window)
         var actions = obj.actionScript;
         length = actions.length;
         if (length) {
-            for (; length--;) {
-                if (!(length in actions)) {
+            for (var i = 0; i < length; i++) {
+                if (!(i in actions))
                     continue;
-                }
-                mc.setActions(frame, actions[length]);
+                mc.setActions(frame, actions[i]);
             }
         }
 
@@ -1884,9 +1850,8 @@ if (window['swf2js'] == undefined) { (function(window)
         length = labels.length;
         if (length) {
             for (; length--;) {
-                if (!(length in labels)) {
+                if (!(length in labels))
                     continue;
-                }
                 var label = labels[length];
                 mc.addLabel(label.frame, label.name);
             }
@@ -1897,9 +1862,8 @@ if (window['swf2js'] == undefined) { (function(window)
         length = sounds.length;
         if (length) {
             for (; length--;) {
-                if (!(length in sounds)) {
+                if (!(length in sounds))
                     continue;
-                }
                 mc.addSound(frame, sounds[length]);
             }
         }
@@ -1908,9 +1872,8 @@ if (window['swf2js'] == undefined) { (function(window)
         length = cTags.length;
         if (length) {
             for (var i = 0; i < length; i++) {
-                if (!(i in cTags)) {
+                if (!(i in cTags))
                     continue;
-                }
 
                 var tag = cTags[i];
                 newDepth[tag.Depth] = true;
@@ -1922,14 +1885,13 @@ if (window['swf2js'] == undefined) { (function(window)
         var tags = obj.removeTags;
         length = tags.length;
         if (length) {
+            mc.setRemoveTag(frame, tags);
             for (; length--;) {
-                if (!(length in tags)) {
+                if (!(length in tags))
                     continue;
-                }
 
                 var rTag = tags[length];
                 newDepth[rTag.Depth] = true;
-                mc.removeTag(frame, rTag);
             }
         }
 
@@ -1967,7 +1929,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buildTag
      * @param frame
      * @param tag
      * @param parent
@@ -1979,6 +1940,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var _build = _this.build;
         var obj = {};
         var _clone = clone;
+        var _cloneArray = cloneArray;
 
         if (parent.addTags[frame] == undefined) {
             parent.addTags[frame] = [];
@@ -2026,6 +1988,13 @@ if (window['swf2js'] == undefined) { (function(window)
                     tag.ClipDepth = oTag.ClipDepth;
                 }
 
+                if (!tag.PlaceFlagHasClipActions
+                    && oTag.PlaceFlagHasClipActions
+                ) {
+                    tag.PlaceFlagHasClipActions = oTag.PlaceFlagHasClipActions;
+                    tag.ClipActionRecords = oTag.ClipActionRecords;
+                }
+
                 if (!tag.PlaceFlagHasRatio && !isCopy) {
                     tag.PlaceFlagHasRatio = 1;
                     tag.Ratio = frame - 1;
@@ -2049,9 +2018,34 @@ if (window['swf2js'] == undefined) { (function(window)
                 }
                 _build.call(_this, char, mc);
 
-                if (mc.getTotalFrames > 1) {
-                    mc.isStatic = false;
+                if (tag.PlaceFlagHasClipActions) {
+                    var ClipActionRecords = tag.ClipActionRecords;
+                    var rLength = ClipActionRecords.length;
+
+                    var eventArray = [];
+                    for (var i = 0; i < rLength; i++) {
+                        var actionRecord = ClipActionRecords[i];
+                        var eventFlag = actionRecord.EventFlags;
+
+                        for (var eventName in eventFlag) {
+                            if (eventFlag[eventName] == 0)
+                                continue;
+
+                            if (!(eventName in eventArray))
+                                eventArray[eventName] = [];
+
+                            eventArray[eventName].push(actionRecord.Actions);
+                        }
+                    }
+
+                    for (eventName in eventArray) {
+                        mc.clipEvent[eventName] = eventArray[eventName];
+                    }
                 }
+            }
+
+            if (mc.isStatic && mc.getTotalFrames() > 1) {
+                mc.isStatic = false;
             }
 
             if (parent.isStatic) {
@@ -2100,8 +2094,8 @@ if (window['swf2js'] == undefined) { (function(window)
                             } else {
                                 characters[d].push({
                                     characterId: bTag.CharacterId,
-                                    matrix:  _clone(bTag.Matrix),
-                                    colorTransform: _clone(bTag.ColorTransform)
+                                    matrix:  _cloneArray(bTag.Matrix),
+                                    colorTransform: _cloneArray(bTag.ColorTransform)
                                 });
                             }
                         }
@@ -2125,24 +2119,34 @@ if (window['swf2js'] == undefined) { (function(window)
         if (obj instanceof MovieClip) {
             if (!tag.PlaceFlagHasMatrix) {
                 tag.Matrix = [1,0,0,1,0,0];
+                if (isArrayBuffer)
+                    tag.Matrix = new Float32Array(tag.Matrix)
             }
 
             if (!tag.PlaceFlagHasColorTransform) {
                 tag.ColorTransform = [1,1,1,1,0,0,0,0];
+                if (isArrayBuffer)
+                    tag.ColorTransform = new Float32Array(tag.ColorTransform);
             }
 
-            controlTag._Matrix = _clone(tag.Matrix);
-            controlTag._ColorTransform = _clone(tag.ColorTransform);
+            controlTag._Matrix = _cloneArray(tag.Matrix);
+            controlTag._ColorTransform = _cloneArray(tag.ColorTransform);
         }
 
-        obj.matrix = [1,0,0,1,0,0];
         if (tag.PlaceFlagHasMatrix) {
-            obj.matrix = _clone(tag.Matrix);
+            obj.matrix = _cloneArray(tag.Matrix);
+        } else {
+            obj.matrix = [1,0,0,1,0,0];
+            if (isArrayBuffer)
+                obj.matrix = new Float32Array(obj.matrix);
         }
 
-        obj.colorTransform = [1,1,1,1,0,0,0,0];
         if (tag.PlaceFlagHasColorTransform) {
-            obj.colorTransform = _clone(tag.ColorTransform);
+            obj.colorTransform = _cloneArray(tag.ColorTransform);
+        } else {
+            obj.colorTransform = [1,1,1,1,0,0,0,0];
+            if (isArrayBuffer)
+                obj.colorTransform = new Float32Array(obj.colorTransform);
         }
 
         if (tag.PlaceFlagHasRatio) {
@@ -2179,7 +2183,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseTags
      * @param dataLength
      * @param characterId
      * @returns {Array}
@@ -2248,7 +2251,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseTag
      * @param tagType
      * @param length
      * @returns {*}
@@ -2450,7 +2452,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * addTag
      * @param tagType
      * @param tags
      * @param tag
@@ -2492,7 +2493,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineShape
      * @param tagType
      */
     SwfTag.prototype.parseDefineShape = function(tagType)
@@ -2515,7 +2515,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * rect
      * @returns {{Xmin: number, Xmax: number, Ymin: number, Ymax: number}}
      */
     SwfTag.prototype.rect = function()
@@ -2533,9 +2532,8 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * shapeWithStyle
      * @param tagType
-     * @returns {{fillStyles: {fillStyleCount: number, fillStyles: Array}, lineStyles: {lineStyleCount: number, lineStyles: Array}, NumFillBits: number, NumLineBits: number, ShapeRecords: Array}}
+     * @returns {{}}
      */
     SwfTag.prototype.shapeWithStyle = function(tagType)
     {
@@ -2568,9 +2566,8 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * fillStyleArray
      * @param tagType
-     * @returns {{fillStyleCount: number, fillStyles: Array}}
+     * @returns {{}}
      */
     SwfTag.prototype.fillStyleArray = function(tagType)
     {
@@ -2593,7 +2590,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * fillStyle
      * @param tagType
      * @returns {{}}
      */
@@ -2651,8 +2647,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * rgb
-     * @returns {{R: number, G: number, B: number, A: number}}
+     * @returns {{}}
      */
     SwfTag.prototype.rgb = function()
     {
@@ -2666,8 +2661,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * rgba
-     * @returns {{R: number, G: number, B: number, A: number}}
+     * @returns {{}}
      */
     SwfTag.prototype.rgba = function()
     {
@@ -2681,43 +2675,34 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * matrix
      * @returns {Array}
      */
     SwfTag.prototype.matrix = function()
     {
         var bitio = this.bitio;
         bitio.byteAlign();
-        var HasScale = bitio.getUIBit();
-        var ScaleX = 1;
-        var ScaleY = 1;
-        if (HasScale) {
+
+        var result = [1,0,0,1,0,0];
+        if (isArrayBuffer)
+            result = new Float32Array(result);
+
+        if (bitio.getUIBit()) {
             var nScaleBits = bitio.getUIBits(5);
-            ScaleX = bitio.getSIBits(nScaleBits) / 0x10000;
-            ScaleY = bitio.getSIBits(nScaleBits) / 0x10000;
+            result[0] = bitio.getSIBits(nScaleBits) / 0x10000;
+            result[3] = bitio.getSIBits(nScaleBits) / 0x10000;
         }
 
-        var HasRotate = bitio.getUIBit();
-        var RotateSkew0 = 0;
-        var RotateSkew1 = 0;
-        if (HasRotate) {
+        if (bitio.getUIBit()) {
             var nRotateBits = bitio.getUIBits(5);
-            RotateSkew0 = bitio.getSIBits(nRotateBits) / 0x10000;
-            RotateSkew1 = bitio.getSIBits(nRotateBits) / 0x10000;
+            result[1] = bitio.getSIBits(nRotateBits) / 0x10000;
+            result[2] = bitio.getSIBits(nRotateBits) / 0x10000;
         }
 
         var nTranslateBits = bitio.getUIBits(5);
-        var TranslateX = bitio.getSIBits(nTranslateBits);
-        var TranslateY = bitio.getSIBits(nTranslateBits);
+        result[4] = bitio.getSIBits(nTranslateBits);
+        result[5] = bitio.getSIBits(nTranslateBits);
 
-        return [
-            ScaleX,
-            RotateSkew0,
-            RotateSkew1,
-            ScaleY,
-            TranslateX,
-            TranslateY
-        ];
+        return result;
     };
 
     /**
@@ -2748,7 +2733,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * gradientRecord
      * @param tagType
      * @returns {{Ratio: number, Color: *}}
      */
@@ -2772,7 +2756,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * focalGradient
      * @param tagType
      * @returns {{SpreadMode: number, InterpolationMode: number, GradientRecords: Array, FocalPoint: number}}
      */
@@ -2801,7 +2784,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * lineStyleArray
      * @param tagType
      * @returns {{lineStyleCount: number, lineStyles: Array}}
      */
@@ -2826,7 +2808,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * lineStyles
      * @param tagType
      * @returns {{}}
      */
@@ -2903,7 +2884,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * shapeRecords
      * @param tagType
      * @param currentNumBits
      * @returns {Array}
@@ -2948,10 +2928,9 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * straightEdgeRecord
      * @param tagType
      * @param numBits
-     * @returns {{ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
+     * @returns {{}}
      */
     SwfTag.prototype.straightEdgeRecord = function(tagType, numBits)
     {
@@ -2994,10 +2973,9 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * curvedEdgeRecord
      * @param tagType
      * @param numBits
-     * @returns {{ControlX: number, ControlY: number, AnchorX: number, AnchorY: number, isCurved: boolean, isChange: boolean}}
+     * @returns {{}}
      */
     SwfTag.prototype.curvedEdgeRecord = function(tagType, numBits)
     {
@@ -3033,7 +3011,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * styleChangeRecord
      * @param tagType
      * @param changeFlag
      * @param currentNumBits
@@ -3078,7 +3055,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * appendShapeTag
      * @param characterId
      * @param shapeBounds
      * @param shapes
@@ -3097,7 +3073,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineBitsLossLess
      * @param tagType
      * @param length
      */
@@ -3197,7 +3172,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseExportAssets
      * @returns {{}}
      */
     SwfTag.prototype.parseExportAssets = function()
@@ -3216,7 +3190,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseJPEGTables
      * @param length
      * @returns {string}
      */
@@ -3226,7 +3199,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineBits
      * @param tagType
      * @param length
      * @param jpegTables
@@ -3308,13 +3280,12 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         image.src = "data:image/jpeg;base64,"
-        + _this.base64encode(_this.parseJpegData(JPEGData));
+            + _this.base64encode(_this.parseJpegData(JPEGData));
 
         _setTimeout(function() {}, 0);
     };
 
     /**
-     * parseJpegData
      * @param JPEGData
      * @returns {string}
      */
@@ -3365,7 +3336,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * base64encode
      * @param data
      * @returns {*}
      */
@@ -3409,7 +3379,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineFont
+     * @param tagType
      */
     SwfTag.prototype.parseDefineFont = function(tagType)
     {
@@ -3563,7 +3533,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param str
      * @returns {string}
      */
@@ -3582,7 +3551,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param tagType
      * @param length
      */
@@ -3645,14 +3613,13 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param fontName
      * @returns {string}
      */
     SwfTag.prototype.getFontName = function(fontName)
     {
-        var switchName = fontName.substr(0, fontName.length - 1);
-        switch (switchName) {
+        //var switchName = fontName.substr(0, fontName.length);
+        switch (fontName) {
             case '_sans':
                 return 'sans-serif';
                 break;
@@ -3663,7 +3630,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 return 'monospace';
                 break;
             default:
-                return switchName;
+                return fontName;
                 break;
         }
     };
@@ -3680,7 +3647,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineText
      * @param tagType
      */
     SwfTag.prototype.parseDefineText = function(tagType)
@@ -3760,7 +3726,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getGlyphEntries
      * @param count
      * @param GlyphBits
      * @param AdvanceBits
@@ -3780,7 +3745,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineEditText
      * @param tagType
      */
     SwfTag.prototype.parseDefineEditText = function(tagType)
@@ -3864,7 +3828,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineMorphShape
      * @param tagType
      */
     SwfTag.prototype.parseDefineMorphShape = function(tagType)
@@ -4069,7 +4032,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buildMorphShape
      * @param char
      * @param ratio
      * @returns {{data: *, Xmax: number, Xmin: number, Ymax: number, Ymin: number}}
@@ -4273,8 +4235,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseFrameLabel
-     * @returns {{name: string, frame: number}}
+     * @returns {{}}
      */
     SwfTag.prototype.parseFrameLabel = function()
     {
@@ -4285,7 +4246,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseRemoveObject
      * @param tagType
      * @returns {*}
      */
@@ -4294,6 +4254,7 @@ if (window['swf2js'] == undefined) { (function(window)
         // RemoveObject
         var bitio = this.bitio;
         if (tagType == 5) {
+            console.log('RemoveObject')
             return {
                 CharacterId: bitio.getUI16(),
                 Depth: bitio.getUI16()
@@ -4305,7 +4266,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineButton
      * @param tagType
      * @param length
      * @returns {{}}
@@ -4332,9 +4292,9 @@ if (window['swf2js'] == undefined) { (function(window)
 
         // actionScript
         if (tagType == 7) {
-            obj.actions = _this.parseDoAction(length - bitio.byte_offset);
+            obj.actions = _this.parseDoAction(endOffset - bitio.byte_offset);
         } else if (ActionOffset > 0) {
-            obj.actions = _this.buttonActions(length);
+            obj.actions = _this.buttonActions(endOffset);
         }
 
         // set layer
@@ -4347,7 +4307,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buttonCharacters
      * @returns {Array}
      */
     SwfTag.prototype.buttonCharacters = function()
@@ -4370,7 +4329,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buttonRecord
      * @returns {{}}
      */
     SwfTag.prototype.buttonRecord = function()
@@ -4413,20 +4371,20 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * buttonActions
-     * @param length
+     * @param endOffset
      * @returns {Array}
      */
-    SwfTag.prototype.buttonActions = function(length)
+    SwfTag.prototype.buttonActions = function(endOffset)
     {
         var _this = this;
         var bitio = _this.bitio;
-        var array = [];
+        var results = [];
+
         for (;;) {
             var obj = {};
             var startOffset = bitio.byte_offset;
 
-            obj.CondActionSize = bitio.getUI16();
+            var CondActionSize = bitio.getUI16();
             obj.CondIdleToOverDown = bitio.getUIBits(1);
             obj.CondOutDownToIdle = bitio.getUIBits(1);
             obj.CondOutDownToOverDown = bitio.getUIBits(1);
@@ -4439,40 +4397,21 @@ if (window['swf2js'] == undefined) { (function(window)
             obj.CondOverDownToIdle = bitio.getUIBits(1);
 
             // ActionScript
-            var cacheOffset = bitio.byte_offset + 1;
-            for (;;) {
-                var actionCode = bitio.getUI8();
-                if (actionCode == 0) {
-                    break;
-                }
+            var length = endOffset - bitio.byte_offset + 1;
+            obj.ActionScript = _this.parseDoAction(length);
+            results[results.length] = obj;
 
-                var payload = null;
-                if (actionCode >= 0x80) {
-                    var payloadLength = bitio.getUI16();
-                    payload = bitio.getData(payloadLength);
-                }
-            }
-
-            var actionLength = bitio.byte_offset - cacheOffset;
-            bitio.byte_offset = cacheOffset;
-            obj.ActionScript = _this.parseDoAction(actionLength);
-
-            array[array.length] = obj;
-            if (obj.CondActionSize == 0) {
+            if (CondActionSize == 0) {
                 break;
             }
 
-            var o = bitio.byte_offset - obj.CondActionSize;
-            if (startOffset != o) {
-                bitio.byte_offset = o;
-            }
+            bitio.byte_offset = startOffset + CondActionSize;
         }
 
-        return array;
+        return results;
     };
 
     /**
-     * parsePlaceObject
      * @param tagType
      * @param length
      * @returns {{}}
@@ -4584,8 +4523,6 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
                 }
                 obj.ClipActionRecords = actionRecords;
-
-                console.log(obj)
             }
         }
 
@@ -4596,7 +4533,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseClipActionRecord
      * @returns {{}}
      */
     SwfTag.prototype.parseClipActionRecord = function()
@@ -4618,7 +4554,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseClipEventFlags
      * @returns {{}}
      */
     SwfTag.prototype.parseClipEventFlags = function()
@@ -4628,31 +4563,31 @@ if (window['swf2js'] == undefined) { (function(window)
         var bitio = _this.bitio;
         var player = _this.player;
 
-        obj.ClipEventKeyUp = bitio.getUIBits(1);
-        obj.ClipEventKeyDown = bitio.getUIBits(1);
-        obj.ClipEventMouseUp = bitio.getUIBits(1);
-        obj.ClipEventMouseDown = bitio.getUIBits(1);
-        obj.ClipEventMouseMove = bitio.getUIBits(1);
-        obj.ClipEventUnload = bitio.getUIBits(1);
-        obj.ClipEventEnterFrame = bitio.getUIBits(1);
-        obj.ClipEventLoad = bitio.getUIBits(1);
+        obj.keyUp = bitio.getUIBits(1);
+        obj.keyDown = bitio.getUIBits(1);
+        obj.mouseUp = bitio.getUIBits(1);
+        obj.mouseDown = bitio.getUIBits(1);
+        obj.mouseMove = bitio.getUIBits(1);
+        obj.unload = bitio.getUIBits(1);
+        obj.enterFrame = bitio.getUIBits(1);
+        obj.load = bitio.getUIBits(1);
 
         if (player.version >= 6) {
-            obj.ClipEventDragOver = bitio.getUIBits(1);
-            obj.ClipEventRollOut = bitio.getUIBits(1);
-            obj.ClipEventRollOver = bitio.getUIBits(1);
-            obj.ClipEventReleaseOutside = bitio.getUIBits(1);
-            obj.ClipEventRelease = bitio.getUIBits(1);
-            obj.ClipEventPress = bitio.getUIBits(1);
-            obj.ClipEventInitialize = bitio.getUIBits(1);
+            obj.dragOver = bitio.getUIBits(1);
+            obj.rollOut = bitio.getUIBits(1);
+            obj.rollOver = bitio.getUIBits(1);
+            obj.releaseOutside = bitio.getUIBits(1);
+            obj.release = bitio.getUIBits(1);
+            obj.pess = bitio.getUIBits(1);
+            obj.initialize = bitio.getUIBits(1);
         }
 
         obj.ClipEventData = bitio.getUIBits(1);
         if (player.version >= 6) {
             var Reserved = bitio.getUIBits(5);
-            obj.ClipEventConstruct = bitio.getUIBits(1);
-            obj.ClipEventKeyPress = bitio.getUIBits(1);
-            obj.ClipEventDragOut = bitio.getUIBits(1);
+            obj.construct = bitio.getUIBits(1);
+            obj.keyPress = bitio.getUIBits(1);
+            obj.dragOut = bitio.getUIBits(1);
             Reserved = bitio.getUIBits(8);
         }
 
@@ -4662,8 +4597,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getFilterList
-     * @returns {Array}
+     * @returns {{}}
      */
     SwfTag.prototype.getFilterList = function()
     {
@@ -4679,7 +4613,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getFilter
+     * @return {{}}
      */
     SwfTag.prototype.getFilter = function()
     {
@@ -4719,7 +4653,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * dropShadowFilter
      * @returns {{}}
      */
     SwfTag.prototype.dropShadowFilter = function()
@@ -4741,7 +4674,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * blurFilter
      * @returns {{}}
      */
     SwfTag.prototype.blurFilter = function()
@@ -4756,7 +4688,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * glowFilter
      * @returns {{}}
      */
     SwfTag.prototype.glowFilter = function()
@@ -4777,7 +4708,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * bevelFilter
      * @returns {{}}
      */
     SwfTag.prototype.bevelFilter = function()
@@ -4801,7 +4731,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * gradientGlowFilter
      * @returns {{}}
      */
     SwfTag.prototype.gradientGlowFilter = function()
@@ -4834,7 +4763,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * convolutionFilter
      * @returns {{}}
      */
     SwfTag.prototype.convolutionFilter = function()
@@ -4860,7 +4788,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * colorMatrixFilter
      * @returns {{}}
      */
     SwfTag.prototype.colorMatrixFilter = function()
@@ -4875,7 +4802,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * gradientBevelFilter
      * @returns {{}}
      */
     SwfTag.prototype.gradientBevelFilter = function()
@@ -4908,7 +4834,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * colorTransform
      * @returns {Array}
      */
     SwfTag.prototype.colorTransform = function()
@@ -4916,46 +4841,33 @@ if (window['swf2js'] == undefined) { (function(window)
         var bitio = this.bitio;
         bitio.byteAlign();
 
+        var result = [1,1,1,1,0,0,0,0];
+        if (isArrayBuffer)
+            result = new Float32Array(result);
+
         var first6bits = bitio.getUIBits(6);
         var HasAddTerms = first6bits >> 5;
         var HasMultiTerms = (first6bits >> 4) & 1;
         var nbits = first6bits & 0x0f;
 
-        var RedMultiTerm = 1;
-        var GreenMultiTerm = 1;
-        var BlueMultiTerm = 1;
-        var AlphaMultiTerm = 1;
         if (HasMultiTerms) {
-            RedMultiTerm = bitio.getSIBits(nbits) / 256;
-            GreenMultiTerm = bitio.getSIBits(nbits) / 256;
-            BlueMultiTerm = bitio.getSIBits(nbits) / 256;
-            AlphaMultiTerm = bitio.getSIBits(nbits) / 256;
+            result[0] = bitio.getSIBits(nbits) / 256;
+            result[1] = bitio.getSIBits(nbits) / 256;
+            result[2] = bitio.getSIBits(nbits) / 256;
+            result[3] = bitio.getSIBits(nbits) / 256;
         }
 
-        var RedAddTerm = 0;
-        var GreenAddTerm = 0;
-        var BlueAddTerm = 0;
-        var AlphaAddTerm = 0;
         if (HasAddTerms) {
-            RedAddTerm = bitio.getSIBits(nbits);
-            GreenAddTerm = bitio.getSIBits(nbits);
-            BlueAddTerm = bitio.getSIBits(nbits);
-            AlphaAddTerm = bitio.getSIBits(nbits);
+            result[4] = bitio.getSIBits(nbits);
+            result[5] = bitio.getSIBits(nbits);
+            result[6] = bitio.getSIBits(nbits);
+            result[7] = bitio.getSIBits(nbits);
         }
-        return [
-            RedMultiTerm,
-            GreenMultiTerm,
-            BlueMultiTerm,
-            AlphaMultiTerm,
-            RedAddTerm,
-            GreenAddTerm,
-            BlueAddTerm,
-            AlphaAddTerm
-        ];
+
+        return result;
     };
 
     /**
-     * parseDefineSprite
      * @param dataLength
      */
     SwfTag.prototype.parseDefineSprite = function(dataLength)
@@ -4969,17 +4881,18 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDoAction
      * @param length
      * @returns {ActionScript}
      */
     SwfTag.prototype.parseDoAction = function(length)
     {
-        return new ActionScript(this.bitio.getData(length));
+        var _this = this;
+        var bitio = _this.bitio;
+        var data = bitio.getData(length);
+        return new ActionScript(data);
     };
 
     /**
-     * parseDoInitAction
      * @param length
      */
     SwfTag.prototype.parseDoInitAction = function(length)
@@ -4990,7 +4903,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineSceneAndFrameLabelData
      * @returns {{}}
      */
     SwfTag.prototype.parseDefineSceneAndFrameLabelData = function ()
@@ -5022,7 +4934,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseSoundStreamHead
      * @param tagType
      * @returns {{}}
      */
@@ -5071,7 +4982,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDoABC
      * @param tagType
      * @param length
      * @returns {{}}
@@ -5087,7 +4997,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseSymbolClass
      * @returns {{}}
      */
     SwfTag.prototype.parseSymbolClass = function()
@@ -5118,7 +5027,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineSound
      * @param tagType
      * @param length
      */
@@ -5157,7 +5065,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 mimeType = 'adpcm';
                 break;
             case 2:
-                mimeType = 'mp3';
+                mimeType = 'mpeg';
                 break;
             case 4:
             case 5:
@@ -5167,15 +5075,16 @@ if (window['swf2js'] == undefined) { (function(window)
             case 11:
                 mimeType = 'speex';
                 break;
+            case 15:
+                mimeType = 'x-aiff';
+                break;
         }
 
         obj.base64 = 'data:audio/'+ mimeType +';base64,' + window.btoa(SoundData);
-
         player.sounds[obj.SoundId] = obj;
     };
 
     /**
-     * parseStartSound
      * @param tagType
      */
     SwfTag.prototype.parseStartSound = function(tagType)
@@ -5223,7 +5132,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var bitio = _this.bitio;
         var player = _this.player;
-
 
         var buttonId = bitio.getUI16();
         var ButtonSoundChar0 = bitio.getUI16();
@@ -5308,7 +5216,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseSoundInfo
      * @returns {{}}
      */
     SwfTag.prototype.parseSoundInfo = function()
@@ -5351,7 +5258,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parseDefineFontAlignZones
      * @param tagType
      * @param length
      */
@@ -5399,7 +5305,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param tagType
      * @param length
      */
@@ -5421,50 +5326,51 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * ActionScript
      * @param data
+     * @param constantPool
      * @constructor
      */
-    var ActionScript = function (data)
+    var ActionScript = function (data, constantPool)
     {
-        this.length = data.length;
-        this.bitio = new BitIO();
-        this.bitio.setData(data);
-        this.constantPool = [];
-        this.register = [];
+        this.data = data;
+        this.constantPool = constantPool == undefined ? [] : constantPool;
         this.params = [];
-        this.pBitio = new BitIO();
+        this.register = [];
+        this.cache = [];
+        this.init(data);
     };
 
     /**
-     * execute
-     * @param mc
-     * @returns {*}
+     * @param data
      */
-    ActionScript.prototype.execute = function(mc)
+    ActionScript.prototype.init = function(data)
     {
-        // init action
-        var characterId = mc.characterId;
-        var _this = this;
         var isEnd = false;
-        var stack = [];
-        var bitio = _this.bitio;
-        var movieClip = mc;
-        var _execute = _this.execute;
+        var cache = [];
+        var indexes = [];
 
-        var pBitio = _this.pBitio;
-
-        var player = mc.getPlayer();
-        var initActions = player.initActions;
-        if (characterId in initActions) {
-            var initAction = initActions[characterId];
-            _execute.call(initAction, mc);
+        var register = this.register;
+        var length = register.length;
+        if (length) {
+            for (var i = 0; i < length; i++) {
+                var obj = register[i];
+                this.params[obj.register] = obj.value;
+            }
         }
 
-        // 開始
-        bitio.setOffset(0, 0);
-        for (; bitio.byte_offset < _this.length; ) {
-            var actionCode = _this.bitio.getUI8();
+        var bitio = new BitIO();
+        bitio.setData(data);
+
+        var pBitio = new BitIO();
+        var endPoint = data.length;
+
+        for (; bitio.byte_offset < endPoint; ) {
+            var startOffset = bitio.byte_offset;
+            var obj = {};
+
+            var actionCode = bitio.getUI8();
+            obj.actionCode = actionCode;
+
             var payload = null;
             if (actionCode >= 0x80) {
                 var payloadLength = bitio.getUI16();
@@ -5474,45 +5380,363 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             switch (actionCode) {
+                // GotoFrame
+                case 0x81:
+                    obj.frame = _floor(pBitio.getUI16()) + 1;
+                    break;
+                // WaitForFrame
+                case 0x8A:
+                    obj.frame = pBitio.getUI16();
+                    obj.skipCount = pBitio.getUI8();
+                    break;
+                // SetTarget
+                case 0x8B:
+                    obj.targetName = pBitio.getDataUntil("\0");
+                    break;
+                // GoToLabel
+                case 0x8C:
+                    obj.label = pBitio.getDataUntil("\0");
+                    break;
+
+                case 0x83:
+                    var len = payload.length - 1;
+                    var urls = [[]];
+                    var idx = 0;
+                    for (var i = 0; i < len; i++) {
+                        var str = _fromCharCode(payload[i]);
+                        if (payload[i] == 0) {
+                            idx++;
+                            urls[idx] = [];
+                            continue;
+                        }
+
+                        urls[idx] += str;
+                    }
+
+                    var urlString = urls[0];
+                    if (typeof urlString == 'string') {
+                        var splitUrl = urlString.split('?');
+
+                        // ?が2個あった場合は&に変更
+                        if (2 in splitUrl) {
+                            urlString = splitUrl[0];
+                            urlString += '?' + splitUrl[1];
+                            var paramLength = splitUrl.length;
+                            for (var i = 2; i < paramLength; i++) {
+                                urlString += '&' + splitUrl[i];
+                            }
+                        }
+                    }
+
+                    obj.url = urlString;
+                    obj.target = urls[1];
+
+                    break;
+                // PUSH
+                case 0x96:
+                    var values = [];
+                    for (; pBitio.byte_offset < payloadLength; ) {
+                        var type = pBitio.getUI8();
+                        switch (type) {
+                            // String
+                            case 0:
+                                var string = pBitio.getDataUntil("\0");
+                                if (string == '') {
+                                    string = null;
+                                }
+                                values[values.length] = string;
+                                break;
+                            // Float
+                            case 1:
+                                values[values.length] = pBitio.getFloat32();
+                                break;
+                            // null
+                            case 2:
+                                values[values.length] = null;
+                                break;
+                            // undefined
+                            case 3:
+                                values[values.length] = undefined;
+                                break;
+                            // RegisterNumber
+                            case 4:
+                                values[values.length] = this.params[pBitio.getUI8()];
+                                break;
+                            // Boolean
+                            case 5:
+                                values[values.length] = (pBitio.getUI8());
+                                break;
+                            // Double
+                            case 6:
+                                values[values.length] = pBitio.getFloat64();
+                                break;
+                            // Integer
+                            case 7:
+                                values[values.length] = pBitio.getUI32();
+                                break;
+                            // Constant8
+                            case 8:
+                                values[values.length] = this.constantPool[pBitio.getUI8()];
+                                break;
+                            // Constant16
+                            case 9:
+                                values[values.length] = this.constantPool[pBitio.getUI16()];
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    obj.values = values;
+                    break;
+
+                // If
+                case 0x9D:
+                    obj.offset = bitio.byte_offset + bitio.toSI16LE(payload);
+                    break;
+                // Jump
+                case 0x99:
+                    obj.offset = bitio.byte_offset + bitio.toSI16LE(payload);
+                    break;
+
+                // GetURL2
+                case 0x9A:
+                    obj.LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
+                    obj.LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
+                    obj.Reserved = pBitio.getUIBits(4);
+                    obj.SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
+
+                    break;
+
+                // GoToFrame2
+                case 0x9F:
+                    obj.Reserved = pBitio.getUIBits(6);
+                    obj.SceneBiasFlag = pBitio.getUIBit();
+                    obj.PlayFlag = pBitio.getUIBit();// 0=stop, 1=play
+                    if (obj.SceneBiasFlag == 1) {
+                        obj.SceneBias = pBitio.getUI16();
+                    }
+
+                    break;
+
+                // WaitForFrame2
+                case 0x8D:
+                    console.log('WaitForFrame2');
+                    obj.skipCount = pBitio.getUI8();
+
+                    break;
+
+                // ConstantPool
+                case 0x88:
+                    var count = pBitio.getUI16();
+                    var constantPool = [];
+                    for (; count--;) {
+                        constantPool[constantPool.length] = pBitio.getDataUntil("\0");
+                    }
+                    obj.constantPool = constantPool;
+                    this.constantPool = constantPool;
+                    break;
+
+                // ActionDefineFunction
+                case 0x9b:
+                    obj.FunctionName = pBitio.getDataUntil("\0");
+                    var NumParams = pBitio.getUI16();
+                    var params = [];
+                    for (; NumParams--;) {
+                        params[params.length] = pBitio.getDataUntil("\0");
+                    }
+
+                    var codeSize  = pBitio.getUI16();
+                    obj.as = new ActionScript(bitio.getData(codeSize), this.constantPool);
+                    obj.as.param = params;
+
+                    break;
+
+                // ActionWith
+                case 0x94:
+                    console.log('ActionWith');
+                    obj.Size = pBitio.getUI16();
+
+                    break;
+
+                // ActionStoreRegister
+                case 0x87:
+                    console.log('ActionStoreRegister');
+                    obj.RegisterNumber = pBitio.getUI8();
+                    console.log('-------> '+ obj.RegisterNumber);
+                    break;
+
+
+                // SWF 7 ***********************************
+                // ActionDefineFunction2
+                case 0x8e:
+                    console.log('ActionDefineFunction2');
+
+                    obj.FunctionName = pBitio.getDataUntil("\0");
+                    var NumParams = pBitio.getUI16();
+                    obj.RegisterCount = pBitio.getUI8();
+                    obj.PreloadParentFlag = pBitio.getUIBits(1);
+                    obj.PreloadRootFlag = pBitio.getUIBits(1);
+                    obj.SuppressSuperFlag = pBitio.getUIBits(1);
+                    obj.PreloadSuperFlag = pBitio.getUIBits(1);
+                    obj.SuppressArgumentsFlag = pBitio.getUIBits(1);
+                    obj.PreloadArgumentsFlag = pBitio.getUIBits(1);
+                    obj.SuppressThisFlag = pBitio.getUIBits(1);
+                    obj.PreloadThisFlag = pBitio.getUIBits(1);
+                    var Reserved = pBitio.getUIBits(7);
+                    obj.PreloadGlobalFlag = pBitio.getUIBits(1);
+
+                    var register = [];
+                    for (; NumParams--;) {
+                        var Register = pBitio.getUI8();
+                        var ParamName = pBitio.getDataUntil("\0");
+                        register[register.length] = {
+                            register: Register,
+                            name: ParamName,
+                            value: null
+                        };
+                    }
+
+                    var codeSize = pBitio.getUI16();
+                    obj.as = new ActionScript(bitio.getData(codeSize), constantPool);
+                    obj.as.register = register;
+
+                    break;
+                // ActionTry
+                case 0x8f:
+                    console.log('ActionTry');
+                    var Reserved = pBitio.getUIBits(5);
+                    var CatchInRegisterFlag = pBitio.getUIBits(1);
+                    var FinallyBlockFlag = pBitio.getUIBits(1);
+                    var CatchBlockFlag = pBitio.getUIBits(1);
+                    var TrySize = pBitio.getUI16();
+                    var CatchSize = pBitio.getUI16();
+                    var FinallySize = pBitio.getUI16();
+                    var CatchName = pBitio.getDataUntil("\0");
+
+                    if (CatchInRegisterFlag) {
+                        var CatchRegister = pBitio.getUI8();
+                    }
+
+                    var TryBody = [];
+                    if (TrySize) {
+                        for (var i = TrySize; i--;) {
+                            TryBody[TryBody.length] = pBitio.getUI8();
+                        }
+                    }
+                    var CatchBody = [];
+                    if (CatchSize) {
+                        for (var i = CatchSize; i--;) {
+                            CatchBody[CatchBody.length] = pBitio.getUI8();
+                        }
+                    }
+                    var FinallyBody = [];
+                    if (FinallySize) {
+                        for (var i = FinallySize; i--;) {
+                            FinallyBody[FinallyBody.length] = pBitio.getUI8();
+                        }
+                    }
+
+                    break;
+
+                // SWF 9 ***********************************
+                // DoABC
+                case 0x82:
+                    console.log('DoABC');
+                    obj.flags = pBitio.getUI32();
+                    obj.Name = pBitio.getDataUntil("\0");
+                    obj.ABCData = pBitio.getData(payload.length - pBitio.byte_offset);
+                    break;
+
+                case 0x00:
+                    isEnd = true;
+                    break;
+
+            }
+
+            indexes[startOffset] = cache.length;
+            cache[cache.length] = obj;
+
+            if (isEnd)
+                break;
+        }
+
+        // If and Jump
+        var length = cache.length;
+        for (var i = 0; i < length; i++) {
+            var obj = cache[i];
+            var code = obj.actionCode;
+            if (code == 0x9D || code == 0x99) {
+                var index = indexes[obj.offset];
+                obj.offset = index - 1;
+            }
+        }
+
+        this.cache = cache;
+    };
+
+    /**
+     * @param mc
+     * @returns {*}
+     */
+    ActionScript.prototype.execute = function(mc)
+    {
+        // init action
+        var characterId = mc.characterId;
+        var _this = this;
+        var stack = [];
+        var movieClip = mc;
+        var _execute = _this.execute;
+
+        var player = mc.getPlayer();
+        var initActions = player.initActions;
+        if (characterId in initActions) {
+            var initAction = initActions[characterId];
+            _execute.call(initAction, mc);
+        }
+
+        // 開始
+        var cache = _this.cache;
+        var cLength = cache.length;
+        for (var cIdx = 0; cIdx < cLength; cIdx++) {
+            if (!(cIdx in cache))
+                continue;
+
+            var aScript = cache[cIdx];
+            var actionCode = aScript.actionCode;
+            if (!actionCode)
+                break;
+
+            switch (actionCode) {
                 // ********************************************
                 // SWF 3
                 // ********************************************
                 // GotoFrame
                 case 0x81:
                     if (movieClip != null) {
-                        var frame = _floor(pBitio.getUI16()) + 1;
                         movieClip.stop();
-                        movieClip.setNextFrame(frame);
+                        movieClip.setNextFrame(aScript.frame);
                     }
-
                     break;
                 // NextFrame
                 case 0x04:
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.nextFrame();
-                    }
-
                     break;
                 // PreviousFrame
                 case 0x05:
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.previousFrame();
-                    }
-
                     break;
                 // Play
                 case 0x06:
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.play();
-                    }
-
                     break;
                 // Stop
                 case 0x07:
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.stop();
-                    }
-
                     break;
                 // ToggleQuality
                 case 0x08:
@@ -5520,17 +5744,15 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // StopSounds
                 case 0x09:
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.stopAllSounds();
-                    }
-
                     break;
                 // WaitForFrame
                 case 0x8A:
                     console.log('WaitForFrame');
                     if (movieClip != null) {
-                        var frame = pBitio.getUI16();
-                        var skipCount = pBitio.getUI8();
+                        var frame = aScript.frame;
+                        var skipCount = aScript.skipCount;
                         if (movieClip.getFrame() == frame) {
                             movieClip.stop();
                         } else {
@@ -5539,12 +5761,12 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     break;
-                case 0x8B: // SetTarget
-                    var targetName = pBitio.getDataUntil("\0");
+                // SetTarget
+                case 0x8B:
+                    var targetName = aScript.targetName;
                     if (targetName != '') {
-                        if (movieClip == null) {
+                        if (movieClip == null)
                             movieClip = mc;
-                        }
                         movieClip = movieClip.getMovieClip(targetName);
                     } else {
                         movieClip = mc;
@@ -5554,49 +5776,18 @@ if (window['swf2js'] == undefined) { (function(window)
                 // GoToLabel
                 case 0x8C:
                     if (movieClip != null) {
-                        var label = pBitio.getDataUntil("\0");
-                        var frame = movieClip.getLabel(label);
+                        var frame = movieClip.getLabel(aScript.label);
 
                         movieClip.stop();
-                        if (typeof frame == 'number') {
+                        if (typeof frame == 'number')
                             movieClip.setNextFrame(frame);
-                        }
                     }
 
                     break;
                 // GetUrl
                 case 0x83:
                     if (movieClip != null) {
-                        var len = payload.length - 1;
-                        var urls = [[]];
-                        var idx = 0;
-                        for (var i = 0; i < len; i++) {
-                            var str = _fromCharCode(payload[i]);
-                            if (payload[i] == 0) {
-                                idx++;
-                                urls[idx] = [];
-                                continue;
-                            }
-
-                            urls[idx] += str;
-                        }
-
-                        var urlString = urls[0];
-                        if (typeof urlString == 'string') {
-                            var splitUrl = urlString.split('?');
-
-                            // 分解してチェック
-                            if (2 in splitUrl) {
-                                var urlString = splitUrl[0];
-                                urlString += '?' + splitUrl[1];
-                                var paramLength = splitUrl.length;
-                                for (var i = 2; i < paramLength; i++) {
-                                    urlString += '&' + splitUrl[i];
-                                }
-                            }
-                        }
-
-                        movieClip.getURL(urlString, urls[1]);
+                        movieClip.getURL(aScript.url, aScript.target);
                     }
 
                     break;
@@ -5610,61 +5801,33 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x0A:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = a+b;
-
                     break;
                 // Subtract
                 case 0x0B:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = b-a;
-
                     break;
                 // Multiply
                 case 0x0C:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = a*b;
-
                     break;
                 // Divide
                 case 0x0D:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = b/a;
-
                     break;
 
                 // 数値比較 ***********************************
@@ -5672,33 +5835,17 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x0E:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = (a == b) ? 1 : 0;
-
                     break;
                 // Less
                 case 0x0F:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = (b < a) ? 1 : 0;
-
                     break;
 
                 // 論理演算 ***********************************
@@ -5706,45 +5853,25 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x10:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-
-
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     var boolInt = (a != 0 && b != 0) ? 1 : 0;
                     stack[stack.length] = boolInt;
-
                     break;
                 // Or
                 case 0x11:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-
-                    // 整数に置き換え
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
-
+                    if (_isNaN(a)) { a = 0; }
+                    if (_isNaN(b)) { b = 0; }
                     stack[stack.length] = (a != 0 || b != 0) ? 1 : 0;
-
                     break;
                 // Not
                 case 0x12:
                     var value = _parseFloat(stack.pop());
-                    // 整数に置き換え
-                    if (_isNaN(value)) {
-                        value = 0;
-                    }
-
+                    if (_isNaN(value)) { value = 0; }
                     stack[stack.length] = (value == 0) ? 1 : 0;
+
                     break;
 
                 // 文字列操作 ***********************************
@@ -5776,17 +5903,10 @@ if (window['swf2js'] == undefined) { (function(window)
                 // StringAdd
                 case 0x21:
                     var a = stack.pop();
-                    if (a == null) {
-                        a = '';
-                    }
-
                     var b = stack.pop();
-                    if (b == null) {
-                        b = '';
-                    }
-
+                    if (a == null) { a = ''; }
+                    if (b == null) { b = ''; }
                     stack[stack.length] = b +''+ a;
-
                     break;
                 case 0x15:// StringExtract
                 case 0x35:// MBStringExtract
@@ -5820,56 +5940,10 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // Push
                 case 0x96:
-                    for (; pBitio.byte_offset < payloadLength; ) {
-                        var type = pBitio.getUI8();
-                        switch (type) {
-                            // String
-                            case 0:
-                                var string = pBitio.getDataUntil("\0");
-                                if (string == '') {
-                                    string = null;
-                                }
-                                stack[stack.length] = string;
-                                break;
-                            // Float
-                            case 1:
-                                stack[stack.length] = pBitio.getFloat32();
-                                break;
-                            // null
-                            case 2:
-                                stack[stack.length] = null;
-                                break;
-                            // undefined
-                            case 3:
-                                stack[stack.length] = undefined;
-                                break;
-                            // RegisterNumber
-                            case 4:
-                                stack[stack.length] = this.params[pBitio.getUI8()];
-                                break;
-                            // Boolean
-                            case 5:
-                                stack[stack.length] = (pBitio.getUI8());
-                                break;
-                            // Double
-                            case 6:
-                                stack[stack.length] = pBitio.getFloat64();
-                                break;
-                            // Integer
-                            case 7:
-                                stack[stack.length] = pBitio.getUI32();
-                                break;
-                            // Constant8
-                            case 8:
-                                stack[stack.length] = this.constantPool[pBitio.getUI8()];
-                                break;
-                            // Constant16
-                            case 9:
-                                stack[stack.length] = this.constantPool[pBitio.getUI16()];
-                                break;
-                            default:
-                                break;
-                        }
+                    var values = aScript.values;
+                    var vLen = values.length;
+                    for (var i = 0; i < vLen; i++) {
+                        stack[stack.length] = values[i];
                     }
 
                     break;
@@ -5907,7 +5981,6 @@ if (window['swf2js'] == undefined) { (function(window)
                     var value = stack.pop() + '';
                     var splitData = value.split(':');
                     if (splitData.length > 1) {
-
                         if (movieClip == null) {
                             break;
                         }
@@ -5953,18 +6026,14 @@ if (window['swf2js'] == undefined) { (function(window)
                 // If
                 case 0x9D:
                     var condition = _parseFloat(stack.pop());
-                    var offset = bitio.toSI16LE(payload);
                     if (condition) {
-                        bitio.bit_offset = 0;
-                        bitio.incrementOffset(offset, 0);
+                        cIdx = aScript.offset;
                     }
 
                     break;
                 // Jump
                 case 0x99:
-                    var offset = bitio.toSI16LE(payload);
-                    bitio.bit_offset = 0;
-                    bitio.incrementOffset(offset, 0);
+                    cIdx = aScript.offset;
                     break;
 
                 // 変数 ***********************************
@@ -5973,6 +6042,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     var name = stack.pop() + '';
                     var splitData = name.split(':');
                     var value = '';
+
 
                     if (movieClip != null) {
                         if (splitData.length > 1) {
@@ -6013,15 +6083,16 @@ if (window['swf2js'] == undefined) { (function(window)
                     var target = stack.pop();
                     var urlString = stack.pop();
 
-                    var LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
-                    var LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
-                    var Reserved = pBitio.getUIBits(4);
-                    var SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
+                    var LoadVariablesFlag = aScript.LoadVariablesFlag; // 0=none, 1=LoadVariables
+                    var LoadTargetFlag = aScript.LoadTargetFlag; // 0=web, 1=スプライト
+                    var Reserved = aScript.Reserved;
+                    var SendVarsMethod = aScript.SendVarsMethod; // 0=NONE, 1=GET, 2=POST
 
                     var method = 'GET';
                     if (SendVarsMethod == 2) {
                         method = 'POST';
                     }
+
 
                     if (movieClip instanceof MovieClip) {
                         if (urlString) {
@@ -6065,6 +6136,8 @@ if (window['swf2js'] == undefined) { (function(window)
 
                             if (LoadVariablesFlag) {
                                 movieClip.loadVariables(url, target, method);
+                            } else if (LoadTargetFlag) {
+                                movieClip.loadMovie(url, target, SendVarsMethod);
                             } else {
                                 movieClip.getURL(url, target, method);
                             }
@@ -6095,11 +6168,11 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // GoToFrame2
                 case 0x9F:
-                    var Reserved = pBitio.getUIBits(6);
-                    var SceneBiasFlag = pBitio.getUIBit();
-                    var PlayFlag = pBitio.getUIBit();// 0=stop, 1=play
+                    var Reserved = aScript.Reserved;
+                    var SceneBiasFlag = aScript.SceneBiasFlag;
+                    var PlayFlag = aScript.PlayFlag; // 0=stop, 1=play
                     if (SceneBiasFlag == 1) {
-                        var SceneBias = pBitio.getUI16();
+                        var SceneBias = aScript.SceneBias;
                     }
 
                     var frame = stack.pop();
@@ -6189,8 +6262,8 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x8D:
                     console.log('WaitForFrame2');
                     var frame = stack.pop();
-                    var skipCount = pBitio.getUI8();
-                    if (obj.getFrame() == frame) {
+                    var skipCount = aScript.skipCount;
+                    if (movieClip.getFrame() == frame) {
 
                     }
 
@@ -6241,7 +6314,6 @@ if (window['swf2js'] == undefined) { (function(window)
                     console.log('[trace] ' + value);
                     break;
                 case 0x00:
-                    isEnd = true;
                     break;
                 case 0x2D: // fscommand2
                     var count = _parseFloat(stack.pop());
@@ -6346,30 +6418,24 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // ConstantPool
                 case 0x88:
-                    var _this = this;
-                    var count = pBitio.getUI16();
-                    _this.constantPool = [];
-                    for (; count--;) {
-                        _this.constantPool[_this.constantPool.length] =
-                            pBitio.getDataUntil("\0");
-                    }
+                    _this.constantPool = aScript.constantPool;
 
                     break;
                 // ActionCallFunction
                 case 0x3d:
-                    var FunctionName = stack.pop() + '';
+                    var FunctionName = stack.pop();
                     var numArgs = _parseFloat(stack.pop());
                     var params = [];
                     for (; numArgs--;) {
                         params[params.length] = stack.pop();
                     }
 
+                    var ret = null;
                     if (movieClip != null) {
                         if (window[FunctionName]) {
                             targetMc = movieClip;
-                            if (params[0] instanceof MovieClip) {
+                            if (params[0] instanceof MovieClip)
                                 targetMc = params.shift();
-                            }
 
                             if (params[0] instanceof ActionScript) {
                                 var as = params.shift();
@@ -6391,20 +6457,20 @@ if (window['swf2js'] == undefined) { (function(window)
 
                                 // build
                                 for (var idx = register.length; idx--;) {
-                                    var obj = register[idx];
-                                    as.params[obj.register] = obj.value;
+                                    var object = register[idx];
+                                    as.params[object.register] = object.value;
                                 }
 
+                                as.init(as.data);
                                 _execute.call(as, targetMc);
                             });
 
-                            var ret = window[FunctionName].apply(window, params);
-                            stack[stack.length] = ret;
-
+                            ret = window[FunctionName].apply(window, params);
                         } else {
                             var as = movieClip.getVariable(FunctionName);
                             if (as != undefined) {
                                 var register = as.register;
+
                                 // set
                                 for (var idx = params.length; idx--;) {
                                     if (!(idx in register)) {
@@ -6415,40 +6481,37 @@ if (window['swf2js'] == undefined) { (function(window)
 
                                 // build
                                 for (var idx = register.length; idx--;) {
-                                    var obj = register[idx];
-                                    as.params[obj.register] = obj.value;
+                                    var object = register[idx];
+                                    as.params[object.register] = object.value;
                                 }
 
-                                _execute.call(as, movieClip);
+                                as.init(as.data);
+                                ret = _execute.call(as, movieClip);
                             }
                         }
+
+                        stack[stack.length] = ret;
                     }
 
                     break;
                 // ActionDefineFunction
                 case 0x9b:
-                    var FunctionName = pBitio.getDataUntil("\0");
-                    var NumParams = pBitio.getUI16();
-                    var params = [];
-                    for (; NumParams--;) {
-                        params[params.length] = pBitio.getDataUntil("\0");
-                    }
-
-                    var codeSize  = pBitio.getUI16();
-                    var as = new ActionScript(bitio.getData(codeSize));
+                    var as = aScript.as;
                     as.constantPool = clone(this.constantPool);
-                    movieClip.setVariable(FunctionName, as);
+
+                    var FunctionName = aScript.FunctionName;
+                    if (FunctionName != '')
+                        movieClip.setVariable(FunctionName, as);
 
                     stack[stack.length] = as;
 
                     break;
                 // ActionDefineLocal
                 case 0x3c:
-                    var value = stack.pop() + '';
+                    var value = stack.pop();
                     var name = stack.pop();
-                    if (movieClip != null) {
+                    if (movieClip != null)
                         movieClip.setVariable(name, value);
-                    }
 
                     break;
                 // ActionDefineLocal2
@@ -6461,18 +6524,15 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x3a:
                     var name = stack.pop();
                     var object = stack.pop();
-
-                    if (object instanceof MovieClip) {
-                        object.deleteVariable(name);
-                    }
+                    if (object instanceof MovieClip)
+                        object.setVariable(name, undefined);
 
                     break;
                 // ActionDelete2
                 case 0x3b:
                     var name = stack.pop();
-                    if (movieClip != null) {
-                        movieClip.deleteVariable(name);
-                    }
+                    if (movieClip != null)
+                        movieClip.setVariable(name, undefined);
 
                     break;
                 // ActionEnumerate
@@ -6566,7 +6626,8 @@ if (window['swf2js'] == undefined) { (function(window)
                     if (object == 'MovieClip') {
                         stack[stack.length] = new MovieClip();
                     } else if (window[object]) {
-                        stack[stack.length] = new window[object](); //(Function.prototype.bind.apply(window[object], params));
+                        stack[stack.length] = new window[object]();
+                        //(Function.prototype.bind.apply(window[object], params));
                     } else {
                         var func = movieClip.getVariable(object);
                         if (func instanceof Function) {
@@ -6580,6 +6641,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     var value = stack.pop();
                     var name = stack.pop();
                     var object = stack.pop();
+
                     if (object instanceof MovieClip) {
                         object.setProperty(name, value);
                     } else {
@@ -6618,7 +6680,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 // ActionWith
                 case 0x94:
                     console.log('ActionWith');
-                    var Size = pBitio.getUI16();
+                    var Size = aScript.Size;
                     var object = stack.pop();
 
                     break;
@@ -6715,9 +6777,9 @@ if (window['swf2js'] == undefined) { (function(window)
                     var value = stack[0];
                     stack[stack.length] = value;
                     break;
-                // ActionReturn
+                // ActionReturnActionReturn
                 case 0x3e:
-                    var value = stack.pop();
+                    return stack.pop();
                     break;
                 // ActionStackSwap
                 case 0x4d:
@@ -6729,28 +6791,30 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // ActionStoreRegister
                 case 0x87:
-                    var RegisterNumber = pBitio.getUI8();
+                    console.log('ActionStoreRegister');
+                    var RegisterNumber = aScript.RegisterNumber;
+                    console.log(stack)
                     break;
 
                 // SWF 6 ***********************************
                 // ActionInstanceOf
                 case 0x54:
                     var constr = stack.pop();
-                    var obj = stack.pop();
-                    var boolInt = (obj instanceof constr) ? 1 : 0;
+                    var object = stack.pop();
+                    var boolInt = (object instanceof constr) ? 1 : 0;
                     stack[stack.length] = boolInt;
                     break;
                 // ActionEnumerate2
                 case 0x55:
-                    var obj = stack.pop();
+                    var object = stack.pop();
                     stack[stack.length] = null;
 
-                    if (typeof obj == Object) {
-                        if (obj instanceof MovieClip) {
-                            obj = obj.variables;
+                    if (typeof object == Object) {
+                        if (object instanceof MovieClip) {
+                            object = object.variables;
                         }
 
-                        for (var slotName in obj) {
+                        for (var slotName in object) {
                             stack[stack.length] = slotName + '';
                         }
                     }
@@ -6781,37 +6845,9 @@ if (window['swf2js'] == undefined) { (function(window)
                 // SWF 7 ***********************************
                 // ActionDefineFunction2
                 case 0x8e:
-                    console.log('ActionDefineFunction2');
-
-                    var FunctionName = pBitio.getDataUntil("\0");
-                    var NumParams = pBitio.getUI16();
-                    var RegisterCount = pBitio.getUI8();
-                    var PreloadParentFlag = pBitio.getUIBits(1);
-                    var PreloadRootFlag = pBitio.getUIBits(1);
-                    var SuppressSuperFlag = pBitio.getUIBits(1);
-                    var PreloadSuperFlag = pBitio.getUIBits(1);
-                    var SuppressArgumentsFlag = pBitio.getUIBits(1);
-                    var PreloadArgumentsFlag = pBitio.getUIBits(1);
-                    var SuppressThisFlag = pBitio.getUIBits(1);
-                    var PreloadThisFlag = pBitio.getUIBits(1);
-                    var Reserved = pBitio.getUIBits(7);
-                    var PreloadGlobalFlag = pBitio.getUIBits(1);
-
-                    var params = [];
-                    for (; NumParams--;) {
-                        var Register = pBitio.getUI8();
-                        var ParamName = pBitio.getDataUntil("\0");
-                        params[params.length] = {
-                            register: Register,
-                            name: ParamName,
-                            value: null
-                        };
-                    }
-
-                    var codeSize = pBitio.getUI16();
-                    var as = new ActionScript(bitio.getData(codeSize));
+                    //console.log('ActionDefineFunction2');
+                    var as = aScript.as;
                     as.constantPool = clone(this.constantPool);
-                    as.register = params;
                     stack[stack.length] = as;
 
                     break;
@@ -6851,37 +6887,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 // ActionTry
                 case 0x8f:
                     console.log('ActionTry');
-                    var Reserved = pBitio.getUIBits(5);
-                    var CatchInRegisterFlag = pBitio.getUIBits(1);
-                    var FinallyBlockFlag = pBitio.getUIBits(1);
-                    var CatchBlockFlag = pBitio.getUIBits(1);
-                    var TrySize = pBitio.getUI16();
-                    var CatchSize = pBitio.getUI16();
-                    var FinallySize = pBitio.getUI16();
-                    var CatchName = pBitio.getDataUntil("\0");
-
-                    if (CatchInRegisterFlag) {
-                        var CatchRegister = pBitio.getUI8();
-                    }
-
-                    var TryBody = [];
-                    if (TrySize) {
-                        for (var i = TrySize; i--;) {
-                            TryBody[TryBody.length] = pBitio.getUI8();
-                        }
-                    }
-                    var CatchBody = [];
-                    if (CatchSize) {
-                        for (var i = CatchSize; i--;) {
-                            CatchBody[CatchBody.length] = pBitio.getUI8();
-                        }
-                    }
-                    var FinallyBody = [];
-                    if (FinallySize) {
-                        for (var i = FinallySize; i--;) {
-                            FinallyBody[FinallyBody.length] = pBitio.getUI8();
-                        }
-                    }
 
                     break;
                 // ActionThrow
@@ -6902,17 +6907,10 @@ if (window['swf2js'] == undefined) { (function(window)
                     console.log('[actionScript] '+actionCode);
                     break;
             }
-
-            if (isEnd) {
-                break;
-            }
         }
     };
-    var cacheAS = new ActionScript([]);
 
     /**
-     * MovieClip
-     * @param player
      * @constructor
      */
     var MovieClip = function()
@@ -6935,12 +6933,14 @@ if (window['swf2js'] == undefined) { (function(window)
         this.labels = [];
         this.sounds = [];
         this.variables = [];
+        this.buttonStatus = 'up';
 
         // 判定用
         this.stopFlag = false;
         this.isAction = true;
+        this.isLoad = false;
+        this.isEnterFrame = false;
         this.isButtonRemove = false;
-        this._nextFrame = 0;
         this.isStatic = true;
 
         // clip
@@ -6966,6 +6966,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
         // event
         this.event = {};
+        this.clipEvent = {};
     };
 
     /**
@@ -6980,7 +6981,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * addEvent
      * @param name
      * @param as
      */
@@ -6988,16 +6988,13 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var event = _this.event;
-        if(!(name in event)) {
+        if (!(name in event))
             event[name] = [];
-        } else {
-            _this.delEvent(name, as);
-        }
+
         event[name].push(as);
     };
 
     /**
-     * delEvent
      * @param name
      * @param as
      */
@@ -7018,31 +7015,27 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * dispatchEvent
      * @param name
      */
     MovieClip.prototype.dispatchEvent = function(name)
     {
         var _this = this;
         var event = _this.event;
-        var _execute = cacheAS.execute;
-        for (name in event) {
-            var length = event[name].length;
-            for (var i = length; i--;) {
-                var as = event[name][i];
-                if (!(as instanceof ActionScript)) {
-                    if (_this.callback) {
-                        as[name].apply();
-                    }
-                    continue;
-                }
-                _execute.call(as, _this);
+        if (event[name] != undefined) {
+
+            var events = event[name];
+            var length = events.length;
+            if (!length)
+                return 0;
+
+            for (var i = 0; i < length; i++) {
+                var as = events[i];
+                as[name].apply();
             }
         }
     };
 
     /**
-     * getMovieClip
      * @param path
      * @returns {*}
      */
@@ -7051,8 +7044,17 @@ if (window['swf2js'] == undefined) { (function(window)
         var mc = this;
         var player = mc.getPlayer();
         var _path = path + '';
+
+        if (_path == 'this')
+            return this;
+
+        var _root = player.getParent();
+        if (_path == '_root')
+            return _root;
+
         if (_path.substr(0, 6) == '_level') {
             var level = _path.substr(6);
+
             if (level == 0) {
                 return player.getParent();
             } else {
@@ -7076,10 +7078,21 @@ if (window['swf2js'] == undefined) { (function(window)
             }
         }
 
-        var splitData = _path.split('/');
-        var len = splitData.length;
-        if (splitData[0] == '') {
-            mc = player.getParent();
+        var len = 1;
+        var splitData = [_path];
+
+        if (_path.indexOf('/') != -1) {
+            splitData = _path.split('/');
+            len = splitData.length;
+            if (splitData[0] == '') {
+                mc = _root;
+            }
+        } else if (_path.indexOf('.') != -1) {
+            splitData = _path.split('.');
+            len = splitData.length;
+            if (splitData[0] == '_root') {
+                mc = _root;
+            }
         }
 
         var _getTags = mc.getTags;
@@ -7092,7 +7105,12 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             if (name == '_root') {
-                mc = player.getParent();
+                mc = _root;
+                continue;
+            }
+
+            if (name == 'this') {
+                mc = this;
                 continue;
             }
 
@@ -7156,7 +7174,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * gotoAndPlay
+     * @param frame
      */
     MovieClip.prototype.gotoAndPlay = function(frame)
     {
@@ -7169,7 +7187,7 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * gotoAndStop
+     * @param frame
      */
     MovieClip.prototype.gotoAndStop = function(frame)
     {
@@ -7186,7 +7204,8 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     MovieClip.prototype.stopAllSounds = function()
     {
-        var loadSounds = this.player.loadSounds;
+        var player = this.getPlayer();
+        var loadSounds = player.loadSounds;
         var sLen = loadSounds.length;
         for (; sLen--;) {
             if (!(sLen in loadSounds)) {
@@ -7200,7 +7219,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param url
      * @param target
      * @param SendVarsMethod
@@ -7286,6 +7304,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         mc.loadPlayer = loadPlayer;
                         mc.characterId = targetMc.characterId;
                         mc.instanceId = targetMc.instanceId;
+                        mc.event = targetMc.event;
                         mc.setParent(parent);
                         mc.setName(targetMc.getName());
 
@@ -7299,14 +7318,11 @@ if (window['swf2js'] == undefined) { (function(window)
                         mc.setLevel(level);
                     }
                 }
-
-                cacheStore.reset();
             }
         }
     };
 
     /**
-     *
      * @param target
      * @returns {number}
      */
@@ -7344,7 +7360,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param url
      * @param target
      * @param method
@@ -7353,8 +7368,7 @@ if (window['swf2js'] == undefined) { (function(window)
     MovieClip.prototype.getURL = function(url, target, method)
     {
         var _this = this;
-
-        if (target) {
+        if (target instanceof String) {
             switch (target.toLowerCase()) {
                 case '_self':
                 case '_blank':
@@ -7370,9 +7384,8 @@ if (window['swf2js'] == undefined) { (function(window)
                     method = 'GET';
                     break;
                 default:
-                    if (!method) {
+                    if (!method)
                         method = 'GET';
-                    }
 
                     _this.loadMovie(url, target, method);
                     return 0;
@@ -7413,7 +7426,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param url
      * @param target
      * @param method
@@ -7463,6 +7475,45 @@ if (window['swf2js'] == undefined) { (function(window)
 
     /**
      *
+     * @param x
+     * @param y
+     * @param bool
+     * @returns {number}
+     */
+    MovieClip.prototype.hitTest = function(x, y, bool)
+    {
+        if (!x || !y)
+            return 0;
+
+        var _this = this;
+        var player = _this.getPlayer();
+        var div = _document.getElementById(player.getName());
+        var bounds = div.getBoundingClientRect();
+        var docBody = _document.body;
+
+        x -= (docBody.scrollLeft + bounds.left);
+        y -= (docBody.scrollTop + bounds.top);
+
+        x *= _devicePixelRatio;
+        y *= _devicePixelRatio;
+
+        var parent = _this.getParent();
+        if (parent) {
+            var mcBounds = this.getBounds(parent.getMatrix());
+        } else {
+            var mcBounds = this.getBounds();
+        }
+
+        if (x >= mcBounds.Xmin && x <= mcBounds.Xmax
+            && y >= mcBounds.Ymin && y <= mcBounds.Ymax
+        ) {
+            return 1;
+        }
+
+        return 0;
+    };
+
+    /**
      * @param target
      * @param name
      * @param depth
@@ -7475,15 +7526,15 @@ if (window['swf2js'] == undefined) { (function(window)
             var cloneMc = new MovieClip();
             cloneMc.player = player;
             var parent = targetMc.getParent();
-            if (parent == null) {
+            if (!parent)
                 parent = player.getParent();
-            }
 
             cloneMc.characterId = targetMc.characterId;
             cloneMc.setParent(parent);
             cloneMc.setName(target);
             cloneMc.setLevel(depth);
             cloneMc.setTotalFrames(targetMc.getTotalFrames());
+            cloneMc.isStatic = targetMc.isStatic;
 
             var char = player.getCharacter(targetMc.characterId);
             var swftag = new SwfTag(player);
@@ -7505,6 +7556,7 @@ if (window['swf2js'] == undefined) { (function(window)
             totalFrame = parent.getTotalFrames();
 
             var _clone = clone;
+            var _cloneArray = cloneArray;
             for (frame = 1; frame < totalFrame; frame++) {
                 if (!(frame in cTags)
                     || !(level in cTags[frame])
@@ -7518,18 +7570,24 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 var tags = cTags[frame];
                 oTags[frame][depth] = _clone(oTags[frame][level]);
-                tags[depth] = {
-                    _Matrix: _clone(tags[level]._Matrix),
-                    _ColorTransform: _clone(tags[level]._ColorTransform)
-                }
+
+                tags[depth] = {};
+                var tag = tags[level];
+
+                if (tag._Matrix)
+                    tags[depth]._Matrix = _cloneArray(tag._Matrix);
+
+                if (tag._ColorTransform)
+                    tags[depth]._ColorTransform = _cloneArray(tag._ColorTransform);
+
             }
 
-            //cloneMc.setNextFrame(1);
+            cloneMc.reset(true, 1);
+            cloneMc.addActions();
         }
     };
 
     /**
-     *
      * @param name
      */
     MovieClip.prototype.removeMovieClip = function(name)
@@ -7611,15 +7669,13 @@ if (window['swf2js'] == undefined) { (function(window)
     MovieClip.prototype.putFrame = function()
     {
         var _this = this;
-        if (!_this.stopFlag || _this.getNextFrame() > 0) {
-            var frame = (_this.getNextFrame() > 0)
-                ? _this.getNextFrame()
-                : _this.getFrame() + 1;
-            var frameCount = _this.getTotalFrames();
+        if (!_this.stopFlag) {
+            var frame = _this.getFrame() + 1;
+            var totalFrames = _this.getTotalFrames();
 
-            if (frame > frameCount || frame <= 0) {
+            if (frame > totalFrames || frame <= 0) {
                 frame = 1;
-                if (frameCount > 1) {
+                if (totalFrames > 1) {
                     _this.reset(false, frame);
                 }
             } else {
@@ -7628,11 +7684,6 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             _this.setFrame(frame);
-            if (_this.getNextFrame() > 0) {
-                _this._nextFrame = 0;
-            }
-
-            // remove
             _this.remove();
         }
     };
@@ -7662,7 +7713,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getFrame
      * @returns {number}
      */
     MovieClip.prototype.getFrame = function()
@@ -7671,7 +7721,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setFrame
      * @param frame
      */
     MovieClip.prototype.setFrame = function(frame)
@@ -7681,16 +7730,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getNextFrame
-     * @returns {number}
-     */
-    MovieClip.prototype.getNextFrame = function()
-    {
-        return this._nextFrame;
-    };
-
-    /**
-     * setNextFrame
      * @param frame
      */
     MovieClip.prototype.setNextFrame = function(frame)
@@ -7699,6 +7738,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
         if (_this.getFrame() != frame) {
             _this.isAction = true;
+
             if (frame > _this.getTotalFrames()) {
                 frame = _this.getTotalFrames();
                 _this.isAction = false;
@@ -7733,20 +7773,15 @@ if (window['swf2js'] == undefined) { (function(window)
                 }
             }
 
-            _this._nextFrame = frame;
             _this.setFrame(frame);
-            _this.remove();
+            //_this.remove();
 
-            var player = _this.getPlayer();
-            var actions = player.actions;
-            if (_this.instanceId in actions) {
-                actions[_this.instanceId] = null;
-            }
+            if (_this.isAction)
+                _this.addActions();
         }
     };
 
     /**
-     * getTotalFrames
      * @returns {number}
      */
     MovieClip.prototype.getTotalFrames = function()
@@ -7755,7 +7790,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setTotalFrames
      * @param frame
      */
     MovieClip.prototype.setTotalFrames = function(frame)
@@ -7764,7 +7798,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getProperty
      * @param name
      * @returns {null}
      */
@@ -7854,11 +7887,11 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             case 20:
             case '_xmouse':
-                value = this._xmouse;
+                value = this.getXMouse();
                 break;
             case 21:
             case '_ymouse':
-                value = this._ymouse;
+                value = this.getYMouse();
                 break;
             default:
                 value = this.getVariable(name);
@@ -7872,7 +7905,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setProperty
      * @param name
      * @param value
      */
@@ -8000,9 +8032,6 @@ if (window['swf2js'] == undefined) { (function(window)
             case '_ymouse':
                 this._ymouse = value;
                 break;
-            case 'onEnterFrame':
-                this.addEvent(name, value);
-                break;
             default:
                 value = this.setVariable(name, value);
                 break;
@@ -8010,7 +8039,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setVariable
      * @param name
      * @param value
      */
@@ -8021,10 +8049,11 @@ if (window['swf2js'] == undefined) { (function(window)
         var player = _this.getPlayer();
         if (player.version < 7 && typeof name == 'string') {
             for (var key in variables) {
-                if (key.toLowerCase() == name.toLowerCase()) {
-                    this.variables[key] = value;
-                    return 0;
-                }
+                if (key.toLowerCase() != name.toLowerCase())
+                    continue;
+
+                this.variables[key] = value;
+                return 0;
             }
         }
 
@@ -8032,7 +8061,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getVariable
      * @param name
      * @returns {*}
      */
@@ -8040,50 +8068,42 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var variables = _this.variables;
-        var value;
 
-        if (name in variables) {
+        if (name in variables)
             return variables[name];
-        }
 
         var player = _this.getPlayer();
         var version = player.version;
         if (version < 7) {
             for (var key in variables) {
-                if (typeof key != 'string') {
+                if (typeof key != 'string')
                     continue;
-                }
 
-                if (key.toLowerCase() == name.toLowerCase()) {
+                if (key.toLowerCase() == name.toLowerCase())
                     return variables[key];
-                }
             }
         }
 
         if (version > 4) {
-            if (name in window) {
+            if (name in window)
                 return window[name];
-            } else {
-                return this.getMovieClip(name);
-            }
+            return _this.getMovieClip(name);
         }
 
-        return value;
+        return undefined;
     };
 
     /**
-     * deleteVariable
      * @param name
      */
     MovieClip.prototype.deleteVariable = function(name)
     {
-        if (name in this.variables) {
-            delete this.variables[name];
-        }
+        var variables = this.variables;
+        if (name in variables)
+            delete variables[name];
     };
 
     /**
-     * getLevel
      * @returns {number}
      */
     MovieClip.prototype.getLevel = function()
@@ -8092,7 +8112,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setLevel
      * @param level
      */
     MovieClip.prototype.setLevel = function(level)
@@ -8101,31 +8120,26 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @returns {number}
      */
     MovieClip.prototype.getAlpha = function()
     {
-        var _this = this;
-        var colorTransform = _this.getColorTransform();
+        var colorTransform = this.getColorTransform();
         var alpha = colorTransform[3] + (colorTransform[7] / 255);
         return alpha * 100;
     };
 
     /**
-     *
      * @param alpha
      */
     MovieClip.prototype.setAlpha = function(alpha)
     {
-        var _this = this;
-        var colorTransform = _this.getColorTransform();
+        var colorTransform = this.getColorTransform();
         colorTransform[3] = alpha / 100;
         colorTransform[7] = 0;
     };
 
     /**
-     *
      * @returns {number}
      */
     MovieClip.prototype.getVisible = function()
@@ -8134,7 +8148,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param visible
      */
     MovieClip.prototype.setVisible = function(visible)
@@ -8153,7 +8166,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getLabel
      * @param name
      * @returns {*}
      */
@@ -8163,20 +8175,17 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * addSound
      * @param frame
      * @param obj
      */
     MovieClip.prototype.addSound = function(frame, obj)
     {
-        if (!(frame in this.sounds)) {
+        if (!(frame in this.sounds))
             this.sounds[frame] = [];
-        }
         this.sounds[frame].push(obj);
     };
 
     /**
-     * getSounds
      * @returns {*}
      */
     MovieClip.prototype.getSounds = function()
@@ -8186,10 +8195,9 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * executeSound
      * @param sound
      */
-    MovieClip.prototype.executeSound = function(sound)
+    MovieClip.prototype.startSound = function(sound)
     {
         var _this = this;
         var player = _this.getPlayer();
@@ -8208,12 +8216,12 @@ if (window['swf2js'] == undefined) { (function(window)
                 audio.loopCount = soundInfo.LoopCount;
                 var loopSound = function()
                 {
-                    this.loopCount--;
+                    audio.loopCount--;
                     if (!this.loopCount) {
-                        this.removeEventListener('ended', loopSound, false);
+                        audio.removeEventListener('ended', loopSound, false);
                     } else {
-                        this.currentTime = 0;
-                        this.play();
+                        audio.currentTime = 0;
+                        audio.play();
                     }
                 };
                 audio.addEventListener('ended', loopSound, false);
@@ -8225,12 +8233,12 @@ if (window['swf2js'] == undefined) { (function(window)
 
             audio.currentTime = 0;
             audio.play();
+
             this.soundStopFlag = true;
         }
     };
 
     /**
-     * addTags
      * @param frame
      * @param tag
      */
@@ -8244,7 +8252,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getTags
      * @returns {*}
      */
     MovieClip.prototype.getTags = function()
@@ -8257,7 +8264,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setTags
      * @returns {*}
      */
     MovieClip.prototype.setTags = function()
@@ -8270,21 +8276,24 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * removeTag
      * @param frame
-     * @param tag
+     * @param tags
      */
-    MovieClip.prototype.removeTag = function(frame, tag)
+    MovieClip.prototype.setRemoveTag = function(frame, tags)
     {
-        var tags = this.removeTags;
-        if (!(frame in tags)) {
-            tags[frame] = [];
+        var rTags = this.removeTags;
+        var length = tags.length;
+
+        rTags[frame] = [];
+        if (isArrayBuffer)
+            rTags[frame] = new Uint16Array(length);
+
+        for (var i = 0; i < length; i++) {
+            rTags[frame][i] = tags[i].Depth;
         }
-        tags[frame][tags[frame].length] = tag.Depth;
     };
 
     /**
-     * getRemoveTags
      * @returns {*}
      */
     MovieClip.prototype.getRemoveTags = function()
@@ -8302,7 +8311,8 @@ if (window['swf2js'] == undefined) { (function(window)
         var tags = _this.getRemoveTags();
         var removeFrame = _this.getFrame() - 1;
         if (tags != undefined) {
-            for (var i = tags.length; i--;) {
+            var length = tags.length;
+            for (var i = 0; i < length; i++) {
                 if (!(i in tags)) {
                     continue;
                 }
@@ -8319,6 +8329,11 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 var obj = addTags[depth];
                 if (obj instanceof MovieClip) {
+                    var as = obj.clipEvent.unload;
+                    if (as != undefined) {
+                        _this.setActionQueue(as);
+                    }
+
                     obj.reset(true, 1);
                 }
             }
@@ -8326,14 +8341,13 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * reset
      * @param isRemove
      * @param resetFrame
      */
     MovieClip.prototype.reset = function(isRemove, resetFrame)
     {
         var _this = this;
-        var _clone = clone;
+        var _cloneArray = cloneArray;
         var controlTags = _this.controlTags;
         var originTags = _this.originTags;
         if (controlTags != undefined) {
@@ -8364,8 +8378,8 @@ if (window['swf2js'] == undefined) { (function(window)
                                     continue;
                                 }
 
-                                originTags[frame][depth].Matrix = _clone(tag._Matrix);
-                                originTags[frame][depth].ColorTransform = _clone(tag._ColorTransform);
+                                originTags[frame][depth].Matrix = _cloneArray(tag._Matrix);
+                                originTags[frame][depth].ColorTransform = _cloneArray(tag._ColorTransform);
                                 obj.reset(true, 1);
                             }
                         }
@@ -8377,6 +8391,8 @@ if (window['swf2js'] == undefined) { (function(window)
         if (isRemove) {
             _this.play();
             _this.setVisible(1);
+            _this.isLoad = false;
+            _this.isEnterFrame = false;
         }
 
         _this.setFrame(resetFrame);
@@ -8385,31 +8401,61 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * eventDispatcher
+     * shiftActions
      */
-    MovieClip.prototype.eventDispatcher = function()
+    MovieClip.prototype.shiftActions = function()
     {
         var _this = this;
-        _this.dispatchEvent('onEnterFrame');
-
         var tags = _this.getTags();
-        var _eventDispatcher = _this.eventDispatcher;
+        var _shiftActions = _this.shiftActions;
         var _btnCallback = _this.btnCallback;
-        var length = tags.length;
-        for (;length--;) {
-            if (!(length in tags)) {
+        for (var depth = tags.length; depth--;) {
+            if (!(depth in tags)) {
                 continue;
             }
 
-            var tag = tags[length];
-            if (tag instanceof Player) {
+            var tag = tags[depth];
+            if (tag instanceof Player)
                 tag = tag.getParent();
-            }
 
             if (tag instanceof MovieClip) {
-                _eventDispatcher.call(tag);
+                _shiftActions.call(tag);
             } else if (tag.characters instanceof Array) {
-                _btnCallback.call(_this, tag, _eventDispatcher);
+                _btnCallback.call(_this, tag, _shiftActions);
+            }
+        }
+
+        _this.addAction();
+        _this.addTouchEvent();
+    };
+
+    /**
+     * addTouchEvent
+     */
+    MovieClip.prototype.addTouchEvent = function()
+    {
+        var _this = this;
+        var clipEvent = _this.clipEvent;
+        var player = _this.getPlayer();
+
+        for (name in clipEvent) {
+            var as = clipEvent[name];
+
+            switch (name) {
+                case 'mouseDown':
+                case 'press':
+                    var downEventHits = player.downEventHits;
+                    downEventHits[downEventHits.length] = {as: as, mc: _this};
+                    break;
+                case 'mouseMove':
+                    var moveEventHits = player.moveEventHits;
+                    moveEventHits[moveEventHits.length] = {as: as, mc: _this};
+                    break;
+                case 'mouseUp':
+                case 'release':
+                    var upEventHits = player.upEventHits;
+                    upEventHits[upEventHits.length] = {as: as, mc: _this};
+                    break;
             }
         }
     };
@@ -8420,6 +8466,10 @@ if (window['swf2js'] == undefined) { (function(window)
     MovieClip.prototype.addActions = function()
     {
         var _this = this;
+
+        // action
+        _this.addAction();
+
         var tags = _this.getTags();
         var _addActions = _this.addActions;
         var _btnCallback = _this.btnCallback;
@@ -8430,9 +8480,8 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             var tag = tags[depth];
-            if (tag instanceof Player) {
+            if (tag instanceof Player)
                 tag = tag.getParent();
-            }
 
             if (tag instanceof MovieClip) {
                 _addActions.call(tag);
@@ -8440,20 +8489,73 @@ if (window['swf2js'] == undefined) { (function(window)
                 _btnCallback.call(_this, tag, _addActions);
             }
         }
+    };
 
-        var player = _this.getPlayer();
-        if (_this.isAction) {
-            var as = _this.getActions(_this.getFrame());
+    /**
+     * @param as
+     */
+    MovieClip.prototype.setActionQueue = function(as)
+    {
+        var _this = this;
+        var player = _this.player;
+        var actions = player.actions;
+        var queue = player.queue;
+        var obj = { as: as, mc: _this };
+        if (queue == null) {
+            actions[actions.length] = obj;
+        } else {
+            queue[queue.length] = obj;
+        }
+    };
+
+    /**
+     * アクション追加
+     */
+    MovieClip.prototype.addAction = function()
+    {
+        var _this = this;
+        var clipEvent = _this.clipEvent;
+
+        // onLoad
+        if (!_this.isLoad) {
+            var as = clipEvent.load;
             if (as != undefined) {
-                var actions = player.actions;
-                actions[_this.instanceId] = {as: as, mc: _this};
+                _this.setActionQueue(as);
+            }
+            _this.isLoad = true;
+        }
+
+        // enterFrame
+        if (!_this.isEnterFrame) {
+            var as = clipEvent.enterFrame;
+            if (as != undefined) {
+                _this.isEnterFrame = true;
+            }
+        } else {
+            var as = clipEvent.enterFrame;
+            if (as != undefined) {
+                _this.setActionQueue(as);
+            }
+        }
+
+        // onEnterFrame
+        var variables = _this.variables
+        var as = variables['onEnterFrame'];
+        if (as instanceof ActionScript) {
+            _this.setActionQueue([as]);
+        }
+
+        if (_this.isAction) {
+            var frame = _this.getFrame();
+            var as = _this.getActions(frame);
+            if (as != undefined) {
+                _this.setActionQueue(as);
             }
             _this.isAction = false;
         }
     };
 
     /**
-     * getName
      * @returns {*}
      */
     MovieClip.prototype.getName = function()
@@ -8462,7 +8564,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setName
      * @param name
      */
     MovieClip.prototype.setName = function(name)
@@ -8471,7 +8572,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getParent
      * @returns {*}
      */
     MovieClip.prototype.getParent = function()
@@ -8480,7 +8580,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setParent
      * @param parent
      */
     MovieClip.prototype.setParent = function(parent)
@@ -8489,7 +8588,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getControlTag
      * @returns {*}
      */
     MovieClip.prototype.getControlTag = function()
@@ -8499,7 +8597,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getOriginTag
      * @returns {*}
      */
     MovieClip.prototype.getOriginTag = function()
@@ -8509,7 +8606,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getMatrix
      * @returns {*}
      */
     MovieClip.prototype.getMatrix = function()
@@ -8526,11 +8622,7 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var parent = _this.getParent();
-        if (!parent) {
-            var player = _this.getPlayer();
-            var scale = player.getScale();
-            _this.matrix = [scale, 0, 0, scale, 0, 0];
-        } else {
+        if (parent) {
             var oTags = parent.getOriginTag();
             if (oTags != undefined) {
                 var level = _this.getLevel();
@@ -8539,15 +8631,16 @@ if (window['swf2js'] == undefined) { (function(window)
                     _this.matrix = oTag.Matrix;
                 }
             }
-
-            if (_this.matrix == undefined) {
-                _this.matrix = [1,0,0,1,0,0];
-            }
+        } else if (_this.matrix == undefined) {
+            var player = _this.getPlayer();
+            var scale = player.getScale();
+            _this.matrix = [scale, 0, 0, scale, 0, 0];
+            if (isArrayBuffer)
+                _this.matrix = new Float32Array(_this.matrix);
         }
     };
 
     /**
-     * getColorTransform
      * @returns {*}
      */
     MovieClip.prototype.getColorTransform = function()
@@ -8564,9 +8657,7 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var parent = _this.getParent();
-        if (!parent) {
-            _this.colorTransform = [1,1,1,1,0,0,0,0];
-        } else {
+        if (parent) {
             var oTags = parent.getOriginTag();
             if (oTags != undefined) {
                 var level = _this.getLevel();
@@ -8575,61 +8666,53 @@ if (window['swf2js'] == undefined) { (function(window)
                     _this.colorTransform = oTag.ColorTransform;
                 }
             }
-
-            if (_this.colorTransform == undefined) {
-                _this.colorTransform = [1,1,1,1,0,0,0,0];
-            }
+        } else if (_this.colorTransform == undefined) {
+            _this.colorTransform = [1,1,1,1,0,0,0,0];
+            if (isArrayBuffer)
+                _this.colorTransform = new Float32Array(_this.colorTransform);
         }
+
     };
 
     /**
-     * getX
      * @returns {*}
      */
     MovieClip.prototype.getX = function()
     {
-        var _this = this;
-        var Matrix = _this.getMatrix();
+        var Matrix = this.getMatrix();
         return Matrix[4]/20;
     };
 
     /**
-     * setX
      * @param x
      */
     MovieClip.prototype.setX = function(x)
     {
-        var _this = this;
-        var Matrix = _this.getMatrix();
+        var Matrix = this.getMatrix();
         Matrix[4] = x*20;
     };
 
     /**
-     * getY
      * @returns {*}
      */
     MovieClip.prototype.getY = function()
     {
-        var _this = this;
-        var Matrix = _this.getMatrix();
+        var Matrix = this.getMatrix();
         return Matrix[5]/20;
     };
 
     /**
-     * setY
      * @param y
      */
     MovieClip.prototype.setY = function(y)
     {
-        var _this = this;
-        var Matrix = _this.getMatrix();
+        var Matrix = this.getMatrix();
         Matrix[5] = y*20;
     };
 
     /**
-     * getBounds
      * @param parentMatrix
-     * @returns {{Xmax: number, Xmin: number, Ymax: number, Ymin: number}}
+     * @returns {{}}
      */
     MovieClip.prototype.getBounds = function(parentMatrix)
     {
@@ -8697,22 +8780,20 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getWidth
      * @returns {number}
      */
     MovieClip.prototype.getWidth = function()
     {
         var _this = this;
-        var bounds = _this.getBounds(_this.getMatrix());
+        var matrix = _this.getMatrix();
+        var bounds = _this.getBounds(matrix);
         var width = bounds.Xmax - bounds.Xmin;
         if (width < 0)
             width *= -1;
-
         return width / 20;
     };
 
     /**
-     * setWidth
      * @param width
      */
     MovieClip.prototype.setWidth = function(width)
@@ -8723,22 +8804,20 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getHeight
      * @returns {number}
      */
     MovieClip.prototype.getHeight = function()
     {
         var _this = this;
-        var bounds = _this.getBounds(_this.getMatrix());
+        var matrix = _this.getMatrix();
+        var bounds = _this.getBounds(matrix);
         var height = bounds.Ymax - bounds.Ymin;
         if (height < 0)
             height *= -1;
-
         return height / 20;
     };
 
     /**
-     * setHeight
      * @param height
      */
     MovieClip.prototype.setHeight = function(height)
@@ -8749,7 +8828,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getXScale
      * @returns {*}
      */
     MovieClip.prototype.getXScale = function()
@@ -8760,7 +8838,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setXScale
      * @param xscale
      */
     MovieClip.prototype.setXScale = function(xscale)
@@ -8775,7 +8852,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getYScale
      * @returns {*}
      */
     MovieClip.prototype.getYScale = function()
@@ -8786,7 +8862,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setScale
      * @param yscale
      */
     MovieClip.prototype.setYScale = function(yscale)
@@ -8801,7 +8876,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getRotation
      * @returns {number}
      */
     MovieClip.prototype.getRotation = function()
@@ -8812,7 +8886,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setRotation
      * @param rotation
      */
     MovieClip.prototype.setRotation = function(rotation)
@@ -8835,7 +8908,66 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * getActions
+     *
+     * @returns {*}
+     */
+    MovieClip.prototype.getXMouse = function()
+    {
+        if (!_event)
+            return null;
+
+        var _this = this;
+        var player = _this.getPlayer();
+        var div = _document.getElementById(player.getName());
+        var bounds = div.getBoundingClientRect();
+        var docBody = _document.body;
+        var x = docBody.scrollLeft + bounds.left;
+        var touchX = 0;
+
+        if (isTouch) {
+            var changedTouche = _event.targetTouches[0];
+            touchX = changedTouche.pageX;
+        } else {
+            touchX = _event.pageX;
+        }
+
+        touchX -= x;
+        //touchX *= _devicePixelRatio;
+
+        return touchX / 20;
+    };
+
+    /**
+     *
+     * @returns {*}
+     */
+    MovieClip.prototype.getYMouse = function()
+    {
+        if (!_event)
+            return null;
+
+        var _this = this;
+        var player = _this.getPlayer();
+        var div = _document.getElementById(player.getName());
+        var bounds = div.getBoundingClientRect();
+        var docBody = _document.body;
+        var y = docBody.scrollTop + bounds.top;
+        var touchY = 0;
+
+        if (isTouch) {
+            var changedTouche = _event.targetTouches[0];
+            touchY = changedTouche.pageY;
+        } else {
+            touchY = _event.pageY;
+        }
+
+        touchY -= y;
+        //touchY *= _devicePixelRatio;
+
+        return touchY / 20;
+    };
+
+    /**
      * @param frame
      * @returns {*}
      */
@@ -8845,7 +8977,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * setActions
      * @param frame
      * @param actionScript
      */
@@ -8864,17 +8995,18 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * render
      * @param ctx
      * @param matrix
      * @param colorTransform
+     * @param player
+     * @param isButton
      */
-    MovieClip.prototype.render = function(ctx, matrix, colorTransform)
+    MovieClip.prototype.render = function(ctx, matrix, colorTransform, player, isButton)
     {
         var _this = this;
-        var player = _this.getPlayer();
         var tags = _this.getTags();
         var length = tags.length;
+        var localPlayer = _this.getPlayer();
 
         // sound
         if (!_this.soundStopFlag) {
@@ -8887,13 +9019,12 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     var sound = sounds[idx];
-                    _this.executeSound(sound);
+                    _this.startSound(sound);
                 }
             }
         }
 
         var _render = _this.render;
-        var _renderMorphShape = _this.renderMorphShape;
         var _renderShape = _this.renderShape;
         var _renderButton = _this.renderButton;
         var _renderText = _this.renderText;
@@ -8902,10 +9033,9 @@ if (window['swf2js'] == undefined) { (function(window)
         var _getColorTransform = _this.getColorTransform;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
-        var _drawImage = ctx.drawImage;
-        var _setTransform = ctx.setTransform;
         for (var depth = 1; depth < length; depth++) {
-            var cache = null;
+            if (player.isReload)
+                break;
 
             if (!(depth in tags))
                 continue;
@@ -8931,123 +9061,51 @@ if (window['swf2js'] == undefined) { (function(window)
                 obj = obj.getParent();
 
             if (obj instanceof MovieClip) {
-                var renderMatrix = _multiplicationMatrix.call(
-                    obj,
-                    matrix,
-                    _getMatrix.call(obj)
-                );
-
-                var renderColorTransform = _multiplicationColor.call(
-                    obj,
-                    colorTransform,
-                    _getColorTransform.call(obj)
-                );
-
                 // _alpha or _visible
                 if (obj.getAlpha() == 0 || obj.getVisible() == 0)
                     continue;
 
-                var test = false;
-                if (test === true
-                    && obj.isStatic
-                    && ctx.canvas.isStatic == undefined
-                ) {
-                    var cacheKey = cacheStore.generateKey(
-                        'MovieClip',
-                        obj.characterId +"_"+ player.getId(),
-                        renderMatrix,
-                        renderColorTransform
-                    );
+                var renderMatrix = _multiplicationMatrix.call(obj, matrix, _getMatrix.call(obj));
 
-                    cache = cacheStore.get(cacheKey);
-                    if (!cache) {
-                        var bounds = obj.getBounds(renderMatrix, true);
-                        var W = bounds.Xmax - bounds.Xmin;
-                        var H = bounds.Ymax - bounds.Ymin;
+                var renderColorTransform = _multiplicationColor.call(obj, colorTransform, _getColorTransform.call(obj));
 
-                        if (player.getWidth() > W && player.getHeight() > H) {
-                            var canvas = cacheStore.getCanvas();
-                            canvas.width = W;
-                            canvas.height = H;
+                _render.call(obj, ctx, renderMatrix, renderColorTransform, player, isButton);
 
-                            cache = canvas.getContext("2d");
-                            cache.offsetX = -bounds.Xmin;
-                            cache.offsetY = -bounds.Ymin;
-                            cache.canvas.isStatic = true;
-
-                            _render.call(obj, cache, renderMatrix, renderColorTransform);
-
-                            cache.offsetX = bounds.Xmin - renderMatrix[4];
-                            cache.offsetY = bounds.Ymin - renderMatrix[5];
-
-                            cacheStore.set(cacheKey, cache);
-                        }
-                    }
-                }
-
-                if (!cache) {
-                    _render.call(obj, ctx, renderMatrix, renderColorTransform);
-                }
             } else {
-
-                var char = player.getCharacter(obj.characterId);
+                var char = localPlayer.getCharacter(obj.characterId);
                 if (!char) {
                     continue;
                 }
 
-                var renderMatrix = matrix;
-                if (obj.matrix != undefined) {
-                    renderMatrix = _multiplicationMatrix.call(
-                        _this,
-                        matrix,
-                        obj.matrix
-                    );
-                }
+                var renderMatrix = _multiplicationMatrix.call(_this, matrix, obj.matrix);
 
-                var renderColorTransform = colorTransform;
-                if (obj.colorTransform != undefined) {
-                    renderColorTransform = _multiplicationColor.call(
-                        _this,
-                        colorTransform,
-                        obj.colorTransform
-                    );
-                }
+                var renderColorTransform = _multiplicationColor.call(_this, colorTransform, obj.colorTransform);
 
                 switch (char.tagType) {
                     case 46: // MorphShape
                     case 84: // MorphShape2
                         var controlTag = _this.getControlTag();
                         var cTag = controlTag[depth];
-                        cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, cTag.Ratio);
+                        _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, cTag.Ratio, player);
                         break;
                     case 2:  // DefineShape
                     case 22: // DefineShape2
                     case 32: // DefineShape3
                     case 83: // DefineShape4
-                        cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, false);
+                        _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, obj, false, player);
                         break;
                     case 7: // DefineButton
                     case 34: // DefineButton2
-                        _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, obj, depth);
-                        continue;
+                        _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, obj, depth, player);
+                        break;
                     case 11: // DefineText
                     case 33: // DefineText2
                         _renderText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
-                        continue;
+                        break;
                     case 37: // DefineEditText
                         _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, obj);
-                        continue;
+                        break;
                 } //  switch
-            }
-
-            if (cache instanceof CanvasRenderingContext2D) {
-                var canvas = cache.canvas;
-                if (canvas.width > 0 && canvas.height > 0) {
-                    var x = _ceil(cache.offsetX + renderMatrix[4] - 0.5);
-                    var y = _ceil(cache.offsetY + renderMatrix[5] - 0.5);
-                    _setTransform.call(ctx, 1, 0, 0, 1, x, y);
-                    _drawImage.call(ctx, canvas, 0, 0);
-                }
             }
         }
 
@@ -9058,103 +9116,116 @@ if (window['swf2js'] == undefined) { (function(window)
             ctx.restore();
         }
 
-        _this._nextFrame = 0;
-        _this.putFrame();
+        if (!isButton)
+            _this.putFrame();
+
     };
 
     /**
-     * renderShape
      * @param ctx
      * @param matrix
      * @param colorTransform
      * @param tag
+     * @param ratio
+     * @param player
      * @returns {*}
      */
-    MovieClip.prototype.renderShape = function(ctx, matrix, colorTransform, tag)
+    MovieClip.prototype.renderShape = function(ctx, matrix, colorTransform, tag, ratio, player)
     {
         var _this = this;
-        var player = _this.getPlayer();
-        var cacheKey = cacheStore.generateKey(
-            'Shape',
-            tag.characterId +"_"+ player.getId(),
-            matrix,
-            colorTransform
-        );
+        var cache = null;
+        var localPlayer = _this.getPlayer();
+        var characterId = tag.characterId;
+        var char = (ratio === false) ? localPlayer.getCharacter(characterId) : tag;
+        var _setTransform = ctx.setTransform;
+        var _executeRenderShape = _this.executeRenderShape;
 
-        var cache = cacheStore.get(cacheKey);
-        if (!cache || tag.isClipDepth) {
+        if (tag.isClipDepth) {
+            _setTransform.call(ctx, matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
+            _executeRenderShape.call(_this, ctx, _min(matrix[0], matrix[3]), colorTransform, char.data, tag.isClipDepth, player);
+        } else {
+            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+            var yScale = _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]);
+            xScale = _pow(_SQRT2, _ceil(_log(xScale) / (_LN2 / 2)));// - 0.5260688116675875));
+            yScale = _pow(_SQRT2, _ceil(_log(yScale) / (_LN2 / 2)));// - 0.5260688116675875));
 
-            var char = player.getCharacter(tag.characterId);
-            var _executeRenderShape = _this.executeRenderShape;
-            var _setTransform = ctx.setTransform;
+            var cacheId = characterId +"_"+ localPlayer.getId();
+            if (ratio != false)
+                cacheId += "_"+ ratio;
 
-            var isStatic = ctx.canvas.isStatic;
-            if (isStatic == true) {
-                _setTransform.call(ctx, matrix[0], matrix[1], matrix[2], matrix[3],
-                    ctx.offsetX + matrix[4], ctx.offsetY + matrix[5]);
-            } else {
-                _setTransform.call(ctx, matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
-            }
+            var cacheKey = cacheStore.generateKey(
+                'Shape',
+                cacheId,
+                [xScale, yScale],
+                colorTransform
+            );
 
-            if (isStatic == false && !_this.cacheWait && !tag.isClipDepth) {
-                var _renderBoundMatrix = _this.renderBoundMatrix;
-                var rBound = _renderBoundMatrix.call(_this, char, matrix);
-                var W = _ceil(rBound[2]);
-                var H = _ceil(rBound[3]);
+            var Xmax = char.Xmax;
+            var Xmin = char.Xmin;
+            var Ymax = char.Ymax;
+            var Ymin = char.Ymin;
+            var W = _ceil((Xmax - Xmin) * xScale);
+            var H = _ceil((Ymax - Ymin) * yScale);
 
-                if (player.getWidth() > W && player.getHeight() > H) {
-                    player.cacheStart();
+            cache = cacheStore.get(cacheKey);
+            if (!cache) {
+                if (player.width > W && player.height > H && cacheStore.size > W*H) {
+                    var canvas = cacheStore.getCanvas();
+                    canvas.width = W;
+                    canvas.height = H;
 
-                    var cacheFunc = function ()
-                    {
-                        var canvas = cacheStore.getCanvas();
-                        canvas.width = W;
-                        canvas.height = H;
+                    cache = canvas.getContext("2d");
+                    _setTransform.call(cache, xScale, 0, 0, yScale, -Xmin * xScale, -Ymin * yScale);
 
-                        var cache = canvas.getContext("2d");
-                        cache.offsetX = rBound[0];
-                        cache.offsetY = rBound[1];
+                    cache = _executeRenderShape.call(
+                        _this, cache, _min(xScale, yScale), colorTransform, char.data, tag.isClipDepth, player
+                    );
 
-                        _setTransform.call(cache, matrix[0], matrix[1], matrix[2], matrix[3], -rBound[0], -rBound[1]);
-
-                        cacheStore.set(cacheKey, _executeRenderShape.call(
-                            _this, cache, matrix, colorTransform, char.data, tag.isClipDepth
-                        ));
-
-                        player.cacheEnd();
-                    };
-
-                    _setTimeout(cacheFunc, 0);
+                    cacheStore.set(cacheKey, cache);
                 }
             }
 
-            // 実行
-            _executeRenderShape.call(_this, ctx, matrix, colorTransform, char.data, tag.isClipDepth);
+            if (cache) {
+                var _multiplicationMatrix = _this.multiplicationMatrix;
+                var m2 = _multiplicationMatrix.call(
+                    _this,
+                    matrix,
+                    [1 / xScale, 0, 0, 1 / yScale, Xmin, Ymin]
+                );
 
-            cache = null;
+                ctx.setTransform(m2[0], m2[1], m2[2], m2[3], m2[4], m2[5]);
+
+                if (isAndroid4x && !isChrome) {
+                    ctx.fillStyle = player.context.createPattern(cache.canvas, 'no-repeat');
+                    ctx.fillRect(0, 0, W, H);
+                } else {
+                    ctx.drawImage(cache.canvas, 0, 0);
+                }
+            } else {
+                _setTransform.call(ctx, matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
+                _executeRenderShape.call(_this, ctx, _min(matrix[0], matrix[3]), colorTransform, char.data, tag.isClipDepth, player);
+            }
         }
-
-        return cache;
     };
 
     /**
-     * executeRenderShape
      * @param ctx
-     * @param matrix
+     * @param minScale
      * @param colorTransform
      * @param shapes
      * @param isClipDepth
+     * @param player
      * @returns {*}
      */
-    MovieClip.prototype.executeRenderShape = function(ctx, matrix, colorTransform, shapes, isClipDepth)
+    MovieClip.prototype.executeRenderShape = function(ctx, minScale, colorTransform, shapes, isClipDepth, player)
     {
         var _this = this;
-        var player = _this.getPlayer();
         var shapeLength = shapes.length;
         var _generateColorTransform = _this.generateColorTransform;
         var _generateImageTransform = _this.generateImageTransform;
         var _transform = ctx.transform;
         var _drawImage = ctx.drawImage;
+        var localPlayer = _this.getPlayer();
 
         for (var idx = 0; idx < shapeLength; idx++) {
             if (!(idx in shapes)) {
@@ -9194,9 +9265,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                         if (isStroke) {
                             ctx.strokeStyle = css;
-                            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-                            var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
-                            var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
+                            var lineWidth = _max(styleObj.Width, 1 / minScale);
                             ctx.lineWidth = lineWidth;
                             ctx.lineCap = "round";
                             ctx.lineJoin = "round";
@@ -9236,9 +9305,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                         if (isStroke) {
                             ctx.strokeStyle = css;
-                            var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-                            var yScale = _sqrt(matrix[3] * matrix[3] + matrix[2] * matrix[2]);
-                            var lineWidth = _max(styleObj.Width, 1 / _min(xScale, yScale));
+                            var lineWidth = _max(styleObj.Width, 1 / minScale);
                             ctx.lineWidth = lineWidth;
                             ctx.lineCap = "round";
                             ctx.lineJoin = "round";
@@ -9263,14 +9330,18 @@ if (window['swf2js'] == undefined) { (function(window)
 
                         var bitmapCacheKey = cacheStore.generateKey(
                             'Bitmap',
-                            bitmapId +"_"+ player.getId() +"_"+ repeat,
+                            bitmapId +"_"+ localPlayer.getId() +"_"+ repeat,
                             undefined,
                             colorTransform
                         );
 
                         var image = cacheStore.get(bitmapCacheKey);
                         if (image == undefined) {
-                            image = player.getCharacter(bitmapId);
+                            image = localPlayer.getCharacter(bitmapId);
+                            if (!image)
+                                break;
+
+
 
                             if (colorTransform[0] != 1
                                 || colorTransform[1] != 1
@@ -9282,6 +9353,7 @@ if (window['swf2js'] == undefined) { (function(window)
                                 var canvas = cacheStore.getCanvas();
                                 canvas.width = image.canvas.width;
                                 canvas.height = image.canvas.height;
+
                                 var imageContext = canvas.getContext("2d");
                                 _drawImage.call(imageContext, image.canvas, 0, 0);
 
@@ -9324,7 +9396,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 ctx.save();
                 ctx.setTransform(1,0,0,1,0,0);
                 ctx.beginPath();
-                ctx.clearRect(0, 0, canvas.width+1, canvas.height);
+                ctx.clearRect(0, 0, canvas.width+1, canvas.height+1);
                 _drawImage.call(ctx, tmpCanvas, 0, 0);
                 ctx.restore();
 
@@ -9341,94 +9413,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * renderMorphShape
-     * @param ctx
-     * @param matrix
-     * @param colorTransform
-     * @param tag
-     * @param ratio
-     * @returns {*}
-     */
-    MovieClip.prototype.renderMorphShape = function(ctx, matrix, colorTransform, tag, ratio)
-    {
-        var _this = this;
-        var player = _this.getPlayer();
-        ratio = ratio | 0;
-        var cacheKey = cacheStore.generateKey(
-            'MorphShape',
-            tag.characterId +"_"+ player.getId() +"_"+ ratio,
-            matrix,
-            colorTransform
-        );
-
-        var cache = cacheStore.get(cacheKey);
-        if (!cache) {
-            var _executeRenderShape = _this.executeRenderShape;
-            var _setTransform = ctx.setTransform;
-
-            _setTransform.call(
-                ctx,
-                matrix[0],
-                matrix[1],
-                matrix[2],
-                matrix[3],
-                matrix[4],
-                matrix[5]
-            );
-
-            if (!player.cacheWait) {
-                var _renderBoundMatrix = _this.renderBoundMatrix;
-                var rBound = _renderBoundMatrix.call(_this, tag, matrix);
-                var W = _ceil(rBound[2]);
-                var H = _ceil(rBound[3]);
-
-                if (player.getWidth() > W && player.getHeight() > H) {
-                    player.cacheStart();
-
-                    var cacheFunc = function ()
-                    {
-                        var canvas = cacheStore.getCanvas();
-                        canvas.width = W;
-                        canvas.height = H;
-
-                        var cache = canvas.getContext("2d");
-                        cache.offsetX = rBound[0];
-                        cache.offsetY = rBound[1];
-
-                        _setTransform.call(
-                            cache,
-                            matrix[0],
-                            matrix[1],
-                            matrix[2],
-                            matrix[3],
-                            -rBound[0],
-                            -rBound[1]
-                        );
-
-                        cacheStore.set(cacheKey, _executeRenderShape.call(
-                            _this, cache, matrix, colorTransform, tag.data, false
-                        ));
-
-                        player.cacheEnd();
-                    };
-
-                    requestAnimationFrame(cacheFunc, 0);
-                }
-            }
-
-            // 実行
-            _executeRenderShape.call(_this, ctx, matrix, colorTransform, tag.data, false);
-
-            ctx.globalAlpha = 1;
-
-            cache = null;
-        }
-
-        return cache;
-    };
-
-    /**
-     * renderText
      * @param ctx
      * @param matrix
      * @param colorTransform
@@ -9521,7 +9505,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * renderGlyph
      * @param records
      * @param ctx
      */
@@ -9553,7 +9536,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * renderEditText
      * @param ctx
      * @param matrix
      * @param colorTransform
@@ -9637,10 +9619,10 @@ if (window['swf2js'] == undefined) { (function(window)
 
         color = _this.generateColorTransform(color, colorTransform);
         ctx.fillStyle = 'rgb('
-        + color.R +','
-        + color.G +','
-        + color.B +
-        ')';
+            + color.R +','
+            + color.G +','
+            + color.B +
+            ')';
         ctx.globalAlpha = color.A;
 
         // font type
@@ -9651,9 +9633,9 @@ if (window['swf2js'] == undefined) { (function(window)
         if (data.HasFont) {
             var fontData = player.getCharacter(data.FontID);
             useOutlines = (
-            fontData.FontFlagsHasLayout
-            && data.UseOutlines
-            && !data.Password
+                fontData.FontFlagsHasLayout
+                && data.UseOutlines
+                && !data.Password
             );
 
             fontHeight = data.FontHeight / 20;
@@ -9716,7 +9698,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         XOffset += W*20 - rightMargin - textWidth - 2;
                     } else if (data.Align == 2) {
                         XOffset += (indent + leftMargin)
-                        + ((W*20 - indent - leftMargin - rightMargin - textWidth) / 2);
+                            + ((W*20 - indent - leftMargin - rightMargin - textWidth) / 2);
                     } else {
                         XOffset += indent + leftMargin + 2;
                     }
@@ -9767,7 +9749,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 } else if (data.Align == 2) {
                     ctx.textAlign = "center";
                     dx += (indent + leftMargin)
-                    + (((XMax + XMin) - indent - leftMargin - rightMargin) / 2);
+                        + (((XMax + XMin) - indent - leftMargin - rightMargin) / 2);
                 } else {
                     dx += indent + leftMargin;
                 }
@@ -9810,19 +9792,19 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * renderButton
      * @param ctx
      * @param matrix
      * @param colorTransform
      * @param tag
      * @param depth
+     * @param player
+     * @param isButton
      */
-    MovieClip.prototype.renderButton = function(ctx, matrix, colorTransform, tag, depth)
+    MovieClip.prototype.renderButton = function(ctx, matrix, colorTransform, tag, depth, player, isButton)
     {
         var _this = this;
-        var player = _this.getPlayer();
-        var char = player.getCharacter(tag.characterId);
-        var isHit = player.isHit;
+        var localPlayer = _this.getPlayer();
+        var char = localPlayer.getCharacter(tag.characterId);
         var touchObj = player.touchObj;
         var characters = char.characters;
         var buttonHits = player.buttonHits;
@@ -9851,7 +9833,6 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         var _render = _this.render;
-        var _renderMorphShape = _this.renderMorphShape;
         var _renderShape = _this.renderShape;
         var _renderButton = _this.renderButton;
         var _renderText = _this.renderText;
@@ -9859,8 +9840,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var _getBounds = _this.getBounds;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
-        var _drawImage = ctx.drawImage;
-        var _setTransform = ctx.setTransform;
 
         var length = characters.length;
         for (var d = 1; d < length; d++) {
@@ -9895,7 +9874,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
                     var cacheKey = cacheStore.generateKey(
                         'ButtonHit',
-                        tag.characterId +"_"+ player.getId(),
+                        tag.characterId +"_"+ _this.getPlayer().getId(),
                         renderMatrix,
                         renderColorTransform
                     );
@@ -9905,7 +9884,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         if (tagChar instanceof MovieClip) {
                             var bounds = _getBounds.call(tagChar, renderMatrix);
                         } else {
-                            var bounds = player.getCharacter(tagChar.characterId);
+                            var bounds = localPlayer.getCharacter(tagChar.characterId);
                         }
 
                         var no = _Number.MAX_VALUE;
@@ -9928,7 +9907,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
                         Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
 
-                        cacheStore.store[cacheKey] = {
+                        hitObj = {
                             characterId: tag.characterId,
                             Xmax: Xmax,
                             Xmin: Xmin,
@@ -9938,11 +9917,14 @@ if (window['swf2js'] == undefined) { (function(window)
                             Sound: btnChar.Sound,
                             parent: _this
                         };
+
+                        cacheStore.store[cacheKey] = hitObj;
                     }
                     buttonHits[buttonHits.length] = hitObj;
                 }
 
-                if (isHit && touchObj != null
+                if (_this.buttonStatus == 'down'
+                    && touchObj != null
                     && touchObj.characterId == tag.characterId
                 ) {
                     if (!btnChar.ButtonStateDown) {
@@ -9951,74 +9933,63 @@ if (window['swf2js'] == undefined) { (function(window)
 
                     if (tagChar instanceof MovieClip) {
                         tagChar.isButtonRemove = true;
-                        tagChar._nextFrame = 0;
-                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
+                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform, player, isButton);
                     } else {
-                        var obj = player.getCharacter(tagChar.characterId);
+                        var obj = localPlayer.getCharacter(tagChar.characterId);
                         switch (obj.tagType) {
                             case 46: // MorphShape
                             case 84: // MorphShape2
                                 var controlTag = _this.getControlTag();
                                 var cTag = controlTag[depth];
-                                cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio, player);
                                 break;
                             case 2:  // DefineShape
                             case 22: // DefineShape2
                             case 32: // DefineShape3
                             case 83: // DefineShape4
-                                cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                if (obj.isClipDepth) {
-                                    continue;
-                                }
+                                _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, false, player);
                                 break;
                             case 7: // DefineButton
                             case 34: // DefineButton2
                                 _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                continue;
+                                break;
                             case 11: // DefineText
                             case 33: // DefineText2
-                                cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 break;
                             case 37: // DefineEditText
                                 _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                continue;
                                 break;
                         } //  switch
                     }
                 } else if (btnChar.ButtonStateUp) {
                     if (tagChar instanceof MovieClip) {
-                        tagChar._nextFrame = 0;
-                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform);
+                        _render.call(tagChar, ctx, renderMatrix, renderColorTransform, player, isButton);
                     } else {
-                        var obj = player.getCharacter(tagChar.characterId);
+                        var obj = localPlayer.getCharacter(tagChar.characterId);
                         switch (obj.tagType) {
                             case 46: // MorphShape
                             case 84: // MorphShape2
                                 var controlTag = _this.getControlTag();
                                 var cTag = controlTag[depth];
-                                cache = _renderMorphShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio);
+                                _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, cTag.Ratio, player);
                                 break;
                             case 2:  // DefineShape
                             case 22: // DefineShape2
                             case 32: // DefineShape3
                             case 83: // DefineShape4
-                                cache = _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                if (obj.isClipDepth) {
-                                    continue;
-                                }
+                                _renderShape.call(_this, ctx, renderMatrix, renderColorTransform, tagChar, false, player);
                                 break;
                             case 7: // DefineButton
                             case 34: // DefineButton2
                                 _renderButton.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                continue
                                 break;
                             case 11: // DefineText
                             case 33: // DefineText2
-                                cache = _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
+                                _renderText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
                                 break;
                             case 37: // DefineEditText
                                 _renderEditText.call(_this, ctx, renderMatrix, renderColorTransform, tagChar);
-                                continue;
                                 break;
                         } //  switch
                     }
@@ -10032,65 +10003,11 @@ if (window['swf2js'] == undefined) { (function(window)
                     tagChar.isButtonRemove = false;
                     tagChar.reset(false, 1);
                 }
-
-                if (cache instanceof CanvasRenderingContext2D) {
-                    var canvas = cache.canvas;
-                    if (canvas.width > 0 && canvas.height > 0) {
-                        var x = _ceil(cache.offsetX + renderMatrix[4] - 0.5);
-                        var y = _ceil(cache.offsetY + renderMatrix[5] - 0.5);
-                        _setTransform.call(ctx, 1, 0, 0, 1, x, y);
-                        _drawImage.call(ctx,canvas, 0, 0);
-                    }
-                }
             }
         }
     };
 
     /**
-     * renderBoundMatrix
-     * @param bound
-     * @param matrix
-     * @returns {Array}
-     */
-    MovieClip.prototype.renderBoundMatrix = function(bound, matrix)
-    {
-        var no = _Number.MAX_VALUE;
-        var Xmax = -no;
-        var Ymax = -no;
-        var Xmin = no;
-        var Ymin = no;
-
-        var x0 = bound.Xmax * matrix[0] + bound.Ymax * matrix[2];
-        var x1 = bound.Xmax * matrix[0] + bound.Ymin * matrix[2];
-        var x2 = bound.Xmin * matrix[0] + bound.Ymax * matrix[2];
-        var x3 = bound.Xmin * matrix[0] + bound.Ymin * matrix[2];
-        var y0 = bound.Xmax * matrix[1] + bound.Ymax * matrix[3];
-        var y1 = bound.Xmax * matrix[1] + bound.Ymin * matrix[3];
-        var y2 = bound.Xmin * matrix[1] + bound.Ymax * matrix[3];
-        var y3 = bound.Xmin * matrix[1] + bound.Ymin * matrix[3];
-
-        Xmax = _max(_max(_max(_max(Xmax, x0), x1), x2), x3);
-        Xmin = _min(_min(_min(_min(Xmin, x0), x1), x2), x3);
-        Ymax = _max(_max(_max(_max(Ymax, y0), y1), y2), y3);
-        Ymin = _min(_min(_min(_min(Ymin, y0), y1), y2), y3);
-
-        var x = Xmin;
-        var w = Xmax - x;
-        if (w < 0) {
-            w *= -1;
-        }
-
-        var y = Ymin;
-        var h = Ymax - y;
-        if (h < 0) {
-            h *= -1;
-        }
-
-        return [x, y, w, h];
-    };
-
-    /**
-     * generateColorTransform
      * @param color
      * @param data
      * @returns {{R: *, G: *, B: *, A: *}}
@@ -10111,29 +10028,38 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * multiplicationMatrix
      * @param a
      * @param b
      * @returns {Array}
      */
     MovieClip.prototype.multiplicationMatrix = function(a, b)
     {
-        return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+        return [
+            a[0] * b[0] + a[2] * b[1],
+            a[1] * b[0] + a[3] * b[1],
+            a[0] * b[2] + a[2] * b[3],
+            a[1] * b[2] + a[3] * b[3],
+            a[0] * b[4] + a[2] * b[5] + a[4],
+            a[1] * b[4] + a[3] * b[5] + a[5]
+        ];
     };
 
     /**
-     *
      * @param a
      * @param b
      * @returns {Array}
      */
     MovieClip.prototype.multiplicationColor = function(a, b)
     {
-        return [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3], a[0] * b[4] + a[4], a[1] * b[5] + a[5], a[2] * b[6] + a[6], a[3] * b[7] + a[7]];
+        return [
+            a[0] * b[0], a[1] * b[1],
+            a[2] * b[2], a[3] * b[3],
+            a[0] * b[4] + a[4], a[1] * b[5] + a[5],
+            a[2] * b[6] + a[6], a[3] * b[7] + a[7]
+        ];
     };
 
     /**
-     * generateImageTransform
      * @param ctx
      * @param color
      * @returns {*}
@@ -10172,7 +10098,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * keyAction
      * @param event
      */
     function keyAction(event)
@@ -10192,7 +10117,6 @@ if (window['swf2js'] == undefined) { (function(window)
             var buttonHits = player.buttonHits;
             var len = buttonHits.length;
             var isEnd = false;
-            var touchActions = player.touchActions;
 
             if (96 <= keyCode && keyCode <= 105) {
                 var n = keyCode - 96;
@@ -10297,9 +10221,7 @@ if (window['swf2js'] == undefined) { (function(window)
                         continue;
                     }
 
-                    var mc = hitObj.parent;
-                    var as = cond.ActionScript;
-                    touchActions[touchActions.length] = {as: as, mc: mc};
+                    player.buttonAction(hitObj.parent, cond.ActionScript);
                     isEnd = true;
                     break;
                 }
@@ -10312,7 +10234,6 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
-     * unzip
      * @param compressed
      * @param isDeCompress
      * @returns {Array}
@@ -10326,8 +10247,8 @@ if (window['swf2js'] == undefined) { (function(window)
         var _buildHuffTable = buildHuffTable;
         var _decodeSymbol = decodeSymbol;
 
-        var zBitio = new BitIO();
-        zBitio.setData(compressed);
+        var bitio = new BitIO();
+        bitio.setData(compressed);
 
         var ORDER =
             [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
@@ -10362,14 +10283,14 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         if (isDeCompress) {
-            zBitio.setOffset(10, 8);
+            bitio.setOffset(10, 8);
         } else {
-            zBitio.setOffset(2, 8);
+            bitio.setOffset(2, 8);
         }
 
         for (; !done; ) {
-            var done = zBitio.readUB(1);
-            var type = zBitio.readUB(2);
+            var done = bitio.readUB(1);
+            var type = bitio.readUB(2);
 
             var distTable = {};
             var litTable = {};
@@ -10412,16 +10333,16 @@ if (window['swf2js'] == undefined) { (function(window)
                         litTable = fixedLitTable = _buildHuffTable(bitLengths);
                     }
                 } else {
-                    var numLitLengths = zBitio.readUB(5) + 257;
-                    var numDistLengths = zBitio.readUB(5) + 1;
-                    var numCodeLengths = zBitio.readUB(4) + 4;
+                    var numLitLengths = bitio.readUB(5) + 257;
+                    var numDistLengths = bitio.readUB(5) + 1;
+                    var numCodeLengths = bitio.readUB(4) + 4;
                     var codeLengths = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                     if (isArrayBuffer) {
                         codeLengths = new Uint8Array(codeLengths);
                     }
 
                     for(i = 0; i < numCodeLengths; i++){
-                        codeLengths[ORDER[i]] = zBitio.readUB(3);
+                        codeLengths[ORDER[i]] = bitio.readUB(3);
                     }
 
                     var codeTable = _buildHuffTable(codeLengths);
@@ -10431,22 +10352,22 @@ if (window['swf2js'] == undefined) { (function(window)
                     var prevCodeLen = 0;
                     var maxLengths = numLitLengths + numDistLengths;
                     for (; litLengths.length < maxLengths; ) {
-                        sym = _decodeSymbol(zBitio, codeTable);
+                        sym = _decodeSymbol(bitio, codeTable);
                         switch (sym) {
                             case 16:
-                                i = zBitio.readUB(2) + 3;
+                                i = bitio.readUB(2) + 3;
                                 for (; i--; ) {
                                     litLengths[litLengths.length] = prevCodeLen;
                                 }
                                 break;
                             case 17:
-                                i = zBitio.readUB(3) + 3;
+                                i = bitio.readUB(3) + 3;
                                 for (; i--; ) {
                                     litLengths[litLengths.length] = 0;
                                 }
                                 break;
                             case 18:
-                                i = zBitio.readUB(7) + 11;
+                                i = bitio.readUB(7) + 11;
                                 for (; i--; ) {
                                     litLengths[litLengths.length] = 0;
                                 }
@@ -10467,16 +10388,15 @@ if (window['swf2js'] == undefined) { (function(window)
 
                 sym = 0;
                 for (; sym != 256; ) {
-                    sym = _decodeSymbol(zBitio, litTable);
-
+                    sym = _decodeSymbol(bitio, litTable);
 
                     if (sym < 256) {
                         buff[buff.length] = sym;
                     } else if(sym > 256){
                         var mapIdx = sym - 257;
-                        var len = LENS[mapIdx] + zBitio.readUB(LEXT[mapIdx]);
-                        var distMap = _decodeSymbol(zBitio, distTable);
-                        var dist = DISTS[distMap] + zBitio.readUB(DEXT[distMap]);
+                        var len = LENS[mapIdx] + bitio.readUB(LEXT[mapIdx]);
+                        var distMap = _decodeSymbol(bitio, distTable);
+                        var dist = DISTS[distMap] + bitio.readUB(DEXT[distMap]);
                         i = buff.length - dist;
                         for (; len--; ) {
                             buff[buff.length] = buff[i++];
@@ -10484,13 +10404,13 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
                 }
             } else {
-                zBitio.bit_offset = 8;
-                zBitio.bit_buffer = null;
+                bitio.bit_offset = 8;
+                bitio.bit_buffer = null;
 
-                var len = zBitio.readNumber(2);
-                var nlen = zBitio.readNumber(2);
+                var len = bitio.readNumber(2);
+                var nlen = bitio.readNumber(2);
                 for (; len--; ) {
-                    buff[buff.length] = zBitio.readNumber(1);
+                    buff[buff.length] = bitio.readNumber(1);
                 }
 
             }
@@ -10500,7 +10420,6 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
-     * buildHuffTable
      * @param bitLengths
      * @returns {{}}
      */
@@ -10544,7 +10463,6 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
-     * decodeSymbol
      * @param bitio
      * @param table
      * @returns {*}
@@ -10568,13 +10486,13 @@ if (window['swf2js'] == undefined) { (function(window)
     }
 
     /**
-     * Player
      * @constructor
      */
     var Player = function()
     {
         this.id = playerId++;
         this.name = 'swf2js_'+this.id;
+        this.intervalId = 0;
 
         this.stopFlag = true;
         this.parent = null;
@@ -10595,14 +10513,16 @@ if (window['swf2js'] == undefined) { (function(window)
         this.preContext = null;
         this.characters = [];
         this.buttonHits = [];
+        this.downEventHits = [];
+        this.moveEventHits = [];
+        this.upEventHits = [];
         this.sounds = [];
         this.loadSounds = [];
         this.actions = [];
-        this.touchActions = [];
+        this.queue = null;
         this.initActions = [];
         this.touchObj = null;
         this.touchEndAction = null;
-        this.startTime = 0;
         this.imgUnLoadCount = 0;
         this.scale = 1;
         this.baseWidth = 0;
@@ -10615,10 +10535,9 @@ if (window['swf2js'] == undefined) { (function(window)
         this.jpegTables = null;
         this.backgroundColor = null;
         this.version = 0;
-        this.cacheWait = false;
         this.loadStatus = 0;
         this.isReload = false;
-        this.isBuffer = false;
+        this.startTime = 0;
 
         // parse
         this.swftag = null;
@@ -10626,7 +10545,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @returns {number|*}
      */
     Player.prototype.getId = function()
@@ -10635,7 +10553,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param id
      */
     Player.prototype.setId = function(id)
@@ -10668,11 +10585,29 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
+     * @param version
+     */
+    Player.prototype.setVersion = function(version)
+    {
+        this.version = version;
+    };
+
+    /**
+     * @returns {number|*}
+     */
+    Player.prototype.getVersion = function()
+    {
+        return this.version;
+    };
+
+    /**
      * play
      */
     Player.prototype.play = function()
     {
-        this.stopFlag = false;
+        var _this = this;
+        _this.stopFlag = false;
+        _this.intervalId = _setInterval(function(){ _this.buffer(); }, _this.getFps());
     };
 
     /**
@@ -10680,7 +10615,9 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     Player.prototype.stop = function()
     {
-        this.stopFlag = true;
+        var _this = this;
+        _this.stopFlag = true;
+        _clearInterval(_this.intervalId);
     };
 
     /**
@@ -10700,7 +10637,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param options
      */
     Player.prototype.setOptions = function(options)
@@ -10743,7 +10679,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param baseHeight
      */
     Player.prototype.setBaseHeight = function(baseHeight)
@@ -10761,19 +10696,16 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param width
      */
     Player.prototype.setWidth = function(width)
     {
         if (width < 0)
             width *= -1;
-
         this.width = width;
     };
 
     /**
-     *
      * @returns {number}
      */
     Player.prototype.getHeight = function()
@@ -10782,14 +10714,12 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param height
      */
     Player.prototype.setHeight = function(height)
     {
         if (height < 0)
             height *= -1;
-
         this.height = height;
     };
 
@@ -10855,10 +10785,14 @@ if (window['swf2js'] == undefined) { (function(window)
                 _this.loadStatus++;
                 break;
             case 3:
-                if (_this.isLoad && _this.stopFlag && _this.imgUnLoadCount == 0) {
-                    _this.loaded();
-                    _this.loadStatus++;
-                }
+                if (!_this.isLoad || !_this.stopFlag || _this.imgUnLoadCount > 0)
+                    break;
+
+                _this.loadStatus++;
+                if (_this.isReload)
+                    cacheStore.reset();
+                _this.isReload = false;
+                _this.loaded();
                 break;
         }
 
@@ -10868,18 +10802,16 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * parse
      * @param swf
      */
     Player.prototype.parse = function(swf)
     {
         var _this = this;
-        _this.isLoad = false;
 
         _this.reset();
-
         players[_this.getId()] = _this;
 
+        _this.isLoad = false;
         _this.bitio = new BitIO();
         _this.swftag = new SwfTag(_this, _this.bitio);
 
@@ -10891,9 +10823,10 @@ if (window['swf2js'] == undefined) { (function(window)
 
         // Header
         if (_this.setSwfHeader()) {
+            var swftag = _this.swftag;
             var mc = _this.parent;
-            var tags = _this.swftag.parse(mc);
-            _this.swftag.build(tags, mc);
+            var tags = swftag.parse(mc);
+            swftag.build(tags, mc);
         }
 
         _this.swftag = null;
@@ -10902,7 +10835,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @returns {boolean}
      */
     Player.prototype.setSwfHeader = function()
@@ -10915,23 +10847,27 @@ if (window['swf2js'] == undefined) { (function(window)
         var signature = bitio.getHeaderSignature();
 
         // version
-        _this.version = bitio.getVersion();
+        var version = bitio.getVersion();
+        _this.setVersion(version);
 
         // ファイルサイズ
         var fileLength = bitio.getUI32();
 
         // 圧縮データを解凍
-        if (signature == 'FWS') {
-            // No ZIP
-        } else if (signature == 'CWS') {
-            // ZLIB
-            bitio.deCompress(fileLength);
-        } else if (signature == 'ZWS') {
-            alert('not supported by LZMA');
-            return false;
-        } else {
-            _this.parseJPEG(bitio.data);
-            return false;
+        switch (signature) {
+            case 'FWS': // No ZIP
+                break;
+            case 'CWS': // ZLIB
+                bitio.deCompress(fileLength);
+                break;
+            case 'ZWS': // LZMA
+                alert('not supported by LZMA');
+                return false;
+                break;
+            default: // JPEG
+                _this.parseJPEG(bitio.data);
+                return false;
+                break;
         }
 
         // フレームサイズ
@@ -10951,7 +10887,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param data
      */
     Player.prototype.parseJPEG = function(data)
@@ -11055,7 +10990,7 @@ if (window['swf2js'] == undefined) { (function(window)
         };
 
         image.src = "data:image/jpeg;base64,"
-        + swftag.base64encode(swftag.parseJpegData(data));
+            + swftag.base64encode(swftag.parseJpegData(data));
 
         var mc = _this.getParent();
         var obj = {};
@@ -11142,6 +11077,12 @@ if (window['swf2js'] == undefined) { (function(window)
             tmpCanvas.width = width;
             tmpCanvas.height = height;
         }
+
+        var mc = _this.getParent();
+        if (mc.matrix) {
+            mc.matrix[0] = _this.getScale();
+            mc.matrix[3] = _this.getScale();
+        }
     };
 
     /**
@@ -11152,50 +11093,85 @@ if (window['swf2js'] == undefined) { (function(window)
         // reset
         var _this = this;
         _this.buttonHits = [];
-        _this.touchActions = [];
+        _this.downEventHits = [];
+        _this.moveEventHits = [];
+        _this.upEventHits = [];
         _this.actions = [];
-
-        // _root
-        var mc = _this.parent;
-
-        // action
-        var _executeAction = _this.executeAction;
-        _executeAction.call(_this, mc);
-        mc.eventDispatcher();
-        _executeAction.call(_this, mc);
-
-        if (_this.callback) {
-            _this.callback.call(window, _this.getParent());
-        }
-
-        // render
-        var canvas = _this.context.canvas;
-        var style = canvas.style;
-        style.backgroundColor = _this.backgroundColor;
-
-        var preContext = _this.preContext;
-        mc.render(preContext, mc.getMatrix(), mc.getColorTransform());
 
         // DOM
         _this.deleteNode();
         var div = _document.getElementById(_this.getName());
         if (div) {
-            _this.clearMain();
-            var context = _this.context;
-            div.appendChild(context.canvas);
+            // backgroundColor
+            var style = div.style;
+            style.backgroundColor = _this.backgroundColor;
 
-            canvas = preContext.canvas;
-            var _drawImage = context.drawImage;
-            _drawImage.call(context, canvas, 0, 0);
+            var ctx = _this.context;
+            var canvas = ctx.canvas;
 
+            // load sound
+            if (isTouch) {
+                var loadSounds = _this.loadSounds;
+                var sLen = loadSounds.length;
+                if (sLen) {
+                    var loadSound = function () {
+                        canvas.removeEventListener(startEvent, loadSound);
+                        if (sLen) {
+                            for (var i = sLen; i--;) {
+                                if (!(i in loadSounds))
+                                    continue;
+                                var audio = loadSounds[i];
+                                audio.load();
+                            }
+                        }
+                    };
+                    canvas.addEventListener(startEvent, loadSound);
+                }
+            }
+
+            canvas.addEventListener(startEvent, function (event)
+            {
+                _event = event;
+                _this.touchStart(event);
+            });
+
+            canvas.addEventListener(moveEvent, function (event)
+            {
+                _event = event;
+                _this.touchMove(event);
+            });
+
+            canvas.addEventListener(endEvent, function (event)
+            {
+                _event = event;
+                _this.touchEnd(event);
+            });
+
+            div.appendChild(canvas);
+
+            // _root
+            var mc = _this.getParent();
+
+            // action
+            mc.addActions();
+            mc.shiftActions();
+            _this.executeAction();
+
+            // API
+            if (_this.callback) {
+                _this.callback.call(window, mc);
+            }
+
+            // render
+            _this.render(mc, false);
+            _this.renderMain();
 
             // start
-            _this.startTime = _Date.now();
             _this.play();
-            requestAnimationFrame(function() {_this.onEnterFrame();}, _this.getFps());
-        }
 
-        _this.isReload = false;
+            _this.startTime = _Date.now();
+            requestAnimationFrame(function() { _this.onEnterFrame(); }, 16);
+        }
     };
 
     /**
@@ -11221,21 +11197,18 @@ if (window['swf2js'] == undefined) { (function(window)
     Player.prototype.onEnterFrame = function()
     {
         var _this = this;
-        var fps = _this.getFps();
-
         if (_this.isLoad && !_this.stopFlag && !_this.isReload) {
             var now = _Date.now();
             var check = now - _this.startTime;
+            var fps = _this.getFps();
             if ((check / fps) >= 1) {
                 _this.startTime = _Date.now();
-                _this.clearMain();
-                _this.context.drawImage(_this.preContext.canvas, 0, 0);
-                _this.isBuffer = true;
+                _this.renderMain();
             }
         }
 
-        _setTimeout(function () { _this.buffer(); }, 0);
-        requestAnimationFrame(function() { _this.onEnterFrame(); }, fps);
+        if (!_this.isReload)
+            requestAnimationFrame(function() { _this.onEnterFrame(); }, 0);
     };
 
     /**
@@ -11244,47 +11217,49 @@ if (window['swf2js'] == undefined) { (function(window)
     Player.prototype.buffer = function()
     {
         var _this = this;
+        _this.downEventHits = [];
+        _this.moveEventHits = [];
+        _this.upEventHits = [];
 
-        if (!_this.isBuffer)
-            return 0;
-
-        _this.isBuffer = false;
-
-        // _root
         var mc = _this.parent;
+        mc.shiftActions();
+        _this.executeAction();
+        _this.render(mc, false);
+    };
 
-        // action
-        _this.buttonAction(mc);
+    /**
+     * @param mc
+     */
+    Player.prototype.render = function(mc, isButton)
+    {
+        var _this = this;
+        var ctx = this.preContext;
+        var matrix = mc.getMatrix();
+        var colorTransform = mc.getColorTransform();
 
-        var _executeAction = _this.executeAction;
-        _executeAction.call(_this, mc);
-        mc.eventDispatcher();
-        _executeAction.call(_this, mc);
-
-        // clear
-        _this.clearPre();
         _this.buttonHits = [];
-
-        // render
-        mc.render(_this.preContext, mc.getMatrix(), mc.getColorTransform());
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, _this.width + 1, _this.height + 1);
+        mc.render(ctx, matrix, colorTransform, _this, isButton);
     };
 
     /**
      * executeAction
-     * @param mc
      */
-    Player.prototype.executeAction = function(mc)
+    Player.prototype.executeAction = function()
     {
         var _this = this;
         var _action = _this.action;
-        var _addActions = mc.addActions;
-        _addActions.call(mc);
+
         if (_this.actions.length) {
             for (; _this.actions.length; ) {
+                _this.queue = [];
                 _action.call(_this);
-                _addActions.call(mc);
+                _this.actions = _this.queue;
             }
         }
+
+        _this.queue = null;
     };
 
     /**
@@ -11295,95 +11270,53 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var actions = _this.actions;
         var length = actions.length;
-        var _execute = cacheAS.execute;
         for (var i = 0; i < length; i++) {
-            if (!(i in actions)) {
+            if (!(i in actions))
                 continue;
-            }
 
             var obj = actions[i];
-            if (obj == null) {
+            if (obj == null)
                 continue;
-            }
 
             var as = obj.as;
             var mc = obj.mc;
             var aLen = as.length;
             for (var idx = 0; idx < aLen; idx++) {
-                if (!(idx in as)) {
+                if (!(idx in as))
                     continue;
-                }
-                _execute.call(as[idx], mc);
+
+                var actionScript = as[idx];
+                actionScript.execute(mc);
             }
         }
 
-        _this.actions = null;
         _this.actions = [];
-        _this.actions.length = 0;
     };
 
     /**
-     * buttonAction
      * @param mc
+     * @param as
      */
-    Player.prototype.buttonAction = function(mc)
+    Player.prototype.buttonAction = function(mc, as)
     {
         var _this = this;
-        var touchActions = _this.touchActions;
-        var length = touchActions.length;
-        var _execute = cacheAS.execute;
-        for (var i = 0; i < length; i++) {
-            if (!(i in touchActions)) {
-                continue;
-            }
-
-            var obj = touchActions[i];
-            var as = obj.as;
-            _execute.call(as, obj.mc);
-        }
-        _this.touchActions = [];
-
-        if (length) {
-            _this.executeAction(mc);
-        }
+        as.execute(mc);
+        _this.executeAction();
     };
 
     /*
-     * main canvas clear
+     * main canvas
      */
-    Player.prototype.clearMain = function()
+    Player.prototype.renderMain = function()
     {
-        var context = this.context;
-        var canvas = context.canvas;
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, canvas.width + 1, canvas.height);
-    };
+        var _this = this;
+        var preContext = _this.preContext;
+        var preCanvas = preContext.canvas;
 
-    /*
-     * pre canvas clear
-     */
-    Player.prototype.clearPre = function()
-    {
-        var preContext = this.preContext;
-        var canvas = preContext.canvas;
-        preContext.setTransform(1, 0, 0, 1, 0, 0);
-        preContext.clearRect(0, 0, canvas.width + 1, canvas.height);
-    };
-
-    /**
-     * cacheStart
-     */
-    Player.prototype.cacheStart = function()
-    {
-        this.cacheWait = true;
-    };
-
-    /**
-     * cacheEnd
-     */
-    Player.prototype.cacheEnd = function()
-    {
-        this.cacheWait = false;
+        var ctx = _this.context;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, _this.width + 1, _this.height + 1);
+        ctx.drawImage(preCanvas, 0, 0);
     };
 
     /**
@@ -11392,16 +11325,19 @@ if (window['swf2js'] == undefined) { (function(window)
     Player.prototype.reset = function()
     {
         var _this = this;
+        _this.instanceId = 0;
         _this.parent = new MovieClip();
         _this.parent.player = _this;
         _this.swftag = null;
         _this.bitio = null;
         _this.characters = [];
         _this.buttonHits = [];
+        _this.downEventHits = [];
+        _this.moveEventHits = [];
+        _this.upEventHits = [];
         _this.sounds = [];
         _this.loadSounds = [];
         _this.actions = [];
-        _this.touchActions = [];
         _this.initActions = [];
     };
 
@@ -11449,6 +11385,7 @@ if (window['swf2js'] == undefined) { (function(window)
             style.top = '0';
             style.backgroundColor = '#000000';
             style.overflow = 'hidden';
+            style["-webkit-backface-visibility"] = "hidden";
 
             var parent = div.parentNode;
             var oWidth = _this.optionWidth;
@@ -11483,23 +11420,6 @@ if (window['swf2js'] == undefined) { (function(window)
             style.MozTransformOrigin = '0 0';
             style.MozTransform = 'scale(' + 1 / _devicePixelRatio + ')';
 
-            canvas.addEventListener(startEvent, function (event)
-            {
-                _event = event;
-                _this.touchStart(event);
-            });
-
-            canvas.addEventListener(moveEvent, function (event)
-            {
-                _event = event;
-                _this.touchMove(event);
-            });
-
-            canvas.addEventListener(endEvent, function (event)
-            {
-                _this.touchEnd(event);
-            });
-
             if (isAndroid) {
                 canvas.addEventListener('touchcancel', function (event)
                 {
@@ -11508,22 +11428,20 @@ if (window['swf2js'] == undefined) { (function(window)
             }
 
             if (!isTouch) {
-                window.addEventListener("mouseup", function (event)
+                window.addEventListener("keydown", keyAction);
+                window.addEventListener("keyup", function (event)
                 {
-                    _this.mouseUp(_event);
-                }, false);
-                window.addEventListener("keydown", keyAction, false);
+                    _this.touchEnd(event);
+                });
             }
 
             _this.context = canvas.getContext('2d');
             _this.canvas = canvas;
-            canvas = null;
 
             var preCanvas = _document.createElement('canvas');
             preCanvas.width = 1;
             preCanvas.height = 1;
             _this.preContext = preCanvas.getContext('2d');
-            preCanvas = null;
         }
 
         _this.loadStatus++;
@@ -11568,7 +11486,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     * reload
      * @param url
      * @param options
      */
@@ -11581,11 +11498,8 @@ if (window['swf2js'] == undefined) { (function(window)
             _this.deleteNode();
 
         _this.loadStatus = 0;
-
-        // 初期化
         _this.isReload = true;
-
-        cacheStore.reset();
+        _this.isLoad = false;
 
         return swf2js.load(url, {
             optionWidth: options.optionWidth | _this.optionWidth,
@@ -11600,7 +11514,6 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
-     *
      * @param outputPath
      * @param frame
      * @param width
@@ -11615,7 +11528,7 @@ if (window['swf2js'] == undefined) { (function(window)
             {
                 _this.output(outputPath, frame, width, height);
             }, 500);
-            return false;
+            return 0;
         }
 
         _this.stop();
@@ -11632,51 +11545,29 @@ if (window['swf2js'] == undefined) { (function(window)
             height = _this.getHeight();
         }
 
-        // tmp
-        var canvas = _this.preContext.canvas;
-        var tmp = cacheStore.getCanvas();
-        tmp.width = canvas.width;
-        tmp.height = canvas.height;
-        var tmpCtx = tmp.getContext('2d');
-        tmpCtx.drawImage(canvas, 0, 0);
-
         // resize
-        var isResize = false;
+        var mc = _this.getParent();
+        mc.reset(true, frame);
         if (width != _this.getWidth() || height != _this.getHeight()) {
-            isResize = true;
-
-            var tmpWidth = _this.optionWidth;
-            var tmpHeight = _this.optionHeight;
-
             _this.optionWidth = width;
             _this.optionHeight = height;
-
             _this.resize();
         }
 
-        var mc = _this.parent;
-        var currentFrame = mc.getFrame();
-        var stopFlag = mc.stopFlag;
+        // action
+        mc.addActions();
+        _this.executeAction();
 
-        mc.gotoAndStop(frame);
-        _this.buffer();
+        // backgroundColor
+        var canvas = _this.preContext.canvas;
+        var style = canvas.style;
+        style.backgroundColor = _this.backgroundColor;
+
+        // render
+        _this.render(mc, false);
+
+        // base64
         var base64 = canvas.toDataURL();
-
-        // reset
-        if (isResize) {
-            _this.optionWidth = tmpWidth;
-            _this.optionHeight = tmpHeight;
-            _this.resize();
-        }
-
-        mc.gotoAndStop(currentFrame);
-        mc.stopFlag = stopFlag;
-        var tmpCanvas = tmpCtx.canvas;
-        _this.context.drawImage(tmpCanvas, 0, 0);
-        _this.preContext.drawImage(tmpCanvas, 0, 0);
-
-        cacheStore.destroy(tmpCanvas);
-        _this.play();
 
         var xmlHttpRequest = new XMLHttpRequest();
         xmlHttpRequest.open('POST', outputPath);
@@ -11684,8 +11575,6 @@ if (window['swf2js'] == undefined) { (function(window)
             'Content-Type',
             'application/x-www-form-urlencoded'
         );
-
-        xmlHttpRequest.send('data='+ encodeURIComponent(base64));
 
         // alert
         xmlHttpRequest.onreadystatechange = function()
@@ -11700,22 +11589,20 @@ if (window['swf2js'] == undefined) { (function(window)
                     alert('[ERROR] HTTP STATUS: '+ status);
                 }
             }
-        }
+        };
+
+        xmlHttpRequest.send('data='+ encodeURIComponent(base64));
     };
 
     /**
-     *
      * @param event
      */
     Player.prototype.hitCheck = function(event)
     {
         var _this = this;
-
         var buttonHits = _this.buttonHits;
         var len = buttonHits.length;
-        if (!len) {
-            return 0;
-        }
+        if (!len) return 0;
 
         var div = _document.getElementById(_this.getName());
         var bounds = div.getBoundingClientRect();
@@ -11740,13 +11627,8 @@ if (window['swf2js'] == undefined) { (function(window)
         touchX *= _devicePixelRatio;
         touchY *= _devicePixelRatio;
 
+        // reset
         _this.isHit = false;
-
-        if (!_this.isTouchEvent) {
-            _this.touchObj = null;
-            _this.touchEndAction = null;
-        }
-
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -11760,146 +11642,205 @@ if (window['swf2js'] == undefined) { (function(window)
             if (touchX >= hitObj.Xmin && touchX <= hitObj.Xmax
                 && touchY >= hitObj.Ymin && touchY <= hitObj.Ymax
             ){
+                event.preventDefault();
                 _this.isHit = true;
-                if (_this.isTouchEvent) {
-                    break;
-                }
 
-                _this.touchObj = hitObj;
-                var char = _this.getCharacter(hitObj.characterId);
-                if (char.actions == undefined) {
-                    break;
-                }
+                var mc = hitObj.parent;
+                mc.buttonStatus = 'down';
 
-                var actions = char.actions;
-                var aLen = actions.length;
-                for (var idx = 0; idx < aLen; idx++) {
-                    if (!(idx in actions)) {
-                        continue;
-                    }
+                if (!_this.touchObj) {
+                    _this.touchObj = hitObj;
 
-                    var cond = actions[idx];
-                    if (cond.CondOverDownToOverUp) {
-                        _this.touchEndAction = cond.ActionScript;
-                        continue;
-                    }
-
-                    // enter
-                    if (hitObj.CondKeyPress == 13
-                        && hitObj.CondKeyPress != cond.CondKeyPress
-                    ) {
-                        continue;
-                    }
-
-                    var keyPress = cond.CondKeyPress;
-                    if (keyPress == 0 || keyPress == 13
-                        || (keyPress >= 48 && keyPress <= 57)
-                    ) {
-                        event.preventDefault();
-                        _this.touchObj.ActionScript = cond.ActionScript;
-                        if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
-                            var sound = hitObj.Sound;
-                            if (sound != null) {
-                                sound.currentTime = 0;
-                                sound.play();
+                    var char = _this.getCharacter(hitObj.characterId);
+                    if (char.actions != undefined) {
+                        var actions = char.actions;
+                        var aLen = actions.length;
+                        for (var idx = 0; idx < aLen; idx++) {
+                            if (!(idx in actions)) {
+                                continue;
                             }
 
-                            _this.touchEvent(event);
-                            break;
+                            var cond = actions[idx];
+                            if (cond.CondOverDownToOverUp) {
+                                _this.touchEndAction = cond.ActionScript;
+                                continue;
+                            }
+
+                            // enter
+                            if (hitObj.CondKeyPress == 13
+                                && hitObj.CondKeyPress != cond.CondKeyPress
+                            ) {
+                                continue;
+                            }
+
+                            var keyPress = cond.CondKeyPress;
+                            if (keyPress == 0 || keyPress == 13
+                                || (keyPress >= 48 && keyPress <= 57)
+                            ) {
+                                _this.touchObj.ActionScript = cond.ActionScript;
+                                if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
+                                    var sound = hitObj.Sound;
+                                    if (sound != null) {
+                                        sound.currentTime = 0;
+                                        sound.play();
+                                    }
+
+                                    var mc = hitObj.parent;
+                                    var as = hitObj.ActionScript;
+                                    _this.buttonAction(mc, as);
+
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
+
+                if (event.type == startEvent)
+                    _this.touchRender();
+
+                break;
             }
         }
     };
 
     /**
-     *
-     * @param event
+     * @param obj
      */
-    Player.prototype.mouseUp = function(event)
+    Player.prototype.executeEventAction = function(obj)
     {
-        this.isHit = false;
+        var actions = obj.as;
+        var mc = obj.mc;
+        var length = actions.length;
+        for (var i = 0; i < length; i++) {
+            var as = actions[i];
+            as.execute(mc);
+        }
     };
 
     /**
-     *
      * @param event
      */
     Player.prototype.touchStart = function(event)
     {
-        this.hitCheck(event);
+        var _this = this;
+        _this.isTouchEvent = true;
+        _this.touchObj = null;
+        _this.touchEndAction = null;
+
+        var downEventHits = _this.downEventHits;
+        var length = downEventHits.length;
+        if (length) {
+            event.preventDefault();
+
+            var _executeEventAction = _this.executeEventAction;
+            for (var i = 0; i < length; i++) {
+                var obj = downEventHits[i];
+                _executeEventAction.call(_this, obj);
+            }
+
+            _this.executeAction();
+        }
+
+        _this.hitCheck(event);
     };
 
     /**
-     *
      * @param event
      */
     Player.prototype.touchMove = function(event)
     {
         var _this = this;
-        if (_this.isHit) {
+        var moveEventHits = _this.moveEventHits;
+        var length = moveEventHits.length;
+        if (length) {
+            event.preventDefault();
+
+            var _executeEventAction = _this.executeEventAction;
+            for (var i = 0; i < length; i++) {
+                var obj = moveEventHits[i];
+                _executeEventAction.call(_this, obj);
+            }
+
+            _this.executeAction();
+        }
+
+        if (_this.isTouchEvent) {
+            var isHit = _this.isHit;
             _this.hitCheck(event);
+
+            if (isHit && !_this.isHit || !isHit && _this.isHit) {
+                var mc = _this.touchObj.parent;
+                mc.buttonStatus = 'up';
+                _this.touchRender();
+            }
         }
     };
 
     /**
-     *
      * @param event
      */
     Player.prototype.touchEnd = function(event)
     {
         var _this = this;
+        var upEventHits = _this.upEventHits;
+        var length = upEventHits.length;
+        if (length) {
+            event.preventDefault();
+
+            var _executeEventAction = _this.executeEventAction;
+            for (var i = 0; i < length; i++) {
+                var obj = upEventHits[i];
+                _executeEventAction.call(_this, obj);
+            }
+
+            _this.executeAction();
+        }
+
         var touchObj = _this.touchObj;
         var touchEndAction = _this.touchEndAction;
 
-        if (touchObj != null && touchEndAction != null) {
-            event.preventDefault();
+        if (_this.isHit) {
+            var mc = touchObj.parent;
+            if (touchEndAction != null) {
+                event.preventDefault();
 
-            var sound = touchObj.Sound;
-            if (sound != null) {
-                sound.currentTime = 0;
-                sound.play();
+                var sound = touchObj.Sound;
+                if (sound != null) {
+                    sound.currentTime = 0;
+                    sound.play();
+                }
+
+                _this.buttonAction(mc, touchEndAction);
             }
 
-            var touchActions = _this.touchActions;
-            touchActions[touchActions.length] = {
-                as: touchEndAction,
-                mc: touchObj.parent
-            };
+            mc.buttonStatus = 'up';
+            _this.touchRender();
         }
 
+        _this.isHit = false;
         _this.isTouchEvent = false;
         _this.touchObj = null;
         _event = null;
     };
 
     /**
-     *
-     * @param event
+     * touchRender
      */
-    Player.prototype.touchEvent = function(event)
+    Player.prototype.touchRender = function()
     {
         var _this = this;
-        var touchObj = _this.touchObj;
-        if (touchObj != null) {
-            _this.isTouchEvent = true;
-            var touchActions = _this.touchActions;
-            touchActions[touchActions.length] = {
-                as: touchObj.ActionScript,
-                mc: touchObj.parent
-            };
-        }
+        var parent = _this.getParent();
+        _this.render(parent, true);
+        _this.renderMain();
     };
 
     /**
-     * swf2js
      * @type {{}}
      */
     var swf2js = {};
 
     /**
-     * load
      * @param url
      * @param options
      */
@@ -11926,7 +11867,7 @@ if (window['swf2js'] == undefined) { (function(window)
             player.init();
 
             var xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open('GET', url);
+            xmlHttpRequest.open('GET', url, true);
             isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
 
             if (isXHR2) {
@@ -11937,7 +11878,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 );
             }
 
-            xmlHttpRequest.send(null);
             xmlHttpRequest.onreadystatechange = function()
             {
                 var readyState = xmlHttpRequest.readyState;
@@ -11955,7 +11895,9 @@ if (window['swf2js'] == undefined) { (function(window)
                             break;
                     }
                 }
-            }
+            };
+
+            xmlHttpRequest.send(null);
         } else {
             alert('please set swf url');
         }
@@ -11974,19 +11916,19 @@ if (window['swf2js'] == undefined) { (function(window)
             return swf2js.load(url, options);
 
         var player = players[0];
-        if (playerId > 1) {
-            for (var i = 1; i < playerId; i++) {
-                if (!(i in players))
-                    continue;
+        for (var i = 0; i < playerId; i++) {
+            if (!(i in players))
+                continue;
 
-                var p = players[i];
-                p.deleteNode(p.tagId);
-            }
+            var p = players[i];
+            _clearInterval(p.intervalId);
 
-            playerId = 1;
-            players = [];
-            players[0] = player;
+            if (i) p.deleteNode(p.tagId);
         }
+
+        playerId = 1;
+        players = [];
+        players[0] = player;
 
         return player.reload(url, options);
     };
