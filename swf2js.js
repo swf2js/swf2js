@@ -3631,7 +3631,6 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         switch (fontName) {
             case '_sans':
-                console.log('koko')
                 return 'sans-serif';
                 break;
             case '_serif':
