@@ -3415,6 +3415,9 @@ if (window['swf2js'] == undefined) { (function(window)
                 var data = bitio.getData(obj.FontNameLen);
                 var str = '';
                 for (var i = 0; i < obj.FontNameLen; i++) {
+                    if (data[i] > 127)
+                        continue;
+
                     str += _fromCharCode(data[i]);
                 }
 
@@ -3573,6 +3576,8 @@ if (window['swf2js'] == undefined) { (function(window)
         var data = bitio.getData(len);
         var str = '';
         for (var i = 0; i < len; i++) {
+            if (data[i] > 127)
+                continue;
             str += _fromCharCode(data[i]);
         }
 
@@ -3624,9 +3629,9 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     SwfTag.prototype.getFontName = function(fontName)
     {
-        //var switchName = fontName.substr(0, fontName.length);
         switch (fontName) {
             case '_sans':
+                console.log('koko')
                 return 'sans-serif';
                 break;
             case '_serif':
@@ -3636,6 +3641,9 @@ if (window['swf2js'] == undefined) { (function(window)
                 return 'monospace';
                 break;
             default:
+                var ander = fontName.substr(0,1);
+                if (ander == '_')
+                    return 'sans-serif';
                 return fontName;
                 break;
         }
@@ -9850,9 +9858,9 @@ if (window['swf2js'] == undefined) { (function(window)
 
         color = _this.generateColorTransform(color, colorTransform);
         ctx.fillStyle = 'rgb('
-        + color.R +','
-        + color.G +','
-        + color.B +
+            + color.R +','
+            + color.G +','
+            + color.B +
         ')';
         ctx.globalAlpha = color.A;
 
@@ -9864,9 +9872,9 @@ if (window['swf2js'] == undefined) { (function(window)
         if (data.HasFont) {
             var fontData = player.getCharacter(data.FontID);
             useOutlines = (
-            fontData.FontFlagsHasLayout
-            && data.UseOutlines
-            && !data.Password
+                fontData.FontFlagsHasLayout
+                && data.UseOutlines
+                && !data.Password
             );
 
             fontHeight = data.FontHeight / 20;
