@@ -7639,24 +7639,11 @@ if (window['swf2js'] == undefined) { (function(window)
             var tyMin = targetMc.getY() + targetBounds.yMin;
             var tyMax = tyMin + targetMc.getHeight();
 
-            if(txMax < xMin) {
-                //console.log('test1')
-            } else if (tyMax < yMin) {
-                //console.log('test2')
-            } else if (xMax < txMin) {
-                //console.log('test3')
-            } else if (yMax < tyMin) {
-                //console.log('test4')
-            }else{
+            if(txMax > xMin && tyMax > yMin && xMax > txMin && yMax > tyMin)
                 return true;
-            }
-
         } else {
-            if (x >= xMin && x <= xMax
-                && y >= yMin && y <= yMax
-            ) {
+            if (x >= xMin && x <= xMax && y >= yMin && y <= yMax)
                 return true;
-            }
         }
 
         return false;
