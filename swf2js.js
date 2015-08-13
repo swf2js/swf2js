@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.3.9)
+ * swf2js (version 0.3.10)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -4619,7 +4619,7 @@ if (window['swf2js'] == undefined) { (function(window)
             obj.rollOver = bitio.getUIBits(1);
             obj.releaseOutside = bitio.getUIBits(1);
             obj.release = bitio.getUIBits(1);
-            obj.pess = bitio.getUIBits(1);
+            obj.press = bitio.getUIBits(1);
             obj.initialize = bitio.getUIBits(1);
         }
 
@@ -6365,20 +6365,29 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // StartDrag
                 case 0x27:
-                    console.log('StartDrag');
                     var target = stack.pop();
-                    var lockcenter = stack.pop();
-                    if (lockcenter) {
-
-                    }
-
+                    var lock = stack.pop();
                     var constrain = stack.pop();
+                    var y2 = null;
+                    var x2 = null;
+                    var y1 = null;
+                    var x1 = null;
                     if (constrain) {
-                        var y2 = stack.pop();
-                        var x2 = stack.pop();
-                        var y1 = stack.pop();
-                        var x1 = stack.pop();
+                        y2 = stack.pop();
+                        x2 = stack.pop();
+                        y1 = stack.pop();
+                        x1 = stack.pop();
                     }
+
+                    var targetMc = movieClip;
+                    if (target instanceof MovieClip)
+                        targetMc = target;
+
+                    if (typeof target == "string")
+                        console.log('StartDrag:String');
+
+                    if (targetMc != null)
+                        targetMc.startDrag(lock, x1, y1, x2, y2);
 
                     break;
                 // WaitForFrame2
@@ -6412,7 +6421,8 @@ if (window['swf2js'] == undefined) { (function(window)
                     break;
                 // EndDrag
                 case 0x28:
-                    console.log('EndDrag');
+                    if (movieClip != null)
+                        movieClip.stopDrag();
                     break;
 
                 // ユーティリティ ***********************************
@@ -7064,7 +7074,6 @@ if (window['swf2js'] == undefined) { (function(window)
         this.isButtonRemove = false;
         this.isStatic = true;
         this.removable = false;
-        this.isDrag = false;
 
         // clip
         this.isClipDepth = false;
@@ -7490,6 +7499,9 @@ if (window['swf2js'] == undefined) { (function(window)
      */
     MovieClip.prototype.getURL = function(url, target, method)
     {
+        if (url == 'FSCommand:fullscreen' || url == 'FSCommand:allowscale')
+            return true;
+
         var _this = this;
         if (target instanceof String) {
             switch (target.toLowerCase()) {
@@ -7611,33 +7623,18 @@ if (window['swf2js'] == undefined) { (function(window)
                 return false;
         }
 
-        var mc = _this;
-        while (true) {
-            var parent = mc.getParent();
-            if (!parent || parent.characterId == 0)
-                break;
-            mc = parent;
-        }
-
-        var mcBounds = mc.getBounds();
-        var xMin = mc.getX() + mcBounds.xMin;
-        var xMax = xMin + mc.getWidth();
-        var yMin = mc.getY() + mcBounds.yMin;
-        var yMax = yMin + mc.getHeight();
+        var bounds = _this._getHitBounds();
+        var xMax = bounds.xMax;
+        var xMin = bounds.xMin;
+        var yMax = bounds.yMax;
+        var yMin = bounds.yMin;
 
         if (targetMc instanceof MovieClip) {
-            while (true) {
-                var parent = targetMc.getParent();
-                if (!parent || parent.characterId == 0)
-                    break;
-                targetMc = parent;
-            }
-
-            var targetBounds = targetMc.getBounds();
-            var txMin = targetMc.getX() + targetBounds.xMin;
-            var txMax = txMin + targetMc.getWidth();
-            var tyMin = targetMc.getY() + targetBounds.yMin;
-            var tyMax = tyMin + targetMc.getHeight();
+            var bounds = targetMc._getHitBounds();
+            var txMax = bounds.xMax;
+            var txMin = bounds.xMin;
+            var tyMax = bounds.yMax;
+            var tyMin = bounds.yMin;
 
             if(txMax > xMin && tyMax > yMin && xMax > txMin && yMax > tyMin)
                 return true;
@@ -7649,16 +7646,73 @@ if (window['swf2js'] == undefined) { (function(window)
         return false;
     };
 
-    MovieClip.prototype.startDrag = function()
+    /**
+     * @returns {{xMin: *, xMax: *, yMin: *, yMax: *}}
+     * @private
+     */
+    MovieClip.prototype._getHitBounds = function()
     {
-        console.log(arguments)
+        var _this = this;
+        var mc = _this;
+        var matrix = _this.getMatrix();
+        while (true) {
+            var parent = mc.getParent();
+            if (!parent || parent.characterId == 0)
+                break;
+            matrix = parent.multiplicationMatrix(parent.getMatrix(),matrix);
+            mc = parent;
+        }
+
+        var bounds = _this.boundsMatrix(_this._getBounds(), matrix);
+
+        var xMax = bounds.xMax/20;
+        var xMin = bounds.xMin/20;
+        var yMax = bounds.yMax/20;
+        var yMin = bounds.yMin/20;
+
+        return {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
     };
 
+    /**
+     * @param lock
+     * @param left
+     * @param top
+     * @param right
+     * @param bottom
+     */
+    MovieClip.prototype.startDrag = function(lock, left, top, right, bottom)
+    {
+        var _this = this;
+        var player = _this.getPlayer();
+        player.dragMc = _this;
+    };
 
+    /**
+     *
+     */
     MovieClip.prototype.stopDrag = function()
     {
-        console.log(arguments)
+        var _this = this;
+        var player = _this.getPlayer();
+        player.dragMc = null;
+    };
 
+    /**
+     * executeDrag
+     */
+    MovieClip.prototype.executeDrag = function()
+    {
+        var _this = this;
+        var x = _this.getX();
+        var y = _this.getY();
+
+        var xmouse = _this.getXMouse();
+        xmouse *= _devicePixelRatio;
+        var ymouse = _this.getYMouse();
+        ymouse *= _devicePixelRatio;
+
+        _this.setX(x+xmouse);
+        _this.setY(y+ymouse);
     };
 
     /**
@@ -8746,7 +8800,6 @@ if (window['swf2js'] == undefined) { (function(window)
 
             switch (name) {
                 case 'mouseDown':
-                case 'press':
                     var downEventHits = player.downEventHits;
                     downEventHits[downEventHits.length] = {as: as, mc: _this};
                     break;
@@ -8755,7 +8808,6 @@ if (window['swf2js'] == undefined) { (function(window)
                     moveEventHits[moveEventHits.length] = {as: as, mc: _this};
                     break;
                 case 'mouseUp':
-                case 'release':
                     var upEventHits = player.upEventHits;
                     upEventHits[upEventHits.length] = {as: as, mc: _this};
                     break;
@@ -9022,8 +9074,8 @@ if (window['swf2js'] == undefined) { (function(window)
             var value = bounds[name] / 20;
             bounds[name] = value;
         }
-        return bounds
-    }
+        return bounds;
+    };
 
     /**
      * @param parentMatrix
@@ -9034,6 +9086,8 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var player = _this.getPlayer();
         var _multiplicationMatrix = _this.multiplicationMatrix;
+        var _boundsMatrix = _this.boundsMatrix;
+
         var no = _Number.MAX_VALUE;
         var xMax = -no;
         var yMax = -no;
@@ -9072,21 +9126,52 @@ if (window['swf2js'] == undefined) { (function(window)
 
             bounds = player.getCharacter(tag.characterId);
             if (bounds) {
-                var x0 = bounds.xMax * matrix[0] + bounds.yMax * matrix[2] + matrix[4];
-                var x1 = bounds.xMax * matrix[0] + bounds.yMin * matrix[2] + matrix[4];
-                var x2 = bounds.xMin * matrix[0] + bounds.yMax * matrix[2] + matrix[4];
-                var x3 = bounds.xMin * matrix[0] + bounds.yMin * matrix[2] + matrix[4];
-                var y0 = bounds.xMax * matrix[1] + bounds.yMax * matrix[3] + matrix[5];
-                var y1 = bounds.xMax * matrix[1] + bounds.yMin * matrix[3] + matrix[5];
-                var y2 = bounds.xMin * matrix[1] + bounds.yMax * matrix[3] + matrix[5];
-                var y3 = bounds.xMin * matrix[1] + bounds.yMin * matrix[3] + matrix[5];
-
-                xMax = _max(_max(_max(_max(xMax, x0), x1), x2), x3);
-                xMin = _min(_min(_min(_min(xMin, x0), x1), x2), x3);
-                yMax = _max(_max(_max(_max(yMax, y0), y1), y2), y3);
-                yMin = _min(_min(_min(_min(yMin, y0), y1), y2), y3);
+                var object = {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
+                var bounds = _boundsMatrix.call(tag, bounds, matrix, object);
+                xMin = bounds.xMin;
+                xMax = bounds.xMax;
+                yMin = bounds.yMin;
+                yMax = bounds.yMax;
             }
         }
+
+        return {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
+    };
+
+    /**
+     * @param bounds
+     * @param matrix
+     * @param object
+     * @returns {{xMin: (number|*|Number), xMax: (number|*), yMin: (number|*|Number), yMax: (number|*)}}
+     */
+    MovieClip.prototype.boundsMatrix = function(bounds, matrix, object)
+    {
+        if (object) {
+            var xMin = object.xMin;
+            var xMax = object.xMax;
+            var yMin = object.yMin;
+            var yMax = object.yMax;
+        } else {
+            var no = _Number.MAX_VALUE;
+            var xMax = -no;
+            var yMax = -no;
+            var xMin = no;
+            var yMin = no;
+        }
+
+        var x0 = bounds.xMax * matrix[0] + bounds.yMax * matrix[2] + matrix[4];
+        var x1 = bounds.xMax * matrix[0] + bounds.yMin * matrix[2] + matrix[4];
+        var x2 = bounds.xMin * matrix[0] + bounds.yMax * matrix[2] + matrix[4];
+        var x3 = bounds.xMin * matrix[0] + bounds.yMin * matrix[2] + matrix[4];
+        var y0 = bounds.xMax * matrix[1] + bounds.yMax * matrix[3] + matrix[5];
+        var y1 = bounds.xMax * matrix[1] + bounds.yMin * matrix[3] + matrix[5];
+        var y2 = bounds.xMin * matrix[1] + bounds.yMax * matrix[3] + matrix[5];
+        var y3 = bounds.xMin * matrix[1] + bounds.yMin * matrix[3] + matrix[5];
+
+        xMax = _max(_max(_max(_max(xMax, x0), x1), x2), x3);
+        xMin = _min(_min(_min(_min(xMin, x0), x1), x2), x3);
+        yMax = _max(_max(_max(_max(yMax, y0), y1), y2), y3);
+        yMin = _min(_min(_min(_min(yMin, y0), y1), y2), y3);
 
         return {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
     };
@@ -9272,7 +9357,7 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         touchY -= y;
-        touchY -= this.getY();
+        touchY -= _this.getY();
 
         return touchY;
     };
@@ -9360,6 +9445,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var _getColorTransform = _this.getColorTransform;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
+        var _boundsMatrix = _this.boundsMatrix;
         for (var depth = 1; depth < length; depth++) {
             if (player.isReload)
                 break;
@@ -9388,9 +9474,25 @@ if (window['swf2js'] == undefined) { (function(window)
                 obj = obj.getParent();
 
             if (obj instanceof MovieClip) {
+                var isVisible = _min(obj.getVisible(), visible);
                 var renderMatrix = _multiplicationMatrix.call(obj, matrix, _getMatrix.call(obj));
                 var renderColorTransform = _multiplicationColor.call(obj, colorTransform, _getColorTransform.call(obj));
-                _render.call(obj, ctx, renderMatrix, renderColorTransform, player, _min(obj.getVisible(), visible), isButton);
+
+                var clipEvent = obj.clipEvent;
+                var buttonStatus = obj.buttonStatus;
+                if (isVisible && 'press' in clipEvent && buttonStatus == 'up') {
+                    var bounds =_boundsMatrix.call(obj, obj._getBounds(), renderMatrix);
+                    var buttonHits = player.buttonHits;
+                    buttonHits[buttonHits.length] = {
+                        xMax: bounds.xMax,
+                        xMin: bounds.xMin,
+                        yMax: bounds.yMax,
+                        yMin: bounds.yMin,
+                        parent: obj
+                    };
+                }
+
+                _render.call(obj, ctx, renderMatrix, renderColorTransform, player, isVisible, isButton);
             } else {
                 var char = localPlayer.getCharacter(obj.characterId);
                 if (!char)
@@ -10159,6 +10261,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var _getBounds = _this._getBounds;
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _multiplicationColor = _this.multiplicationColor;
+        var _boundsMatrix = _this.boundsMatrix;
 
         var length = characters.length;
         for (var d = 1; d < length; d++) {
@@ -10205,32 +10308,14 @@ if (window['swf2js'] == undefined) { (function(window)
                             var bounds = localPlayer.getCharacter(tagChar.characterId);
                         }
 
-                        var no = _Number.MAX_VALUE;
-                        var xMax = -no;
-                        var yMax = -no;
-                        var xMin = no;
-                        var yMin = no;
-
-                        var x0 = bounds.xMax * renderMatrix[0] + bounds.yMax * renderMatrix[2] + renderMatrix[4];
-                        var x1 = bounds.xMax * renderMatrix[0] + bounds.yMin * renderMatrix[2] + renderMatrix[4];
-                        var x2 = bounds.xMin * renderMatrix[0] + bounds.yMax * renderMatrix[2] + renderMatrix[4];
-                        var x3 = bounds.xMin * renderMatrix[0] + bounds.yMin * renderMatrix[2] + renderMatrix[4];
-                        var y0 = bounds.xMax * renderMatrix[1] + bounds.yMax * renderMatrix[3] + renderMatrix[5];
-                        var y1 = bounds.xMax * renderMatrix[1] + bounds.yMin * renderMatrix[3] + renderMatrix[5];
-                        var y2 = bounds.xMin * renderMatrix[1] + bounds.yMax * renderMatrix[3] + renderMatrix[5];
-                        var y3 = bounds.xMin * renderMatrix[1] + bounds.yMin * renderMatrix[3] + renderMatrix[5];
-
-                        xMax = _max(_max(_max(_max(xMax, x0), x1), x2), x3);
-                        xMin = _min(_min(_min(_min(xMin, x0), x1), x2), x3);
-                        yMax = _max(_max(_max(_max(yMax, y0), y1), y2), y3);
-                        yMin = _min(_min(_min(_min(yMin, y0), y1), y2), y3);
+                        var btnBounds = _boundsMatrix.call(_this, bounds, renderMatrix);
 
                         hitObj = {
                             characterId: tag.characterId,
-                            xMax: xMax,
-                            xMin: xMin,
-                            yMax: yMax,
-                            yMin: yMin,
+                            xMax: btnBounds.xMax,
+                            xMin: btnBounds.xMin,
+                            yMax: btnBounds.yMax,
+                            yMin: btnBounds.yMin,
                             CondKeyPress: 0,
                             Sound: btnChar.Sound,
                             parent: _this
@@ -10864,6 +10949,7 @@ if (window['swf2js'] == undefined) { (function(window)
         this.loadStatus = 0;
         this.isReload = false;
         this.startTime = 0;
+        this.dragMc = null;
 
         // parse
         this.swftag = null;
@@ -11957,6 +12043,7 @@ if (window['swf2js'] == undefined) { (function(window)
 
         // reset
         _this.isHit = false;
+        _this.touchEndAction = null;
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -11971,54 +12058,73 @@ if (window['swf2js'] == undefined) { (function(window)
                 && touchY >= hitObj.yMin && touchY <= hitObj.yMax
             ){
                 event.preventDefault();
+
                 _this.isHit = true;
-
                 var mc = hitObj.parent;
-                mc.buttonStatus = 'down';
 
-                if (!_this.touchObj) {
+                if (event.type == startEvent && mc.buttonStatus == 'up') {
+                    var clipEvent = mc.clipEvent;
+                    if ('press' in clipEvent) {
+                        _this.executeEventAction({as:clipEvent['press'], mc: mc});
+                    }
+                }
+
+                var parent = null;
+                if (_this.touchObj != null) {
+                    var parent = _this.touchObj.parent;
+                }
+
+                if (event.type == startEvent) {
                     _this.touchObj = hitObj;
+                    mc.buttonStatus = 'down';
+                } else if (parent == mc) {
+                    mc.buttonStatus = 'down';
+                }
 
-                    var char = _this.getCharacter(hitObj.characterId);
-                    if (char.actions != undefined) {
-                        var actions = char.actions;
-                        var aLen = actions.length;
-                        for (var idx = 0; idx < aLen; idx++) {
-                            if (!(idx in actions)) {
-                                continue;
-                            }
+                var char = _this.getCharacter(hitObj.characterId);
+                if (char && char.actions != undefined) {
+                    var actions = char.actions;
+                    var aLen = actions.length;
+                    for (var idx = 0; idx < aLen; idx++) {
+                        if (!(idx in actions))
+                            continue;
 
-                            var cond = actions[idx];
-                            if (cond.CondOverDownToOverUp) {
+                        var cond = actions[idx];
+                        if (cond.CondOverDownToOverUp) {
+                            if (event.type == startEvent) {
                                 _this.touchEndAction = cond.ActionScript;
-                                continue;
+                            } else if (parent == mc) {
+                                _this.touchEndAction = cond.ActionScript;
                             }
+                            continue;
+                        }
 
-                            // enter
-                            if (hitObj.CondKeyPress == 13
-                                && hitObj.CondKeyPress != cond.CondKeyPress
-                            ) {
-                                continue;
-                            }
+                        if (event.type != startEvent)
+                            continue;
 
-                            var keyPress = cond.CondKeyPress;
-                            if (keyPress == 0 || keyPress == 13
-                                || (keyPress >= 48 && keyPress <= 57)
-                            ) {
-                                _this.touchObj.ActionScript = cond.ActionScript;
-                                if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
-                                    var sound = hitObj.Sound;
-                                    if (sound != null) {
-                                        sound.currentTime = 0;
-                                        sound.play();
-                                    }
+                        // enter
+                        if (hitObj.CondKeyPress == 13
+                            && hitObj.CondKeyPress != cond.CondKeyPress
+                        ) {
+                            continue;
+                        }
 
-                                    var mc = hitObj.parent;
-                                    var as = hitObj.ActionScript;
-                                    _this.buttonAction(mc, as);
-
-                                    break;
+                        var keyPress = cond.CondKeyPress;
+                        if (keyPress == 0 || keyPress == 13
+                            || (keyPress >= 48 && keyPress <= 57)
+                        ) {
+                            _this.touchObj.ActionScript = cond.ActionScript;
+                            if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
+                                var sound = hitObj.Sound;
+                                if (sound != null) {
+                                    sound.currentTime = 0;
+                                    sound.play();
                                 }
+
+                                var as = hitObj.ActionScript;
+                                _this.buttonAction(mc, as);
+
+                                break;
                             }
                         }
                     }
@@ -12057,7 +12163,6 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.touchEndAction = null;
 
         var downEventHits = _this.downEventHits;
-
         var length = downEventHits.length;
         if (length) {
             event.preventDefault();
@@ -12096,9 +12201,17 @@ if (window['swf2js'] == undefined) { (function(window)
 
             if (isHit && !_this.isHit || !isHit && _this.isHit) {
                 var mc = _this.touchObj.parent;
-                mc.buttonStatus = 'up';
-                _this.touchRender();
+                if (mc.buttonStatus == 'down') {
+                    mc.buttonStatus = 'up';
+                    _this.touchRender();
+                }
             }
+        }
+
+        var dragMc = _this.dragMc;
+        if (dragMc) {
+            event.preventDefault();
+            dragMc.executeDrag();
         }
     };
 
@@ -12135,6 +12248,10 @@ if (window['swf2js'] == undefined) { (function(window)
                 _this.buttonAction(mc, touchEndAction);
             }
 
+            var clipEvent = mc.clipEvent;
+            if ('release' in clipEvent) {
+                _this.executeEventAction({as:clipEvent['release'], mc:mc});
+            }
             mc.buttonStatus = 'up';
             _this.touchRender();
         }
