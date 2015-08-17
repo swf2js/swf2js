@@ -6035,8 +6035,8 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x21:
                     var a = stack.pop();
                     var b = stack.pop();
-                    if (!a) { a = ''; }
-                    if (!b) { b = ''; }
+                    if (a == null) { a = ''; }
+                    if (b == null) { b = ''; }
                     stack[stack.length] = b +''+ a;
                     break;
                 case 0x15:// StringExtract
@@ -6140,14 +6140,12 @@ if (window['swf2js'] == undefined) { (function(window)
                 // If
                 case 0x9D:
                     var condition = stack.pop();
-                    if (typeof condition != 'boolean')
+                    if (typeof condition == 'string')
                         condition = _parseFloat(condition);
-
                     if (condition)
                         cIdx = aScript.offset;
-
                     break;
-
+                
                 // Jump
                 case 0x99:
                     cIdx = aScript.offset;
@@ -6272,18 +6270,15 @@ if (window['swf2js'] == undefined) { (function(window)
                 case 0x22:
                     var index  = _floor(stack.pop());
                     var target = stack.pop();
-
                     var value = null;
 
                     if (movieClip != null) {
                         var targetMc = movieClip;
                         if (target != null) {
                             targetMc = movieClip.getMovieClip(target);
-                            if (targetMc == null) {
+                            if (!targetMc)
                                 break;
-                            }
                         }
-
                         value = targetMc.getProperty(index);
                     }
 
