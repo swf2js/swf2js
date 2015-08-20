@@ -30,7 +30,6 @@ if (window['swf2js'] == undefined) { (function(window)
     var _fromCharCode = String.fromCharCode;
     var _parseInt = parseInt;
     var _parseFloat = parseFloat;
-    var _isFinite = isFinite
     var _isNaN = isNaN;
     var resizeId = 0;
     var _setTimeout = setTimeout;
@@ -4776,6 +4775,7 @@ if (window['swf2js'] == undefined) { (function(window)
     SwfTag.prototype.convolutionFilter = function()
     {
         var _this = this;
+        var bitio = _this.bitio;
         var obj = {};
         obj.MatrixX = bitio.getUI8();
         obj.MatrixY = bitio.getUI8();
@@ -5777,10 +5777,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var cache = _this.cache;
         var cLength = cache.length;
         for (var cIdx = 0; cIdx < cLength; cIdx++) {
-            if (this.id == 67) {
-                //console.log(stack)
-                //console.log(cache[cIdx])
-            }
             if (!(cIdx in cache))
                 continue;
 
@@ -6526,6 +6522,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     }
 
                     stack[stack.length] = value;
+
                     break;
                 // ConstantPool
                 case 0x88:
@@ -7031,6 +7028,18 @@ if (window['swf2js'] == undefined) { (function(window)
 
     };
 
+    var Button = function()
+    {
+        var _this = this;
+        _this.characterId = 0;
+        _this.characters = [];
+
+    };
+
+
+
+
+
     /**
      * @param mc
      * @constructor
@@ -7308,8 +7317,7 @@ if (window['swf2js'] == undefined) { (function(window)
         // Property
         _this._currentframe = 1;
         _this._visible = true;
-        _this._target = 0;
-        _this._droptarget = 0;
+        _this._droptarget = null;
         _this._url = null;
         _this._highquality = 1;
         _this._focusrect = 1;
@@ -7950,7 +7958,7 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var _this = this;
         var targetMc = arguments[0];
-        if (!targetMc) {
+        if (!(targetMc instanceof MovieClip)) {
             var x = arguments[0];
             var y = arguments[1];
             var bool = arguments[2];
@@ -8036,6 +8044,8 @@ if (window['swf2js'] == undefined) { (function(window)
             right: right,
             bottom: bottom
         };
+
+        _this.setDropTarget();
     };
 
     /**
@@ -8048,6 +8058,7 @@ if (window['swf2js'] == undefined) { (function(window)
         var player = _root.getPlayer();
         player.dragMc = null;
         player.dragRules = null;
+        _this.setDropTarget();
     };
 
     /**
@@ -8105,7 +8116,6 @@ if (window['swf2js'] == undefined) { (function(window)
             } else {
                 _this.setY(moveY);
             }
-
         } else {
             _this.setX(moveX);
             _this.setY(moveY);
@@ -8649,7 +8659,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             case 11:
             case '_target':
-                value = this._target;
+                value = this.getTarget();
                 break;
             case 12:
             case '_framesloaded':
@@ -8661,7 +8671,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             case 14:
             case '_droptarget':
-                value = this._droptarget;
+                value = this.getDropTarget();
                 break;
             case 15:
             case '_url':
@@ -8774,7 +8784,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             case 11:
             case '_target':
-                this._target = value;
                 break;
             case 12:
             case '_framesloaded':
@@ -8786,7 +8795,6 @@ if (window['swf2js'] == undefined) { (function(window)
                 break;
             case 14:
             case '_droptarget':
-                this._droptarget = value;
                 break;
             case 15:
             case '_url':
@@ -9564,6 +9572,7 @@ if (window['swf2js'] == undefined) { (function(window)
     MovieClip.prototype._getBounds = function(parentMatrix)
     {
         var _this = this;
+        var player = _this.getPlayer();
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var _boundsMatrix = _this.boundsMatrix;
 
@@ -9611,6 +9620,33 @@ if (window['swf2js'] == undefined) { (function(window)
                 xMax = bounds.xMax;
                 yMin = bounds.yMin;
                 yMax = bounds.yMax;
+            } else {
+                if (tag.characters != undefined) {
+                    var btnChar = player.getCharacter(tag.characterId);
+                    var characters = btnChar.characters;
+                    var bLen = characters.length;
+                    for (var bDepth = 1; bDepth < bLen; bDepth++) {
+                        if (!(bDepth in characters))
+                            continue;
+
+                        var character = characters[bDepth];
+                        var cLen = character.length;
+                        for (var idx = 0; idx < cLen; idx++) {
+                            var bTag = character[idx];
+                            if (!bTag.ButtonStateUp)
+                                continue;
+
+                            matrix = _multiplicationMatrix.call(_this, matrix, bTag.Matrix);
+                            var object = {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
+                            var char = player.getCharacter(bTag.CharacterId);
+                            bounds = _boundsMatrix.call(tag, char.bounds, matrix, object);
+                            xMin = bounds.xMin;
+                            xMax = bounds.xMax;
+                            yMin = bounds.yMin;
+                            yMax = bounds.yMax;
+                        }
+                    }
+                }
             }
         }
 
@@ -9781,6 +9817,86 @@ if (window['swf2js'] == undefined) { (function(window)
         Matrix[1] = ScaleX  * _sin(radianX);
         Matrix[2] = -ScaleY * _sin(radianY);
         Matrix[3] = ScaleY  * _cos(radianY);
+    };
+
+    /**
+     * @returns {MovieClip}
+     */
+    MovieClip.prototype.getTarget = function()
+    {
+        return this.instanceId;
+    };
+
+    /**
+     * @returns {null}
+     */
+    MovieClip.prototype.getDropTarget = function()
+    {
+        var mc = this._droptarget;
+        if (mc instanceof MovieClip)
+            return mc.instanceId;
+        return null;
+    };
+
+    /**
+     * setDropTarget
+     */
+    MovieClip.prototype.setDropTarget = function()
+    {
+        var _this = this;
+        _this._droptarget = null;
+
+        var _root = _this.getMovieClip('_root');
+        var player = _root.getPlayer();
+        var tagMatrix = [1,0,0,1,0,0];
+        var matrix = _this.getMatrix();
+        var mc = _this;
+        for (;;) {
+            var parent = mc.getParent();
+            if (!parent.getParent())
+                break;
+            matrix = parent.multiplicationMatrix(parent.getMatrix(), matrix);
+            tagMatrix = parent.multiplicationMatrix(parent.getMatrix(), tagMatrix);
+            mc = parent;
+        }
+
+        var parent = _this.getParent();
+        if (!parent)
+            parent = player.getParent();
+
+        var x = matrix[4]/20;
+        var y = matrix[5]/20;
+
+        var tags = parent.getTags();
+        var length = tags.length + 1;
+        for (var depth = length; depth--;) {
+            if (!(depth in tags))
+                continue;
+
+            var tag = tags[depth];
+            if (tag == _this)
+                continue;
+
+            if (tag instanceof MovieClip) {
+                var hit = tag.hitTest(x, y);
+                if (hit) {
+                    _this._droptarget = tag;
+                    break;
+                }
+            } else {
+                var bounds = tag.bounds;
+                if (bounds && tag.characters == undefined && !_this._droptarget) {
+                    bounds = _this.boundsMatrix(bounds, tagMatrix);
+                    var xMin = bounds.xMin/20;
+                    var xMax = bounds.xMax/20;
+                    var yMin = bounds.yMin/20;
+                    var yMax = bounds.yMax/20;
+                    if (x >= xMin && x <= xMax && y >= yMin && y <= yMax) {
+                        _this._droptarget = parent;
+                    }
+                }
+            }
+        }
     };
 
     /**
