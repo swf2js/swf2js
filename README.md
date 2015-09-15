@@ -3,16 +3,29 @@ FlashをHTML5に変換してiPhone、Androidで再生可能にする「swf2js」
 
 swfをJavaScriptで直接バイナリ分解してcanvas出力  
 変換と再生をリアルタイムで行っているので動的なswfも再生可能。  
-対応バージョン：SWF6以下(FlashLite 1.x, 2.x)  
+対応バージョン: SWF7以下
+* FlashLite 1.x
+* FlashLite 2.x
+* FlashPlayer4
+* FlashPlayer5
+* FlashPlayer6
+* FlashPlayer7
   
   
 output in the canvas with swf binary decomposition in JavaScript.  
 play the swf on the iPhone.  
-An open source Flash™ runtime written in pure JavaScript
-※Supports SWF6 or lower.  
+An open source Flash™ runtime written in pure JavaScript.
+
+Supports: SWF7 or lower.  
+
+
+## Latest Version *0.5.0*  
+
+-- Release Date: 15 Sep 2015  
 
 
 ## HTML - SAMPLE CODE
+
 ~~~
 <script type="text/javascript" src="swf2js.js"></script>
 <script type="text/javascript">
@@ -21,25 +34,20 @@ An open source Flash™ runtime written in pure JavaScript
 ~~~
 
 
-## Demonstration Site
+## Demonstration Site  
 
 https://swf2js.wordpress.com/  
 
 
-## Game Using
+## API  
+
+https://swf2js.wordpress.com/api/   
+
+
+## Game Using  
 
 [覇者もん for GREE and Mobage]  
 http://gamebiz.jp/?p=131364  
-
-
-## API  
-
-https://swf2js.wordpress.com/api/  
-
-
-## Controller API  
-
-https://swf2js.wordpress.com/api/#ControllerAPI  
 
 
 ## SNS  
@@ -57,48 +65,52 @@ Release Notes
 ## TODO
 
 ##### *ActionScript*  
-SWF 9  
+
+* SWF 9  
 
 
 ##### *TAG*  
-FreeCharacter  
-StopSound
-SoundStreamBlock  
-DefineButtonCxform  
-PathsArePostScript  
-SyncFrame  
-FreeAll  
-DefineVideo  
-ProductInfo  
-DefineTextFormat  
-DefineBehavior  
-FrameTag  
-GenCommand  
-DefineCommandObj  
-CharacterSet  
-FontRef  
-DefineFunction  
-PlaceFunction  
-GenTagObject  
-ImportAssets  
-EnableDebugger  
-DefineVideoStream  
-VideoFrame  
-DebugID
-ScriptLimits  
-SetTabIndex  
-ImportAssets2  
-DefineScalingGrid  
-DefineBinaryData  
-DefineFont4  
-EnableTelemetry  
+
+* FreeCharacter  
+* StopSound  
+* SoundStreamBlock  
+* DefineButtonCxform  
+* PathsArePostScript  
+* SyncFrame  
+* FreeAll  
+* DefineVideo  
+* ProductInfo  
+* DefineTextFormat  
+* DefineBehavior  
+* FrameTag  
+* GenCommand  
+* DefineCommandObj  
+* CharacterSet  
+* FontRef  
+* DefineFunction  
+* PlaceFunction  
+* GenTagObject  
+* ImportAssets  
+* EnableDebugger  
+* DefineVideoStream  
+* VideoFrame  
+* DebugID
+* ScriptLimits  
+* SetTabIndex  
+* ImportAssets2  
+* DefineScalingGrid  
+* DefineBinaryData  
+* DefineFont4  
+* EnableTelemetry  
 
 
 ##### *UN ZIP TYPE*  
-LZMA  
+
+* LZMA  
 
 
 ##### *MODE*  
-WebGL  
+
+* WebGL  
 
 
