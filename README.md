@@ -56,8 +56,7 @@ Facebook: https://www.facebook.com/swf2js
 Twitter: https://twitter.com/swf2js  
 
 
-Release Notes  
-======
+## Release Notes  
 
 [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 
