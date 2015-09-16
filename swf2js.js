@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.5.0)
+ * swf2js (version 0.5.1)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  *
@@ -6345,10 +6345,11 @@ if (window['swf2js'] == undefined) { (function(window)
                     value = undefined;
                     if (object) {
                         method = mc.checkMethod(method);
-                        if (object instanceof MovieClip) {
+                        if (object instanceof MovieClip || mc[method] != undefined) {
+                            if (typeof object == 'string')
+                                object = movieClip.getMovieClip(object);
+
                             if (object[method] != undefined) {
-
-
                                 value = object[method].apply(object, params);
                             } else {
                                 var as = object.getVariable(method);
@@ -6359,10 +6360,6 @@ if (window['swf2js'] == undefined) { (function(window)
                                     console.log('TODO:'+method);
                                 }
                             }
-                        } else if (object instanceof Sound) {
-                            if (!object.movieClip)
-                                object.movieClip = mc;
-                            value = object[method].apply(object, params);
                         } else {
                             value = object[method].apply(object, params);
                         }
@@ -6573,7 +6570,9 @@ if (window['swf2js'] == undefined) { (function(window)
                     if (object == 'MovieClip') {
                         stack[stack.length] = new MovieClip();
                     } else if (object == 'Sound') {
-                        stack[stack.length] = new Sound(params[0]);
+                        var sound = new Sound(params[0]);
+                        sound.movieClip = movieClip;
+                        stack[stack.length] = sound;
                     } else if (window[object]) {
                         stack[stack.length] = new window[object]();
                     } else {
@@ -7945,6 +7944,7 @@ if (window['swf2js'] == undefined) { (function(window)
             var cacheId = _this.getCharacterId() +"_"+ localPlayer.getId();
             if (_this.isMorphing)
                 cacheId += "_"+ _this.getRatio();
+
             var cacheKey = cacheStore.generateKey('Shape', cacheId, [xScale, yScale], colorTransform);
             cache = cacheStore.get(cacheKey);
             if (!cache) {
@@ -9247,9 +9247,9 @@ if (window['swf2js'] == undefined) { (function(window)
     {
         var buttonCharacter = this.getButtonCharacter();
         var tags = buttonCharacter.getTags();
-        var length = tags.length;
-        if (length) {
-            for (var depth = length; depth--;) {
+        var depth = tags.length;
+        if (depth) {
+            for (; depth--;) {
                 if (!(depth in tags))
                     continue;
                 var tag = tags[depth];
@@ -10257,45 +10257,46 @@ if (window['swf2js'] == undefined) { (function(window)
         var depth = 0;
         var swapMc = null;
         var swapDepth = null;
-        var player = _this.getPlayer();
         var parent = _this.getParent();
-        if (!parent)
-            parent = player.getParent();
-
-        if (mc instanceof MovieClip) {
-            if (_this.getParent() == mc.getParent()) {
-                depth = mc.getLevel();
-                swapDepth = _this.getLevel();
-                swapMc = mc;
-                _this.setDepth(depth, swapDepth, swapMc);
-            }
-        } else {
-            depth = mc;
-            if (_isNaN(depth)) {
-                depth = parent.getNextHighestDepth();
-                if (16384 > depth)
-                    depth = 16384;
+        if (parent) {
+            if (mc instanceof MovieClip) {
+                if (_this.getParent() == mc.getParent()) {
+                    depth = mc.getLevel();
+                    swapDepth = _this.getLevel();
+                    swapMc = mc;
+                    _this.setDepth(depth, swapDepth, swapMc);
+                }
             } else {
-                depth += 16384;
-            }
+                depth = mc;
+                if (_isNaN(depth)) {
+                    depth = parent.getNextHighestDepth();
+                    if (16384 > depth)
+                        depth = 16384;
+                } else {
+                    depth += 16384;
+                }
 
-            var tags = parent.getTags();
-            if (depth in tags) {
-                var tag = tags[depth];
-                if (tag.instanceId != _this.instanceId) {
-                    swapMc = tag;
-                    swapDepth = (_this._depth) ? _this._depth : _this.getLevel();
-                    if (swapDepth == depth) {
-                        for (var length = tags.length; length--;) {
-                            if (!(length in tags) || _this != tags[length])
-                                continue;
-                            swapDepth = length;
-                            break;
+                var tags = parent.getTags();
+                if (depth in tags) {
+                    var tag = tags[depth];
+                    if (tag.instanceId != _this.instanceId) {
+                        swapMc = tag;
+                        swapDepth = (_this._depth) ? _this._depth : _this.getLevel();
+                        if (swapDepth == depth) {
+                            var length = tags.length;
+                            if (length) {
+                                for (; length--;) {
+                                    if (!(length in tags) || _this != tags[length])
+                                        continue;
+                                    swapDepth = length;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
+                _this.setDepth(depth, swapDepth, swapMc);
             }
-            _this.setDepth(depth, swapDepth, swapMc);
         }
     };
 
@@ -10571,11 +10572,14 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         var tags = _this.getTags();
-        for (var depth = tags.length; depth--;) {
-            if (!(depth in tags))
-                continue;
-            var tag = tags[depth];
-            tag.putFrame();
+        var depth = tags.length;
+        if (depth) {
+            for (;depth--;) {
+                if (!(depth in tags))
+                    continue;
+                var tag = tags[depth];
+                tag.putFrame();
+            }
         }
 
         if (_this.isLoad) {
@@ -10780,9 +10784,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var player = _this.getPlayer();
         var parent = _this.getParent();
-        if (!parent)
-            parent = player.getParent();
-
         var level  = (_this._depth)
             ? _this._depth
             : _this.getLevel();
@@ -10878,15 +10879,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var addFrame = (!frame) ? _this.getFrame() : frame;
         return (addFrame in _this.addTags) ? _this.addTags[addFrame] : [];
-    };
-
-    /**
-     * @param frame
-     * @param tags
-     */
-    MovieClip.prototype.setTags = function(frame, tags)
-    {
-        this.addTags[frame] = tags;
     };
 
     /**
@@ -11095,8 +11087,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var as = variables['onRelease'];
         if (as)
             upEventHits[upEventHits.length] = {as: [as], mc: _this};
-
-
     };
 
     /**
@@ -11380,69 +11370,71 @@ if (window['swf2js'] == undefined) { (function(window)
         }
 
         var lastDepth = 0;
-        for (var depth = 1; depth < length; depth++) {
-            if (!(depth in tags))
-                continue;
+        if (length) {
+            for (var depth = 1; depth < length; depth++) {
+                if (!(depth in tags))
+                    continue;
 
-            lastDepth = _max(depth, lastDepth);
-            var obj = tags[depth];
+                lastDepth = _max(depth, lastDepth);
+                var obj = tags[depth];
 
-            // mask 終了
-            var cLen = clips.length;
-            for (var cIdx = 0; cIdx < cLen; cIdx++) {
-                var cDepth = clips[cIdx];
-                if (depth > cDepth) {
-                    clips.splice(cIdx, 1);
-                    ctx.restore();
+                // mask 終了
+                var cLen = clips.length;
+                for (var cIdx = 0; cIdx < cLen; cIdx++) {
+                    var cDepth = clips[cIdx];
+                    if (depth > cDepth) {
+                        clips.splice(cIdx, 1);
+                        ctx.restore();
+                        break;
+                    }
+                }
+
+                // mask 開始
+                if (obj.isClipDepth) {
+                    ctx.save();
+                    ctx.beginPath();
+                    clips[clips.length] = obj.clipDepth;
+                    if (obj instanceof MovieClip)
+                        player.isClipDepth = true;
+                }
+
+                var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
+                var renderColorTransform = _multiplicationColor(colorTransform, obj.getColorTransform());
+                var isVisible = _min(obj.getVisible(), visible);
+
+                var isFilter = false;
+                if (obj instanceof MovieClip) {
+                    var buttonStatus = obj.getButtonStatus();
+                    var clipEvent = obj.clipEvent;
+                    if (isVisible && 'press' in clipEvent && buttonStatus == 'up') {
+                        var bounds = obj.getBounds(renderMatrix);
+                        var buttonHits = player.buttonHits;
+                        buttonHits[buttonHits.length] = {
+                            xMax: bounds.xMax,
+                            xMin: bounds.xMin,
+                            yMax: bounds.yMax,
+                            yMin: bounds.yMin,
+                            parent: obj
+                        };
+                    }
+
+                    var filters = obj.getFilters();
+                    if (filters.length) {
+                        isFilter = true;
+                        obj.preFilter(ctx, matrix, renderColorTransform, player, isVisible);
+                    }
+                }
+
+                if (player.moveFrame)
                     break;
+
+                obj.render(ctx, renderMatrix, renderColorTransform, player, isVisible, _this.getPlayer());
+                if (player.isClipDepth)
+                    player.isClipDepth = false;
+
+                if (isFilter) {
+                    obj.postFilter(ctx, renderMatrix, renderColorTransform, player, isVisible);
                 }
-            }
-
-            // mask 開始
-            if (obj.isClipDepth) {
-                ctx.save();
-                ctx.beginPath();
-                clips[clips.length] = obj.clipDepth;
-                if (obj instanceof MovieClip)
-                    player.isClipDepth = true;
-            }
-
-            var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
-            var renderColorTransform = _multiplicationColor(colorTransform, obj.getColorTransform());
-            var isVisible = _min(obj.getVisible(), visible);
-
-            var isFilter = false;
-            if (obj instanceof MovieClip) {
-                var buttonStatus = obj.getButtonStatus();
-                var clipEvent = obj.clipEvent;
-                if (isVisible && 'press' in clipEvent && buttonStatus == 'up') {
-                    var bounds = obj.getBounds(renderMatrix);
-                    var buttonHits = player.buttonHits;
-                    buttonHits[buttonHits.length] = {
-                        xMax: bounds.xMax,
-                        xMin: bounds.xMin,
-                        yMax: bounds.yMax,
-                        yMin: bounds.yMin,
-                        parent: obj
-                    };
-                }
-
-                var filters = obj.getFilters();
-                if (filters.length) {
-                    isFilter = true;
-                    obj.preFilter(ctx, matrix, renderColorTransform, player, isVisible);
-                }
-            }
-
-            if (player.moveFrame)
-                break;
-
-            obj.render(ctx, renderMatrix, renderColorTransform, player, isVisible, _this.getPlayer());
-            if (player.isClipDepth)
-                player.isClipDepth = false;
-
-            if (isFilter) {
-                obj.postFilter(ctx, renderMatrix, renderColorTransform, player, isVisible);
             }
         }
 
@@ -12223,12 +12215,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 }
             };
 
-            var bounds = {
-                xMin: 0,
-                xMax: shapeWidth,
-                yMin: 0,
-                yMax: shapeHeight
-            };
+            var bounds = {xMin: 0, xMax: shapeWidth, yMin: 0, yMax: shapeHeight};
 
             _this.setCharacter(1, {
                 tagType: 22,
@@ -12501,7 +12488,6 @@ if (window['swf2js'] == undefined) { (function(window)
                         } else {
                             action.apply(mc);
                         }
-
                     }
                 }
             }
@@ -12679,7 +12665,6 @@ if (window['swf2js'] == undefined) { (function(window)
         var _this = this;
         var div = _document.getElementById(_this.getName());
         var loadingId = _this.getName() + '_loading';
-
         var css = '<style>';
         css += '#'+ loadingId +' {\n';
         css += 'z-index: 999;\n';
@@ -12702,7 +12687,6 @@ if (window['swf2js'] == undefined) { (function(window)
         css += '} \n';
         css += '</style>';
         div.innerHTML = css;
-
         var loadingDiv = _document.createElement('div');
         loadingDiv.id = loadingId;
         div.appendChild(loadingDiv);
