@@ -26,12 +26,12 @@ Supports: SWF7 or lower.
 
 ## HTML - SAMPLE CODE
 
-~~~
+```
 <script type="text/javascript" src="swf2js.js"></script>
 <script type="text/javascript">
     swf2js.load('SET SWF PATH');
 </script>  
-~~~
+```
 
 
 ## Demonstration Site  
