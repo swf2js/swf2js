@@ -64,53 +64,11 @@ Release Notes
 
 ## TODO
 
-##### *ActionScript*  
-
-* SWF 9  
+[Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
 
 
-##### *TAG*  
-
-* FreeCharacter  
-* StopSound  
-* SoundStreamBlock  
-* DefineButtonCxform  
-* PathsArePostScript  
-* SyncFrame  
-* FreeAll  
-* DefineVideo  
-* ProductInfo  
-* DefineTextFormat  
-* DefineBehavior  
-* FrameTag  
-* GenCommand  
-* DefineCommandObj  
-* CharacterSet  
-* FontRef  
-* DefineFunction  
-* PlaceFunction  
-* GenTagObject  
-* ImportAssets  
-* EnableDebugger  
-* DefineVideoStream  
-* VideoFrame  
-* DebugID
-* ScriptLimits  
-* SetTabIndex  
-* ImportAssets2  
-* DefineScalingGrid  
-* DefineBinaryData  
-* DefineFont4  
-* EnableTelemetry  
 
 
-##### *UN ZIP TYPE*  
 
-* LZMA  
-
-
-##### *MODE*  
-
-* WebGL  
 
 
