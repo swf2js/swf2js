@@ -6520,7 +6520,7 @@ if (window['swf2js'] == undefined) { (function(window)
                     if (typeof object == 'string')
                         object = movieClip.getMovieClip(object);
 
-                    var property = null;
+                    var property = undefined;
                     if (object instanceof Object) {
                         if ('getProperty' in object) {
                             property = object.getProperty(name);
@@ -6701,12 +6701,13 @@ if (window['swf2js'] == undefined) { (function(window)
 
                     stack[stack.length] = (b < a);
                     break;
-                // ActionModule
+                // ActionModulo
                 case 0x3f:
-                    var x = stack.pop();
                     var y = stack.pop();
+                    var x = stack.pop();
                     stack[stack.length] = x % y;
                     break;
+
                 // ActionBitAnd
                 case 0x60:
                     var a = stack.pop();
@@ -7097,6 +7098,9 @@ if (window['swf2js'] == undefined) { (function(window)
                 }
 
                 break;
+            case 'Key':
+                value = keyClass;
+                break;
             default:
                 value = _this.getVariable(name);
                 break;
@@ -7433,7 +7437,16 @@ if (window['swf2js'] == undefined) { (function(window)
     Property.prototype.getRotation = function()
     {
         var matrix = this.getMatrix();
-        return _atan2(matrix[1], matrix[0]) * 180 / _PI;
+        var rotation = _atan2(matrix[1], matrix[0]) * 180 / _PI;
+        switch (rotation) {
+            case -90.00000000000001:
+                rotation = -90;
+                break;
+            case 90.00000000000001:
+                rotation = 90;
+                break;
+        }
+        return rotation;
     };
 
     /**
@@ -11060,18 +11073,27 @@ if (window['swf2js'] == undefined) { (function(window)
         var moveEventHits = player.moveEventHits;
         var downEventHits = player.downEventHits;
         var upEventHits = player.upEventHits;
+        var keyDownEventHits = player.keyDownEventHits;
 
         for (var name in clipEvent) {
             var as = clipEvent[name];
             switch (name) {
                 case 'mouseDown':
-                case 'keyDown':
                     downEventHits[downEventHits.length] = {as: as, mc: _this};
                     break;
                 case 'mouseMove':
                     moveEventHits[moveEventHits.length] = {as: as, mc: _this};
                     break;
                 case 'mouseUp':
+                    upEventHits[upEventHits.length] = {as: as, mc: _this};
+                    break;
+                case 'keyDown':
+                    if(isTouch) {
+                        downEventHits[downEventHits.length] = {as: as, mc: _this};
+                    } else {
+                        keyDownEventHits[keyDownEventHits.length] = {as: as, mc: _this};
+                    }
+                    break;
                 case 'keyUp':
                     upEventHits[upEventHits.length] = {as: as, mc: _this};
                     break;
@@ -11577,55 +11599,93 @@ if (window['swf2js'] == undefined) { (function(window)
     };
 
     /**
+     *
+     * @constructor
+     */
+    var Key = function(){};
+
+    /**
+     * @param code
+     * @returns {boolean}
+     */
+    Key.prototype.isDown = function(code)
+    {
+        return (this.getCode() == code) ? true : false;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Key.prototype.getCode = function()
+    {
+        var keyCode = (_event) ? _event.keyCode : null;
+        if (96 <= keyCode && keyCode <= 105) {
+            var n = keyCode - 96;
+            switch (n) {
+                case 0:
+                    keyCode = 48;
+                    break;
+                case 1:
+                    keyCode = 49;
+                    break;
+                case 2:
+                    keyCode = 50;
+                    break;
+                case 3:
+                    keyCode = 51;
+                    break;
+                case 4:
+                    keyCode = 52;
+                    break;
+                case 5:
+                    keyCode = 53;
+                    break;
+                case 6:
+                    keyCode = 54;
+                    break;
+                case 7:
+                    keyCode = 55;
+                    break;
+                case 8:
+                    keyCode = 56;
+                    break;
+                case 9:
+                    keyCode = 57;
+                    break;
+            }
+        }
+        return keyCode;
+    };
+
+    var keyClass = new Key();
+
+    /**
      * @param event
      */
     function keyAction(event)
     {
-        var keyCode = event.keyCode;
+        _event = event;
+        var keyCode = keyClass.getCode();
         var length = players.length;
         for (var pIdx = 0; pIdx < length; pIdx++) {
             if (!(pIdx in players))
                 continue;
 
             var player = players[pIdx];
+            var keyDownEventHits = player.keyDownEventHits;
+            var kLen = keyDownEventHits.length;
+            if (kLen) {
+                var _executeEventAction = player.executeEventAction;
+                for (var idx = 0; idx < kLen; idx++) {
+                    var obj = keyDownEventHits[idx];
+                    _executeEventAction.call(player, obj);
+                }
+                player.executeAction();
+            }
+
             var buttonHits = player.buttonHits;
             var len = buttonHits.length;
             var isEnd = false;
-            if (96 <= keyCode && keyCode <= 105) {
-                var n = keyCode - 96;
-                switch (n) {
-                    case 0:
-                        keyCode = 48;
-                        break;
-                    case 1:
-                        keyCode = 49;
-                        break;
-                    case 2:
-                        keyCode = 50;
-                        break;
-                    case 3:
-                        keyCode = 51;
-                        break;
-                    case 4:
-                        keyCode = 52;
-                        break;
-                    case 5:
-                        keyCode = 53;
-                        break;
-                    case 6:
-                        keyCode = 54;
-                        break;
-                    case 7:
-                        keyCode = 55;
-                        break;
-                    case 8:
-                        keyCode = 56;
-                        break;
-                    case 9:
-                        keyCode = 57;
-                        break;
-                }
-            }
 
             for (var i = len; i--;) {
                 if (!(i in buttonHits))
@@ -11744,6 +11804,8 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.downEventHits = [];
         _this.moveEventHits = [];
         _this.upEventHits = [];
+        _this.keyDownEventHits = [];
+        _this.keyUpEventHits = [];
         _this.sounds = [];
         _this.loadSounds = [];
         _this.actions = [];
@@ -12345,6 +12407,8 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.downEventHits = [];
         _this.moveEventHits = [];
         _this.upEventHits = [];
+        _this.keyDownEventHits = [];
+        _this.keyUpEventHits = [];
         _this.actions = [];
 
         // DOM
@@ -12454,6 +12518,8 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.downEventHits = [];
         _this.moveEventHits = [];
         _this.upEventHits = [];
+        _this.keyDownEventHits = [];
+        _this.keyUpEventHits = [];
 
         var mc = _this.getParent();
         mc.putFrame();
@@ -12514,6 +12580,8 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.downEventHits = [];
         _this.moveEventHits = [];
         _this.upEventHits = [];
+        _this.keyDownEventHits = [];
+        _this.keyUpEventHits = [];
         as.execute(mc);
         _this.executeAction();
     };
@@ -12548,6 +12616,8 @@ if (window['swf2js'] == undefined) { (function(window)
         _this.downEventHits = [];
         _this.moveEventHits = [];
         _this.upEventHits = [];
+        _this.keyDownEventHits = [];
+        _this.keyUpEventHits = [];
         _this.sounds = [];
         _this.loadSounds = [];
         _this.actions = [];
@@ -12649,6 +12719,7 @@ if (window['swf2js'] == undefined) { (function(window)
                 window.addEventListener("keydown", keyAction);
                 window.addEventListener("keyup", function (event)
                 {
+                    _event = event;
                     _this.touchEnd(event);
                 });
             }
