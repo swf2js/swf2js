@@ -8163,7 +8163,9 @@ if (!('swf2js' in window)){(function(window)
                     ctx.fillStyle = player.context.createPattern(cache.canvas, 'no-repeat');
                     ctx.fillRect(0, 0, W, H);
                 } else {
-                    ctx.drawImage(cache.canvas, 0, 0);
+                    var canvas = cache.canvas;
+                    if (canvas.width > 0 && canvas.height)
+                        ctx.drawImage(canvas, 0, 0);
                 }
             } else {
                 ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
@@ -8316,7 +8318,9 @@ if (!('swf2js' in window)){(function(window)
                     if (styleType == 0x41 || styleType == 0x43) {
                         ctx.clip();
                         ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
-                        ctx.drawImage(image.canvas, 0, 0);
+                        var canvas = image.canvas;
+                        if (canvas.width > 0 && canvas.height)
+                            ctx.drawImage(canvas, 0, 0);
                     } else {
                         ctx.fillStyle = player.context.createPattern(image.canvas, repeat);
                         ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
@@ -8537,7 +8541,9 @@ if (!('swf2js' in window)){(function(window)
                 ctx.fillStyle = player.context.createPattern(cache.canvas, 'no-repeat');
                 ctx.fillRect(0, 0, W, H);
             } else {
-                ctx.drawImage(cache.canvas, 0, 0);
+                var canvas = cache.canvas;
+                if (canvas.width > 0 && canvas.height)
+                    ctx.drawImage(canvas, 0, 0);
             }
         } else {
             ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
