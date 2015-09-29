@@ -1716,7 +1716,9 @@ if (!('swf2js' in window)){(function(window)
         }
 
         originTags[frame][tag.Depth] = _clone(tag);
-        addTags[frame][tag.Depth] = _this.buildObject(tag, parent, isCopy, frame);
+        var buildObject = _this.buildObject(tag, parent, isCopy, frame);
+        if (buildObject)
+            addTags[frame][tag.Depth] = buildObject;
     };
 
     /**
@@ -1769,6 +1771,9 @@ if (!('swf2js' in window)){(function(window)
                 case 7: // DefineButton
                 case 34: // DefineButton2
                     obj = _this.buildButton(char, tag, parent);
+                    break;
+                default:
+                    return 0;
                     break;
             }
         }
@@ -6169,7 +6174,12 @@ if (!('swf2js' in window)){(function(window)
                             if (LoadVariablesFlag) {
                                 movieClip.loadVariables(url, target, method);
                             } else if (LoadTargetFlag) {
-                                movieClip.loadMovie(url, target, SendVarsMethod);
+                                if (target instanceof MovieClip) {
+                                    target.loadMovie(url, null, SendVarsMethod);
+                                } else {
+                                    movieClip.loadMovie(url, target, SendVarsMethod);
+                                }
+
                             } else {
                                 movieClip.getURL(url, target, method);
                             }
@@ -7791,6 +7801,7 @@ if (!('swf2js' in window)){(function(window)
      */
     Property.prototype.getMovieClip = function(path)
     {
+
         var _this = this;
         var mc = _this;
         var _root = mc;
@@ -7809,25 +7820,25 @@ if (!('swf2js' in window)){(function(window)
             return this;
 
         var player = _root.getPlayer();
-        var parent = mc.getParent();
-        if (!parent)
-            parent = player.getParent();
-
         if (_path == '_global')
             return player.getGlobal();
 
+        parent = mc.getParent();
         if (_path == '_parent')
-            return parent;
+            return (parent != null) ? parent : undefined;
 
         if (_path.substr(0, 6) == '_level') {
             var level = _path.substr(6);
             if (level == 0)
                 return _root;
-
+            if (!parent)
+                parent = player.getParent();
             var tags = parent.getTags();
-            var tag = tags[level];
-            if (tag instanceof MovieClip)
-                return tag;
+            if (level in tags) {
+                var tag = tags[level];
+                if (tag instanceof MovieClip)
+                    return tag;
+            }
             return undefined;
         }
 
@@ -7863,8 +7874,10 @@ if (!('swf2js' in window)){(function(window)
 
             if (name == '_parent') {
                 parent = mc.getParent();
-                if (!parent)
-                    parent = player.getParent();
+                if (!parent) {
+                    mc = undefined;
+                    break;
+                }
                 mc = parent;
                 continue;
             }
@@ -7901,6 +7914,7 @@ if (!('swf2js' in window)){(function(window)
             if (!setTarget)
                 return undefined;
         }
+
         return mc;
     };
 
@@ -9488,6 +9502,7 @@ if (!('swf2js' in window)){(function(window)
         var sounds = _this.sounds;
         for (var id in sounds) {
             var audio = sounds[id];
+            audio.load();
 
             if (currentTime) {
                 audio.addEventListener('canplay', function() {
