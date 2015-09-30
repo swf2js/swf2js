@@ -23,6 +23,9 @@ Supports: SWF7 or lower.
 
 -- Release Date: 30 Sep 2015  
 
+* [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
+* [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
+
 
 ## HTML - SAMPLE CODE
 
@@ -54,18 +57,6 @@ http://gamebiz.jp/?p=131364
 
 Facebook: https://www.facebook.com/swf2js  
 Twitter: https://twitter.com/swf2js  
-
-
-## Release Notes  
-
-[ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
-
-
-## TODO
-
-[Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
-
-
 
 
 
