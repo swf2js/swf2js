@@ -19,9 +19,9 @@ An open source Flash™ runtime written in pure JavaScript.
 Supports: SWF7 or lower.  
 
 
-## Latest Version *0.5.3*  
+## Latest Version *0.5.4*  
 
--- Release Date: 29 Sep 2015  
+-- Release Date: 30 Sep 2015  
 
 
 ## HTML - SAMPLE CODE
