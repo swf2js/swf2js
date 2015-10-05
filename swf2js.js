@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.5.4)
+ * swf2js (version 0.5.5)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -1860,7 +1860,7 @@ if (!('swf2js' in window)){(function(window)
 
         // Filter
         if (tag.PlaceFlagHasFilterList) {
-            console.log(tag.SurfaceFilterList)
+            //console.log(tag.SurfaceFilterList)
             mc.setFilters(tag.SurfaceFilterList);
         }
 
@@ -2367,6 +2367,12 @@ if (!('swf2js' in window)){(function(window)
             case 19: // SoundStreamBlock
                 _this.parseSoundStreamBlock(tagType, length);
                 break;
+            case 60: // DefineVideoStream
+                _this.parseDefineVideoStream(tagType, length);
+                break;
+            case 61: // VideoFrame
+                _this.parseVideoFrame(tagType, length);
+                break;
             // TODO 未実装
             case 3:  // FreeCharacter
             case 16: // StopSound
@@ -2386,8 +2392,6 @@ if (!('swf2js' in window)){(function(window)
             case 55: // GenTagObject
             case 57: // ImportAssets
             case 58: // EnableDebugger
-            case 60: // DefineVideoStream
-            case 61: // VideoFrame
             case 63: // DebugID
             case 65: // ScriptLimits
             case 66: // SetTabIndex
@@ -4946,11 +4950,16 @@ if (!('swf2js' in window)){(function(window)
      */
     SwfTag.prototype.parseDoABC = function(tagType, length)
     {
+        var _this = this;
+        var bitio = _this.bitio;
+        var startOffset = bitio.byte_offset;
+
         var obj = {};
-        var bitio = this.bitio;
+        obj.tagType = tagType;
         obj.Flags = bitio.getUI32();
         obj.Name = bitio.getDataUntil('\0');
-        obj.ABCData = null;
+        var moveOffset = bitio.byte_offset - startOffset;
+        obj.ABCData = _this.parseDoAction(length - moveOffset);
         return obj;
     };
 
@@ -5134,17 +5143,12 @@ if (!('swf2js' in window)){(function(window)
         obj.HasOutPoint = bitio.getUIBit();
         obj.HasInPoint = bitio.getUIBit();
 
-        if (obj.HasInPoint) {
+        if (obj.HasInPoint)
             obj.InPoint = bitio.getUI32();
-        }
-
-        if (obj.HasOutPoint) {
+        if (obj.HasOutPoint)
             obj.OutPoint = bitio.getUI32();
-        }
-
-        if (obj.HasLoops) {
+        if (obj.HasLoops)
             obj.LoopCount = bitio.getUI16();
-        }
 
         if (obj.HasEnvelope) {
             obj.EnvPoints = bitio.getUI8();
@@ -5240,6 +5244,77 @@ if (!('swf2js' in window)){(function(window)
         var compressed = bitio.getData(length);
     };
 
+    /**
+     * @param tagType
+     * @param length
+     */
+    SwfTag.prototype.parseDefineVideoStream = function(tagType, length)
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
+        var obj = {};
+        obj.tagType = tagType;
+        obj.CharacterId = bitio.getUI16();
+        obj.NumFrames = bitio.getUI16();
+        obj.Width = bitio.getUI16();
+        obj.Height = bitio.getUI16();
+        var VideoFlagsReserved = bitio.getUIBits(4);
+        obj.VideoFlagsDeblocking = bitio.getUIBits(3);
+        obj.VideoFlagsSmoothing = bitio.getUIBits(1);
+        obj.CodecID = bitio.getUI8();
+        player.setCharacter(obj.CharacterId, obj);
+        console.log(obj);
+    };
+
+    /**
+     *
+     * @param tagType
+     * @param length
+     */
+    SwfTag.prototype.parseVideoFrame = function(tagType, length)
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var player = _this.player;
+        var startOffset = bitio.byte_offset;
+
+        var obj = {};
+        obj.tagType = tagType;
+        obj.StreamID = bitio.getUI16();
+        obj.FrameNum = bitio.getUI16();
+
+        var StreamData = player.getCharacter(obj.StreamID);
+
+        var sub = bitio.byte_offset - startOffset;
+        var dataLength = length - sub;
+
+        var VideoData;
+        switch (StreamData.CodecID) {
+            case 4:
+                VideoData = _this.parseVp6SwfVideoPacket(dataLength);
+                break;
+        }
+
+        bitio.byte_offset = startOffset + length;
+
+        //obj.base64 = 'data:video/mp4;base64,' + window.btoa(VideoData);
+        player.videos[obj.StreamID] = obj;
+    };
+
+    /**
+     * @param length
+     * @returns {string}
+     */
+    SwfTag.prototype.parseVp6SwfVideoPacket = function(length)
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var VideoData = '';
+        var data = bitio.getData(length);
+        return VideoData;
+    };
+
     // TODO けす
     var asId = 0;
     /**
@@ -5298,6 +5373,7 @@ if (!('swf2js' in window)){(function(window)
             variables[obj.name] = values[key++];
         }
         _this.variables = variables;
+        _this.initParam();
     };
 
     /**
@@ -5347,6 +5423,7 @@ if (!('swf2js' in window)){(function(window)
         var isEnd = false;
         var cache = [];
         var indexes = [];
+        var withEndPoint = 0;
         var bitio = new BitIO();
         bitio.setData(data);
 
@@ -5357,6 +5434,14 @@ if (!('swf2js' in window)){(function(window)
         for (; bitio.byte_offset < endPoint; ) {
             var startOffset = bitio.byte_offset;
             var obj = {};
+
+            if (withEndPoint && withEndPoint == bitio.byte_offset) {
+                withEndPoint = 0;
+                obj.actionCode = 0x94;
+                obj.Size = 0;
+                cache[cache.length] = obj;
+                continue;
+            }
 
             var actionCode = bitio.getUI8();
             obj.actionCode = actionCode;
@@ -5529,8 +5614,8 @@ if (!('swf2js' in window)){(function(window)
                     break;
                 // ActionWith
                 case 0x94:
-                    console.log('ActionWith');
                     obj.Size = pBitio.getUI16();
+                    withEndPoint = obj.Size + bitio.byte_offset;
                     break;
                 // ActionStoreRegister
                 case 0x87:
@@ -5612,27 +5697,29 @@ if (!('swf2js' in window)){(function(window)
                     var TrySize = pBitio.getUI16();
                     var CatchSize = pBitio.getUI16();
                     var FinallySize = pBitio.getUI16();
-                    var CatchName = pBitio.getDataUntil("\0");
 
-                    if (CatchInRegisterFlag) {
+                    if (!CatchInRegisterFlag) {
+                        var CatchName = pBitio.getDataUntil("\0");
+                    } else {
                         var CatchRegister = pBitio.getUI8();
                     }
 
+                    var i = 0;
                     var TryBody = [];
                     if (TrySize) {
-                        for (var i = TrySize; i--;) {
+                        for (i = TrySize; i--;) {
                             TryBody[TryBody.length] = pBitio.getUI8();
                         }
                     }
                     var CatchBody = [];
                     if (CatchSize) {
-                        for (var i = CatchSize; i--;) {
+                        for (i = CatchSize; i--;) {
                             CatchBody[CatchBody.length] = pBitio.getUI8();
                         }
                     }
                     var FinallyBody = [];
                     if (FinallySize) {
-                        for (var i = FinallySize; i--;) {
+                        for (i = FinallySize; i--;) {
                             FinallyBody[FinallyBody.length] = pBitio.getUI8();
                         }
                     }
@@ -5725,6 +5812,8 @@ if (!('swf2js' in window)){(function(window)
         var movieClip = mc;
         var player = mc.getPlayer();
         var version = player.getVersion();
+        if (!mc.active)
+            return 0;
 
         // 開始
         var cache = _this.cache;
@@ -6125,6 +6214,7 @@ if (!('swf2js' in window)){(function(window)
                         if (value == undefined && _this.scope)
                             value = _this.scope.getProperty(name);
                     }
+
                     stack[stack.length] = value;
                     break;
 
@@ -6334,15 +6424,15 @@ if (!('swf2js' in window)){(function(window)
                 // CloneSprite
                 case 0x24:
                     var depth = _parseFloat(stack.pop());
-                    var target = stack.pop() + '';
-                    var source = stack.pop() + '';
+                    var target = stack.pop();
+                    var source = stack.pop();
                     if (movieClip)
                         movieClip.duplicateMovieClip(target, source, depth);
                     break;
 
                 // RemoveSprite
                 case 0x25:
-                    var target = stack.pop() + '';
+                    var target = stack.pop();
                     if (movieClip)
                         movieClip.removeMovieClip(target);
                     break;
@@ -6639,19 +6729,18 @@ if (!('swf2js' in window)){(function(window)
                 case 0x49:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    var aString = a;
-                    if (a instanceof MovieClip)
-                        aString = a.getTarget();
-
-                    var bString = b;
-                    if (b instanceof MovieClip)
-                        bString = b.getTarget();
-
                     arg[1] = a;
                     arg[2] = b;
 
-                    stack[stack.length] = (bString === aString);
+                    var A = a;
+                    if (a instanceof MovieClip)
+                        A = a.getTarget();
+
+                    var B = b;
+                    if (b instanceof MovieClip)
+                        B = b.getTarget();
+
+                    stack[stack.length] = (B == A);
                     break;
                 // ActionGetMember
                 case 0x4e:
@@ -6836,10 +6925,13 @@ if (!('swf2js' in window)){(function(window)
                     break;
                 // ActionWith
                 case 0x94:
-                    console.log('ActionWith');
                     var Size = aScript.Size;
-                    var object = stack.pop();
+                    var object = mc;
+                    if (Size)
+                        object = stack.pop();
+                    movieClip = object;
                     break;
+
                 // ActionToNumber
                 case 0x4a:
                     var object = stack.pop();
@@ -6951,15 +7043,13 @@ if (!('swf2js' in window)){(function(window)
                 case 0x3e:
                     return stack.pop();
                     break;
-
                 // ActionStackSwap
                 case 0x4d:
                     var a = stack.pop();
                     var b = stack.pop();
-                    stack[stack.length] = b;
                     stack[stack.length] = a;
+                    stack[stack.length] = b;
                     break;
-
                 // ActionStoreRegister
                 case 0x87:
                     var RegisterNumber = aScript.RegisterNumber;
@@ -6996,7 +7086,7 @@ if (!('swf2js' in window)){(function(window)
                     arg[1] = a;
                     arg[2] = b;
 
-                    stack[stack.length] = (a === b);
+                    stack[stack.length] = (b === a);
                     break;
                 // ActionGreater
                 case 0x67:
@@ -7043,7 +7133,7 @@ if (!('swf2js' in window)){(function(window)
                     var subClass = stack.pop();
                     subClass.prototype = {};
                     subClass.prototype.__proto__ = superClass.prototype;
-                    subClass.prototype.__constructor__ = superClass;
+                    subClass.prototype.constructor = superClass;
                     break;
                 // ActionCastOp
                 case 0x2b:
@@ -7083,9 +7173,6 @@ if (!('swf2js' in window)){(function(window)
                 // DoABC
                 case 0x82:
                     console.log('DoABC');
-                    var flags = pBitio.getUI32();
-                    var Name = pBitio.getDataUntil("\0");
-                    var ABCData = pBitio.getData(payload.length - pBitio.byte_offset);
                     break;
 
                 default:
@@ -7918,11 +8005,14 @@ if (!('swf2js' in window)){(function(window)
 
             var tagLength = tags.length;
             var setTarget = false;
-            for (var idx = 0; idx < tagLength; idx++) {
-                if (!(idx in tags))
+            if (!tagLength)
+                break;
+
+            for (;tagLength--;) {
+                if (!(tagLength in tags))
                     continue;
 
-                var tag = tags[idx];
+                var tag = tags[tagLength];
                 var tagName = tag.getName();
                 if (!tagName)
                     continue;
@@ -10337,15 +10427,10 @@ if (!('swf2js' in window)){(function(window)
             var txMin = bounds.xMin;
             var tyMax = bounds.yMax;
             var tyMin = bounds.yMin;
-
-            if(txMax > xMin && tyMax > yMin && xMax > txMin && yMax > tyMin)
-                return true;
+            return (txMax > xMin && tyMax > yMin && xMax > txMin && yMax > tyMin)
         } else {
-            if (x >= xMin && x <= xMax && y >= yMin && y <= yMax)
-                return true;
+            return (x >= xMin && x <= xMax && y >= yMin && y <= yMax)
         }
-
-        return false;
     };
 
     /**
@@ -10672,16 +10757,38 @@ if (!('swf2js' in window)){(function(window)
     };
 
     /**
-     * @param target
-     * @param name
-     * @param depth
+     * duplicateMovieClip
      */
-    MovieClip.prototype.duplicateMovieClip = function(target, name, depth)
+    MovieClip.prototype.duplicateMovieClip = function()
     {
+        var _this = this;
+        var _root = _this.getMovieClip('_root');
+        var player = _root.getPlayer();
+
+        var target = arguments[0];
+        var name = arguments[1];
+        var depth = arguments[2];
         var targetMc = this.getMovieClip(name);
+
+        if (player.getVersion() > 4) {
+            target = arguments[0];
+            depth = arguments[1];
+            if (_isNaN(depth)) {
+                var parent = _this.getParent();
+                if (!parent)
+                    parent = player.getParent();
+                depth = parent.getNextHighestDepth();
+                if (16384 > depth)
+                    depth = 16384;
+            }
+            var object = arguments[2];
+            targetMc = _this;
+        }
+
+        var cloneMc;
         if (targetMc != null && targetMc.getCharacterId() != 0) {
             var player = targetMc.getPlayer();
-            var cloneMc = new MovieClip();
+            cloneMc = new MovieClip();
             cloneMc.player = player;
 
             var char = player.getCharacter(targetMc.characterId);
@@ -10699,7 +10806,6 @@ if (!('swf2js' in window)){(function(window)
             cloneMc.setTotalFrames(targetMc.getTotalFrames());
             cloneMc.setCharacterId(targetMc.characterId);
             cloneMc.isStatic = targetMc.isStatic;
-            cloneMc.variables = targetMc.variables;
             cloneMc.clipEvent = targetMc.clipEvent;
             cloneMc.filters = targetMc.filters;
             cloneMc.removable = true;
@@ -10714,6 +10820,7 @@ if (!('swf2js' in window)){(function(window)
             var frame = 1;
             if (!(frame in controller))
                 controller[frame] = [];
+
             controller[frame][depth] = {
                 matrix: _cloneArray(matrix),
                 colorTransform: _cloneArray(colorTransform)
@@ -10741,6 +10848,8 @@ if (!('swf2js' in window)){(function(window)
             cloneMc.initParams();
             cloneMc.addActions();
         }
+
+        return cloneMc;
     };
 
     /**
@@ -10748,11 +10857,12 @@ if (!('swf2js' in window)){(function(window)
      */
     MovieClip.prototype.removeMovieClip = function(name)
     {
-        var targetMc = this;
-        if (name)
-            targetMc = this.getMovieClip(name);
+        var _this = this;
+        var targetMc = _this;
+        if (typeof name == 'string')
+            targetMc = _this.getMovieClip(name);
 
-        if (targetMc != null && targetMc.removable) {
+        if (targetMc instanceof MovieClip && targetMc.removable) {
             var depth = targetMc.getLevel();
             var parent = targetMc.getParent();
             var addTags = parent.addTags;
@@ -11659,7 +11769,6 @@ if (!('swf2js' in window)){(function(window)
                 var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
                 var renderColorTransform = _multiplicationColor(colorTransform, obj.getColorTransform());
                 var isVisible = _min(obj.getVisible(), visible);
-
                 var isFilter = false;
                 if (obj instanceof MovieClip) {
                     var buttonStatus = obj.getButtonStatus();
@@ -12091,6 +12200,7 @@ if (!('swf2js' in window)){(function(window)
         _this.keyUpEventHits = [];
         _this.sounds = [];
         _this.loadSounds = [];
+        _this.videos = [];
         _this.actions = [];
         _this.queue = null;
         _this._global = new _Global();
@@ -12845,16 +12955,17 @@ if (!('swf2js' in window)){(function(window)
             for (var i = 0; i < _this.actions.length; i++) {
                 var obj = _this.actions[i];
                 var mc = obj.mc;
-                if (mc.active) {
-                    var as = obj.as;
-                    var length = as.length;
-                    for (var idx = 0; idx < length; idx++) {
-                        var action = as[idx];
-                        if (action instanceof ActionScript) {
-                            action.execute(mc);
-                        } else if (typeof action == 'function') {
-                            action.apply(mc);
-                        }
+                if (!mc.active)
+                    continue;
+
+                var as = obj.as;
+                var length = as.length;
+                for (var idx = 0; idx < length; idx++) {
+                    var action = as[idx];
+                    if (action instanceof ActionScript) {
+                        action.execute(mc);
+                    } else if (typeof action == 'function') {
+                        action.apply(mc);
                     }
                 }
             }
