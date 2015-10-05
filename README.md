@@ -19,9 +19,9 @@ An open source Flash™ runtime written in pure JavaScript.
 Supports: SWF7 or lower.  
 
 
-## Latest Version *0.5.4*  
+## Latest Version *0.5.5*  
 
--- Release Date: 30 Sep 2015  
+-- Release Date: 05 Oct 2015  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
