@@ -6587,8 +6587,11 @@ if (!('swf2js' in window)){(function(window)
                                 as.initVariable(params);
                                 value = as.execute(movieClip);
                             } else {
+                                var caller = movieClip;
+                                if (params.length)
+                                    caller = params.shift();
                                 object.initVariable(params);
-                                value = object.execute(mc);
+                                value = object.execute(caller);
                             }
                         } else {
                             var func = object[method];
@@ -7875,7 +7878,6 @@ if (!('swf2js' in window)){(function(window)
                     return variables[key];
             }
         }
-
         if (version > 4) {
             if (name in window)
                 return window[name];
@@ -8005,8 +8007,10 @@ if (!('swf2js' in window)){(function(window)
 
             var tagLength = tags.length;
             var setTarget = false;
-            if (!tagLength)
+            if (!tagLength) {
+                mc = undefined;
                 break;
+            }
 
             for (;tagLength--;) {
                 if (!(tagLength in tags))
@@ -11450,18 +11454,12 @@ if (!('swf2js' in window)){(function(window)
         var as = variables['onMouseDown'];
         if (as)
             downEventHits[downEventHits.length] = {as: [as], mc: _this};
-        var as = variables['onPress'];
-        if (as)
-            downEventHits[downEventHits.length] = {as: [as], mc: _this};
 
         var as = variables['onMouseMove'];
         if (as)
             moveEventHits[moveEventHits.length] = {as: [as], mc: _this};
 
         var as = variables['onMouseUp'];
-        if (as)
-            upEventHits[upEventHits.length] = {as: [as], mc: _this};
-        var as = variables['onRelease'];
         if (as)
             upEventHits[upEventHits.length] = {as: [as], mc: _this};
     };
@@ -11772,17 +11770,20 @@ if (!('swf2js' in window)){(function(window)
                 var isFilter = false;
                 if (obj instanceof MovieClip) {
                     var buttonStatus = obj.getButtonStatus();
-                    var clipEvent = obj.clipEvent;
-                    if (isVisible && 'press' in clipEvent && buttonStatus == 'up') {
-                        var bounds = obj.getBounds(renderMatrix);
-                        var buttonHits = player.buttonHits;
-                        buttonHits[buttonHits.length] = {
-                            xMax: bounds.xMax,
-                            xMin: bounds.xMin,
-                            yMax: bounds.yMax,
-                            yMin: bounds.yMin,
-                            parent: obj
-                        };
+                    if (isVisible && buttonStatus == 'up') {
+                        var variables = obj.variables;
+                        var clipEvent = obj.clipEvent;
+                        if ('press' in clipEvent || 'onPress' in variables) {
+                            var buttonHits = player.buttonHits;
+                            var bounds = obj.getBounds(renderMatrix);
+                            buttonHits[buttonHits.length] = {
+                                xMax: bounds.xMax,
+                                xMin: bounds.xMin,
+                                yMax: bounds.yMax,
+                                yMin: bounds.yMin,
+                                parent: obj
+                            };
+                        }
                     }
 
                     var filters = obj.getFilters();
@@ -13341,6 +13342,10 @@ if (!('swf2js' in window)){(function(window)
                     if ('press' in clipEvent) {
                         _this.executeEventAction({as:clipEvent['press'], mc: mc});
                     }
+                    var variables = mc.variables;
+                    if ('onPress' in variables) {
+                        _this.executeEventAction({as:[variables['onPress']], mc: mc});
+                    }
                 }
 
                 if (event.type == startEvent)
@@ -13538,6 +13543,11 @@ if (!('swf2js' in window)){(function(window)
             var clipEvent = mc.clipEvent;
             if ('release' in clipEvent) {
                 _this.executeEventAction({as:clipEvent['release'], mc:mc});
+                isRender = true;
+            }
+            var variables = mc.variables;
+            if ('onRelease' in variables) {
+                _this.executeEventAction({as:[variables['onRelease']], mc:mc});
                 isRender = true;
             }
             mc.setButtonStatus('up');
