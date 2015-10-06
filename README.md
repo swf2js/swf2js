@@ -6,8 +6,9 @@ swfをJavaScriptで直接バイナリ分解してcanvas出力
 対応バージョン: SWF8以下
 * FlashLite 1.x
 * FlashLite 2.x
-* FlashPlayer3 - FlashPlayer8
-  
+* ActionScript 1.x
+* ActionScript 2.x 
+
 
 output in the canvas with swf binary decomposition in JavaScript.  
 play the swf on the iPhone.  
