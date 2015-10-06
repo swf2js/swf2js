@@ -10157,8 +10157,11 @@ if (!('swf2js' in window)){(function(window)
             }
         }
 
+
         if (targetMc == null)
             return 0;
+
+        _this.unloadMovie(targetMc);
 
         var xmlHttpRequest = new XMLHttpRequest();
         var method = 'GET';
@@ -10194,8 +10197,6 @@ if (!('swf2js' in window)){(function(window)
             if (readyState == 4) {
                 var status = xmlHttpRequest.status;
                 if (status == 200) {
-                    _this.unloadMovie(targetMc);
-
                     var loadPlayer = new Player();
                     targetMc.removable = true;
                     targetMc.loadPlayer = loadPlayer;
