@@ -59,7 +59,8 @@ if (!('swf2js' in window)){(function(window)
     var isiOS = (ua.indexOf('iPhone') > 0 || ua.indexOf('iPod') > 0);
     var isChrome = (ua.indexOf('Chrome') > 0);
     var isTouch = (isAndroid || isiOS);
-    var isXHR2 = false;
+    var xmlHttpRequest = new XMLHttpRequest();
+    var isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
     var isArrayBuffer = window.ArrayBuffer;
     var devicePixelRatio = window.devicePixelRatio || 1;
     var _devicePixelRatio = devicePixelRatio * 0.75;
@@ -1077,7 +1078,7 @@ if (!('swf2js' in window)){(function(window)
         var array = _this.createArray(length);
         for (var key = 0; length--; key++)
             array[key] = data.charCodeAt(key) & 0xff;
-        _this.data = data;
+        _this.data = array;
     };
 
     /**
@@ -1152,7 +1153,8 @@ if (!('swf2js' in window)){(function(window)
         var array = _this.createArray(length);
         var key = 0;
         var data = _this.data;
-        for (; length--; )
+        var limit = length;
+        for (; limit--; )
             array[key++] = data[_this.byte_offset++];
         return array;
     };
@@ -10199,7 +10201,10 @@ if (!('swf2js' in window)){(function(window)
                         targetMc.removable = true;
                         targetMc.loadStage = loadStage;
                         loadStage.parent = targetMc;
-                        loadStage.parse(isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText);
+                        var data = isXHR2
+                            ? xmlHttpRequest.response
+                            : xmlHttpRequest.responseText;
+                        loadStage.parse(data);
 
                         // 入れ替え
                         if (target == 0 || (typeof target != 'number' && targetMc.getParent() == null)) {
@@ -13694,7 +13699,6 @@ if (!('swf2js' in window)){(function(window)
 
             var xmlHttpRequest = new XMLHttpRequest();
             xmlHttpRequest.open('GET', url, true);
-            isXHR2 = typeof xmlHttpRequest.responseType != 'undefined';
 
             if (isXHR2) {
                 xmlHttpRequest.responseType = 'arraybuffer';
