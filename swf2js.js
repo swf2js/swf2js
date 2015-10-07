@@ -523,13 +523,16 @@ if (!('swf2js' in window)){(function(window)
     {
         var numLengths = bitLengths.length;
         var blCount = [];
-        var maxBits = _max.apply(Math, bitLengths) + 1;
+        var maxBits = 0;
+        for (var i = 0; i < numLengths; i++)
+            maxBits = _max(maxBits, bitLengths[i]);
+        maxBits++;
         var nextCode = [];
-        var code = 0;
         var table = {};
-        var i = numLengths;
+        var code = 0;
         var len = 0;
 
+        i = numLengths;
         for (; i--; ) {
             len = bitLengths[i];
             blCount[len] = (blCount[len] || 0) + (len > 0);
