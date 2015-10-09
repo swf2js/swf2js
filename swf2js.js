@@ -1,5 +1,5 @@
 /**
- * swf2js (version 0.5.7)
+ * swf2js (version 0.5.8)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -49,6 +49,7 @@ if (!('swf2js' in window)){(function(window)
     // params
     var stageId = 0;
     var stages = [];
+    var asId = 0;
     var instanceId = 0;
     var tmpContext;
     var StartDate = new _Date();
@@ -1111,8 +1112,7 @@ if (!('swf2js' in window)){(function(window)
         var count = 3;
         for (; count; ) {
             var code = _this.getUI8();
-            // trim
-            switch (code) {
+            switch (code) { // trim
                 case 32:
                 case 96:
                 case 127:
@@ -4858,10 +4858,16 @@ if (!('swf2js' in window)){(function(window)
     SwfTag.prototype.parseDoInitAction = function(length)
     {
         var _this = this;
+        var bitio = _this.bitio;
         var stage = _this.stage;
-        var spriteId = _this.bitio.getUI16();
-        var as = _this.parseDoAction(length - 2);
-        as.initAction = true;
+        var spriteId = bitio.getUI16();
+
+        var mc = new MovieClip();
+        mc.stage = stage;
+        mc.active = true;
+
+        var as = new ActionScript(bitio.getData(length - 2), undefined, undefined, true);
+        as.execute(mc);
         stage.initActions[spriteId] = as;
     };
 
@@ -5027,7 +5033,7 @@ if (!('swf2js' in window)){(function(window)
         switch (obj.SoundFormat) {
             case 0: // Uncompressed native-endian
             case 3: // Uncompressed little-endian
-                mimeType = 'wav';
+                mimeType = 'x-wav';
                 break;
             case 1: // ADPCM ? 32KADPCM
                 mimeType = 'wav';
@@ -5316,15 +5322,14 @@ if (!('swf2js' in window)){(function(window)
         return VideoData;
     };
 
-    // TODO けす
-    var asId = 0;
     /**
      * @param data
      * @param constantPool
      * @param register
+     * @param initAction
      * @constructor
      */
-    var ActionScript = function (data, constantPool, register)
+    var ActionScript = function (data, constantPool, register, initAction)
     {
         this.id = asId++; // TODO けす
         this.cache = [];
@@ -5332,7 +5337,7 @@ if (!('swf2js' in window)){(function(window)
         this.constantPool = (constantPool == undefined) ? [] : constantPool;
         this.register = (register == undefined) ? [] : register;
         this.variables = [];
-        this.initAction = false;
+        this.initAction = (initAction) ? true : false;
         this.scope = null;
         this.__init__(data);
     };
@@ -5395,7 +5400,7 @@ if (!('swf2js' in window)){(function(window)
         var _this = this;
         var value = _this.variables[name];
         if (value == undefined)
-            value = _this.__proto__[name];
+            value = _this[name];
         return value;
     };
 
@@ -5594,7 +5599,17 @@ if (!('swf2js' in window)){(function(window)
                         };
                     }
                     var codeSize  = pBitio.getUI16();
-                    obj.as = new ActionScript(bitio.getData(codeSize), _this.constantPool, register);
+                    var data = bitio.getData(codeSize);
+                    var as = new ActionScript(data, _this.constantPool, register, _this.initAction);
+                    obj.ActionScript = function ActionScript(as, mc, args)
+                    {
+                        as.initVariable(args);
+                        if (as.initAction)
+                            as.variables['this'] = this;
+                        return as.execute(mc);
+                    };
+                    obj.ActionScript.cache = as;
+
                     break;
                 // ActionWith
                 case 0x94:
@@ -5667,9 +5682,17 @@ if (!('swf2js' in window)){(function(window)
                         };
                     }
 
-                    var codeSize = pBitio.getUI16();
-                    obj.as = new ActionScript(bitio.getData(codeSize), _this.constantPool, register);
-
+                    var codeSize  = pBitio.getUI16();
+                    var data = bitio.getData(codeSize);
+                    var as = new ActionScript(data, _this.constantPool, register, _this.initAction);
+                    obj.ActionScript = function ActionScript(as, mc, args)
+                    {
+                        as.initVariable(args);
+                        if (as.initAction)
+                            as.variables['this'] = this;
+                        return as.execute(mc);
+                    };
+                    obj.ActionScript.cache = as;
                     break;
                 // ActionTry
                 case 0x8f:
@@ -5792,7 +5815,6 @@ if (!('swf2js' in window)){(function(window)
     {
         var _this = this;
         var stack = [];
-        var arg = [];
         var movieClip = mc;
         var stage = mc.getStage();
         var version = stage.getVersion();
@@ -5855,10 +5877,9 @@ if (!('swf2js' in window)){(function(window)
                 case 0x8A:
                     if (movieClip) {
                         var frame = aScript.frame;
-                        var skipCount = aScript.skipCount;skipCount
+                        var skipCount = aScript.skipCount;
                     }
                     break;
-
                 // SetTarget
                 case 0x8B:
                     var targetName = aScript.targetName;
@@ -5872,7 +5893,6 @@ if (!('swf2js' in window)){(function(window)
                             movieClip = mc;
                     }
                     break;
-
                 // GoToLabel
                 case 0x8C:
                     if (movieClip) {
@@ -5882,7 +5902,6 @@ if (!('swf2js' in window)){(function(window)
                             movieClip.setNextFrame(frame);
                     }
                     break;
-
                 // GetUrl
                 case 0x83:
                     if (movieClip)
@@ -5898,48 +5917,32 @@ if (!('swf2js' in window)){(function(window)
                 case 0x0A:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
+                    if (_isNaN(a)) a = 0;
+                    if (_isNaN(b)) b = 0;
                     stack[stack.length] = a + b;
                     break;
                 // Subtract
                 case 0x0B:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
+                    if (_isNaN(a)) a = 0;
+                    if (_isNaN(b)) b = 0;
                     stack[stack.length] = b - a;
                     break;
                 // Multiply
                 case 0x0C:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
+                    if (_isNaN(a)) a = 0;
+                    if (_isNaN(b)) b = 0;
                     stack[stack.length] = a * b;
                     break;
                 // Divide
                 case 0x0D:
                     var a = _parseFloat(stack.pop());
                     var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) {
-                        a = 0;
-                    }
-                    if (_isNaN(b)) {
-                        b = 0;
-                    }
+                    if (_isNaN(a)) a = 0;
+                    if (_isNaN(b)) b = 0;
                     stack[stack.length] = b / a;
                     break;
 
@@ -5954,7 +5957,6 @@ if (!('swf2js' in window)){(function(window)
                         stack[stack.length] = (a == b) ? 1 : 0;
                     }
                     break;
-
                 // Less
                 case 0x0F:
                     var a = _this.calc(stack.pop());
@@ -5965,7 +5967,6 @@ if (!('swf2js' in window)){(function(window)
                         stack[stack.length] = (b < a) ? 1 : 0;
                     }
                     break;
-
                 // 論理演算 ***********************************
                 // And
                 case 0x10:
@@ -5977,7 +5978,6 @@ if (!('swf2js' in window)){(function(window)
                         stack[stack.length] = (a != 0 && b != 0) ? 1 : 0;
                     }
                     break;
-
                 // Or
                 case 0x11:
                     var a = _this.calc(stack.pop());
@@ -5988,7 +5988,6 @@ if (!('swf2js' in window)){(function(window)
                         stack[stack.length] = (a != 0 || b != 0) ? 1 : 0;
                     }
                     break;
-
                 // Not
                 case 0x12:
                     var value = _this.calc(stack.pop());
@@ -6010,7 +6009,6 @@ if (!('swf2js' in window)){(function(window)
                         stack[stack.length] = (b == a) ? 1 : 0;
                     }
                     break;
-
                 case 0x14: // StringLength
                 case 0x31: // MBStringLength
                     var string = stack.pop() + '';
@@ -6028,32 +6026,24 @@ if (!('swf2js' in window)){(function(window)
                     }
                     stack[stack.length] = length;
                     break;
-
                 // StringAdd
                 case 0x21:
                     var a = stack.pop();
                     var b = stack.pop();
-                    if (a == null) {
-                        a = '';
-                    }
-                    if (b == null) {
-                        b = '';
-                    }
+                    if (a == null) a = '';
+                    if (b == null) b = '';
                     stack[stack.length] = b + '' + a;
                     break;
-
                 case 0x15:// StringExtract
                 case 0x35:// MBStringExtract
                     var count = stack.pop();
                     var index = stack.pop() - 1;
-                    if (index < 0)
-                        index = 0;
+                    if (index < 0) index = 0;
                     var string = stack.pop() + '';
                     stack[stack.length] = (count < 0)
                         ? string.substr(index)
                         : string.substr(index, count);
                     break;
-
                 // StringLess
                 case 0x29:
                     var a = stack.pop();
@@ -6083,18 +6073,12 @@ if (!('swf2js' in window)){(function(window)
                             if (key in params) {
                                 var name = params[key];
                                 if (typeof name == 'string') {
-                                    if (_this.initAction && name == 'this')
-                                        value = _this;
-                                    if (value == undefined)
-                                        value = _this.getVariable(name);
+                                    value = _this.getVariable(name);
                                     if (value == undefined)
                                         value = movieClip.getVariable(name);
                                 }
-
                                 if (value == undefined)
                                     value = name;
-                            } else if (key in arg) {
-                                value = arg[key];
                             }
                         }
                         stack[stack.length] = value;
@@ -6151,7 +6135,6 @@ if (!('swf2js' in window)){(function(window)
                         movieClip.executeActions(frame);
                     }
                     break;
-
                 // If
                 case 0x9D:
                     var condition = stack.pop();
@@ -6166,7 +6149,6 @@ if (!('swf2js' in window)){(function(window)
                     if (condition)
                         cIdx = aScript.offset;
                     break;
-
                 // Jump
                 case 0x99:
                     cIdx = aScript.offset;
@@ -6189,7 +6171,6 @@ if (!('swf2js' in window)){(function(window)
 
                     stack[stack.length] = value;
                     break;
-
                 // SetVariable
                 case 0x1D:
                     var value = stack.pop();
@@ -6272,7 +6253,6 @@ if (!('swf2js' in window)){(function(window)
                             movieClip.unloadMovie(target);
                         }
                     }
-
                     break;
                 // GetProperty
                 case 0x22:
@@ -6328,7 +6308,6 @@ if (!('swf2js' in window)){(function(window)
                             movieClip.stop();
                         }
                     }
-
                     break;
                 case 0x20: // SetTarget2
                     var target = stack.pop();
@@ -6354,7 +6333,6 @@ if (!('swf2js' in window)){(function(window)
                         }
                         targetMc.setProperty(index, value);
                     }
-
                     break;
                 // StartDrag
                 case 0x27:
@@ -6385,13 +6363,8 @@ if (!('swf2js' in window)){(function(window)
                     break;
                 // WaitForFrame2
                 case 0x8D:
-                    console.log('WaitForFrame2');
                     var frame = stack.pop();
                     var skipCount = aScript.skipCount;
-                    if (movieClip.getFrame() == frame) {
-
-                    }
-
                     break;
                 // CloneSprite
                 case 0x24:
@@ -6401,14 +6374,12 @@ if (!('swf2js' in window)){(function(window)
                     if (movieClip)
                         movieClip.duplicateMovieClip(target, source, depth);
                     break;
-
                 // RemoveSprite
                 case 0x25:
                     var target = stack.pop();
                     if (movieClip)
                         movieClip.removeMovieClip(target);
                     break;
-
                 // EndDrag
                 case 0x28:
                     if (movieClip)
@@ -6419,8 +6390,7 @@ if (!('swf2js' in window)){(function(window)
                 // GetTime
                 case 0x34:
                     var now = new _Date();
-                    stack[stack.length] =
-                        now.getTime() - StartDate.getTime();
+                    stack[stack.length] = now.getTime() - StartDate.getTime();
                     break;
                 // RandomNumber
                 case 0x30:
@@ -6443,7 +6413,6 @@ if (!('swf2js' in window)){(function(window)
                 case 0x2D: // fscommand2
                     var count = _parseFloat(stack.pop());
                     var method = stack.pop();
-
                     var now = new _Date();
                     switch (method.toLowerCase()) {
                         case 'getdateyear':
@@ -6519,7 +6488,6 @@ if (!('swf2js' in window)){(function(window)
                             stack[stack.length] = -1;
                             break;
                     }
-
                     break;
 
                 // SWF 5 ***********************************
@@ -6528,7 +6496,6 @@ if (!('swf2js' in window)){(function(window)
                     var method = stack.pop();
                     var object = stack.pop();
                     var count = _parseFloat(stack.pop());
-
                     var params = [];
                     for (; count--;)
                         params[params.length] = stack.pop();
@@ -6536,62 +6503,48 @@ if (!('swf2js' in window)){(function(window)
                     value = undefined;
                     if (object) {
                         method = mc.checkMethod(method);
-                        var as = _this.getVariable(method);
-                        if (as instanceof ActionScript) {
-                            as.initVariable(params);
-                            value = as.execute(movieClip);
-                        } else if (object instanceof MovieClip || mc[method] != undefined) {
-                            if (typeof object == 'string')
-                                object = movieClip.getMovieClip(object);
 
-                            if (object[method] != undefined) {
-                                value = object[method].apply(object, params);
-                            } else {
-                                var as = object.getVariable(method);
-                                if (as instanceof ActionScript) {
-                                    as.initVariable(params);
-                                    value = as.execute(object);
-                                }
+                        var func = object[method];
+                        var caller = movieClip;
+                        if (!func && object instanceof MovieClip) {
+                            func = object.getVariable(method);
+                            if (func) {
+                                caller = object;
+                                object = func;
                             }
-                        } else if (object instanceof ActionScript) {
-                            var as = object[method];
-                            if (as instanceof ActionScript) {
-                                as.initVariable(params);
-                                value = as.execute(movieClip);
-                            } else {
-                                var caller = movieClip;
-                                if (params.length)
-                                    caller = params.shift();
-                                object.initVariable(params);
-                                value = object.execute(caller);
+                        }
+
+                        if (func) {
+                            if (method == 'call' || method == 'apply') {
+                                caller = params.shift();
+                                func = object;
                             }
-                        } else {
-                            var func = object[method];
-                            if (func instanceof ActionScript) {
-                                func.initVariable(params);
-                                value = func.execute(movieClip);
-                            } else {
-                                value = func.apply(object, params);
+
+                            if ('cache' in func) {
+                                var paramCache = params;
+                                params = [];
+                                params[params.length] = func.cache;
+                                params[params.length] = caller;
+                                params[params.length] = paramCache;
                             }
+
+                            value = func.apply(object, params);
                         }
                     }
 
                     stack[stack.length] = value;
                     break;
-
                 // ConstantPool
                 case 0x88:
                     _this.constantPool = aScript.constantPool;
                     break;
-
                 // ActionCallFunction
                 case 0x3d:
                     var FunctionName = stack.pop();
                     var numArgs = _parseFloat(stack.pop());
                     var params = [];
-                    for (; numArgs--;) {
+                    for (; numArgs--;)
                         params[params.length] = stack.pop();
-                    }
 
                     var ret = null;
                     if (movieClip) {
@@ -6602,59 +6555,52 @@ if (!('swf2js' in window)){(function(window)
                                 targetMc = params.shift();
 
                             if (params.length > 0) {
-                                var as = params.shift();
-                                if (!(as instanceof ActionScript))
-                                    as = targetMc.getVariable(method);
+                                var obj = params.shift();
+                                var as = {};
 
-                                if (as instanceof ActionScript) {
-                                    params.unshift(function () {
-                                        as.initVariable(arguments);
-                                        as.execute(movieClip);
+                                if (typeof obj == 'string')
+                                    as = targetMc.getVariable(obj);
+
+                                if (as instanceof Function) {
+                                    var AS = as.cache;
+                                    params.unshift(function(){
+                                        AS.initVariable(arguments);
+                                        AS.execute(targetMc);
                                     });
                                 } else {
-                                    params.unshift(as);
+                                    params.unshift(obj);
                                 }
                             }
 
                             ret = window[FunctionName].apply(window, params);
                         } else if (movieClip[FunctionName]) {
-                            movieClip[FunctionName].apply(movieClip, params);
+                            ret = movieClip[FunctionName].apply(movieClip, params);
                         } else {
-                            var as = movieClip.getVariable(FunctionName);
-                            var scope = _this.scope;
-                            if (as instanceof ActionScript) {
-                                as.initVariable(params);
-                                ret = as.execute(movieClip);
-                            } else if (scope) {
-                                as = scope.getVariable(FunctionName);
-                                if (as instanceof ActionScript) {
-                                    as.initVariable(params);
-                                    ret = as.execute(movieClip);
-                                }
-                            } else {
-                                console.log("TODO::", FunctionName, as, mc);
+                            var func = movieClip.getVariable(FunctionName);
+                            if (!func) {
+                                var scope = _this.scope;
+                                if (scope)
+                                    func = scope.getVariable(FunctionName);
                             }
-                        }
 
+                            if (func)
+                                ret = func(func.cache, movieClip, params);
+                        }
                         stack[stack.length] = ret;
                     }
                     break;
-
                 // ActionDefineFunction
                 case 0x9b:
-                    var as = aScript.as;
-                    as.constantPool = clone(_this.constantPool);
-                    as.initAction = _this.initAction;
+                    var as = aScript.ActionScript;
                     var scope = _this.scope;
-                    as.scope = (!scope) ? mc : scope;
-
+                    as.cache.scope = (scope) ? scope : movieClip;
                     var FunctionName = aScript.FunctionName;
-                    if (FunctionName != '')
+                    if (FunctionName) {
                         movieClip.setVariable(FunctionName, as);
-
-                    stack[stack.length] = as;
+                    } else {
+                        stack[stack.length] = as;
+                    }
                     break;
-
                 // ActionDefineLocal
                 case 0x3c:
                     var value = stack.pop();
@@ -6662,7 +6608,6 @@ if (!('swf2js' in window)){(function(window)
                     if (movieClip)
                         movieClip.setVariable(name, value);
                     break;
-
                 // ActionDefineLocal2
                 case 0x41:
                     var name = stack.pop();
@@ -6676,37 +6621,29 @@ if (!('swf2js' in window)){(function(window)
                     if (object instanceof MovieClip)
                         object.setVariable(name, undefined);
                     break;
-
                 // ActionDelete2
                 case 0x3b:
                     var name = stack.pop();
                     if (movieClip)
                         movieClip.setVariable(name, undefined);
                     break;
-
                 // ActionEnumerate
                 case 0x46:
                     var path = stack.pop();
                     stack[stack.length] = null;
-
                     if (movieClip) {
                         var targetMc = movieClip.getMovieClip(path);
                         if (targetMc != null) {
                             var variables = targetMc.variables;
-                            for (var name in variables) {
+                            for (var name in variables)
                                 stack[stack.length] = name;
-                            }
                         }
                     }
                     break;
-
                 // ActionEquals2
                 case 0x49:
                     var a = stack.pop();
                     var b = stack.pop();
-                    arg[1] = a;
-                    arg[2] = b;
-
                     var A = a;
                     if (a instanceof MovieClip)
                         A = a.getTarget();
@@ -6721,27 +6658,20 @@ if (!('swf2js' in window)){(function(window)
                 case 0x4e:
                     var name = stack.pop();
                     var object = stack.pop();
-                    var scope = null;
-
-                    if (name == "prototype") {
-                        stack[stack.length] = object;
-                        stack[stack.length] = object.__proto__;
-                        break;
-                    }
-
                     var scope = _this.scope;
+
                     if (typeof object == 'string') {
-                        var mc = (scope)
-                            ? scope.getMovieClip(object)
-                            : movieClip.getMovieClip(object);
+                        var mc = movieClip.getMovieClip(object);
+                        if (mc == undefined && scope)
+                            mc = scope.getMovieClip(object);
                         if (mc instanceof MovieClip)
                             object = mc;
+
                     }
 
                     var property = undefined;
                     if (object instanceof Object) {
                         if ('getProperty' in object) {
-                            property = _this.getVariable(name);
                             if (property == undefined)
                                 property = object.getProperty(name);
                             if (property == undefined && scope)
@@ -6769,12 +6699,13 @@ if (!('swf2js' in window)){(function(window)
                                 }
                             } else {
                                 property = object[name];
+                                if (property == undefined)
+                                    property = _this.getVariable(name);
                             }
                         }
-                    } else if (typeof object == 'string') {
+                    } else if (object != undefined) {
                         property = object[name];
                     }
-
 
                     stack[stack.length] = property;
 
@@ -6783,9 +6714,8 @@ if (!('swf2js' in window)){(function(window)
                 case 0x42:
                     var number = stack.pop();
                     var array = [];
-                    for (; number--;) {
+                    for (; number--;)
                         array[array.length] = stack.pop();
-                    }
                     stack[stack.length] = array;
                     break;
                 // ActionInitObject
@@ -6808,75 +6738,81 @@ if (!('swf2js' in window)){(function(window)
                     for (; number--;)
                         params[params.length] = stack.pop();
 
-                    console.log(method,object,params)
-
+                    var constructor = undefined;
                     if (method == '') {
-                        stack[stack.length] = object.apply(object, params);
-                    } else {
-                        function construct(constructor, args) {
-                            function newFunc() {
-                                return constructor.apply(this, args);
-                            }
+                        constructor = object.apply(object, params);
+                    } else if (object in window) {
+                        constructor = new window[method](params);
+                    } else if (method in object) {
+                        var func = object[method]
+                        if (func instanceof Function && 'cache' in func) {
+                            var as = function ActionScript(as, mc, args) {
+                                as.initVariable(args);
+                                if (as.initAction)
+                                    as.variables['this'] = this;
+                                return as.execute(mc);
+                            };
 
-                            newFunc.prototype = constructor.prototype;
-                            return new newFunc();
+                            var proto = func.prototype;
+                            for (var prop in proto)
+                                as.prototype[prop] = proto[prop];
+
+                            func.cache.scope = movieClip;
+                            constructor = new as(func.cache, movieClip, params);
+                        } else {
+                            constructor = new func();
                         }
-
-                        stack[stack.length] = construct(object[method], params);
                     }
-
+                    stack[stack.length] = constructor;
                     break;
                 // ActionNewObject
                 case 0x40:
-
                     var object = stack.pop();
                     var numArgs = _parseFloat(stack.pop());
                     var params = [];
                     for (; numArgs--;)
                         params[params.length] = stack.pop();
 
-                    if (object == 'MovieClip') {
-                        stack[stack.length] = new MovieClip();
-                    } else if (object == 'Sound') {
-                        var sound = new Sound(params[0]);
-                        sound.movieClip = movieClip;
-                        stack[stack.length] = sound;
-                    } else if (window[object]) {
-                        stack[stack.length] = new window[object]();
-                    } else if (object == 'XML') {
-                        stack[stack.length] = new _XML(movieClip);
+                    var obj = {};
+                    if (object in window) {
+                        obj = new window[object];
                     } else {
-                        if (movieClip) {
-                            // init action
-                            var stage = movieClip.getStage();
-                            var exportAssets = stage.exportAssets;
-                            var PackageKey = "__Packages." + object;
-                            if (PackageKey in exportAssets) {
-                                var spriteId = exportAssets[PackageKey];
-                                var as = stage.initActions[spriteId];
-                                if (as instanceof ActionScript) {
-                                    as.execute(movieClip);
-                                    var constr = as.params[1];
-                                    constr.initVariable(params);
-                                    constr.execute(movieClip);
-                                    stack[stack.length] = as;
-                                    break;
+                        switch (object) {
+                            case 'MovieClip':
+                                obj = new MovieClip();
+                                break;
+                            case 'Sound':
+                                obj = new Sound();
+                                obj.movieClip = movieClip;
+                                break;
+                            case 'XML':
+                                obj = new _XML(movieClip);
+                                break;
+                            default:
+                                if (movieClip) {
+                                    var func = movieClip.getVariable(object);
+                                    if (func instanceof Function && 'cache' in func) {
+                                        var as = function ActionScript(as, mc, args) {
+                                            as.initVariable(args);
+                                            if (as.initAction)
+                                                as.variables['this'] = this;
+                                            return as.execute(mc);
+                                        };
+
+                                        var proto = func.prototype;
+                                        for (var prop in proto)
+                                            as.prototype[prop] = proto[prop];
+
+                                        func.cache.scope = movieClip;
+                                        obj = new as(func.cache, movieClip, params);
+                                    } else {
+                                        obj = new func();
+                                    }
                                 }
-                            }
-
-                            var func = movieClip.getVariable(object);
-                            if (func instanceof ActionScript) {
-                                func.initVariable(params);
-                                stack[stack.length] = func.execute(movieClip);
-                            } else if (func instanceof Function) {
-                                stack[stack.length] = new func();
-                            }
-
-                        } else {
-                            stack[stack.length] = undefined;
+                                break;
                         }
                     }
-
+                    stack[stack.length] = obj;
                     break;
                 // ActionSetMember
                 case 0x4f:
@@ -6887,16 +6823,14 @@ if (!('swf2js' in window)){(function(window)
                     if (object == null)
                         break;
 
-                    if (typeof object == 'string')
-                        object = movieClip.getMovieClip(object);
-
-                    if (!object)
-                        object = movieClip;
+                    if (typeof object == 'string') {
+                        var mc = movieClip.getMovieClip(object);
+                        if (mc)
+                            object = mc;
+                    }
 
                     if ('setProperty' in object) {
                         object.setProperty(name, value);
-                    } else if (object instanceof ActionScript) {
-                        object.__proto__[name] = value;
                     } else if (object instanceof Object) {
                         object[name] = value;
                     }
@@ -6938,7 +6872,6 @@ if (!('swf2js' in window)){(function(window)
                         object = stack.pop();
                     movieClip = object;
                     break;
-
                 // ActionToNumber
                 case 0x4a:
                     var object = stack.pop();
@@ -6958,20 +6891,12 @@ if (!('swf2js' in window)){(function(window)
                 case 0x47:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = b+a;
                     break;
                 // ActionLess2
                 case 0x48:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = (b < a);
                     break;
                 // ActionModulo
@@ -6980,15 +6905,10 @@ if (!('swf2js' in window)){(function(window)
                     var x = stack.pop();
                     stack[stack.length] = x % y;
                     break;
-
                 // ActionBitAnd
                 case 0x60:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = x & y;
                     break;
                 // ActionBitLShift
@@ -7001,10 +6921,6 @@ if (!('swf2js' in window)){(function(window)
                 case 0x61:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = b | a;
                     break;
                 // ActionBitRShift
@@ -7023,10 +6939,6 @@ if (!('swf2js' in window)){(function(window)
                 case 0x62:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = a ^ b;
                     break;
                 // ActionDecrement
@@ -7080,67 +6992,52 @@ if (!('swf2js' in window)){(function(window)
                         object = object.variables;
 
                     if (typeof object == "object") {
-                        for (var name in object) {
+                        for (var name in object)
                             stack[stack.length] = name;
-                        }
                     }
                     break;
                 // ActionStrictEquals
                 case 0x66:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = (b === a);
                     break;
                 // ActionGreater
                 case 0x67:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = (b > a);
                     break;
                 // ActionStringGreater
                 case 0x68:
                     var a = stack.pop();
                     var b = stack.pop();
-
-                    arg[1] = a;
-                    arg[2] = b;
-
                     stack[stack.length] = (b > a);
                     break;
 
                 // SWF 7 ***********************************
                 // ActionDefineFunction2
                 case 0x8e:
-                    var as = aScript.as;
-                    as.constantPool = clone(_this.constantPool);
-                    as.initAction = _this.initAction;
-
+                    var as = aScript.ActionScript;
                     var scope = _this.scope;
-                    as.scope = (!scope) ? mc : scope;
-
+                    as.cache.scope = (scope) ? scope : movieClip;
                     var FunctionName = aScript.FunctionName;
-                    if (FunctionName != '')
+                    if (FunctionName) {
                         movieClip.setVariable(FunctionName, as);
-
-                    stack[stack.length] = as;
-
+                    } else {
+                        stack[stack.length] = as;
+                    }
                     break;
                 // ActionExtends
                 case 0x69:
                     console.log('ActionExtends');
                     var superClass = stack.pop();
                     var subClass = stack.pop();
-                    subClass.prototype = {};
-                    subClass.prototype.__proto__ = superClass.prototype;
-                    subClass.prototype.constructor = superClass;
+                    if (superClass && subClass) {
+                        subClass.prototype = {};
+                        subClass.prototype = superClass.prototype;
+                        subClass.constructor = superClass;
+                    }
                     break;
                 // ActionCastOp
                 case 0x2b:
@@ -7152,7 +7049,6 @@ if (!('swf2js' in window)){(function(window)
                     } else {
                         stack[stack.length] = null;
                     }
-
                     break;
                 // ActionImplementsOp
                 case 0x2c:
@@ -7160,16 +7056,13 @@ if (!('swf2js' in window)){(function(window)
                     var func = stack.pop();
                     var count = stack.pop();
                     var params = [];
-                    for (; count--;) {
+                    for (; count--;)
                         params[params.length] = stack.pop();
-                    }
                     stack[stack.length] = null;
-
                     break;
                 // ActionTry
                 case 0x8f:
                     console.log('ActionTry');
-
                     break;
                 // ActionThrow
                 case 0x2a:
@@ -7195,35 +7088,35 @@ if (!('swf2js' in window)){(function(window)
     var Property = function(caller)
     {
         var _this = this;
-        caller.getProperty = _this.getProperty;
-        caller.setProperty = _this.setProperty;
-        caller.getX = _this.getX;
-        caller.setX = _this.setX;
-        caller.getY = _this.getY;
-        caller.setY = _this.setY;
-        caller.getXScale = _this.getXScale;
-        caller.setXScale = _this.setXScale;
-        caller.getYScale = _this.getYScale;
-        caller.setYScale = _this.setYScale;
-        caller.getAlpha = _this.getAlpha;
-        caller.setAlpha = _this.setAlpha;
-        caller.getVisible = _this.getVisible;
-        caller.setVisible = _this.setVisible;
-        caller.getWidth = _this.getWidth;
-        caller.setWidth = _this.setWidth;
-        caller.getHeight = _this.getHeight;
-        caller.setHeight = _this.setHeight;
-        caller.getRotation = _this.getRotation;
-        caller.setRotation = _this.setRotation;
-        caller.getTarget = _this.getTarget;
-        caller.setTarget = _this.setTarget;
-        caller.getName = _this.getName;
-        caller.setName = _this.setName;
-        caller.getXMouse = _this.getXMouse;
-        caller.getYMouse = _this.getYMouse;
-        caller.getVariable = _this.getVariable;
-        caller.setVariable = _this.setVariable;
-        caller.getMovieClip = _this.getMovieClip;
+        caller.__proto__.getProperty = _this.getProperty;
+        caller.__proto__.setProperty = _this.setProperty;
+        caller.__proto__.getX = _this.getX;
+        caller.__proto__.setX = _this.setX;
+        caller.__proto__.getY = _this.getY;
+        caller.__proto__.setY = _this.setY;
+        caller.__proto__.getXScale = _this.getXScale;
+        caller.__proto__.setXScale = _this.setXScale;
+        caller.__proto__.getYScale = _this.getYScale;
+        caller.__proto__.setYScale = _this.setYScale;
+        caller.__proto__.getAlpha = _this.getAlpha;
+        caller.__proto__.setAlpha = _this.setAlpha;
+        caller.__proto__.getVisible = _this.getVisible;
+        caller.__proto__.setVisible = _this.setVisible;
+        caller.__proto__.getWidth = _this.getWidth;
+        caller.__proto__.setWidth = _this.setWidth;
+        caller.__proto__.getHeight = _this.getHeight;
+        caller.__proto__.setHeight = _this.setHeight;
+        caller.__proto__.getRotation = _this.getRotation;
+        caller.__proto__.setRotation = _this.setRotation;
+        caller.__proto__.getTarget = _this.getTarget;
+        caller.__proto__.setTarget = _this.setTarget;
+        caller.__proto__.getName = _this.getName;
+        caller.__proto__.setName = _this.setName;
+        caller.__proto__.getXMouse = _this.getXMouse;
+        caller.__proto__.getYMouse = _this.getYMouse;
+        caller.__proto__.getVariable = _this.getVariable;
+        caller.__proto__.setVariable = _this.setVariable;
+        caller.__proto__.getMovieClip = _this.getMovieClip;
 
         caller.variables = [];
         caller._currentframe = 1;
@@ -7886,9 +7779,14 @@ if (!('swf2js' in window)){(function(window)
             }
         }
         if (version > 4) {
+            var stage = _this.getStage();
+            var _global = stage.getGlobal();
+            var value = _global.getVariable(name);
+            if (value)
+                return value;
             if (name in window)
                 return window[name];
-            return _this.getMovieClip(name);
+            return  _this.getMovieClip(name);
         }
         return undefined;
     };
@@ -7930,9 +7828,6 @@ if (!('swf2js' in window)){(function(window)
                 break;
             _root = parent;
         }
-
-        if(typeof path == "object" )
-            console.log(path)
 
         var _path = path + '';
         if (_path == '_root')
@@ -8052,12 +7947,12 @@ if (!('swf2js' in window)){(function(window)
         caller.ratio = 0;
         caller.clipDepth = 0;
         caller.isClipDepth = false;
-        caller.getCharacterId = _this.getCharacterId;
-        caller.setCharacterId = _this.setCharacterId;
-        caller.getTagType = _this.getTagType;
-        caller.setTagType = _this.setTagType;
-        caller.getRatio = _this.getRatio;
-        caller.setRatio = _this.setRatio;
+        caller.__proto__.getCharacterId = _this.getCharacterId;
+        caller.__proto__.setCharacterId = _this.setCharacterId;
+        caller.__proto__.getTagType = _this.getTagType;
+        caller.__proto__.setTagType = _this.setTagType;
+        caller.__proto__.getRatio = _this.getRatio;
+        caller.__proto__.setRatio = _this.setRatio;
     };
 
     /**
@@ -8118,12 +8013,12 @@ if (!('swf2js' in window)){(function(window)
         caller.bounds = null;
         caller.matrix = null;
         caller.colorTransform = null;
-        caller.getBounds = _this.getBounds;
-        caller.setBounds = _this.setBounds;
-        caller.getMatrix = _this.getMatrix;
-        caller.setMatrix = _this.setMatrix;
-        caller.getColorTransform = _this.getColorTransform;
-        caller.setColorTransform = _this.setColorTransform;
+        caller.__proto__.getBounds = _this.getBounds;
+        caller.__proto__.setBounds = _this.setBounds;
+        caller.__proto__.getMatrix = _this.getMatrix;
+        caller.__proto__.setMatrix = _this.setMatrix;
+        caller.__proto__.getColorTransform = _this.getColorTransform;
+        caller.__proto__.setColorTransform = _this.setColorTransform;
     };
 
     /**
@@ -8188,11 +8083,11 @@ if (!('swf2js' in window)){(function(window)
     var Dummy = function(caller)
     {
         var _this = this;
-        caller.getName = _this.getName;
-        caller.getVisible = _this.getVisible;
-        caller.reset = _this.reset;
-        caller.addActions = _this.addActions;
-        caller.putFrame = _this.putFrame;
+        caller.__proto__.getName = _this.getName;
+        caller.__proto__.getVisible = _this.getVisible;
+        caller.__proto__.reset = _this.reset;
+        caller.__proto__.addActions = _this.addActions;
+        caller.__proto__.putFrame = _this.putFrame;
     };
 
     Dummy.prototype.getName = function(){return null;};
@@ -9599,10 +9494,9 @@ if (!('swf2js' in window)){(function(window)
     };
 
     /**
-     * @param mc
      * @constructor
      */
-    var Sound = function(mc)
+    var Sound = function()
     {
         var _this = this;
         _this.sounds = [];
@@ -9611,8 +9505,6 @@ if (!('swf2js' in window)){(function(window)
         _this.transform = {ll:100, lr:100, rl:100,rr:100};
         _this.isStreamin = false;
         _this.movieClip = null;
-        if (mc instanceof MovieClip)
-            _this.movieClip = mc;
     };
 
     /**
@@ -9637,7 +9529,7 @@ if (!('swf2js' in window)){(function(window)
                 audio.loopCount = loopCount;
                 var loopSound = function () {
                     audio.loopCount--;
-                    if (!this.loopCount) {
+                    if (!audio.loopCount) {
                         audio.removeEventListener('ended', loopSound);
                     } else {
                         audio.volume = _this.volume / 100;
@@ -9647,10 +9539,8 @@ if (!('swf2js' in window)){(function(window)
 
                     if (!_this.isStreamin && 'onSoundComplete' in _this) {
                         var as = _this['onSoundComplete'];
-                        if (as instanceof ActionScript) {
-                            as.params[1] = true;
-                            as.execute(_this.movieClip);
-                        }
+                        if (as != undefined)
+                            as(as.cache, _this.movieClip, [true]);
                     }
 
                 };
@@ -9700,10 +9590,8 @@ if (!('swf2js' in window)){(function(window)
             audio.removeEventListener('canplaythrough', onLoad);
             if ('onLoad' in _this) {
                 var as = _this['onLoad'];
-                if (as instanceof ActionScript) {
-                    as.params[1] = true;
-                    as.execute(_this.movieClip);
-                }
+                if (as)
+                    as(as.cache, _this.movieClip, [true]);
             }
         };
         audio.addEventListener('canplaythrough', onLoad);
@@ -9713,10 +9601,8 @@ if (!('swf2js' in window)){(function(window)
             audio.removeEventListener('error', onLoad);
             if ('onLoad' in _this) {
                 var as = _this['onLoad'];
-                if (as instanceof ActionScript) {
-                    as.params[1] = false;
-                    as.execute(_this.movieClip);
-                }
+                if (as)
+                    as(as.cache, _this.movieClip, [true]);
             }
         };
         audio.addEventListener('error', onError);
@@ -11724,7 +11610,11 @@ if (!('swf2js' in window)){(function(window)
                 if (as instanceof ActionScript) {
                     as.execute(_this);
                 } else if (typeof as == 'function') {
-                    as.apply(_this);
+                    if ('cache' in as) {
+                        as(as.cache, _this, []);
+                    } else {
+                        as.apply(_this);
+                    }
                 }
             }
         }
@@ -12005,10 +11895,11 @@ if (!('swf2js' in window)){(function(window)
                     case 200:
                     case 304:
                         var as = _this.onLoad;
-                        if (as instanceof ActionScript) {
-                            as.setVariable('success', true);
-                            as.setVariable('this', xmlHttpRequest.responseXML);
-                            as.execute(_this.movieClip);
+                        if (as) {
+                            var AS = as.cache;
+                            AS.setVariable('success', true);
+                            AS.setVariable('this', xmlHttpRequest.responseXML);
+                            AS.execute(_this.movieClip);
                         }
                         break;
                 }
@@ -12252,6 +12143,8 @@ if (!('swf2js' in window)){(function(window)
 
     };
 
+    _Global.prototype = window.prototype;
+
     /**
      * @constructor
      */
@@ -12301,7 +12194,6 @@ if (!('swf2js' in window)){(function(window)
         _this.actions = [];
         _this.queue = null;
         _this._global = new _Global();
-        _this._global.__proto__ = window.__proto__;
         _this.initActions = [];
         _this.touchObj = null;
         _this.touchEndAction = null;
@@ -13058,7 +12950,11 @@ if (!('swf2js' in window)){(function(window)
                     if (action instanceof ActionScript) {
                         action.execute(mc);
                     } else if (typeof action == 'function') {
-                        action.apply(mc);
+                        if ('cache' in action) {
+                            action(action.cache, mc, []);
+                        } else {
+                            action.apply(mc);
+                        }
                     }
                 }
             }
@@ -13521,7 +13417,11 @@ if (!('swf2js' in window)){(function(window)
             if (as instanceof ActionScript) {
                 as.execute(mc);
             } else if (typeof as == 'function') {
-                as.apply(mc);
+                if ('cache' in as) {
+                    as(as.cache, mc, []);
+                } else {
+                    as.apply(mc);
+                }
             }
         }
 
