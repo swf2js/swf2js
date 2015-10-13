@@ -3189,16 +3189,14 @@ if (!("swf2js" in window)){(function(window)
         } else {
             var bpp = (isAlpha) ? 4 : 3;
             var cmIdx = colorTableSize * bpp;
-            var pad = (colorTableSize)
-                ? ((width + 3) & ~3) - width
-                : 0;
+            var pad = 0;
+            if (colorTableSize) {
+                pad = ((width + 3) & ~3) - width;
+            }
 
             for (y = height; y--;) {
                 for (x = width; x--;) {
-                    idx = (colorTableSize)
-                        ? data[cmIdx++] * bpp
-                        : cmIdx++ * bpp;
-
+                    idx = (colorTableSize) ? data[cmIdx++] * bpp : cmIdx++ * bpp;
                     if(!isAlpha){
                         pxData[pxIdx++] = data[idx++];
                         pxData[pxIdx++] = data[idx++];
@@ -3206,10 +3204,7 @@ if (!("swf2js" in window)){(function(window)
                         idx++;
                         pxData[pxIdx++] = 255;
                     } else {
-                        var alpha = (format === 3)
-                            ? data[idx+3]
-                            : data[idx++];
-
+                        var alpha = (format === 3) ? data[idx+3] : data[idx++];
                         if (!isAlphaBug) {
                             pxData[pxIdx++] = data[idx++] * 255 / alpha;
                             pxData[pxIdx++] = data[idx++] * 255 / alpha;
@@ -3345,9 +3340,10 @@ if (!("swf2js" in window)){(function(window)
             JPEGData = margeData;
         }
 
-        image.src = "data:image/jpeg;base64,"
-        + _this.base64encode(_this.parseJpegData(JPEGData));
+        image.src = "data:image/jpeg;base64," +
+            _this.base64encode(_this.parseJpegData(JPEGData));
 
+        // for android
         _setTimeout(function() {}, 0);
     };
 
@@ -3363,9 +3359,7 @@ if (!("swf2js" in window)){(function(window)
         var length = JPEGData.length;
 
         // erroneous
-        if (JPEGData[0] === 0xFF && JPEGData[1] === 0xD9
-            && JPEGData[2] === 0xFF && JPEGData[3] === 0xD8
-        ) {
+        if (JPEGData[0] === 0xFF && JPEGData[1] === 0xD9 && JPEGData[2] === 0xFF && JPEGData[3] === 0xD8) {
             for (i = 4; i < length; i++) {
                 str += _fromCharCode(JPEGData[i]);
             }
@@ -3373,7 +3367,6 @@ if (!("swf2js" in window)){(function(window)
             for (idx = 0; idx < i; idx++) {
                 str += _fromCharCode(JPEGData[idx]);
             }
-
             for (; i < length; ) {
                 if (JPEGData[i] === 0xFF) {
                     if (JPEGData[i + 1] === 0xD9 && JPEGData[i + 2] === 0xFF && JPEGData[i + 3] === 0xD8) {
@@ -3397,7 +3390,6 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
-
         return str;
     };
 
@@ -3455,6 +3447,8 @@ if (!("swf2js" in window)){(function(window)
         var stage = _this.stage;
         var endOffset = bitio.byte_offset + length;
 
+        var i = 0;
+        var len = 0;
         var obj = {};
         obj.tagType = tagType;
         obj.FontId = bitio.getUI16();
@@ -3477,17 +3471,20 @@ if (!("swf2js" in window)){(function(window)
             if (obj.FontNameLen) {
                 var startOffset = bitio.byte_offset;
                 var data = bitio.getData(obj.FontNameLen);
-                var str = '';
-                for (var i = 0; i < obj.FontNameLen; i++) {
-                    if (data[i] > 127)
+                var str = "";
+                len = obj.FontNameLen;
+                for (i = 0; i < len; i++) {
+                    if (data[i] > 127) {
                         continue;
+                    }
                     str += _fromCharCode(data[i]);
                 }
 
+                var fontName;
                 if (obj.FontFlagsShiftJIS || obj.LanguageCode === 1) {
-                    var fontName = decodeToShiftJis(str);
+                    fontName = decodeToShiftJis(str);
                 } else {
-                    var fontName = _this.encodeToUtf8(str);
+                    fontName = _this.encodeToUtf8(str);
                 }
 
                 obj.FontName = _this.getFontName(fontName);
@@ -3500,9 +3497,9 @@ if (!("swf2js" in window)){(function(window)
 
         // offset
         var offset = bitio.byte_offset;
-
-        if (tagType === 10)
+        if (tagType === 10) {
             numGlyphs = bitio.getUI16();
+        }
 
         if (numGlyphs) {
             var OffsetTable = [];
@@ -3513,26 +3510,28 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (obj.FontFlagsWideOffsets) {
-                for (var i = numGlyphs; i--;) {
-                    var len = OffsetTable.length;
-                    OffsetTable[len] = bitio.getUI32();
+                for (i = numGlyphs; i--;) {
+                    OffsetTable[OffsetTable.length] = bitio.getUI32();
                 }
-                if (tagType !== 10)
+                if (tagType !== 10) {
                     obj.CodeTableOffset = bitio.getUI32();
-            } else {
-                for (var i = numGlyphs; i--;) {
-                    var len = OffsetTable.length;
-                    OffsetTable[len] = bitio.getUI16();
                 }
-                if (tagType !== 10)
+            } else {
+                for (i = numGlyphs; i--;) {
+                    OffsetTable[OffsetTable.length] = bitio.getUI16();
+                }
+                if (tagType !== 10) {
                     obj.CodeTableOffset = bitio.getUI16();
+                }
             }
 
             // Shape
             var GlyphShapeTable = [];
-            if (tagType === 10)
+            if (tagType === 10) {
                 numGlyphs++;
-            for (var i = 0; i < numGlyphs; i++) {
+            }
+
+            for (i = 0; i < numGlyphs; i++) {
                 bitio.setOffset(OffsetTable[i] + offset, 0);
 
                 var numBits = bitio.getUI8();
@@ -3559,21 +3558,19 @@ if (!("swf2js" in window)){(function(window)
                     }]
                 };
 
-                var len = GlyphShapeTable.length;
-                GlyphShapeTable[len] = shapes;
+                GlyphShapeTable[GlyphShapeTable.length] = shapes;
             }
             obj.GlyphShapeTable = GlyphShapeTable;
 
             if (tagType === 48 || tagType === 75) {
-                // 文字情報
                 bitio.setOffset(obj.CodeTableOffset + offset, 0);
                 var CodeTable = [];
                 if (obj.FontFlagsWideCodes) {
-                    for (var i = numGlyphs; i--;) {
+                    for (i = numGlyphs; i--;) {
                         CodeTable[CodeTable.length] = bitio.getUI16();
                     }
                 } else {
-                    for (var i = numGlyphs; i--;) {
+                    for (i = numGlyphs; i--;) {
                         CodeTable[CodeTable.length] = bitio.getUI8();
                     }
                 }
@@ -3584,22 +3581,22 @@ if (!("swf2js" in window)){(function(window)
                     obj.FontDescent = bitio.getUI16();
                     obj.FontLeading = bitio.getUI16();
 
-                    obj.FontAdvanceTable = [];
-                    for (var i = numGlyphs; i--;) {
-                        var len = obj.FontAdvanceTable.length;
-                        obj.FontAdvanceTable[len] = bitio.getUI16();
+                    var FontAdvanceTable = [];
+                    for (i = numGlyphs; i--;) {
+                        FontAdvanceTable[FontAdvanceTable.length] = bitio.getUI16();
                     }
+                    obj.FontAdvanceTable = FontAdvanceTable;
 
-                    obj.FontBoundsTable = [];
-                    for (var i = numGlyphs; i--;) {
-                        var len = obj.FontBoundsTable.length;
-                        obj.FontBoundsTable[len] = _this.rect();
+                    var FontBoundsTable = [];
+                    for (i = numGlyphs; i--;) {
+                        FontBoundsTable[FontBoundsTable.length] = _this.rect();
                     }
+                    obj.FontBoundsTable = FontBoundsTable;
 
                     if (tagType === 75) {
                         obj.KerningCount = bitio.getUI16();
                         obj.KerningRecord = [];
-                        for (var i = obj.KerningCount; i--;) {
+                        for (i = obj.KerningCount; i--;) {
                             var FontKerningCode1 = (obj.FontFlagsWideCodes) ? bitio.getUI16() : bitio.getUI8();
                             var FontKerningCode2 = (obj.FontFlagsWideCodes) ? bitio.getUI16() : bitio.getUI8();
                             var FontKerningAdjustment = bitio.getSIBits(16);
@@ -3644,7 +3641,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var bitio = _this.bitio;
-        var stage = _this.stage;
         var endOffset = bitio.byte_offset + length;
 
         var obj = {};
@@ -3670,10 +3666,11 @@ if (!("swf2js" in window)){(function(window)
         if (tagType === 62)
             obj.LanguageCode = bitio.getUI8();
 
+        var fontName;
         if (obj.FontFlagsShiftJIS || obj.LanguageCode === 1) {
-            var fontName = decodeToShiftJis(str);
+            fontName = decodeToShiftJis(str);
         } else {
-            var fontName = _this.encodeToUtf8(str);
+            fontName = _this.encodeToUtf8(str);
         }
         obj.FontName = _this.getFontName(fontName);
 
@@ -3692,8 +3689,6 @@ if (!("swf2js" in window)){(function(window)
             }
         }
         obj.CodeTable = CodeTable;
-
-        //stage.setCharacter(obj.FontId, obj);
     };
 
     /**
@@ -3705,19 +3700,16 @@ if (!("swf2js" in window)){(function(window)
         switch (fontName) {
             case "_sans":
                 return "sans-serif";
-                break;
             case "_serif":
                 return "serif";
-                break;
             case "_typewriter":
                 return "monospace";
-                break;
             default:
-                var ander = fontName.substr(0,1);
-                if (ander === "_")
+                var ander = fontName.substr(0, 1);
+                if (ander === "_") {
                     return "sans-serif";
+                }
                 return fontName;
-                break;
         }
     };
 
@@ -4045,26 +4037,26 @@ if (!("swf2js" in window)){(function(window)
         var FillStyle = 0;
         length = obj.StartEdges.ShapeRecords.length;
         for (i = 0; i < length; i++) {
-            var StartRecord = StartRecords[i];
-            if (!StartRecord.isChange)
+            var record = StartRecords[i];
+            if (!record.isChange)
                 continue;
 
-            if (StartRecord.StateFillStyle0)
-                FillStyle = StartRecord.FillStyle0;
+            if (record.StateFillStyle0)
+                FillStyle = record.FillStyle0;
 
             if (FillStyle) {
-                StartRecord.StateFillStyle0 = 1;
-                StartRecord.StateFillStyle1 = 1;
+                record.StateFillStyle0 = 1;
+                record.StateFillStyle1 = 1;
                 if (FillType) {
-                    StartRecord.FillStyle0 = 0;
-                    StartRecord.FillStyle1 = FillStyle;
+                    record.FillStyle0 = 0;
+                    record.FillStyle1 = FillStyle;
                 } else {
-                    StartRecord.FillStyle0 = FillStyle;
-                    StartRecord.FillStyle1 = 0;
+                    record.FillStyle0 = FillStyle;
+                    record.FillStyle1 = 0;
                 }
             } else {
-                StartRecord.StateFillStyle1 = 1;
-                StartRecord.FillStyle1 = 0;
+                record.StateFillStyle1 = 1;
+                record.FillStyle1 = 0;
             }
 
             FillType = (FillType) ? 0 : 1;
@@ -4160,16 +4152,13 @@ if (!("swf2js" in window)){(function(window)
                 var endControlX = EndRecord.ControlX;
                 var endControlY = EndRecord.ControlY;
 
-                if (per > 0 && per < 1
-                    && StartRecord.isCurved !== EndRecord.isCurved
-                ) {
+                if (per > 0 && per < 1 && StartRecord.isCurved !== EndRecord.isCurved) {
                     if (!StartRecord.isCurved) {
                         startAnchorX = StartRecord.AnchorX / 2;
                         startAnchorY = StartRecord.AnchorY / 2;
                         startControlX = startAnchorX;
                         startControlY = startAnchorY;
                     }
-
                     if (!EndRecord.isCurved) {
                         endAnchorX = EndRecord.AnchorX / 2;
                         endAnchorY = EndRecord.AnchorY / 2;
@@ -4202,11 +4191,14 @@ if (!("swf2js" in window)){(function(window)
         shapes.ShapeRecords = newShapeRecords;
 
 
+        var EndColor;
+        var StartColor;
+        var color;
         for (i = 0; i < lineStyleCount; i++) {
             var lineStyle = lineStyles[i];
-            var EndColor = lineStyle.EndColor;
-            var StartColor = lineStyle.StartColor;
-            var color = {
+            EndColor = lineStyle.EndColor;
+            StartColor = lineStyle.StartColor;
+            color = {
                 R: _floor(StartColor.R * startPer + EndColor.R * per),
                 G: _floor(StartColor.G * startPer + EndColor.G * per),
                 B: _floor(StartColor.B * startPer + EndColor.B * per),
@@ -4227,9 +4219,9 @@ if (!("swf2js" in window)){(function(window)
             var fillStyleType = fillStyle.fillStyleType;
 
             if (fillStyleType === 0x00) {
-                var EndColor = fillStyle.EndColor;
-                var StartColor = fillStyle.StartColor;
-                var color = {
+                EndColor = fillStyle.EndColor;
+                StartColor = fillStyle.StartColor;
+                color = {
                     R: _floor(StartColor.R * startPer + EndColor.R * per),
                     G: _floor(StartColor.G * startPer + EndColor.G * per),
                     B: _floor(StartColor.B * startPer + EndColor.B * per),
@@ -4239,7 +4231,7 @@ if (!("swf2js" in window)){(function(window)
                 shapes.fillStyles.fillStyles[i] = {
                     Color: color,
                     fillStyleType: fillStyleType
-                }
+                };
             } else {
                 var EndGradientMatrix = fillStyle.endGradientMatrix;
                 var StartGradientMatrix = fillStyle.startGradientMatrix;
@@ -4258,9 +4250,9 @@ if (!("swf2js" in window)){(function(window)
                 var gLen = GradientRecords.length;
                 for (var gIdx = 0; gIdx < gLen; gIdx++) {
                     var gRecord = GradientRecords[gIdx];
-                    var StartColor = gRecord.StartColor;
-                    var EndColor = gRecord.EndColor;
-                    var color = {
+                    EndColor = gRecord.EndColor;
+                    StartColor = gRecord.StartColor;
+                    color = {
                         R: _floor(StartColor.R * startPer + EndColor.R * per),
                         G: _floor(StartColor.G * startPer + EndColor.G * per),
                         B: _floor(StartColor.B * startPer + EndColor.B * per),
@@ -4277,7 +4269,7 @@ if (!("swf2js" in window)){(function(window)
                     gradient: { GradientRecords: gRecords },
                     gradientMatrix: cloneArray(matrix),
                     fillStyleType: fillStyleType
-                }
+                };
             }
         }
 
@@ -4319,7 +4311,7 @@ if (!("swf2js" in window)){(function(window)
             return {
                 CharacterId: bitio.getUI16(),
                 Depth: bitio.getUI16()
-            }
+            };
         }
         return { Depth: bitio.getUI16() };
     };
@@ -4409,9 +4401,7 @@ if (!("swf2js" in window)){(function(window)
         obj.Matrix = _this.matrix();
 
         obj.ColorTransform = _this.colorTransform();
-        obj.PlaceFlagHasColorTransform
-            = (obj.ColorTransform === undefined) ? 0 : 1;
-
+        obj.PlaceFlagHasColorTransform = (obj.ColorTransform === undefined) ? 0 : 1;
         if (obj.ButtonHasBlendMode) {
             obj.BlendMode = bitio.getUI8();
         }
@@ -4421,7 +4411,6 @@ if (!("swf2js" in window)){(function(window)
 
         obj.PlaceFlagHasRatio = 0;
         obj.PlaceFlagHasClipDepth = 0;
-
         obj.Sound = null;
 
         return obj;
@@ -4458,8 +4447,9 @@ if (!("swf2js" in window)){(function(window)
             obj.ActionScript = _this.parseDoAction(length);
             results[results.length] = obj;
 
-            if (!CondActionSize)
+            if (!CondActionSize) {
                 break;
+            }
 
             bitio.byte_offset = startOffset + CondActionSize;
         }
@@ -4477,6 +4467,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var bitio = _this.bitio;
         var stage = _this.stage;
+        var Reserved;
         var obj = {};
         obj.tagType = tagType;
         var startOffset = bitio.byte_offset;
@@ -4505,7 +4496,7 @@ if (!("swf2js" in window)){(function(window)
 
             // PlaceObject3
             if (tagType === 70) {
-                var Reserved = bitio.getUIBits(3);
+                Reserved = bitio.getUIBits(3);
                 obj.PlaceFlagHasImage = bitio.getUIBits(1);
                 obj.PlaceFlagHasClassName = bitio.getUIBits(1);
                 obj.PlaceFlagHasCacheAsBitmap = bitio.getUIBits(1);
@@ -4515,9 +4506,7 @@ if (!("swf2js" in window)){(function(window)
 
             obj.Depth = bitio.getUI16();
 
-            if (obj.PlaceFlagHasClassName
-                || (obj.PlaceFlagHasImage && obj.PlaceFlagHasCharacter)
-            ) {
+            if (obj.PlaceFlagHasClassName || (obj.PlaceFlagHasImage && obj.PlaceFlagHasCharacter)) {
                 obj.ClassName = bitio.getDataUntil("\0");
             }
             if (obj.PlaceFlagHasCharacter) {
@@ -4552,23 +4541,18 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (obj.PlaceFlagHasClipActions) {
-                var Reserved = bitio.getUI16();
+                Reserved = bitio.getUI16();
                 obj.AllEventFlags = _this.parseClipEventFlags();
 
                 var endLength = startOffset + length;
                 var actionRecords = [];
                 var endFlag = 0;
                 for (; bitio.byte_offset < endLength; ) {
-                    actionRecords[actionRecords.length] =
-                        _this.parseClipActionRecord();
-
-                    endFlag = (stage.getVersion() <= 5)
-                        ? bitio.getUI16()
-                        : bitio.getUI32();
-
-                    if (!endFlag)
+                    actionRecords[actionRecords.length] = _this.parseClipActionRecord();
+                    endFlag = (stage.getVersion() <= 5) ? bitio.getUI16() : bitio.getUI32();
+                    if (!endFlag) {
                         break;
-
+                    }
                     if (stage.getVersion() <= 5) {
                         bitio.byte_offset -= 2;
                     } else {
@@ -4613,6 +4597,7 @@ if (!("swf2js" in window)){(function(window)
         var obj = {};
         var bitio = _this.bitio;
         var stage = _this.stage;
+        var Reserved;
 
         obj.keyUp = bitio.getUIBits(1);
         obj.keyDown = bitio.getUIBits(1);
@@ -4635,7 +4620,7 @@ if (!("swf2js" in window)){(function(window)
 
         obj.ClipEventData = bitio.getUIBits(1);
         if (stage.getVersion() >= 6) {
-            var Reserved = bitio.getUIBits(5);
+            Reserved = bitio.getUIBits(5);
             obj.construct = bitio.getUIBits(1);
             obj.keyPress = bitio.getUIBits(1);
             obj.dragOut = bitio.getUIBits(1);
@@ -4735,7 +4720,7 @@ if (!("swf2js" in window)){(function(window)
         obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
         obj.Passes = bitio.getUIBits(5);
         var Reserved = bitio.getUIBits(3);
-        return obj
+        return obj;
     };
 
     /**
@@ -5300,7 +5285,7 @@ if (!("swf2js" in window)){(function(window)
                 Mask: bitio.getUI8()
                 //    ZoneMaskY: bitio.getUIBits(1),
                 //    ZoneMaskX: bitio.getUIBits(1)
-            }
+            };
         }
 
         bitio.byteAlign();
@@ -5504,8 +5489,16 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var isEnd = false;
+        var obj = {};
+        var i = 0;
+        var idx = 0;
         var cache = [];
         var indexes = [];
+        var Reserved;
+        var asData;
+        var register;
+        var values;
+        var NumParams;
         var withEndPoint = 0;
         var bitio = new BitIO();
         bitio.setData(data);
@@ -5516,7 +5509,7 @@ if (!("swf2js" in window)){(function(window)
         _this.initParam();
         for (; bitio.byte_offset < endPoint; ) {
             var startOffset = bitio.byte_offset;
-            var obj = {};
+            obj = {};
 
             if (withEndPoint && withEndPoint === bitio.byte_offset) {
                 withEndPoint = 0;
@@ -5558,8 +5551,8 @@ if (!("swf2js" in window)){(function(window)
                 case 0x83:
                     var len = payload.length - 1;
                     var urls = [[]];
-                    var idx = 0;
-                    for (var i = 0; i < len; i++) {
+                    idx = 0;
+                    for (i = 0; i < len; i++) {
                         var str = _fromCharCode(payload[i]);
                         if (payload[i] === 0) {
                             idx++;
@@ -5573,13 +5566,11 @@ if (!("swf2js" in window)){(function(window)
                     var urlString = urls[0];
                     if (typeof urlString === "string") {
                         var splitUrl = urlString.split("?");
-
-                        // ?が2個あった場合は&に変更
                         if (2 in splitUrl) {
                             urlString = splitUrl[0];
                             urlString += "?" + splitUrl[1];
                             var paramLength = splitUrl.length;
-                            for (var i = 2; i < paramLength; i++) {
+                            for (i = 2; i < paramLength; i++) {
                                 urlString += "&" + splitUrl[i];
                             }
                         }
@@ -5587,11 +5578,10 @@ if (!("swf2js" in window)){(function(window)
 
                     obj.url = urlString;
                     obj.target = urls[1];
-
                     break;
                 // Push
                 case 0x96:
-                    var values = [];
+                    values = [];
                     for (; pBitio.byte_offset < payloadLength; ) {
                         var type = pBitio.getUI8();
                         switch (type) {
@@ -5629,11 +5619,11 @@ if (!("swf2js" in window)){(function(window)
                                 break;
                             // Constant8
                             case 8:
-                                values[values.length] = this.constantPool[pBitio.getUI8()];
+                                values[values.length] = _this.constantPool[pBitio.getUI8()];
                                 break;
                             // Constant16
                             case 9:
-                                values[values.length] = this.constantPool[pBitio.getUI16()];
+                                values[values.length] = _this.constantPool[pBitio.getUI16()];
                                 break;
                             default:
                                 break;
@@ -5653,16 +5643,17 @@ if (!("swf2js" in window)){(function(window)
                 case 0x9A:
                     obj.LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
                     obj.LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
-                    var Reserved = pBitio.getUIBits(4);
+                    Reserved = pBitio.getUIBits(4);
                     obj.SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
                     break;
                 // GoToFrame2
                 case 0x9F:
-                    var Reserved = pBitio.getUIBits(6);
+                    Reserved = pBitio.getUIBits(6);
                     obj.SceneBiasFlag = pBitio.getUIBit();
                     obj.PlayFlag = pBitio.getUIBit();// 0=stop, 1=play
-                    if (obj.SceneBiasFlag === 1)
+                    if (obj.SceneBiasFlag === 1) {
                         obj.SceneBias = pBitio.getUI16();
+                    }
                     break;
                 // WaitForFrame2
                 case 0x8D:
@@ -5681,9 +5672,9 @@ if (!("swf2js" in window)){(function(window)
                 // ActionDefineFunction
                 case 0x9b:
                     obj.FunctionName = pBitio.getDataUntil("\0");
-                    var NumParams = pBitio.getUI16();
-                    var register = [];
-                    var idx = 1;
+                    NumParams = pBitio.getUI16();
+                    register = [];
+                    idx = 1;
                     for (; NumParams--;) {
                         register[register.length] = {
                             register: idx,
@@ -5691,9 +5682,7 @@ if (!("swf2js" in window)){(function(window)
                             value: null
                         };
                     }
-                    var codeSize  = pBitio.getUI16();
-                    var data = bitio.getData(codeSize);
-                    var as = new ActionScript(data, _this.constantPool, register, _this.initAction);
+
                     obj.ActionScript = function ActionScript(as, mc, args)
                     {
                         as.initVariable(args);
@@ -5701,7 +5690,8 @@ if (!("swf2js" in window)){(function(window)
                             as.variables["this"] = this;
                         return as.execute(mc);
                     };
-                    obj.ActionScript.cache = as;
+                    asData = bitio.getData(pBitio.getUI16());
+                    obj.ActionScript.cache = new ActionScript(asData, _this.constantPool, register, _this.initAction);
 
                     break;
                 // ActionWith
@@ -5716,11 +5706,11 @@ if (!("swf2js" in window)){(function(window)
                 // SWF 7 ***********************************
                 // ActionDefineFunction2
                 case 0x8e:
-                    var register = [];
-                    var values = [];
+                    register = [];
+                    values = [];
 
                     obj.FunctionName = pBitio.getDataUntil("\0");
-                    var NumParams = pBitio.getUI16();
+                    NumParams = pBitio.getUI16();
                     var RegisterCount = pBitio.getUI8();
                     obj.PreloadParentFlag = pBitio.getUIBits(1);
                     obj.PreloadRootFlag = pBitio.getUIBits(1);
@@ -5730,33 +5720,32 @@ if (!("swf2js" in window)){(function(window)
                     obj.PreloadArgumentsFlag = pBitio.getUIBits(1);
                     obj.SuppressThisFlag = pBitio.getUIBits(1);
                     obj.PreloadThisFlag = pBitio.getUIBits(1);
-                    var Reserved = pBitio.getUIBits(7);
+                    Reserved = pBitio.getUIBits(7);
                     obj.PreloadGlobalFlag = pBitio.getUIBits(1);
 
-                    if (obj.PreloadThisFlag)
+                    if (obj.PreloadThisFlag) {
                         values[values.length] = "this";
-
-                    if (obj.PreloadArgumentsFlag)
+                    }
+                    if (obj.PreloadArgumentsFlag) {
                         values[values.length] = "arguments";
-
-                    if (obj.PreloadSuperFlag)
+                    }
+                    if (obj.PreloadSuperFlag) {
                         values[values.length] = "super";
-
-                    if (obj.PreloadGlobalFlag)
+                    }
+                    if (obj.PreloadGlobalFlag) {
                         values[values.length] = "_global";
-
-                    if (obj.PreloadRootFlag)
+                    }
+                    if (obj.PreloadRootFlag) {
                         values[values.length] = "_root";
-
-                    if (obj.PreloadParentFlag)
+                    }
+                    if (obj.PreloadParentFlag) {
                         values[values.length] = "_parent";
-
-                    // 固定の変数
-                    for (var idx = 1; idx < RegisterCount; idx++) {
-                        var rIdx = idx-1;
-                        if (!(rIdx in values))
+                    }
+                    for (idx = 1; idx < RegisterCount; idx++) {
+                        var rIdx = idx - 1;
+                        if (!(rIdx in values)) {
                             continue;
-
+                        }
                         register[register.length] = {
                             register: idx,
                             name: null,
@@ -5775,9 +5764,6 @@ if (!("swf2js" in window)){(function(window)
                         };
                     }
 
-                    var codeSize  = pBitio.getUI16();
-                    var data = bitio.getData(codeSize);
-                    var as = new ActionScript(data, _this.constantPool, register, _this.initAction);
                     obj.ActionScript = function ActionScript(as, mc, args)
                     {
                         as.initVariable(args);
@@ -5785,12 +5771,13 @@ if (!("swf2js" in window)){(function(window)
                             as.variables["this"] = this;
                         return as.execute(mc);
                     };
-                    obj.ActionScript.cache = as;
+                    asData = bitio.getData(pBitio.getUI16());
+                    obj.ActionScript.cache = new ActionScript(asData, _this.constantPool, register, _this.initAction);
                     break;
                 // ActionTry
                 case 0x8f:
                     console.log('ActionTry');
-                    var Reserved = pBitio.getUIBits(5);
+                    Reserved = pBitio.getUIBits(5);
                     var CatchInRegisterFlag = pBitio.getUIBits(1);
                     var FinallyBlockFlag = pBitio.getUIBits(1);
                     var CatchBlockFlag = pBitio.getUIBits(1);
@@ -5804,7 +5791,7 @@ if (!("swf2js" in window)){(function(window)
                         var CatchRegister = pBitio.getUI8();
                     }
 
-                    var i = 0;
+                    i = 0;
                     var TryBody = [];
                     if (TrySize) {
                         for (i = TrySize; i--;) {
@@ -5847,8 +5834,8 @@ if (!("swf2js" in window)){(function(window)
 
         // If and Jump
         var length = cache.length;
-        for (var i = 0; i < length; i++) {
-            var obj = cache[i];
+        for (i = 0; i < length; i++) {
+            obj = cache[i];
             var code = obj.actionCode;
             if (code === 0x9D || code === 0x99) {
                 var index = indexes[obj.offset];
@@ -5859,7 +5846,6 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
-
         _this.cache = cache;
     };
 
@@ -5907,6 +5893,8 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.execute = function(mc)
     {
         var _this = this;
+        var a;
+        var b;
         var stack = [];
         var movieClip = mc;
         var stage = mc.getStage();
@@ -5939,8 +5927,9 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 // NextFrame
                 case 0x04:
-                    if (movieClip)
+                    if (movieClip) {
                         movieClip.nextFrame();
+                    }
                     break;
                 // PreviousFrame
                 case 0x05:
