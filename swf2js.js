@@ -1,3 +1,4 @@
+
 /**
  * swf2js (version 0.5.9)
  * Develop: https://github.com/ienaga/swf2js
@@ -8,6 +9,7 @@
  */
 if (!("swf2js" in window)){(function(window)
 {
+    "use strict";
     var _document = window.document;
     var isBtoa = ("btoa" in window);
     var _Math = Math;
@@ -58,7 +60,7 @@ if (!("swf2js" in window)){(function(window)
     var isAndroid = (ua.indexOf("Android") > 0);
     var isAndroid4x =(ua.indexOf("Android 4.") > 0);
     var isiOS = (ua.indexOf("iPhone") > 0 || ua.indexOf("iPod") > 0);
-    var isChrome = (ua.indexOf('Chrome') > 0);
+    var isChrome = (ua.indexOf("Chrome") > 0);
     var isTouch = (isAndroid || isiOS);
     var xmlHttpRequest = new XMLHttpRequest();
     var isXHR2 = (typeof xmlHttpRequest.responseType !== "undefined");
@@ -131,7 +133,8 @@ if (!("swf2js" in window)){(function(window)
         var execute = function(src, obj)
         {
             var _cloneArray = cloneArray;
-            for(var prop in src) {
+            var prop;
+            for(prop in src) {
                 var value = src[prop];
                 if (prop === "Matrix" || prop === "ColorTransform") {
                     obj[prop] = _cloneArray(value);
@@ -370,6 +373,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var sym = 0;
         var i = 0;
+        var length = 0;
         var data = [];
         var bitLengths = [];
         var _buildHuffTable = buildHuffTable;
@@ -511,11 +515,11 @@ if (!("swf2js" in window)){(function(window)
                         data[data.length] = sym;
                     } else if (sym > 256) {
                         var mapIdx = sym - 257;
-                        var len = LENS[mapIdx] + bitio.readUB(LEXT[mapIdx]);
+                        length = LENS[mapIdx] + bitio.readUB(LEXT[mapIdx]);
                         var distMap = _decodeSymbol(bitio, distTable);
                         var dist = DISTS[distMap] + bitio.readUB(DEXT[distMap]);
                         i = data.length - dist;
-                        for (; len--; ) {
+                        for (; length--; ) {
                             data[data.length] = data[i++];
                         }
                     }
@@ -523,9 +527,9 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 bitio.bit_offset = 8;
                 bitio.bit_buffer = null;
-                var len = bitio.readNumber(2);
+                length = bitio.readNumber(2);
                 var nlen = bitio.readNumber(2);
-                for ( ; len--; ) {
+                for ( ; length--; ) {
                     data[data.length] = bitio.readNumber(1);
                 }
             }
@@ -1403,9 +1407,11 @@ if (!("swf2js" in window)){(function(window)
         var sign = rv & 0x80000000;
         var exp  = (rv >> 23) & 0xff;
         var fraction = rv & 0x7fffff;
-        return (!rv || rv === 0x80000000)
-            ? 0
-            : (sign ? -1 : 1) * (fraction | 0x800000) *  _pow(2, (exp - 127 - 23));
+        if (!rv || rv === 0x80000000) {
+            return 0;
+        }
+
+        return (sign ? -1 : 1) * (fraction | 0x800000) *  _pow(2, (exp - 127 - 23));
     };
 
     /**
@@ -2432,7 +2438,7 @@ if (!("swf2js" in window)){(function(window)
             case 61: // VideoFrame
                 _this.parseVideoFrame(tagType, length);
                 break;
-            // TODO 未実装
+            // TODO Tag
             case 3:  // FreeCharacter
             case 16: // StopSound
             case 23: // DefineButtonCxform
@@ -5393,7 +5399,7 @@ if (!("swf2js" in window)){(function(window)
      */
     var ActionScript = function (data, constantPool, register, initAction)
     {
-        this.id = asId++; // TODO けす
+        this.id = asId++;
         this.cache = [];
         this.params = [];
         this.constantPool = (constantPool === undefined) ? [] : constantPool;
@@ -7349,28 +7355,31 @@ if (!("swf2js" in window)){(function(window)
     Property.prototype.setProperty = function(name, value)
     {
         var _this = this;
-        if (typeof name === "string") {
-            if (name.indexOf(":") != -1) {
-                var split = name.split(":");
+        var target = name;
+        if (typeof target === "string") {
+            if (target.indexOf(":") !== -1) {
+                var split = target.split(":");
                 var mc = _this.getMovieClip(split[0]);
-                if (mc)
+                if (mc) {
                     _this = mc;
-                name = split[1];
-            } else if (name.indexOf(".") != -1) {
-                var split = name.split(".");
-                name = split.pop();
+                }
+                target = split[1];
+            } else if (target.indexOf(".") !== -1) {
+                var split = target.split(".");
+                target = split.pop();
                 var path = "";
                 var length = split.length;
                 for (var i = 0; i < length; i++) {
                     path += split[i];
                 }
                 var mc = _this.getMovieClip(path);
-                if (mc)
+                if (mc) {
                     _this = mc;
+                }
             }
         }
 
-        switch (name) {
+        switch (target) {
             case 0:
             case "_x":
                 value = _parseFloat(value);
@@ -7486,7 +7495,7 @@ if (!("swf2js" in window)){(function(window)
                 }
                 break;
             default:
-                _this.setVariable(name, value);
+                _this.setVariable(target, value);
                 break;
         }
     };
