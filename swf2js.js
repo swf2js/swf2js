@@ -5933,13 +5933,15 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 // PreviousFrame
                 case 0x05:
-                    if (movieClip)
+                    if (movieClip) {
                         movieClip.prevFrame();
+                    }
                     break;
                 // Play
                 case 0x06:
-                    if (movieClip)
+                    if (movieClip) {
                         movieClip.play();
+                    }
                     break;
                 // Stop
                 case 0x07:
@@ -5978,7 +5980,7 @@ if (!("swf2js" in window)){(function(window)
                 // GoToLabel
                 case 0x8C:
                     if (movieClip) {
-                        var frame = movieClip.getLabel(aScript.label);
+                        var frame = _parseFloat(movieClip.getLabel(aScript.label));
                         movieClip.stop();
                         if (typeof frame === "number") {
                             movieClip.setNextFrame(frame);
@@ -6362,12 +6364,14 @@ if (!("swf2js" in window)){(function(window)
                 case 0x9F:
                     var SceneBiasFlag = aScript.SceneBiasFlag;
                     var PlayFlag = aScript.PlayFlag; // 0=stop, 1=play
-                    if (SceneBiasFlag === 1)
+                    if (SceneBiasFlag === 1) {
                         var SceneBias = aScript.SceneBias;
+                    }
 
                     var frame = stack.pop();
-                    if (frame === null || frame === undefined || movieClip === null)
+                    if (frame === null || frame === undefined || !movieClip) {
                         break;
+                    }
 
                     if (_isNaN(frame)) {
                         var splitData = frame.split(":");
@@ -6383,20 +6387,21 @@ if (!("swf2js" in window)){(function(window)
 
                     if (typeof frame === "number" && frame > 0) {
                         if (PlayFlag) {
-                            if (!movieClip.stopFlag)
+                            if (!movieClip.stopFlag) {
                                 movieClip.setNextFrame(frame);
+                            }
                             movieClip.play();
                         } else {
-                            if (movieClip.stopFlag)
-                                movieClip.setNextFrame(frame);
+                            movieClip.setNextFrame(frame);
                             movieClip.stop();
                         }
                     }
                     break;
                 case 0x20: // SetTarget2
                     var target = stack.pop();
-                    if (movieClip === null)
+                    if (!movieClip) {
                         movieClip = mc;
+                    }
                     movieClip = movieClip.getMovieClip(target);
                     break;
                 // SetProperty
@@ -10047,10 +10052,12 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.gotoAndPlay = function(frame)
     {
         var _this = this;
+        if (!_isNaN(frame)) {
+            frame = _parseFloat(frame);
+        }
         if (typeof frame !== "number") {
             frame = _this.getLabel(frame);
         }
-
         if (typeof frame === "number" && frame) {
             _this.setNextFrame(frame);
             _this.play();
@@ -10063,6 +10070,9 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.gotoAndStop = function(frame)
     {
         var _this = this;
+        if (!_isNaN(frame)) {
+            frame = _parseFloat(frame);
+        }
         if (typeof frame !== "number") {
             frame = _this.getLabel(frame);
         }
