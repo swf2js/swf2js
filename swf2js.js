@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.9)
+ * swf2js (version 0.5.10)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -135,7 +135,7 @@ if (!("swf2js" in window)){(function(window)
         {
             var _cloneArray = cloneArray;
             var prop;
-            for(prop in src) {
+            for (prop in src) {
                 if (!src.hasOwnProperty(prop)) {
                     continue;
                 }
@@ -165,9 +165,6 @@ if (!("swf2js" in window)){(function(window)
      */
     function cloneArray(src)
     {
-        if (!isArrayBuffer) {
-            return src;
-        }
         var arr = [];
         var length = src.length;
         if (isArrayBuffer) {
@@ -1431,9 +1428,8 @@ if (!("swf2js" in window)){(function(window)
         var sign = upperBits >>> 31 & 0x1;
         var exp = upperBits >>> 20 & 0x7FF;
         var upperFraction = upperBits & 0xFFFFF;
-        var lowerFraction = lowerBits;
         return (!upperBits && !lowerBits) ? 0 : ((sign === 0) ? 1 : -1) *
-            (upperFraction / _pow(2, 20) + lowerFraction / _pow(2, 52) + 1) *
+            (upperFraction / _pow(2, 20) + lowerBits / _pow(2, 52) + 1) *
                 _pow(2, exp - 1023);
     };
 
@@ -1528,8 +1524,9 @@ if (!("swf2js" in window)){(function(window)
         var value = 0;
         var o = _this.byte_offset;
         var i = o + n;
-        for(; i > o;)
+        for(; i > o;) {
             value = (value << 8) | _this.data[--i];
+        }
         _this.byte_offset += n;
         return value;
     };
@@ -1545,13 +1542,13 @@ if (!("swf2js" in window)){(function(window)
         var data = _this.getData(bo);
         var deCompress = unzip(_this.data, true);
         var array = _this.createArray(length);
+
         _this.data = null;
 
         var dataLength = data.length;
         for (var i = 0; i < dataLength; i++) {
             array[key++] = data[i];
         }
-
         var compLength = deCompress.length;
         for (i = 0; i < compLength; i++) {
             array[key++] = deCompress[i];
@@ -1568,10 +1565,11 @@ if (!("swf2js" in window)){(function(window)
      */
     var SwfTag = function(stage, bitio)
     {
-        this.stage = stage;
-        this.bitio = bitio;
-        this.currentPosition = {x:0, y:0};
-        this.jpegTables = null;
+        var _this = this;
+        _this.stage = stage;
+        _this.bitio = bitio;
+        _this.currentPosition = {x:0, y:0};
+        _this.jpegTables = null;
     };
 
     /**
@@ -1596,8 +1594,9 @@ if (!("swf2js" in window)){(function(window)
         var _showFrame = _this.showFrame;
         var originTags = [];
         for (var frame = 1; frame < length; frame++) {
-            if (!(frame in tags))
+            if (!(frame in tags)) {
                 continue;
+            }
             _showFrame.call(_this, tags[frame], parent, originTags);
         }
     };
@@ -2085,19 +2084,24 @@ if (!("swf2js" in window)){(function(window)
                 var fontData = stage.getCharacter(fontId);
                 ShapeTable = fontData.GlyphShapeTable;
                 isZoneTable = false;
-                if (fontData.ZoneTable)
+                if (fontData.ZoneTable) {
                     isZoneTable = true;
+                }
             }
-            if ("XOffset" in record)
+            if ("XOffset" in record) {
                 offsetX = record.XOffset;
-            if ("YOffset" in record)
+            }
+            if ("YOffset" in record) {
                 offsetY = record.YOffset;
-            if ("TextColor" in record)
+            }
+            if ("TextColor" in record) {
                 color = record.TextColor;
+            }
             if ("TextHeight" in record) {
                 textHeight = record.TextHeight;
-                if (isZoneTable)
+                if (isZoneTable) {
                     textHeight /= 20;
+                }
             }
 
             var entries = record.GlyphEntries;
@@ -2150,11 +2154,12 @@ if (!("swf2js" in window)){(function(window)
         var button = new Button();
         button.setParent(parent);
         button.setStage(_this.stage);
-        if ("actions" in character)
+        if ("actions" in character) {
             button.setActions(character.actions);
-        if (tag.PlaceFlagHasName)
+        }
+        if (tag.PlaceFlagHasName) {
             button.setName(tag.Name);
-
+        }
         var down = button.down;
         if (character.ButtonStateDownSoundId) {
             down.soundId = character.ButtonStateDownSoundId;
@@ -2180,26 +2185,32 @@ if (!("swf2js" in window)){(function(window)
         }
 
         for (var depth = 1; depth < length; depth++) {
-            if (!(depth in characters))
+            if (!(depth in characters)) {
                 continue;
+            }
 
             var tags = characters[depth];
             var tLen = tags.length;
             for (var idx = 0; idx < tLen; idx++) {
-                if (!(idx in tags))
+                if (!(idx in tags)) {
                     continue;
+                }
+
                 var bTag = tags[idx];
                 var obj = _this.buildObject(bTag, parent, false, 1);
                 var Depth = bTag.Depth;
-
-                if (bTag.ButtonStateDown)
+                if (bTag.ButtonStateDown) {
                     down.addTag(Depth, obj, bTag);
-                if (bTag.ButtonStateHitTest)
+                }
+                if (bTag.ButtonStateHitTest) {
                     hitTest.addTag(Depth, obj, bTag);
-                if (bTag.ButtonStateOver)
+                }
+                if (bTag.ButtonStateOver) {
                     over.addTag(Depth, obj, bTag);
-                if (bTag.ButtonStateUp)
+                }
+                if (bTag.ButtonStateUp) {
                     up.addTag(Depth, obj, bTag);
+                }
             }
         }
 
@@ -2249,8 +2260,9 @@ if (!("swf2js" in window)){(function(window)
 
         for (; bitio.byte_offset < dataLength; ) {
             var tagStartOffset = bitio.byte_offset;
-            if (tagStartOffset + 2 > dataLength)
+            if (tagStartOffset + 2 > dataLength) {
                 break;
+            }
 
             var tagLength = bitio.getUI16();
             tagType = tagLength >> 6;
@@ -2286,8 +2298,9 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
 
-            if (tag !== null)
+            if (tag) {
                 tags = _addTag.call(_this, tagType, tags, tag, frame);
+            }
 
             bitio.bit_offset = 0;
         }
@@ -2960,19 +2973,14 @@ if (!("swf2js" in window)){(function(window)
         for (;;) {
             var first6Bits = bitio.getUIBits(6);
             var shape = 0;
-
             if (first6Bits & 0x20) {
-                // Edge
                 var numBits = first6Bits & 0x0f;
                 if (first6Bits & 0x10) {
-                    // StraigtEdge (11XXXX)
                     shape = _straightEdgeRecord.call(_this, tagType, numBits);
                 } else {
-                    // CurvedEdge (10XXXX)
                     shape = _curvedEdgeRecord.call(_this, tagType, numBits);
                 }
             } else if (first6Bits) {
-                // ChangeStyle (0XXXXX)
                 shape =
                     _styleChangeRecord.call(_this, tagType, first6Bits, currentNumBits);
             }
@@ -5483,6 +5491,18 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param value
+     * @returns {*}
+     */
+    ActionScript.prototype.valueToString = function(value)
+    {
+        if (typeof value !== "string") {
+            value += "";
+        }
+        return value;
+    };
+
+    /**
      * init
      */
     ActionScript.prototype.__init__ = function(data)
@@ -5499,6 +5519,7 @@ if (!("swf2js" in window)){(function(window)
         var register;
         var values;
         var NumParams;
+        var payloadLength;
         var withEndPoint = 0;
         var bitio = new BitIO();
         bitio.setData(data);
@@ -5524,7 +5545,7 @@ if (!("swf2js" in window)){(function(window)
 
             var payload = null;
             if (actionCode >= 0x80) {
-                var payloadLength = bitio.getUI16();
+                payloadLength = bitio.getUI16();
                 payload = bitio.getData(payloadLength);
                 pBitio.setData(payload);
                 pBitio.setOffset(0, 0);
@@ -5585,44 +5606,34 @@ if (!("swf2js" in window)){(function(window)
                     for (; pBitio.byte_offset < payloadLength; ) {
                         var type = pBitio.getUI8();
                         switch (type) {
-                            // String
-                            case 0:
+                            case 0: // String
                                 values[values.length] = String(pBitio.getDataUntil("\0"));
                                 break;
-                            // Float
-                            case 1:
+                            case 1: // Float
                                 values[values.length] = pBitio.getFloat32();
                                 break;
-                            // null
-                            case 2:
+                            case 2: // null
                                 values[values.length] = null;
                                 break;
-                            // undefined
-                            case 3:
+                            case 3: // undefined
                                 values[values.length] = undefined;
                                 break;
-                            // RegisterNumber
-                            case 4:
+                            case 4: // RegisterNumber
                                 values[values.length] = {"key": pBitio.getUI8()};
                                 break;
-                            // Boolean
-                            case 5:
+                            case 5: // Boolean
                                 values[values.length] = (pBitio.getUI8()) ? true : false;
                                 break;
-                            // Double
-                            case 6:
+                            case 6: // Double
                                 values[values.length] = pBitio.getFloat64();
                                 break;
-                            // Integer
-                            case 7:
+                            case 7: // Integer
                                 values[values.length] = pBitio.getUI32();
                                 break;
-                            // Constant8
-                            case 8:
+                            case 8: // Constant8
                                 values[values.length] = _this.constantPool[pBitio.getUI8()];
                                 break;
-                            // Constant16
-                            case 9:
+                            case 9: // Constant16
                                 values[values.length] = _this.constantPool[pBitio.getUI16()];
                                 break;
                             default:
@@ -5686,8 +5697,9 @@ if (!("swf2js" in window)){(function(window)
                     obj.ActionScript = function ActionScript(as, mc, args)
                     {
                         as.initVariable(args);
-                        if (as.initAction)
+                        if (as.initAction) {
                             as.variables["this"] = this;
+                        }
                         return as.execute(mc);
                     };
                     asData = bitio.getData(pBitio.getUI16());
@@ -5767,8 +5779,9 @@ if (!("swf2js" in window)){(function(window)
                     obj.ActionScript = function ActionScript(as, mc, args)
                     {
                         as.initVariable(args);
-                        if (as.initAction)
+                        if (as.initAction) {
                             as.variables["this"] = this;
+                        }
                         return as.execute(mc);
                     };
                     asData = bitio.getData(pBitio.getUI16());
@@ -5855,33 +5868,49 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.calc = function(value)
     {
+        var calc;
         switch (typeof value) {
             case "boolean":
+                calc = value;
                 break;
             case "string":
                 if (value === "") {
-                    value = 0;
+                    calc = 0;
                 } else {
-                    value = _parseFloat(value);
-                    if (_isNaN(value))
-                        value = 1;
+                    calc = _parseFloat(value);
+                    if (_isNaN(calc)) {
+                        calc = 1;
+                    }
                 }
-
                 break;
             case "object":
                 if (value === null) {
-                    value = 0;
+                    calc = 0;
                 } else if (value instanceof Array) {
-                    value = value.length;
+                    calc = value.length;
                 } else if (value instanceof Object) {
-                    value = 1;
+                    calc = 1;
                 }
                 break;
             default:
-                value = _parseFloat(value);
-                if (_isNaN(value))
-                    value = 0;
+                calc = _parseFloat(value);
+                if (_isNaN(calc)) {
+                    calc = 0;
+                }
                 break;
+        }
+        return calc;
+    };
+
+    /**
+     * @param value
+     * @returns {Number|*}
+     */
+    ActionScript.prototype.operationValue = function(value)
+    {
+        value = _parseFloat(value);
+        if (_isNaN(value)) {
+            value = 0;
         }
         return value;
     };
@@ -5892,1272 +5921,336 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.execute = function(mc)
     {
+        if (!mc.active) {
+            return 0;
+        }
+
         var _this = this;
-        var a;
-        var b;
         var stack = [];
         var movieClip = mc;
         var stage = mc.getStage();
         var version = stage.getVersion();
-        if (!mc.active)
-            return 0;
-
-        // 開始
+        stage = null;
         var cache = _this.cache;
         var cLength = cache.length;
         for (var cIdx = 0; cIdx < cLength; cIdx++) {
-            if (!(cIdx in cache))
+            if (!(cIdx in cache)) {
                 continue;
+            }
 
             var aScript = cache[cIdx];
             var actionCode = aScript.actionCode;
-            if (!actionCode)
+            if (!actionCode) {
                 break;
+            }
 
             switch (actionCode) {
                 // ********************************************
                 // SWF 3
                 // ********************************************
-                // GotoFrame
                 case 0x81:
-                    if (movieClip) {
-                        movieClip.stop();
-                        movieClip.setNextFrame(aScript.frame);
-                    }
+                    _this.ActionGotoFrame(movieClip, aScript.frame);
                     break;
-                // NextFrame
                 case 0x04:
-                    if (movieClip) {
-                        movieClip.nextFrame();
-                    }
+                    _this.ActionNextFrame(movieClip);
                     break;
-                // PreviousFrame
                 case 0x05:
-                    if (movieClip) {
-                        movieClip.prevFrame();
-                    }
+                    _this.ActionPreviousFrame(movieClip);
                     break;
-                // Play
                 case 0x06:
-                    if (movieClip) {
-                        movieClip.play();
-                    }
+                    _this.ActionPlay(movieClip);
                     break;
-                // Stop
                 case 0x07:
-                    if (movieClip)
-                        movieClip.stop();
+                    _this.ActionStop(movieClip);
                     break;
-                // ToggleQuality
-                case 0x08:
-                    // JavaScriptなので使わない
+                case 0x08: // ActionToggleQuality
+                case 0x8A: // ActionWaitForFrame
                     break;
-                // StopSounds
                 case 0x09:
-                    if (movieClip)
-                        movieClip.stopAllSounds();
+                    _this.ActionStopSounds(movieClip);
                     break;
-                // WaitForFrame
-                case 0x8A:
-                    if (movieClip) {
-                        var frame = aScript.frame;
-                        var skipCount = aScript.skipCount;
-                    }
-                    break;
-                // SetTarget
                 case 0x8B:
-                    var targetName = aScript.targetName;
-                    if (targetName !== "") {
-                        if (movieClip === null)
-                            movieClip = mc;
-                        movieClip = movieClip.getMovieClip(targetName);
-                    } else {
-                        movieClip = null;
-                        if (mc.active)
-                            movieClip = mc;
-                    }
+                    movieClip = _this.ActionSetTarget(movieClip, mc, aScript.targetName);
                     break;
-                // GoToLabel
                 case 0x8C:
-                    if (movieClip) {
-                        var frame = _parseFloat(movieClip.getLabel(aScript.label));
-                        movieClip.stop();
-                        if (typeof frame === "number") {
-                            movieClip.setNextFrame(frame);
-                        }
-                    }
+                    _this.ActionGoToLabel(movieClip, aScript.label);
                     break;
-                // GetUrl
                 case 0x83:
-                    if (movieClip)
-                        movieClip.getURL(aScript.url, aScript.target);
+                    _this.ActionGetURL(movieClip, aScript.url, aScript.target);
                     break;
 
                 // ********************************************
                 // SWF 4
                 // ********************************************
-
-                // 算術演算 ***********************************
-                // Add
                 case 0x0A:
-                    var a = _parseFloat(stack.pop());
-                    var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) a = 0;
-                    if (_isNaN(b)) b = 0;
-                    stack[stack.length] = a + b;
+                    _this.ActionAdd(stack);
                     break;
-                // Subtract
                 case 0x0B:
-                    var a = _parseFloat(stack.pop());
-                    var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) a = 0;
-                    if (_isNaN(b)) b = 0;
-                    stack[stack.length] = b - a;
+                    _this.ActionSubtract(stack);
                     break;
-                // Multiply
                 case 0x0C:
-                    var a = _parseFloat(stack.pop());
-                    var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) a = 0;
-                    if (_isNaN(b)) b = 0;
-                    stack[stack.length] = a * b;
+                    _this.ActionMultiply(stack);
                     break;
-                // Divide
                 case 0x0D:
-                    var a = _parseFloat(stack.pop());
-                    var b = _parseFloat(stack.pop());
-                    if (_isNaN(a)) a = 0;
-                    if (_isNaN(b)) b = 0;
-                    stack[stack.length] = b / a;
+                    _this.ActionDivide(stack);
                     break;
-
-                // 数値比較 ***********************************
-                // Equals
                 case 0x0E:
-                    var a = _this.calc(stack.pop());
-                    var b = _this.calc(stack.pop());
-                    if (version > 4) {
-                        stack[stack.length] = (a == b);
-                    } else {
-                        stack[stack.length] = (a == b) ? 1 : 0;
-                    }
+                    _this.ActionEquals(stack, version);
                     break;
-                // Less
                 case 0x0F:
-                    var a = _this.calc(stack.pop());
-                    var b = _this.calc(stack.pop());
-                    if (version > 4) {
-                        stack[stack.length] = (b < a);
-                    } else {
-                        stack[stack.length] = (b < a) ? 1 : 0;
-                    }
+                    _this.ActionLess(stack, version);
                     break;
-                // 論理演算 ***********************************
-                // And
                 case 0x10:
-                    var a = _this.calc(stack.pop());
-                    var b = _this.calc(stack.pop());
-                    if (version > 4) {
-                        stack[stack.length] = (a != 0 && b != 0);
-                    } else {
-                        stack[stack.length] = (a != 0 && b != 0) ? 1 : 0;
-                    }
+                    _this.ActionAnd(stack, version);
                     break;
-                // Or
                 case 0x11:
-                    var a = _this.calc(stack.pop());
-                    var b = _this.calc(stack.pop());
-                    if (version > 4) {
-                        stack[stack.length] = (a != 0 || b != 0);
-                    } else {
-                        stack[stack.length] = (a != 0 || b != 0) ? 1 : 0;
-                    }
+                    _this.ActionOr(stack, version);
                     break;
-                // Not
                 case 0x12:
-                    var value = _this.calc(stack.pop());
-                    if (version > 4) {
-                        stack[stack.length] = (value == 0);
-                    } else {
-                        stack[stack.length] = (value == 0) ? 1 : 0;
-                    }
+                    _this.ActionNot(stack, version);
                     break;
-
-                // 文字列操作 ***********************************
-                // StringEquals
                 case 0x13:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    if (version > 4) {
-                        stack[stack.length] = (b == a);
-                    } else {
-                        stack[stack.length] = (b == a) ? 1 : 0;
-                    }
+                    _this.ActionStringEquals(stack, version);
                     break;
-                case 0x14: // StringLength
-                case 0x31: // MBStringLength
-                    var string = stack.pop() + "";
-                    var src = _escape(string.toString());
-                    var length = 0;
-                    var sLen = src.length;
-                    for (i = 0; i < sLen; i++, length++) {
-                        if (src.charAt(i) === "%") {
-                            if (src.charAt(++i) === "u") {
-                                i += 3;
-                                length++;
-                            }
-                            i++;
-                        }
-                    }
-                    stack[stack.length] = length;
+                case 0x14: // ActionStringLength
+                case 0x31: // ActionMBStringLength
+                    _this.ActionStringLength(stack);
                     break;
-                // StringAdd
                 case 0x21:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    if (a === null) a = "";
-                    if (b === null) b = "";
-                    stack[stack.length] = b + "" + a;
+                    _this.ActionStringAdd(stack);
                     break;
-                case 0x15:// StringExtract
-                case 0x35:// MBStringExtract
-                    var count = stack.pop();
-                    var index = stack.pop() - 1;
-                    if (index < 0) index = 0;
-                    var string = stack.pop() + "";
-                    stack[stack.length] = (count < 0)
-                        ? string.substr(index)
-                        : string.substr(index, count);
+                case 0x15:// ActionStringExtract
+                case 0x35:// ActionMBStringExtract
+                    _this.ActionStringExtract(stack);
                     break;
-                // StringLess
                 case 0x29:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    if (version > 4) {
-                        stack[stack.length] = (b < a);
-                    } else {
-                        stack[stack.length] = (b < a) ? 1 : 0;
-                    }
+                    _this.ActionStringLess(stack);
                     break;
-
-                // スタック操作 ***********************************
-                // Pop
-                case 0x17:
+                case 0x17: // ActionPop
                     stack.pop();
                     break;
-                // Push
                 case 0x96:
-                    var values = aScript.values;
-                    var vLen = values.length;
-                    var params = _this.params;
-                    for (var i = 0; i < vLen; i++) {
-                        var value = values[i];
-                        if (value instanceof Object) {
-                            var key = value.key;
-                            value = undefined;
-                            if (key in params) {
-                                var name = params[key];
-                                if (typeof name === "string") {
-                                    value = _this.getVariable(name);
-                                    if (value === undefined)
-                                        value = movieClip.getVariable(name);
-                                }
-                                if (value === undefined)
-                                    value = name;
-                            }
-                        }
-                        stack[stack.length] = value;
-                    }
+                    _this.ActionPush(stack, movieClip, aScript.values);
                     break;
-
-                // 型変換 ***********************************
-                // AsciiToChar
-                case 0x33:
-                    var value = stack.pop();
-                    stack[stack.length] = _fromCharCode(value);
+                case 0x33: // ActionAsciiToChar
+                case 0x37: // ActionMBAsciiToChar
+                    _this.ActionAsciiToChar(stack);
                     break;
-                // MBCharToAscii
-                case 0x36:
-                    var value = stack.pop() + "";
-                    stack[stack.length] = value.charCodeAt(0);
+                case 0x36: // ActionMBCharToAscii
+                case 0x32: // ActionCharToAscii
+                    _this.ActionCharToAscii(stack);
                     break;
-                // MBAsciiToChar
-                case 0x37:
-                    var value = stack.pop();
-                    stack[stack.length] = _fromCharCode(value);
-                    break;
-                // ToInteger
                 case 0x18:
-                    var value = _floor(stack.pop());
-                    stack[stack.length] = value;
+                    _this.ActionToInteger(stack);
                     break;
-                // CharToAscii
-                case 0x32:
-                    var value = stack.pop() + "";
-                    stack[stack.length] = value.charCodeAt(0);
-                    break;
-
-                // フロー制御 ***********************************
-                // Call
                 case 0x9E:
-                    var value = stack.pop() + "";
-                    var splitData = value.split(":");
-                    if (movieClip === null)
-                        break;
-
-                    if (splitData.length > 1) {
-                        var targetMc = movieClip.getMovieClip(splitData[0]);
-                        if (targetMc) {
-                            var frame = (typeof splitData[1] === "number")
-                                ? frame = splitData[1]
-                                : frame = targetMc.getLabel(splitData[1]);
-                            targetMc.executeActions(frame);
-                        }
-                    } else {
-                        var frame = (typeof splitData[0] === "number")
-                            ? splitData[0]
-                            : movieClip.getLabel(splitData[0]);
-                        movieClip.executeActions(frame);
-                    }
+                    _this.ActionCall(stack, movieClip);
                     break;
-                // If
                 case 0x9D:
-                    var condition = stack.pop();
-                    switch (typeof condition) {
-                        case "boolean":
-                            break;
-                        case "string":
-                            if (!_isNaN(condition))
-                                condition = _parseFloat(condition);
-                            break;
-                    }
-                    if (condition)
-                        cIdx = aScript.offset;
+                    cIdx = _this.ActionIf(stack, aScript.offset, cIdx);
                     break;
-                // Jump
-                case 0x99:
+                case 0x99: // ActionJump
                     cIdx = aScript.offset;
                     break;
-
-                // 変数 ***********************************
-                // GetVariable
                 case 0x1C:
-                    var name = stack.pop();
-                    var value = undefined;
-                    if (name instanceof MovieClip) {
-                        value = name;
-                    } else {
-                        value = _this.getVariable(name);
-                        if (value === undefined && movieClip)
-                            value = movieClip.getProperty(name);
-                        if (value === undefined && _this.scope)
-                            value = _this.scope.getProperty(name);
-                    }
-
-                    stack[stack.length] = value;
+                    _this.ActionGetVariable(stack, movieClip);
                     break;
-                // SetVariable
                 case 0x1D:
-                    var value = stack.pop();
-                    var name = stack.pop() + "";
-                    if (_this.scope) {
-                        _this.scope.setProperty(name, value);
-                    } else if (movieClip) {
-                        movieClip.setProperty(name, value);
-                    }
+                    _this.ActionSetVariable(stack, movieClip);
                     break;
-
-                // ムービー制御 ***********************************
-                // GetURL2
                 case 0x9A:
-                    var target = stack.pop();
-                    var urlString = stack.pop();
-
-                    var LoadVariablesFlag = aScript.LoadVariablesFlag; // 0=none, 1=LoadVariables
-                    var LoadTargetFlag = aScript.LoadTargetFlag; // 0=web, 1=スプライト
-                    var Reserved = aScript.Reserved;
-                    var SendVarsMethod = aScript.SendVarsMethod; // 0=NONE, 1=GET, 2=POST
-
-                    var method = "GET";
-                    if (SendVarsMethod === 2)
-                        method = "POST";
-
-                    if (movieClip instanceof MovieClip) {
-                        if (urlString) {
-                            // 分解してチェック
-                            var urls = urlString.split("?");
-                            var uLen = urls.length;
-
-                            var query = "";
-                            if (uLen === 1) {
-                                query = "?";
-                            }
-
-                            if (uLen > 2) {
-                                var url = urls[0] + "?";
-                                url = url + urls[1];
-                                for (var u = 2; u < uLen; u++) {
-                                    var params = urls[u];
-                                    url = url + "&" + params
-                                }
-                            } else {
-                                var url = urlString;
-                            }
-
-                            // local variables
-                            if (SendVarsMethod) {
-                                var variables = movieClip.variables;
-                                var queryString = "";
-                                for (var key in variables) {
-                                    var value = variables[key];
-                                    if (value === null) {
-                                        value = "";
-                                    }
-                                    queryString += "&" + key + "=" + value;
-                                }
-
-                                if (query !== "" && queryString !== "") {
-                                    queryString = query + queryString.slice(1);
-                                }
-                                url += queryString;
-                            }
-
-                            if (LoadVariablesFlag) {
-                                movieClip.loadVariables(url, target, method);
-                            } else if (LoadTargetFlag) {
-                                if (target instanceof MovieClip) {
-                                    target.loadMovie(url, null, SendVarsMethod);
-                                } else {
-                                    movieClip.loadMovie(url, target, SendVarsMethod);
-                                }
-
-                            } else {
-                                movieClip.getURL(url, target, method);
-                            }
-                        } else {
-                            movieClip.unloadMovie(target);
-                        }
-                    }
+                    _this.ActionGetURL2(stack, aScript, movieClip);
                     break;
-                // GetProperty
                 case 0x22:
-                    var index = stack.pop();
-                    if (!_isNaN(index))
-                        index = _floor(index);
-                    var target = stack.pop();
-                    var value = undefined;
-
-                    value = _this.getVariable(index);
-                    if (value === undefined && movieClip) {
-                        targetMc = movieClip;
-                        if (target) {
-                            targetMc = movieClip.getMovieClip(target);
-                            if (!targetMc)
-                                break;
-                        }
-                        value = targetMc.getProperty(index);
-                    }
-
-                    stack[stack.length] = value;
+                    _this.ActionGetProperty(stack, movieClip);
                     break;
-                // GoToFrame2
                 case 0x9F:
-                    var SceneBiasFlag = aScript.SceneBiasFlag;
-                    var PlayFlag = aScript.PlayFlag; // 0=stop, 1=play
-                    if (SceneBiasFlag === 1) {
-                        var SceneBias = aScript.SceneBias;
-                    }
-
-                    var frame = stack.pop();
-                    if (frame === null || frame === undefined || !movieClip) {
-                        break;
-                    }
-
-                    if (_isNaN(frame)) {
-                        var splitData = frame.split(":");
-                        if (splitData.length > 1) {
-                            var targetMc = movieClip.getMovieClip(splitData[0]);
-                            if (targetMc) {
-                                frame = targetMc.getLabel(splitData[1]);
-                            }
-                        } else {
-                            frame = movieClip.getLabel(splitData[0]);
-                        }
-                    }
-
-                    if (typeof frame === "number" && frame > 0) {
-                        if (PlayFlag) {
-                            if (!movieClip.stopFlag) {
-                                movieClip.setNextFrame(frame);
-                            }
-                            movieClip.play();
-                        } else {
-                            movieClip.setNextFrame(frame);
-                            movieClip.stop();
-                        }
-                    }
+                    _this.ActionGoToFrame2(stack, aScript, movieClip);
                     break;
-                case 0x20: // SetTarget2
-                    var target = stack.pop();
-                    if (!movieClip) {
-                        movieClip = mc;
-                    }
-                    movieClip = movieClip.getMovieClip(target);
+                case 0x20:
+                    movieClip = _this.ActionSetTarget2(stack, movieClip, mc);
                     break;
-                // SetProperty
                 case  0x23:
-                    var value = stack.pop();
-                    var index = stack.pop();
-                    if (!_isNaN(index))
-                        index = _floor(index);
-                    var target = stack.pop();
-
-                    if (movieClip) {
-                        var targetMc = movieClip;
-                        if (target !== undefined) {
-                            targetMc = movieClip.getMovieClip(target);
-                            if (!targetMc) {
-                                break;
-                            }
-                        }
-                        targetMc.setProperty(index, value);
-                    }
+                    _this.ActionSetProperty(stack, movieClip);
                     break;
-                // StartDrag
                 case 0x27:
-                    var target = stack.pop();
-                    var lock = stack.pop();
-                    var constrain = stack.pop();
-                    var y2 = null;
-                    var x2 = null;
-                    var y1 = null;
-                    var x1 = null;
-                    if (constrain) {
-                        y2 = stack.pop();
-                        x2 = stack.pop();
-                        y1 = stack.pop();
-                        x1 = stack.pop();
-                    }
-
-                    var targetMc = movieClip;
-                    if (target instanceof MovieClip)
-                        targetMc = target;
-
-                    if (typeof target === "string" && target)
-                        console.log('StartDrag:String', target);
-
-                    if (targetMc !== undefined)
-                        targetMc.startDrag(lock, x1, y1, x2, y2);
-
+                    _this.ActionStartDrag(stack, movieClip);
                     break;
-                // WaitForFrame2
-                case 0x8D:
-                    var frame = stack.pop();
-                    var skipCount = aScript.skipCount;
+                case 0x8D: // ActionWaitForFrame2
+                    stack.pop();
                     break;
-                // CloneSprite
                 case 0x24:
-                    var depth = _parseFloat(stack.pop());
-                    var target = stack.pop();
-                    var source = stack.pop();
-                    if (movieClip)
-                        movieClip.duplicateMovieClip(target, source, depth);
+                    _this.ActionCloneSprite(stack, movieClip);
                     break;
-                // RemoveSprite
                 case 0x25:
-                    var target = stack.pop();
-                    if (movieClip)
-                        movieClip.removeMovieClip(target);
+                    _this.ActionRemoveSprite(stack, movieClip);
                     break;
-                // EndDrag
                 case 0x28:
-                    if (movieClip)
-                        movieClip.stopDrag();
+                    _this.ActionEndDrag(movieClip);
                     break;
-
-                // ユーティリティ ***********************************
-                // GetTime
                 case 0x34:
-                    var now = new Date();
-                    stack[stack.length] = now.getTime() - StartDate.getTime();
+                    _this.ActionGetTime(stack);
                     break;
-                // RandomNumber
                 case 0x30:
-                    var maximum = stack.pop();
-                    var randomNumber = _floor(_random() * maximum);
-                    stack[stack.length] = randomNumber;
+                    _this.ActionRandomNumber(stack);
                     break;
-                // Trace
                 case 0x26:
-                    var value = stack.pop();
-                    if (typeof value === "string") {
-                        value = value.split("@LFCR").join("\n");
-                    } else if (value instanceof MovieClip) {
-                        value = value.getTarget();
-                    }
-                    console.log("[trace] " + value);
+                    _this.ActionTrace(stack);
                     break;
                 case 0x00:
                     break;
-                case 0x2D: // fscommand2
-                    var count = _parseFloat(stack.pop());
-                    var method = stack.pop();
-                    var now = new Date();
-                    switch (method.toLowerCase()) {
-                        case "getdateyear":
-                            stack[stack.length] = now.getFullYear();
-                            break;
-                        case "getdatemonth":
-                            stack[stack.length] = now.getMonth() + 1;
-                            break;
-                        case "getdateday":
-                            stack[stack.length] = now.getDate();
-                            break;
-                        case "getdateweekday":
-                            stack[stack.length] = now.getDay();
-                            break;
-                        case "gettimehours":
-                            stack[stack.length] = now.getHours();
-                            break;
-                        case "gettimeminutes":
-                            stack[stack.length] = now.getMinutes();
-                            break;
-                        case "gettimeseconds":
-                            stack[stack.length] = now.getSeconds();
-                            break;
-                        case "startvibrate":
-                            stack.pop();
-                            stack.pop();
-                            stack.pop();
-                            stack[stack.length] = -1;
-                            break;
-                        case "gettimezoneoffset":
-                            movieClip.setVariable(stack.pop(), now.toUTCString());
-                            movieClip.setVariable(stack.pop(), 0);
-                            break;
-                        case "getlocalelongdate":
-                            movieClip.setVariable(stack.pop(), now.toLocaleDateString());
-                            movieClip.setVariable(stack.pop(), 0);
-                            break;
-                        case "getlocaleshortdate":
-                            movieClip.setVariable(stack.pop(), now.toDateString());
-                            movieClip.setVariable(stack.pop(), 0);
-                            break;
-                        case "getlocaletime":
-                            movieClip.setVariable(stack.pop(), now.toLocaleTimeString());
-                            movieClip.setVariable(stack.pop(), 0);
-                            break;
-                        case "getnetworkname":
-                        case "getdevice":
-                        case "getdeviceid":
-                            movieClip.setVariable(stack.pop(), '');
-                            movieClip.setVariable(stack.pop(), -1);
-                            break;
-                        case "getlanguage":
-                            var language = _navigator.userLanguage || _navigator.language || _navigator.browserLanguage || '';
-                            movieClip.setVariable(stack.pop(), language);
-                            movieClip.setVariable(stack.pop(), 0);
-                            break;
-                        case "setsoftkeys":
-                            stack.pop();
-                            stack.pop();
-                            stack[stack.length] = -1;
-                            break;
-                        case "fullscreen":
-                            var bool = stack.pop();
-                            stack[stack.length] = -1;
-                            break;
-                        case "setquality":
-                        case "getfreestagememory":
-                        case "gettotalstagememory":
-                            stack.pop();
-                            stack[stack.length] = -1;
-                            break;
-                        default:
-                            stack[stack.length] = -1;
-                            break;
-                    }
+                case 0x2D:
+                    _this.ActionFsCommand2(stack, movieClip);
                     break;
 
-                // SWF 5 ***********************************
-                // CallMethod
+                // ********************************************
+                // SWF 5
+                // ********************************************
                 case 0x52:
-                    var method = stack.pop();
-                    var object = stack.pop();
-                    var count = _parseFloat(stack.pop());
-                    var params = [];
-                    for (; count--;)
-                        params[params.length] = stack.pop();
-
-                    value = undefined;
-                    if (object) {
-                        method = checkMethod(method);
-
-                        var func = object[method];
-                        var caller = movieClip;
-                        if (!func && object instanceof MovieClip) {
-                            func = object.getVariable(method);
-                            if (func) {
-                                caller = object;
-                                object = func;
-                            }
-                        }
-
-                        if (func) {
-                            if (method === "call" || method === "apply") {
-                                caller = params.shift();
-                                func = object;
-                            }
-
-                            if ("cache" in func) {
-                                var paramCache = params;
-                                params = [];
-                                params[params.length] = func.cache;
-                                params[params.length] = caller;
-                                params[params.length] = paramCache;
-                            }
-
-                            value = func.apply(object, params);
-                        }
-                    }
-
-                    stack[stack.length] = value;
+                    _this.ActionCallMethod(stack, movieClip);
                     break;
-                // ConstantPool
-                case 0x88:
+                case 0x88: // ActionConstantPool
                     _this.constantPool = aScript.constantPool;
                     break;
-                // ActionCallFunction
                 case 0x3d:
-                    var FunctionName = stack.pop();
-                    var numArgs = _parseFloat(stack.pop());
-                    var params = [];
-                    for (; numArgs--;)
-                        params[params.length] = stack.pop();
-
-                    var ret = null;
-                    if (movieClip) {
-                        var FunctionName = checkMethod(FunctionName);
-                        if (window[FunctionName]) {
-                            targetMc = movieClip;
-                            if (params[0] instanceof MovieClip)
-                                targetMc = params.shift();
-
-                            if (params.length > 0) {
-                                var obj = params.shift();
-                                var as = {};
-
-                                if (typeof obj === "string")
-                                    as = targetMc.getVariable(obj);
-
-                                if (as instanceof Function) {
-                                    var AS = as.cache;
-                                    params.unshift(function(){
-                                        AS.initVariable(arguments);
-                                        AS.execute(targetMc);
-                                    });
-                                } else {
-                                    params.unshift(obj);
-                                }
-                            }
-
-                            ret = window[FunctionName].apply(window, params);
-                        } else if (movieClip[FunctionName]) {
-                            ret = movieClip[FunctionName].apply(movieClip, params);
-                        } else {
-                            var func = movieClip.getVariable(FunctionName);
-                            if (!func) {
-                                var scope = _this.scope;
-                                if (scope)
-                                    func = scope.getVariable(FunctionName);
-                            }
-
-                            if (func)
-                                ret = func(func.cache, movieClip, params);
-                        }
-                        stack[stack.length] = ret;
-                    }
+                    _this.ActionCallFunction(stack, movieClip);
                     break;
-                // ActionDefineFunction
                 case 0x9b:
-                    var as = aScript.ActionScript;
-                    var scope = _this.scope;
-                    as.cache.scope = (scope) ? scope : movieClip;
-                    var FunctionName = aScript.FunctionName;
-                    if (FunctionName) {
-                        movieClip.setVariable(FunctionName, as);
-                    } else {
-                        stack[stack.length] = as;
-                    }
+                    _this.ActionDefineFunction(stack, aScript, movieClip);
                     break;
-                // ActionDefineLocal
                 case 0x3c:
-                    var value = stack.pop();
-                    var name = stack.pop();
-                    if (movieClip)
-                        movieClip.setVariable(name, value);
+                    _this.ActionDefineLocal(stack, movieClip);
                     break;
-                // ActionDefineLocal2
                 case 0x41:
-                    var name = stack.pop();
-                    if (movieClip)
-                        movieClip.setVariable(name, undefined);
+                    _this.ActionDefineLocal2(stack, movieClip);
                     break;
-                // ActionDelete
                 case 0x3a:
-                    var name = stack.pop();
-                    var object = stack.pop();
-                    if (object instanceof MovieClip)
-                        object.setVariable(name, undefined);
+                    _this.ActionDelete(stack);
                     break;
-                // ActionDelete2
                 case 0x3b:
-                    var name = stack.pop();
-                    if (movieClip)
-                        movieClip.setVariable(name, undefined);
+                    _this.ActionDelete2(stack, movieClip);
                     break;
-                // ActionEnumerate
                 case 0x46:
-                    var path = stack.pop();
-                    stack[stack.length] = null;
-                    if (movieClip) {
-                        var targetMc = movieClip.getMovieClip(path);
-                        if (targetMc !== undefined) {
-                            var variables = targetMc.variables;
-                            for (var name in variables)
-                                stack[stack.length] = name;
-                        }
-                    }
+                    _this.ActionEnumerate(stack, movieClip);
                     break;
-                // ActionEquals2
                 case 0x49:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    var A = a;
-                    if (a instanceof MovieClip)
-                        A = a.getTarget();
-
-                    var B = b;
-                    if (b instanceof MovieClip)
-                        B = b.getTarget();
-
-                    stack[stack.length] = (B == A);
+                    _this.ActionEquals2(stack);
                     break;
-                // ActionGetMember
                 case 0x4e:
-                    var name = stack.pop();
-                    var object = stack.pop();
-                    var scope = _this.scope;
-
-                    if (typeof object === "string") {
-                        var mc = movieClip.getMovieClip(object);
-                        if (mc === undefined && scope)
-                            mc = scope.getMovieClip(object);
-                        if (mc instanceof MovieClip)
-                            object = mc;
-
-                    }
-
-                    var property = undefined;
-                    if (object instanceof Object) {
-                        if ("getProperty" in object) {
-                            if (property === undefined)
-                                property = object.getProperty(name);
-                            if (property === undefined && scope)
-                                property = scope.getProperty(name);
-                            if (property === undefined) {
-                                var parent = movieClip.getParent();
-                                if (parent)
-                                    property = parent.getMovieClip(name);
-                            }
-                        } else {
-                            if (object instanceof NamedNodeMap) {
-                                object = object.getNamedItem(name);
-                                name = "value";
-                            }
-
-                            if (name === "childNodes") {
-                                var childNodes = object[name];
-                                var length = childNodes.length;
-                                property = [];
-                                for (var i = 0; i < length; i++) {
-                                    var node = childNodes[i];
-                                    if (node.nodeType !== 1)
-                                        continue;
-                                    property[property.length] = node;
-                                }
-                            } else {
-                                property = object[name];
-                                if (property === undefined)
-                                    property = _this.getVariable(name);
-                            }
-                        }
-                    } else if (object !== undefined) {
-                        property = object[name];
-                    }
-
-                    stack[stack.length] = property;
-
+                    _this.ActionGetMember(stack, movieClip);
                     break;
-                // ActionInitArray
                 case 0x42:
-                    var number = stack.pop();
-                    var array = [];
-                    for (; number--;)
-                        array[array.length] = stack.pop();
-                    stack[stack.length] = array;
+                    _this.ActionInitArray(stack);
                     break;
-                // ActionInitObject
                 case 0x43:
-                    var number = stack.pop();
-                    var object = {};
-                    for (; number--;) {
-                        var value = stack.pop();
-                        var property = stack.pop();
-                        object[property] = value;
-                    }
-                    stack[stack.length] = object;
+                    _this.ActionInitObject(stack);
                     break;
-                // ActionNewMethod
                 case 0x53:
-                    var method = stack.pop();
-                    var object = stack.pop();
-                    var number = stack.pop();
-                    var params = [];
-                    for (; number--;)
-                        params[params.length] = stack.pop();
-
-                    var constructor = undefined;
-                    if (method === "") {
-                        constructor = object.apply(object, params);
-                    } else if (object in window) {
-                        constructor = new window[method](params);
-                    } else if (method in object) {
-                        var func = object[method]
-                        if (func instanceof Function && "cache" in func) {
-                            var as = function ActionScript(as, mc, args) {
-                                as.initVariable(args);
-                                if (as.initAction)
-                                    as.variables["this"] = this;
-                                return as.execute(mc);
-                            };
-
-                            var proto = func.prototype;
-                            for (var prop in proto)
-                                as.prototype[prop] = proto[prop];
-
-                            func.cache.scope = movieClip;
-                            constructor = new as(func.cache, movieClip, params);
-                        } else {
-                            constructor = new func();
-                        }
-                    }
-                    stack[stack.length] = constructor;
+                    _this.ActionNewMethod(stack, movieClip);
                     break;
-                // ActionNewObject
                 case 0x40:
-                    var object = stack.pop();
-                    var numArgs = _parseFloat(stack.pop());
-                    var params = [];
-                    for (; numArgs--;)
-                        params[params.length] = stack.pop();
-
-                    var obj = {};
-                    if (object in window) {
-                        obj = new window[object];
-                    } else {
-                        switch (object) {
-                            case "MovieClip":
-                                obj = new MovieClip();
-                                break;
-                            case "Sound":
-                                obj = new Sound();
-                                obj.movieClip = movieClip;
-                                break;
-                            case "XML":
-                                obj = new _XML(movieClip);
-                                break;
-                            default:
-                                if (movieClip) {
-                                    var func = movieClip.getVariable(object);
-                                    if (func instanceof Function && 'cache' in func) {
-                                        var as = function ActionScript(as, mc, args) {
-                                            as.initVariable(args);
-                                            if (as.initAction)
-                                                as.variables['this'] = this;
-                                            return as.execute(mc);
-                                        };
-
-                                        var proto = func.prototype;
-                                        for (var prop in proto)
-                                            as.prototype[prop] = proto[prop];
-
-                                        func.cache.scope = movieClip;
-                                        obj = new as(func.cache, movieClip, params);
-                                    } else {
-                                        obj = new func();
-                                    }
-                                }
-                                break;
-                        }
-                    }
-                    stack[stack.length] = obj;
+                    _this.ActionNewObject(stack, movieClip);
                     break;
-                // ActionSetMember
                 case 0x4f:
-                    var value = stack.pop();
-                    var name = stack.pop();
-                    var object = stack.pop();
-
-                    if (!object) {
-                        break;
-                    }
-
-                    if (typeof object === "string") {
-                        var mc = movieClip.getMovieClip(object);
-                        if (mc) {
-                            object = mc;
-                        }
-                    }
-
-                    if ("setProperty" in object) {
-                        object.setProperty(name, value);
-                    } else if (object instanceof Object) {
-                        object[name] = value;
-                    }
-
+                    _this.ActionSetMember(stack, movieClip);
                     break;
-                // ActionTargetPath
                 case 0x45:
-                    console.log('ActionTargetPath');
-                    var object = stack.pop();
-                    var path = null;
-                    if (object instanceof MovieClip) {
-                        path = object.getName();
-                        if (path !== null) {
-                            for (;;) {
-                                var parent = object.getParent();
-                                if (parent === null) {
-                                    path = "/"+ path;
-                                    break;
-                                }
-
-                                var name = parent.getName();
-                                if (name === null) {
-                                    path = null;
-                                    break;
-                                }
-
-                                path = name +"/"+ path;
-                            }
-                        }
-                    }
-
-                    stack[stack.length] = path;
+                    _this.ActionTargetPath(stack, movieClip);
                     break;
-                // ActionWith
                 case 0x94:
-                    var Size = aScript.Size;
-                    var object = mc;
-                    if (Size)
-                        object = stack.pop();
-                    movieClip = object;
+                    movieClip = _this.ActionWith(stack, aScript.Size, mc);
                     break;
-                // ActionToNumber
                 case 0x4a:
-                    var object = stack.pop();
-                    stack[stack.length] = _parseFloat(object);
+                    _this.ActionToNumber(stack);
                     break;
-                // ActionToString
                 case 0x4b:
-                    var object = stack.pop();
-                    stack[stack.length] = object + "";
+                    _this.ActionToString(stack);
                     break;
-                // ActionTypeOf
                 case 0x44:
-                    var object = stack.pop();
-                    stack[stack.length] = (object instanceof MovieClip) ? "movieclip" : typeof object;
+                    _this.ActionTypeOf(stack);
                     break;
-                // ActionAdd2
                 case 0x47:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = b+a;
+                    _this.ActionAdd2(stack);
                     break;
-                // ActionLess2
                 case 0x48:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = (b < a);
+                    _this.ActionLess2(stack);
                     break;
-                // ActionModulo
                 case 0x3f:
-                    var y = stack.pop();
-                    var x = stack.pop();
-                    stack[stack.length] = x % y;
+                    _this.ActionModulo(stack);
                     break;
-                // ActionBitAnd
                 case 0x60:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = x & y;
+                    _this.ActionBitAnd(stack);
                     break;
-                // ActionBitLShift
                 case 0x63:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = b << a;
+                    _this.ActionBitLShift(stack);
                     break;
-                // ActionBitOr
                 case 0x61:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = b | a;
+                    _this.ActionBitOr(stack);
                     break;
-                // ActionBitRShift
                 case 0x64:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = b >> a;
+                    _this.ActionBitRShift(stack);
                     break;
-                // ActionBitURShift
                 case 0x65:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = b >> a;
+                    _this.ActionBitURShift(stack);
                     break;
-                // ActionBitXor
                 case 0x62:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = a ^ b;
+                    _this.ActionBitXor(stack);
                     break;
-                // ActionDecrement
                 case 0x51:
-                    var value = _parseFloat(stack.pop());
-                    value--;
-                    stack[stack.length] = value;
+                    _this.ActionDecrement(stack);
                     break;
-                // ActionIncrement
                 case 0x50:
-                    var value = _parseFloat(stack.pop());
-                    value++;
-                    stack[stack.length] = value;
+                    _this.ActionIncrement(stack);
                     break;
-                // ActionPushDuplicate
                 case 0x4c:
-                    var value = stack[0];
-                    stack[stack.length] = value;
+                    _this.ActionPushDuplicate(stack);
                     break;
-                // ActionReturnActionReturn
-                case 0x3e:
+                case 0x3e: // ActionReturnActionReturn
                     return stack.pop();
-                    break;
-                // ActionStackSwap
                 case 0x4d:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = a;
-                    stack[stack.length] = b;
+                    _this.ActionStackSwap(stack);
                     break;
-                // ActionStoreRegister
                 case 0x87:
-                    var RegisterNumber = aScript.RegisterNumber;
-                    var value = stack[stack.length-1];
-                    _this.params[RegisterNumber] = value;
+                    _this.ActionStoreRegister(stack, aScript.RegisterNumber);
                     break;
 
-                // SWF 6 ***********************************
-                // ActionInstanceOf
+                // ********************************************
+                // SWF 6
+                // ********************************************
                 case 0x54:
-                    var constr = stack.pop();
-                    var object = stack.pop();
-                    stack[stack.length] = (object instanceof constr) ? 1 : 0;
+                    _this.ActionInstanceOf(stack);
                     break;
-                // ActionEnumerate2
                 case 0x55:
-                    var object = stack.pop();
-                    stack[stack.length] = null;
-
-                    if (object instanceof MovieClip)
-                        object = object.variables;
-
-                    if (typeof object === "object") {
-                        for (var name in object)
-                            stack[stack.length] = name;
-                    }
+                    _this.ActionEnumerate2(stack);
                     break;
-                // ActionStrictEquals
                 case 0x66:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = (b === a);
+                    _this.ActionStrictEquals(stack);
                     break;
-                // ActionGreater
-                case 0x67:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = (b > a);
-                    break;
-                // ActionStringGreater
-                case 0x68:
-                    var a = stack.pop();
-                    var b = stack.pop();
-                    stack[stack.length] = (b > a);
+                case 0x67: // ActionGreater
+                case 0x68: // ActionStringGreater
+                    _this.ActionGreater(stack);
                     break;
 
-                // SWF 7 ***********************************
-                // ActionDefineFunction2
-                case 0x8e:
-                    var as = aScript.ActionScript;
-                    var scope = _this.scope;
-                    as.cache.scope = (scope) ? scope : movieClip;
-                    var FunctionName = aScript.FunctionName;
-                    if (FunctionName) {
-                        movieClip.setVariable(FunctionName, as);
-                    } else {
-                        stack[stack.length] = as;
-                    }
+                // ********************************************
+                // SWF 7
+                // ********************************************
+                case 0x8e: // ActionDefineFunction2
+                    _this.ActionDefineFunction(stack, aScript, movieClip);
                     break;
-                // ActionExtends
                 case 0x69:
-                    console.log('ActionExtends');
-                    var superClass = stack.pop();
-                    var subClass = stack.pop();
-                    if (superClass && subClass) {
-                        subClass.prototype = {};
-                        subClass.prototype = superClass.prototype;
-                        subClass.constructor = superClass;
-                    }
+                    _this.ActionExtends(stack);
                     break;
-                // ActionCastOp
                 case 0x2b:
-                    console.log('ActionCastOp');
-                    var object = stack.pop();
-                    var func = stack.pop();
-                    if (object === '') {
-                        stack[stack.length] = null;
-                    } else {
-                        stack[stack.length] = null;
-                    }
+                    _this.ActionCastOp(stack);
                     break;
-                // ActionImplementsOp
                 case 0x2c:
-                    console.log('ActionImplementsOp');
-                    var func = stack.pop();
-                    var count = stack.pop();
-                    var params = [];
-                    for (; count--;)
-                        params[params.length] = stack.pop();
-                    stack[stack.length] = null;
+                    _this.ActionImplementsOp(stack);
                     break;
-                // ActionTry
                 case 0x8f:
-                    console.log('ActionTry');
+                    _this.ActionTry();
                     break;
-                // ActionThrow
                 case 0x2a:
-                    throw new Error(stack.pop());
+                    _this.ActionThrow();
                     break;
 
                 // SWF 9 ***********************************
@@ -7165,12 +6258,1615 @@ if (!("swf2js" in window)){(function(window)
                 case 0x82:
                     console.log('DoABC');
                     break;
-
                 default:
                     console.log('[actionScript] '+actionCode);
                     break;
             }
         }
+    };
+
+    /**
+     * @param mc
+     * @param frame
+     */
+    ActionScript.prototype.ActionGotoFrame = function(mc, frame)
+    {
+        if (mc instanceof MovieClip) {
+            mc.stop();
+            mc.setNextFrame(frame);
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionNextFrame = function(mc)
+    {
+        if (mc instanceof MovieClip) {
+            mc.nextFrame();
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionPreviousFrame = function(mc)
+    {
+        if (mc instanceof MovieClip) {
+            mc.prevFrame();
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionPlay = function(mc)
+    {
+        if (mc instanceof MovieClip) {
+            mc.play();
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionStop = function(mc)
+    {
+        if (mc instanceof MovieClip) {
+            mc.stop();
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionStopSounds = function(mc)
+    {
+        if (mc instanceof MovieClip) {
+            mc.stopAllSounds();
+        }
+    };
+
+    /**
+     * @param movieClip
+     * @param mc
+     * @param target
+     * @returns {*}
+     */
+    ActionScript.prototype.ActionSetTarget = function(movieClip, mc, target)
+    {
+        if (target !== "") {
+            var targetMc = movieClip;
+            if (!targetMc) {
+                targetMc = mc;
+            }
+            return targetMc.getMovieClip(target);
+        } else {
+            if (mc.active) {
+                return mc;
+            } else {
+                return undefined;
+            }
+        }
+    };
+
+    /**
+     * @param mc
+     * @param label
+     */
+    ActionScript.prototype.ActionGoToLabel = function(mc, label)
+    {
+        if (mc instanceof MovieClip) {
+            var frame = _parseFloat(mc.getLabel(label));
+            mc.stop();
+            if (typeof frame === "number") {
+                mc.setNextFrame(frame);
+            }
+        }
+    };
+
+    /**
+     * @param mc
+     * @param url
+     * @param target
+     */
+    ActionScript.prototype.ActionGetURL = function(mc, url, target)
+    {
+        if (mc instanceof MovieClip) {
+            mc.getURL(url, target);
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionAdd = function(stack)
+    {
+        var _this = this;
+        var a = _this.operationValue(stack.pop());
+        var b = _this.operationValue(stack.pop());
+        stack[stack.length] = a + b;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionSubtract = function(stack)
+    {
+        var _this = this;
+        var a = _this.operationValue(stack.pop());
+        var b = _this.operationValue(stack.pop());
+        stack[stack.length] = b - a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionMultiply = function(stack)
+    {
+        var _this = this;
+        var a = _this.operationValue(stack.pop());
+        var b = _this.operationValue(stack.pop());
+        stack[stack.length] = a * b;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionDivide = function(stack)
+    {
+        var _this = this;
+        var a = _this.operationValue(stack.pop());
+        var b = _this.operationValue(stack.pop());
+        stack[stack.length] = b / a;
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionEquals = function(stack, version)
+    {
+        var _this = this;
+        var a = _this.calc(stack.pop());
+        var b = _this.calc(stack.pop());
+        if (version > 4) {
+            stack[stack.length] = (a == b);
+        } else {
+            stack[stack.length] = (a == b) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionLess = function(stack, version)
+    {
+        var _this = this;
+        var a = _this.calc(stack.pop());
+        var b = _this.calc(stack.pop());
+        if (version > 4) {
+            stack[stack.length] = (b < a);
+        } else {
+            stack[stack.length] = (b < a) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionAnd = function(stack, version)
+    {
+        var _this = this;
+        var a = _this.calc(stack.pop());
+        var b = _this.calc(stack.pop());
+        if (version > 4) {
+            stack[stack.length] = (a != 0 && b != 0);
+        } else {
+            stack[stack.length] = (a != 0 && b != 0) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionOr = function(stack, version)
+    {
+        var _this = this;
+        var a = _this.calc(stack.pop());
+        var b = _this.calc(stack.pop());
+        if (version > 4) {
+            stack[stack.length] = (a != 0 || b != 0);
+        } else {
+            stack[stack.length] = (a != 0 || b != 0) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionNot = function(stack, version)
+    {
+        var _this = this;
+        var a = _this.calc(stack.pop());
+        if (version > 4) {
+            stack[stack.length] = (a == 0);
+        } else {
+            stack[stack.length] = (a == 0) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param version
+     */
+    ActionScript.prototype.ActionStringEquals = function(stack, version)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        if (version > 4) {
+            stack[stack.length] = (b == a);
+        } else {
+            stack[stack.length] = (b == a) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStringLength = function(stack)
+    {
+        var value = stack.pop();
+        value = this.valueToString(value);
+        var src = _escape(value.toString());
+        var length = 0;
+        var sLen = src.length;
+        for (var i = 0; i < sLen; i++, length++) {
+            if (src.charAt(i) === "%") {
+                if (src.charAt(++i) === "u") {
+                    i += 3;
+                    length++;
+                }
+                i++;
+            }
+        }
+        stack[stack.length] = length;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStringAdd = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        if (a === null) {
+            a = "";
+        }
+        if (b === null) {
+            b = "";
+        }
+        stack[stack.length] = b +""+ a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStringExtract = function(stack)
+    {
+        var count = stack.pop();
+        var index = stack.pop();
+        var string = stack.pop();
+        index--;
+        if (index < 0) {
+            index = 0;
+        }
+        if (typeof string !== "string") {
+            string += "";
+        }
+        stack[stack.length] = (count < 0) ? string.substr(index) : string.substr(index, count);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStringLess = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        if (version > 4) {
+            stack[stack.length] = (b < a);
+        } else {
+            stack[stack.length] = (b < a) ? 1 : 0;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     * @param values
+     */
+    ActionScript.prototype.ActionPush = function(stack, mc, values)
+    {
+        var _this = this;
+        var length = values.length;
+        var params = _this.params;
+        for (var i = 0; i < length; i++) {
+            var value = values[i];
+            if (value instanceof Object) {
+                var key = value.key;
+                value = undefined;
+                if (key in params) {
+                    var name = params[key];
+                    if (typeof name === "string") {
+                        value = _this.getVariable(name);
+                        if (value === undefined) {
+                            value = mc.getVariable(name);
+                        }
+                    }
+                    if (value === undefined) {
+                        value = name;
+                    }
+                }
+            }
+            stack[stack.length] = value;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionAsciiToChar = function(stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = _fromCharCode(value);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionCharToAscii = function(stack)
+    {
+        var value = stack.pop();
+        value = this.valueToString(value);
+        stack[stack.length] = value.charCodeAt(0);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionToInteger = function(stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = _floor(value);
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionCall = function(stack, mc)
+    {
+        var value = stack.pop();
+        if (mc) {
+            value = this.valueToString(value);
+            var splitData = value.split(":");
+            var frame;
+            var label = splitData[0];
+            var targetMc = mc;
+            if (splitData.length > 1) {
+                targetMc = mc.getMovieClip(splitData[0]);
+                label = splitData[1];
+            }
+            if (targetMc instanceof MovieClip) {
+                frame = (typeof label === "number") ? label : targetMc.getLabel(label);
+                targetMc.executeActions(frame);
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     * @param offset
+     * @param index
+     * @returns {*}
+     */
+    ActionScript.prototype.ActionIf = function(stack, offset, index)
+    {
+        var condition = stack.pop();
+        switch (typeof condition) {
+            case "boolean":
+                break;
+            case "string":
+                if (!_isNaN(condition)) {
+                    condition = _parseFloat(condition);
+                }
+                break;
+        }
+        if (condition) {
+            return offset;
+        }
+        return index;
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     * @returns {undefined}
+     */
+    ActionScript.prototype.ActionGetVariable = function(stack, mc)
+    {
+        var _this = this;
+        var name = stack.pop();
+        var value;
+        if (name instanceof MovieClip) {
+            value = name;
+        } else {
+            value = _this.getVariable(name);
+            if (value === undefined && mc) {
+                value = mc.getProperty(name);
+            }
+            if (value === undefined) {
+                var scope = _this.scope;
+                if (scope) {
+                    value = scope.getProperty(name);
+                }
+            }
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionSetVariable = function(stack, mc)
+    {
+        var _this = this;
+        var value = stack.pop();
+        var name = stack.pop();
+        var scope = _this.scope;
+        if (scope) {
+            scope.setProperty(name, value);
+        } else if (mc) {
+            mc.setProperty(name, value);
+        }
+    };
+
+    /**
+     * @param stack
+     * @param aScript
+     * @param mc
+     */
+    ActionScript.prototype.ActionGetURL2 = function(stack, aScript, mc)
+    {
+        var target = stack.pop();
+        var value = stack.pop();
+        var LoadVariablesFlag = aScript.LoadVariablesFlag; // 0=none, 1=LoadVariables
+        var LoadTargetFlag = aScript.LoadTargetFlag; // 0=web, 1=Sprite
+        var SendVarsMethod = aScript.SendVarsMethod; // 0=NONE, 1=GET, 2=POST
+        var method = "GET";
+        if (SendVarsMethod === 2) {
+            method = "POST";
+        }
+
+        var url;
+        if (mc instanceof MovieClip) {
+            if (value) {
+                value = this.valueToString(value);
+                var urls = value.split("?");
+                var uLen = urls.length;
+                var query = "";
+                if (uLen === 1) {
+                    query = "?";
+                }
+
+                if (uLen > 2) {
+                    url = urls[0] + "?";
+                    url = url + urls[1];
+                    for (var u = 2; u < uLen; u++) {
+                        var params = urls[u];
+                        url = url + "&" + params;
+                    }
+                } else {
+                    url = value;
+                }
+
+                // local variables
+                if (SendVarsMethod) {
+                    var variables = mc.variables;
+                    var queryString = "";
+                    for (var key in variables) {
+                        if (!variables.hasOwnProperty(key)) {
+                            continue;
+                        }
+                        var val = variables[key];
+                        if (val === null) {
+                            val = "";
+                        }
+                        queryString += "&" + key + "=" + val;
+                    }
+
+                    if (query !== "" && queryString !== "") {
+                        queryString = query + queryString.slice(1);
+                    }
+                    url += queryString;
+                }
+
+                if (LoadVariablesFlag) {
+                    mc.loadVariables(url, target, method);
+                } else if (LoadTargetFlag) {
+                    if (target instanceof MovieClip) {
+                        target.loadMovie(url, null, SendVarsMethod);
+                    } else {
+                        mc.loadMovie(url, target, SendVarsMethod);
+                    }
+                } else {
+                    mc.getURL(url, target, method);
+                }
+            } else {
+                mc.unloadMovie(target);
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     * @returns {*}
+     */
+    ActionScript.prototype.ActionGetProperty = function(stack, mc)
+    {
+        var index = stack.pop();
+        var target = stack.pop();
+        if (!_isNaN(index)) {
+            index = _floor(index);
+        }
+
+        var _this = this;
+        var value = _this.getVariable(index);
+        if (value === undefined && mc) {
+            var targetMc = mc;
+            if (target) {
+                if (typeof target !== "string") {
+                    target += "";
+                }
+                targetMc = mc.getMovieClip(target);
+            }
+            if (targetMc instanceof MovieClip) {
+                value = targetMc.getProperty(index);
+            }
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param aScript
+     * @param mc
+     */
+    ActionScript.prototype.ActionGoToFrame2 = function(stack, aScript, mc)
+    {
+        var SceneBiasFlag = aScript.SceneBiasFlag;
+        var PlayFlag = aScript.PlayFlag; // 0=stop, 1=play
+        if (SceneBiasFlag === 1) {
+            var SceneBias = aScript.SceneBias;
+        }
+
+        var frame = stack.pop();
+        if (frame && mc) {
+            if (_isNaN(frame)) {
+                var splitData = frame.split(":");
+                if (splitData.length > 1) {
+                    var targetMc = mc.getMovieClip(splitData[0]);
+                    if (targetMc) {
+                        frame = targetMc.getLabel(splitData[1]);
+                    }
+                } else {
+                    frame = mc.getLabel(splitData[0]);
+                }
+            }
+
+            if (typeof frame === "number" && frame > 0) {
+                if (PlayFlag) {
+                    if (!mc.stopFlag) {
+                        mc.setNextFrame(frame);
+                    }
+                    mc.play();
+                } else {
+                    mc.setNextFrame(frame);
+                    mc.stop();
+                }
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     * @param movieClip
+     * @param mc
+     * @returns {*}
+     */
+    ActionScript.prototype.ActionSetTarget2 = function(stack, movieClip, mc)
+    {
+        var target = stack.pop();
+        if (!movieClip) {
+            movieClip = mc;
+        }
+        return movieClip.getMovieClip(target);
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     * @constructor
+     */
+    ActionScript.prototype.ActionSetProperty = function(stack, mc)
+    {
+        var value = stack.pop();
+        var index = stack.pop();
+        var target = stack.pop();
+        if (!_isNaN(index)) {
+            index = _floor(index);
+        }
+        if (mc) {
+            var targetMc = mc;
+            if (target !== undefined) {
+                targetMc = mc.getMovieClip(target);
+            }
+            if (targetMc instanceof MovieClip) {
+                targetMc.setProperty(index, value);
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionStartDrag = function(stack, mc)
+    {
+        var target = stack.pop();
+        var lock = stack.pop();
+        var constrain = stack.pop();
+        var y2 = null;
+        var x2 = null;
+        var y1 = null;
+        var x1 = null;
+        if (constrain) {
+            y2 = stack.pop();
+            x2 = stack.pop();
+            y1 = stack.pop();
+            x1 = stack.pop();
+        }
+
+        var targetMc = mc;
+        if (target instanceof MovieClip) {
+            targetMc = target;
+        }
+
+        if (typeof target === "string" && target) {
+            console.log('StartDrag:String', target);
+        }
+
+        if (targetMc instanceof MovieClip) {
+            targetMc.startDrag(lock, x1, y1, x2, y2);
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionCloneSprite = function(stack, mc)
+    {
+        var depth = _parseFloat(stack.pop());
+        var target = stack.pop();
+        var source = stack.pop();
+        if (mc) {
+            mc.duplicateMovieClip(target, source, depth);
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionRemoveSprite = function(stack, mc)
+    {
+        var target = stack.pop();
+        if (mc) {
+            mc.removeMovieClip(target);
+        }
+    };
+
+    /**
+     * @param mc
+     */
+    ActionScript.prototype.ActionEndDrag = function(mc)
+    {
+        if (mc) {
+            mc.stopDrag();
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionGetTime = function(stack)
+    {
+        var now = new Date();
+        stack[stack.length] = now.getTime() - StartDate.getTime();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionRandomNumber = function(stack)
+    {
+        var maximum = stack.pop();
+        var randomNumber = _floor(_random() * maximum);
+        stack[stack.length] = randomNumber;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionTrace = function(stack)
+    {
+        var value = stack.pop();
+        if (typeof value === "string") {
+            value = value.split("@LFCR").join("\n");
+        } else if (value instanceof MovieClip) {
+            value = value.getTarget();
+        }
+        console.log("[trace] " + value);
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionFsCommand2 = function(stack, mc)
+    {
+        var count = _parseFloat(stack.pop());
+        var method = stack.pop();
+        var now = new Date();
+        switch (method.toLowerCase()) {
+            case "getdateyear":
+                stack[stack.length] = now.getFullYear();
+                break;
+            case "getdatemonth":
+                stack[stack.length] = now.getMonth() + 1;
+                break;
+            case "getdateday":
+                stack[stack.length] = now.getDate();
+                break;
+            case "getdateweekday":
+                stack[stack.length] = now.getDay();
+                break;
+            case "gettimehours":
+                stack[stack.length] = now.getHours();
+                break;
+            case "gettimeminutes":
+                stack[stack.length] = now.getMinutes();
+                break;
+            case "gettimeseconds":
+                stack[stack.length] = now.getSeconds();
+                break;
+            case "startvibrate":
+                stack.pop();
+                stack.pop();
+                stack.pop();
+                stack[stack.length] = -1;
+                break;
+            case "gettimezoneoffset":
+                mc.setVariable(stack.pop(), now.toUTCString());
+                mc.setVariable(stack.pop(), 0);
+                break;
+            case "getlocalelongdate":
+                mc.setVariable(stack.pop(), now.toLocaleDateString());
+                mc.setVariable(stack.pop(), 0);
+                break;
+            case "getlocaleshortdate":
+                mc.setVariable(stack.pop(), now.toDateString());
+                mc.setVariable(stack.pop(), 0);
+                break;
+            case "getlocaletime":
+                mc.setVariable(stack.pop(), now.toLocaleTimeString());
+                mc.setVariable(stack.pop(), 0);
+                break;
+            case "getnetworkname":
+            case "getdevice":
+            case "getdeviceid":
+                mc.setVariable(stack.pop(), '');
+                mc.setVariable(stack.pop(), -1);
+                break;
+            case "getlanguage":
+                var language = _navigator.userLanguage || _navigator.language || _navigator.browserLanguage || '';
+                mc.setVariable(stack.pop(), language);
+                mc.setVariable(stack.pop(), 0);
+                break;
+            case "setsoftkeys":
+                stack.pop();
+                stack.pop();
+                stack[stack.length] = -1;
+                break;
+            case "fullscreen":
+                var bool = stack.pop();
+                stack[stack.length] = -1;
+                break;
+            case "setquality":
+            case "getfreestagememory":
+            case "gettotalstagememory":
+                stack.pop();
+                stack[stack.length] = -1;
+                break;
+            default:
+                stack[stack.length] = -1;
+                break;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionCallMethod = function(stack, mc)
+    {
+        var method = stack.pop();
+        var object = stack.pop();
+        var count = _parseFloat(stack.pop());
+        var params = [];
+        for (; count--;) {
+            params[params.length] = stack.pop();
+        }
+
+        var value;
+        if (object) {
+            method = checkMethod(method);
+
+            var func = object[method];
+            var caller = mc;
+            if (!func && object instanceof MovieClip) {
+                func = object.getVariable(method);
+                if (func) {
+                    caller = object;
+                    object = func;
+                }
+            }
+
+            if (func) {
+                if (method === "call" || method === "apply") {
+                    caller = params.shift();
+                    func = object;
+                }
+
+                if ("cache" in func) {
+                    var paramCache = params;
+                    params = [];
+                    params[params.length] = func.cache;
+                    params[params.length] = caller;
+                    params[params.length] = paramCache;
+                }
+                value = func.apply(object, params);
+            }
+        }
+
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionCallFunction = function(stack, mc)
+    {
+        var _this = this;
+        var name = stack.pop();
+        var numArgs = _parseFloat(stack.pop());
+        var params = [];
+        for (; numArgs--;) {
+            params[params.length] = stack.pop();
+        }
+
+        var ret;
+        if (mc) {
+            name = checkMethod(name);
+            if (window[name]) {
+                var targetMc = mc;
+                if (params[0] instanceof MovieClip) {
+                    targetMc = params.shift();
+                }
+                if (params.length > 0) {
+                    var obj = params.shift();
+                    var as = {};
+                    if (typeof obj === "string") {
+                        as = targetMc.getVariable(obj);
+                    }
+                    if (as instanceof Function) {
+                        var AS = as.cache;
+                        params.unshift(function(){
+                            AS.initVariable(arguments);
+                            AS.execute(targetMc);
+                        });
+                    } else {
+                        params.unshift(obj);
+                    }
+                }
+
+                ret = window[name].apply(window, params);
+            } else if (mc[name]) {
+                ret = mc[name].apply(mc, params);
+            } else {
+                var func = mc.getVariable(name);
+                if (!func) {
+                    var scope = _this.scope;
+                    if (scope) {
+                        func = scope.getVariable(name);
+                    }
+                }
+                if (func) {
+                    ret = func(func.cache, mc, params);
+                }
+            }
+            stack[stack.length] = ret;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param aScript
+     * @param mc
+     */
+    ActionScript.prototype.ActionDefineFunction = function(stack, aScript, mc)
+    {
+        var as = aScript.ActionScript;
+        var scope = this.scope;
+        as.cache.scope = (scope) ? scope : mc;
+        var name = aScript.FunctionName;
+        if (name) {
+            mc.setVariable(name, as);
+        } else {
+            stack[stack.length] = as;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionDefineLocal = function(stack, mc)
+    {
+        var value = stack.pop();
+        var name = stack.pop();
+        if (mc) {
+            mc.setVariable(name, value);
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionDefineLocal2 = function(stack, mc)
+    {
+        var name = stack.pop();
+        if (mc) {
+            mc.setVariable(name, undefined);
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionDelete = function(stack)
+    {
+        var name = stack.pop();
+        var object = stack.pop();
+        if (object instanceof MovieClip) {
+            object.setVariable(name, undefined);
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionDelete2 = function(stack, mc)
+    {
+        var name = stack.pop();
+        if (mc) {
+            mc.setVariable(name, undefined);
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionEnumerate = function(stack, mc)
+    {
+        var path = stack.pop();
+        stack[stack.length] = null;
+        if (mc) {
+            var targetMc = mc.getMovieClip(path);
+            if (targetMc instanceof MovieClip) {
+                var variables = targetMc.variables;
+                for (var name in variables) {
+                    if (!variables.hasOwnProperty(name)) {
+                        continue;
+                    }
+                    stack[stack.length] = name;
+                }
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionEquals2 = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        var A = a;
+        var B = b;
+        if (a instanceof MovieClip) {
+            A = a.getTarget();
+        }
+        if (b instanceof MovieClip) {
+            B = b.getTarget();
+        }
+        stack[stack.length] = (B == A);
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionGetMember = function(stack, mc)
+    {
+        var _this = this;
+        var name = stack.pop();
+        var object = stack.pop();
+        var scope = _this.scope;
+
+        if (typeof object === "string") {
+            var targetMc = mc.getMovieClip(object);
+            if (targetMc === undefined && scope) {
+                targetMc = scope.getMovieClip(object);
+            }
+            if (targetMc instanceof MovieClip) {
+                object = targetMc;
+            }
+        }
+
+        var property;
+        if (object instanceof Object) {
+            if ("getProperty" in object) {
+                if (property === undefined) {
+                    property = object.getProperty(name);
+                }
+                if (property === undefined && scope) {
+                    property = scope.getProperty(name);
+                }
+                if (property === undefined) {
+                    var parent = mc.getParent();
+                    if (parent) {
+                        property = parent.getMovieClip(name);
+                    }
+                }
+            } else {
+                if (object instanceof NamedNodeMap) {
+                    object = object.getNamedItem(name);
+                    name = "value";
+                }
+
+                if (name === "childNodes") {
+                    var childNodes = object[name];
+                    var length = childNodes.length;
+                    property = [];
+                    for (var i = 0; i < length; i++) {
+                        var node = childNodes[i];
+                        if (node.nodeType !== 1) {
+                            continue;
+                        }
+                        property[property.length] = node;
+                    }
+                } else {
+                    property = object[name];
+                    if (property === undefined) {
+                        property = _this.getVariable(name);
+                    }
+                }
+            }
+        } else if (object !== undefined) {
+            property = object[name];
+        }
+
+        stack[stack.length] = property;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionInitArray = function(stack)
+    {
+        var number = stack.pop();
+        var array = [];
+        for (; number--;) {
+            array[array.length] = stack.pop();
+        }
+        stack[stack.length] = array;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionInitObject = function(stack)
+    {
+        var number = stack.pop();
+        var object = {};
+        for (; number--;) {
+            var value = stack.pop();
+            var property = stack.pop();
+            object[property] = value;
+        }
+        stack[stack.length] = object;
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionNewMethod = function(stack, mc)
+    {
+        var method = stack.pop();
+        var object = stack.pop();
+        var number = stack.pop();
+        var params = [];
+        for (; number--;) {
+            params[params.length] = stack.pop();
+        }
+
+        var constructor;
+        if (method === "") {
+            constructor = object.apply(object, params);
+        } else if (object in window) {
+            constructor = new window[method](params);
+        } else if (method in object) {
+            var func = object[method];
+            constructor = this.CreateNewActionScript(func, mc, params);
+        }
+        stack[stack.length] = constructor;
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionNewObject = function(stack, mc)
+    {
+        var object = stack.pop();
+        var numArgs = _parseFloat(stack.pop());
+        var params = [];
+        for (; numArgs--;) {
+            params[params.length] = stack.pop();
+        }
+
+        var obj = {};
+        if (object in window) {
+            obj = new window[object]();
+        } else {
+            switch (object) {
+                case "MovieClip":
+                    obj = new MovieClip();
+                    break;
+                case "Sound":
+                    obj = new Sound();
+                    obj.movieClip = mc;
+                    break;
+                case "XML":
+                    obj = new Xml(mc);
+                    break;
+                default:
+                    if (mc) {
+                        var func = mc.getVariable(object);
+                        obj = this.CreateNewActionScript(func, mc, params);
+                    }
+                    break;
+            }
+        }
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param Constr
+     * @param mc
+     * @param params
+     * @returns {*}
+     */
+    ActionScript.prototype.CreateNewActionScript = function(Constr, mc, params)
+    {
+        if (Constr instanceof Function && "cache" in Constr) {
+            var AS = function ActionScript(as, mc, args) {
+                as.initVariable(args);
+                if (as.initAction) {
+                    as.variables['this'] = this;
+                }
+                return as.execute(mc);
+            };
+
+            var proto = Constr.prototype;
+            for (var prop in proto) {
+                if (!proto.hasOwnProperty(prop)) {
+                    continue;
+                }
+                AS.prototype[prop] = proto[prop];
+            }
+
+            Constr.cache.scope = mc;
+            return new AS(Constr.cache, mc, params);
+        } else {
+            return new Constr();
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionSetMember = function(stack, mc)
+    {
+        var value = stack.pop();
+        var name = stack.pop();
+        var object = stack.pop();
+
+        if (object) {
+            if (typeof object === "string") {
+                var targetMc = mc.getMovieClip(object);
+                if (targetMc) {
+                    object = targetMc;
+                }
+            }
+
+            if ("setProperty" in object) {
+                object.setProperty(name, value);
+            } else if (object instanceof Object) {
+                object[name] = value;
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     * @param mc
+     */
+    ActionScript.prototype.ActionTargetPath = function(stack, mc)
+    {
+        console.log('ActionTargetPath');
+        var object = stack.pop();
+        var path = null;
+        if (object instanceof MovieClip) {
+            path = object.getName();
+            if (path !== null) {
+                for (;;) {
+                    var parent = object.getParent();
+                    if (parent === null) {
+                        path = "/"+ path;
+                        break;
+                    }
+
+                    var name = parent.getName();
+                    if (name === null) {
+                        path = null;
+                        break;
+                    }
+
+                    path = name +"/"+ path;
+                }
+            }
+        }
+        stack[stack.length] = path;
+    };
+
+    /**
+     * @param stack
+     * @param size
+     * @param mc
+     * @returns {*}
+     */
+    ActionScript.prototype.ActionWith = function(stack, size, mc)
+    {
+        var object = mc;
+        if (size) {
+            object = stack.pop();
+        }
+        return object;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionToNumber = function(stack)
+    {
+        var object = stack.pop();
+        stack[stack.length] = _parseFloat(object);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionToString = function(stack)
+    {
+        var object = stack.pop();
+        stack[stack.length] = this.valueToString(object);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionTypeOf = function(stack)
+    {
+        var object = stack.pop();
+        stack[stack.length] = (object instanceof MovieClip) ? "movieclip" : typeof object;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionAdd2 = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = b + a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionLess2 = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = (b < a);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionModulo = function(stack)
+    {
+        var y = stack.pop();
+        var x = stack.pop();
+        stack[stack.length] = x % y;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitAnd = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = a & b;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitLShift = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = b << a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitOr = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = b | a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitRShift = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = b >> a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitURShift = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = b >> a;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionBitXor = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = a ^ b;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionDecrement = function(stack)
+    {
+        var value = _parseFloat(stack.pop());
+        value--;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionIncrement = function(stack)
+    {
+        var value = _parseFloat(stack.pop());
+        value++;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionPushDuplicate = function(stack)
+    {
+        var value = stack[0];
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStackSwap = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = a;
+        stack[stack.length] = b;
+    };
+
+    /**
+     * @param stack
+     * @param number
+     */
+    ActionScript.prototype.ActionStoreRegister = function(stack, number)
+    {
+        var value = stack[stack.length-1];
+        this.params[number] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionInstanceOf = function(stack)
+    {
+        var constr = stack.pop();
+        var object = stack.pop();
+        stack[stack.length] = (object instanceof constr);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionEnumerate2 = function(stack)
+    {
+        var object = stack.pop();
+        stack[stack.length] = null;
+        if (object instanceof Object) {
+            if (object instanceof MovieClip) {
+                object = object.variables;
+            }
+            for (var name in object) {
+                if (!object.hasOwnProperty(name)) {
+                    continue;
+                }
+                stack[stack.length] = name;
+            }
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionStrictEquals = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = (b === a);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionGreater = function(stack)
+    {
+        var a = stack.pop();
+        var b = stack.pop();
+        stack[stack.length] = (b > a);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionExtends = function(stack)
+    {
+        console.log('ActionExtends');
+        var superClass = stack.pop();
+        var subClass = stack.pop();
+        if (superClass && subClass) {
+            subClass.prototype = {};
+            subClass.prototype = superClass.prototype;
+            subClass.constructor = superClass;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionCastOp = function(stack)
+    {
+        console.log('ActionCastOp');
+        var object = stack.pop();
+        var func = stack.pop();
+        if (object === "") {
+            stack[stack.length] = null;
+        } else {
+            stack[stack.length] = null;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript.prototype.ActionImplementsOp = function(stack)
+    {
+        console.log('ActionImplementsOp');
+        var func = stack.pop();
+        var count = stack.pop();
+        var params = [];
+        for (; count--;) {
+            params[params.length] = stack.pop();
+        }
+        stack[stack.length] = null;
+    };
+
+    /**
+     * ActionTry
+     */
+    ActionScript.prototype.ActionTry = function()
+    {
+        console.log("ActionTry");
+    };
+
+    /**
+     * ActionThrow
+     */
+    ActionScript.prototype.ActionThrow = function()
+    {
+        console.log("ActionThrow");
+        var value = stack.pop();
+        throw new Error(value);
     };
 
     /**
@@ -7227,11 +7923,11 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param name
-     * @returns {*}
+     * @returns {undefined}
      */
     Property.prototype.getProperty = function(name)
     {
-        var value = undefined;
+        var value;
         var _this = this;
         if (typeof name === "string") {
             if (name.indexOf(":") !== -1) {
@@ -7273,13 +7969,15 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case 4:
             case "_currentframe":
-                if (_this instanceof MovieClip)
+                if (_this instanceof MovieClip) {
                     value = _this.getFrame();
+                }
                 break;
             case 5:
             case "_totalframes":
-                if (_this instanceof MovieClip)
+                if (_this instanceof MovieClip) {
                     value = _this.getTotalFrames();
+                }
                 break;
             case 6:
             case "_alpha":
@@ -7315,8 +8013,9 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case 14:
             case "_droptarget":
-                if (_this instanceof MovieClip)
+                if (_this instanceof MovieClip) {
                     value = _this.getDropTarget();
+                }
                 break;
             case 15:
             case "_url":
@@ -7353,7 +8052,6 @@ if (!("swf2js" in window)){(function(window)
                 } else {
                     value = _this.getVariable("text");
                 }
-
                 break;
             case "Key":
                 value = keyClass;
@@ -7377,23 +8075,25 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var target = name;
+        var split;
+        var mc;
         if (typeof target === "string") {
             if (target.indexOf(":") !== -1) {
-                var split = target.split(":");
-                var mc = _this.getMovieClip(split[0]);
+                split = target.split(":");
+                mc = _this.getMovieClip(split[0]);
                 if (mc) {
                     _this = mc;
                 }
                 target = split[1];
             } else if (target.indexOf(".") !== -1) {
-                var split = target.split(".");
+                split = target.split(".");
                 target = split.pop();
                 var path = "";
                 var length = split.length;
                 for (var i = 0; i < length; i++) {
                     path += split[i];
                 }
-                var mc = _this.getMovieClip(path);
+                mc = _this.getMovieClip(path);
                 if (mc) {
                     _this = mc;
                 }
@@ -7404,48 +8104,55 @@ if (!("swf2js" in window)){(function(window)
             case 0:
             case "_x":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setX(value);
+                }
                 break;
             case 1:
             case "_y":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setY(value);
+                }
                 break;
             case 2:
             case "_xscale":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setXScale(value);
+                }
                 break;
             case 3:
             case "_yscale":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setYScale(value);
+                }
                 break;
             case 4:
             case "_currentframe":
                 if (_this instanceof MovieClip) {
                     value = _parseFloat(value);
-                    if (!_isNaN(value))
+                    if (!_isNaN(value)) {
                         _this.setNextFrame(value);
-                    break;
+                    }
                 }
+                break;
             case 5:
             case "_totalframes":
                 if (_this instanceof MovieClip) {
                     value = _parseFloat(value);
-                    if (!_isNaN(value))
+                    if (!_isNaN(value)) {
                         _this.setTotalFrames(value);
-                    break;
+                    }
                 }
+                break;
             case 6:
             case "_alpha":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setAlpha(value);
+                }
                 break;
             case 7:
             case "_visible":
@@ -7454,20 +8161,23 @@ if (!("swf2js" in window)){(function(window)
             case 8:
             case "_width":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setWidth(value);
+                }
                 break;
             case 9:
             case "_height":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setHeight(value);
+                }
                 break;
             case 10:
             case "_rotation":
                 value = _parseFloat(value);
-                if (!_isNaN(value))
+                if (!_isNaN(value)) {
                     _this.setRotation(value);
+                }
                 break;
             case 11:
             case "_target":
@@ -7812,9 +8522,9 @@ if (!("swf2js" in window)){(function(window)
      */
     Property.prototype.getYMouse = function()
     {
-        if (!_event)
+        if (!_event) {
             return null;
-
+        }
         var _this = this;
         var _root = _this.getMovieClip("_root");
         var stage = _root.getStage();
@@ -7836,8 +8546,9 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = multiplicationMatrix;
         for (;;) {
             var parent = mc.getParent();
-            if (!parent || parent.characterId === 0)
+            if (!parent || parent.characterId === 0) {
                 break;
+            }
             matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
             mc = parent;
         }
@@ -7865,15 +8576,15 @@ if (!("swf2js" in window)){(function(window)
         var version = stage.getVersion();
         if (version < 7) {
             for (var key in variables) {
-                if (typeof key !== "string")
+                if (typeof key !== "string") {
                     continue;
-
-                if (key.toLowerCase() === name.toLowerCase())
+                }
+                if (key.toLowerCase() === name.toLowerCase()) {
                     return variables[key];
+                }
             }
         }
         if (version > 4) {
-            var stage = _this.getStage();
             var _global = stage.getGlobal();
             var value = _global.getVariable(name);
             if (value) {
@@ -7896,16 +8607,19 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var variables = _this.variables;
         var stage = _this.getStage();
-
-        if (stage.getVersion() < 7 && typeof name === "string") {
+        if (typeof name !== "string") {
+            name += "";
+        }
+        if (stage.getVersion() < 7) {
             for (var key in variables) {
-                if (key.toLowerCase() !== name.toLowerCase())
+                if (key.toLowerCase() !== name.toLowerCase()) {
                     continue;
+                }
                 _this.variables[key] = value;
                 return 0;
             }
         }
-        _this.variables[String(name)] = value;
+        _this.variables[name] = value;
     };
 
     /**
@@ -7914,10 +8628,11 @@ if (!("swf2js" in window)){(function(window)
      */
     Property.prototype.getMovieClip = function(path)
     {
-
         var _this = this;
         var mc = _this;
         var _root = mc;
+        var tags;
+        var tag;
         for (;;) {
             var parent = _root.getParent();
             if (!parent)
@@ -7925,103 +8640,112 @@ if (!("swf2js" in window)){(function(window)
             _root = parent;
         }
 
-        var _path = path + "";
-        if (_path === "_root")
+        if (typeof path !== "string") {
+            path += "";
+        }
+        if (path === "_root") {
             return _root;
-
-        if (_path === "this")
+        }
+        if (path === "this") {
             return this;
-
+        }
         var stage = _root.getStage();
-        if (_path === "_global")
+        if (path === "_global") {
             return stage.getGlobal();
+        }
 
         parent = mc.getParent();
-        if (_path === "_parent")
+        if (path === "_parent") {
             return (parent !== null) ? parent : undefined;
+        }
 
-        if (_path.substr(0, 6) === "_level") {
-            var level = _path.substr(6);
+        if (path.substr(0, 6) === "_level") {
+            var level = path.substr(6);
             if (!_isNaN(level)) {
                 level = _parseFloat(level);
             }
-
             if (level === 0) {
                 return _root;
             }
-
-            if (!parent)
+            if (!parent) {
                 parent = stage.getParent();
-            var tags = parent.getTags();
+            }
+            tags = parent.getTags();
             if (level in tags) {
-                var tag = tags[level];
-                if (tag instanceof MovieClip)
+                tag = tags[level];
+                if (tag instanceof MovieClip) {
                     return tag;
+                }
             }
             return undefined;
         }
 
         var len = 1;
-        var splitData = [_path];
-        if (_path.indexOf("/") !== -1) {
-            splitData = _path.split("/");
+        var splitData = [path];
+        if (path.indexOf("/") !== -1) {
+            splitData = path.split("/");
             len = splitData.length;
-            if (splitData[0] === "")
+            if (splitData[0] === "") {
                 mc = _root;
-        } else if (_path.indexOf(".") !== -1) {
-            splitData = _path.split(".");
+            }
+        } else if (path.indexOf(".") !== -1) {
+            splitData = path.split(".");
             len = splitData.length;
-            if (splitData[0] === "_root")
+            if (splitData[0] === "_root") {
                 mc = _root;
+            }
         }
 
         for (var i = 0; i < len; i++) {
             var name = splitData[i];
-            if (name === "")
+            if (name === "") {
                 continue;
-
+            }
             if (name === "_root") {
                 mc = _root;
                 continue;
             }
-
             if (name === "this") {
                 mc = _this;
                 continue;
             }
-
             if (name === "_parent") {
                 parent = mc.getParent();
-                if (!parent)
+                if (!parent) {
                     return undefined;
+                }
                 mc = parent;
                 continue;
             }
-
             if (name === "..") {
                 mc = mc.getParent();
-                if (!mc)
+                if (!mc) {
                     return undefined;
+                }
                 continue;
             }
 
-            var tags = mc.getTags();
-            if (tags === undefined)
+            tags = mc.getTags();
+            if (tags === undefined) {
                 return undefined;
+            }
 
             var tagLength = tags.length;
             var setTarget = false;
-            if (!tagLength)
+            if (!tagLength) {
                 return undefined;
+            }
 
             for (;tagLength--;) {
-                if (!(tagLength in tags))
+                if (!(tagLength in tags)) {
                     continue;
+                }
 
-                var tag = tags[tagLength];
+                tag = tags[tagLength];
                 var tagName = tag.getName();
-                if (!tagName)
+                if (!tagName) {
                     continue;
+                }
 
                 if (tagName === name) {
                     mc = tag;
@@ -8030,10 +8754,10 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
 
-            if (!setTarget)
+            if (!setTarget) {
                 return undefined;
+            }
         }
-
         return mc;
     };
 
@@ -10282,7 +11006,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var _this = this;
-        if (typeof target === "string") {
+        if (target && typeof target === "string") {
             switch (target.toLowerCase()) {
                 case "_self":
                 case "_blank":
@@ -10298,9 +11022,9 @@ if (!("swf2js" in window)){(function(window)
                     method = "GET";
                     break;
                 default:
-                    if (!method)
+                    if (!method) {
                         method = "GET";
-
+                    }
                     _this.loadMovie(url, target, method);
                     return 0;
                     break;
@@ -10312,7 +11036,9 @@ if (!("swf2js" in window)){(function(window)
             var form = _document.createElement("form");
             form.action = url;
             form.method = method;
-            form.target = target;
+            if (target) {
+                form.target = target;
+            }
 
             var urls = url.split("?");
             if (urls.length > 1) {
@@ -10847,8 +11573,9 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var targetMc = _this;
-        if (typeof name === 'string')
+        if (typeof name === 'string') {
             targetMc = _this.getMovieClip(name);
+        }
 
         if (targetMc instanceof MovieClip && targetMc.removable) {
             var depth = targetMc.getLevel();
@@ -10861,10 +11588,12 @@ if (!("swf2js" in window)){(function(window)
             var controller = parent.controller;
             var _controller = parent._controller;
             for (frame = parent.getTotalFrames(); --frame;) {
-                if (frame in _controller && depth in _controller[frame])
+                if (frame in _controller && depth in _controller[frame]) {
                     delete _controller[frame][depth];
-                if (frame in controller && depth in controller[frame])
+                }
+                if (frame in controller && depth in controller[frame]) {
                     delete controller[frame][depth];
+                }
             }
         }
     };
@@ -11945,7 +12674,7 @@ if (!("swf2js" in window)){(function(window)
      * @param mc
      * @private
      */
-    var _XML = function(mc)
+    var Xml = function(mc)
     {
         this.movieClip = mc;
         this.ignoreWhite = false;
@@ -11956,7 +12685,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param url
      */
-    _XML.prototype.load = function(url)
+    Xml.prototype.load = function(url)
     {
         var _this = this;
         var xmlHttpRequest = new XMLHttpRequest();
@@ -11988,7 +12717,7 @@ if (!("swf2js" in window)){(function(window)
      * @param url
      * @param target
      */
-    _XML.prototype.send = function(url, target)
+    Xml.prototype.send = function(url, target)
     {
         var sendTarget = target ? target : "GET";
         var xmlHttpRequest = new XMLHttpRequest();
@@ -12000,7 +12729,7 @@ if (!("swf2js" in window)){(function(window)
      * @param url
      * @param resultXML
      */
-    _XML.prototype.sendAndLoad = function(url, resultXML)
+    Xml.prototype.sendAndLoad = function(url, resultXML)
     {
         var _this = this;
         _this.send(url);
@@ -13651,15 +14380,15 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @type {{}}
+     * @constructor
      */
-    var swf2js = {};
+    var Swf2js = function(){};
 
     /**
      * @param url
      * @param options
      */
-    swf2js.load = function(url, options)
+    Swf2js.prototype.load = function(url, options)
     {
         // TODO 開発用
         if (url === "develop") {
@@ -13667,23 +14396,17 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (url) {
-            var stage = (options && options.stage instanceof Stage)
-                ? options.stage
-                : new Stage();
-
+            var stage = (options && options.stage instanceof Stage) ? options.stage : new Stage();
             stage.setOptions(options);
             stages[stage.getId()] = stage;
             stage.init();
 
             var xmlHttpRequest = new XMLHttpRequest();
             xmlHttpRequest.open('GET', url, true);
-
             if (isXHR2) {
                 xmlHttpRequest.responseType = "arraybuffer";
             } else {
-                xmlHttpRequest.overrideMimeType(
-                    "text/plain; charset=x-user-defined"
-                );
+                xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
             }
 
             xmlHttpRequest.onreadystatechange = function()
@@ -13694,9 +14417,7 @@ if (!("swf2js" in window)){(function(window)
                     switch (status) {
                         case 200:
                         case 304:
-                            var data = isXHR2
-                                ? xmlHttpRequest.response
-                                : xmlHttpRequest.responseText;
+                            var data = (isXHR2) ? xmlHttpRequest.response : xmlHttpRequest.responseText;
                             stage.parse(data);
                             cacheStore.reset();
                             break;
@@ -13719,18 +14440,21 @@ if (!("swf2js" in window)){(function(window)
      * @param options
      * @returns {*}
      */
-    swf2js.reload = function(url, options)
+    Swf2js.prototype.reload = function(url, options)
     {
-        if (!stageId)
-            return swf2js.load(url, options);
+        if (!stageId) {
+            return this.load(url, options);
+        }
 
         var stage = stages[0];
         for (var i = 0; i < stageId; i++) {
-            if (!(i in stages))
+            if (!(i in stages)) {
                 continue;
+            }
             var p = stages[i];
-            if (i)
+            if (i) {
                 p.deleteNode(p.tagId);
+            }
             _clearInterval(p.intervalId);
         }
 
@@ -13748,7 +14472,7 @@ if (!("swf2js" in window)){(function(window)
      * @param options
      * @returns {MovieClip}
      */
-    swf2js.createRootMovieClip = function(width, height, fps, options)
+    Swf2js.prototype.createRootMovieClip = function(width, height, fps, options)
     {
         var stage = new Stage();
         stage.setBaseWidth(width);
@@ -13756,7 +14480,6 @@ if (!("swf2js" in window)){(function(window)
         stage.setFps(fps);
         stage.setOptions(options);
         stages[stage.getId()] = stage;
-
         stage.init();
         stage.isLoad = true;
 
@@ -13776,5 +14499,5 @@ if (!("swf2js" in window)){(function(window)
         return mc;
     };
 
-    window.swf2js = swf2js;
+    window.swf2js = new Swf2js();
 })(window);}
