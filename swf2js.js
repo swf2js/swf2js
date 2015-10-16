@@ -10392,25 +10392,25 @@ if (!("swf2js" in window)){(function(window)
             audio.load();
 
             if (currentTime) {
-                audio.addEventListener("canplay", (function(time){
-                    this.currentTime = time;
-                })(currentTime));
+                audio.addEventListener("canplay", (function(audio, time){
+                    audio.currentTime = time;
+                })(this, currentTime));
             }
 
             if (typeof loopCount === "number" && loopCount > 0) {
                 audio.loopCount = loopCount;
-                audio.addEventListener("ended", (function(volume, isStreamin, as, mc){
-                    this.loopCount--;
-                    if (this.loopCount > 0) {
-                        this.volume = volume / 100;
-                        this.currentTime = 0;
-                        this.play();
+                audio.addEventListener("ended", (function(audio, volume, isStreamin, as, mc){
+                    audio.loopCount--;
+                    if (audio.loopCount > 0) {
+                        audio.volume = volume / 100;
+                        audio.currentTime = 0;
+                        audio.play();
                     }
 
                     if (!isStreamin && as) {
                         as(as.cache, mc, [true]);
                     }
-                })(_this.volume, _this.isStreamin, _this["onSoundComplete"], _this.movieClip));
+                })(this, _this.volume, _this.isStreamin, _this["onSoundComplete"], _this.movieClip));
             }
 
             audio.play();
