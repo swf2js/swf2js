@@ -4105,7 +4105,6 @@ if (!("swf2js" in window)){(function(window)
         var EndEdges = char.EndEdges;
         var EndShapeRecords = EndEdges.ShapeRecords;
 
-        // 型
         var shapes = {
             lineStyles: {
                 lineStyleCount: lineStyleCount,
@@ -4882,8 +4881,9 @@ if (!("swf2js" in window)){(function(window)
         bitio.byteAlign();
 
         var result = [1,1,1,1,0,0,0,0];
-        if (isArrayBuffer)
+        if (isArrayBuffer) {
             result = new Float32Array(result);
+        }
 
         var first6bits = bitio.getUIBits(6);
         var HasAddTerms = first6bits >> 5;
@@ -5464,8 +5464,9 @@ if (!("swf2js" in window)){(function(window)
         var key = 0;
         for (var i = 0; i < length; i++) {
             var obj = register[i];
-            if (obj.name === null)
+            if (obj.name === null) {
                 continue;
+            }
             variables[obj.name] = values[key++];
         }
         _this.variables = variables;
@@ -5657,7 +5658,7 @@ if (!("swf2js" in window)){(function(window)
                 // GetURL2
                 case 0x9A:
                     obj.LoadVariablesFlag = pBitio.getUIBits(1); // 0=none, 1=LoadVariables
-                    obj.LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=スプライト
+                    obj.LoadTargetFlag = pBitio.getUIBits(1);// 0=web, 1=Sprite
                     pBitio.getUIBits(4); // Reserved
                     obj.SendVarsMethod = pBitio.getUIBits(2);// 0=NONE, 1=GET, 2=POST
                     break;
@@ -5844,8 +5845,9 @@ if (!("swf2js" in window)){(function(window)
             indexes[startOffset] = cache.length;
             cache[cache.length] = obj;
 
-            if (isEnd)
+            if (isEnd) {
                 break;
+            }
         }
 
         // If and Jump
@@ -9084,8 +9086,9 @@ if (!("swf2js" in window)){(function(window)
             var isStroke = (obj.Width !== undefined);
 
             if (isClipDepth) {
-                if (isStroke)
+                if (isStroke) {
                     continue;
+                }
                 cmd(ctx);
                 continue;
             }
@@ -9113,7 +9116,7 @@ if (!("swf2js" in window)){(function(window)
 
                     break;
 
-                // グラデーション
+                // gradient
                 case 0x10:
                 case 0x12:
                 case 0x13:
@@ -13472,11 +13475,10 @@ if (!("swf2js" in window)){(function(window)
         var version = bitio.getVersion();
         _this.setVersion(version);
 
-        // ファイルサイズ
+        // file size
         var fileLength = bitio.getUI32();
         _this.fileSize = fileLength;
 
-        // 圧縮データを解凍
         switch (signature) {
             case "FWS": // No ZIP
                 break;
@@ -13488,10 +13490,7 @@ if (!("swf2js" in window)){(function(window)
                 return false;
         }
 
-        // フレームサイズ
         var bounds = swftag.rect();
-
-        // フレーム
         var frameRate  = bitio.getUI16() / 0x100;
         bitio.getUI16(); // frameCount
 
@@ -13624,8 +13623,9 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var div = _document.getElementById(_this.getName());
-        if (!div)
+        if (!div) {
             return 0;
+        }
 
         var oWidth = _this.optionWidth;
         var oHeight = _this.optionHeight;
@@ -13649,7 +13649,6 @@ if (!("swf2js" in window)){(function(window)
         var baseHeight = _this.getBaseHeight();
         var minSize = _min(screenWidth, screenHeight);
 
-        // 条件に合わせてリサイズ
         if(baseWidth > baseHeight){
             scale = (screenWidth / baseWidth);
             width  = baseWidth * scale;
@@ -13668,7 +13667,7 @@ if (!("swf2js" in window)){(function(window)
         _this.setWidth(width * devicePixelRatio);
         _this.setHeight(height * devicePixelRatio);
 
-        // divの設定
+        // div
         var style = div.style;
         style.width = width + "px";
         style.height = height + "px";
@@ -13749,8 +13748,9 @@ if (!("swf2js" in window)){(function(window)
                     var loadSound = function () {
                         canvas.removeEventListener(startEvent, loadSound);
                         for (var i = sLen; i--;) {
-                            if (!(i in loadSounds))
+                            if (!(i in loadSounds)) {
                                 continue;
+                            }
                             var audio = loadSounds[i];
                             audio.load();
                         }
