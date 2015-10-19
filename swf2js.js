@@ -11792,8 +11792,8 @@ if (!("swf2js" in window)){(function(window)
             var nextTags = _this.getTags(frame);
             var depth;
             var tag;
-            if (nextTags.length) {
-                var length = _max(tags.length, nextTags.length);
+            var length = _max(tags.length, nextTags.length);
+            if (length) {
                 for (depth = 1; depth < length; depth++) {
                     if (!(depth in tags) && !(depth in nextTags)) {
                         continue;
