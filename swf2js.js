@@ -7314,11 +7314,17 @@ if (!("swf2js" in window)){(function(window)
         if (b instanceof MovieClip) {
             B = b.getTarget();
         }
-        if (typeof A === "number") {
-            A += "";
+        if (typeof A === "boolean") {
+            A = Number(A);
         }
-        if (typeof B === "number") {
-            B += "";
+        if (typeof B === "boolean") {
+            B = Number(B);
+        }
+        if (typeof A === "string" && !_isNaN(A)) {
+            A = _parseFloat(A);
+        }
+        if (typeof B === "string" && !_isNaN(B)) {
+            B = _parseFloat(B);
         }
         stack[stack.length] = (B === A);
     };
