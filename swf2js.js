@@ -5992,17 +5992,17 @@ if (!("swf2js" in window)){(function(window)
                 // ********************************************
                 // SWF 4
                 // ********************************************
-                case 0x0A:
-                    _this.ActionAdd(stack);
+                case 0x0A: // ActionAdd
+                    _this.ActionOperation(stack, "+");
                     break;
-                case 0x0B:
-                    _this.ActionSubtract(stack);
+                case 0x0B: // ActionSubtract
+                    _this.ActionOperation(stack, "-");
                     break;
-                case 0x0C:
-                    _this.ActionMultiply(stack);
+                case 0x0C: // ActionMultiply
+                    _this.ActionOperation(stack, "*");
                     break;
-                case 0x0D:
-                    _this.ActionDivide(stack);
+                case 0x0D: // ActionDivide
+                    _this.ActionOperation(stack, "/");
                     break;
                 case 0x0E:
                     _this.ActionEquals(stack, version);
@@ -6389,46 +6389,27 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
+     * @param operation
      */
-    ActionScript.prototype.ActionAdd = function(stack)
+    ActionScript.prototype.ActionOperation = function(stack, operation)
     {
         var _this = this;
         var a = _this.operationValue(stack.pop());
         var b = _this.operationValue(stack.pop());
-        stack[stack.length] = a + b;
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript.prototype.ActionSubtract = function(stack)
-    {
-        var _this = this;
-        var a = _this.operationValue(stack.pop());
-        var b = _this.operationValue(stack.pop());
-        stack[stack.length] = b - a;
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript.prototype.ActionMultiply = function(stack)
-    {
-        var _this = this;
-        var a = _this.operationValue(stack.pop());
-        var b = _this.operationValue(stack.pop());
-        stack[stack.length] = a * b;
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript.prototype.ActionDivide = function(stack)
-    {
-        var _this = this;
-        var a = _this.operationValue(stack.pop());
-        var b = _this.operationValue(stack.pop());
-        stack[stack.length] = b / a;
+        switch (operation) {
+            case "+":
+                stack[stack.length] = b + a;
+                break;
+            case "-":
+                stack[stack.length] = b - a;
+                break;
+            case "*":
+                stack[stack.length] = b * a;
+                break;
+            case "/":
+                stack[stack.length] = b / a;
+                break;
+        }
     };
 
     /**
@@ -7333,7 +7314,13 @@ if (!("swf2js" in window)){(function(window)
         if (b instanceof MovieClip) {
             B = b.getTarget();
         }
-        stack[stack.length] = (B == A);
+        if (typeof A === "number") {
+            A += "";
+        }
+        if (typeof B === "number") {
+            B += "";
+        }
+        stack[stack.length] = (B === A);
     };
 
     /**
@@ -11229,18 +11216,19 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param lock
-     * @param left
-     * @param top
-     * @param right
-     * @param bottom
+     * startDrag
      */
-    MovieClip.prototype.startDrag = function(lock, left, top, right, bottom)
+    MovieClip.prototype.startDrag = function()
     {
+        var lock = arguments[0];
+        var left = arguments[1];
+        var top = arguments[2];
+        var right = arguments[3];
+        var bottom = arguments[4];
+
         var _this = this;
         var _root = _this.getMovieClip('_root');
         var stage = _root.getStage();
-
         var startX = 0;
         var startY = 0;
         if (!lock) {
@@ -12538,7 +12526,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var actions = _this.getActions(frame);
-        var stage = _this.getStage();
         if (actions !== undefined) {
             var length = actions.length;
             var _actionRun = actionRun;
