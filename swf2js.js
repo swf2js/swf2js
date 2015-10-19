@@ -218,6 +218,15 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
+     * @param ctx
+     * @param m
+     */
+    function setTransform(ctx, m)
+    {
+        ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5], m[6]);
+    }
+
+    /**
      * @param bounds
      * @param matrix
      * @param object
@@ -618,6 +627,7 @@ if (!("swf2js" in window)){(function(window)
     function clearTmp()
     {
         var canvas = tmpContext.canvas;
+        setTransform(tmpContext, []);
         tmpContext.setTransform(1, 0, 0, 1, 0, 0);
         tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
     }
@@ -1787,12 +1797,11 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     *
      * @param tag
      * @param parent
      * @param copy
      * @param frame
-     * @returns {{}}
+     * @returns {*}
      */
     SwfTag.prototype.buildObject = function(tag, parent, copy, frame)
     {
@@ -2063,7 +2072,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param tag
      * @param character
-     * @returns {Text}
+     * @returns {DefineText}
      */
     SwfTag.prototype.buildText = function(tag, character)
     {
@@ -2092,7 +2101,7 @@ if (!("swf2js" in window)){(function(window)
                 var fontData = stage.getCharacter(fontId);
                 ShapeTable = fontData.GlyphShapeTable;
                 isZoneTable = false;
-                if (fontData.ZoneTable) {
+                if ("ZoneTable" in fontData) {
                     isZoneTable = true;
                 }
             }
@@ -2806,7 +2815,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param tagType
-     * @returns {{Ratio: number, Color: *}}
+     * @returns {{}}
      */
     SwfTag.prototype.gradientRecord = function(tagType)
     {
@@ -4613,7 +4622,7 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {{}}
+     * @returns {Array}
      */
     SwfTag.prototype.getFilterList = function()
     {
@@ -4934,12 +4943,10 @@ if (!("swf2js" in window)){(function(window)
      */
     SwfTag.prototype.parseDefineSceneAndFrameLabelData = function ()
     {
+        var i;
         var bitio = this.bitio;
-
         var obj = {};
-        var i = 0;
         obj.SceneCount = bitio.getEncodedU32();
-
         obj.sceneInfo = [];
         for (i = 0; i < obj.SceneCount; i++) {
             obj.sceneInfo[i] = {
@@ -4949,7 +4956,6 @@ if (!("swf2js" in window)){(function(window)
         }
 
         obj.FrameLabelCount = bitio.getEncodedU32();
-
         obj.frameInfo = [];
         for (i = 0; i < obj.FrameLabelCount; i++) {
             obj.frameInfo[i] = {
@@ -5053,7 +5059,6 @@ if (!("swf2js" in window)){(function(window)
 
             if (tagId === 0) {
                 obj.class2tag.topLevelClass = name;
-                continue;
             }
         }
 
@@ -6494,12 +6499,12 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionStringEquals = function(stack, version)
     {
-        var a = stack.pop();
-        var b = stack.pop();
+        var a = stack.pop() + "";
+        var b = stack.pop() + "";
         if (version > 4) {
-            stack[stack.length] = (b == a);
+            stack[stack.length] = (b === a);
         } else {
-            stack[stack.length] = (b == a) ? 1 : 0;
+            stack[stack.length] = (b === a) ? 1 : 0;
         }
     };
 
@@ -6558,6 +6563,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
+     * @param version
      */
     ActionScript.prototype.ActionStringLess = function(stack, version)
     {
@@ -6995,8 +7001,7 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.ActionRandomNumber = function(stack)
     {
         var maximum = stack.pop();
-        var randomNumber = _floor(_random() * maximum);
-        stack[stack.length] = randomNumber;
+        stack[stack.length] = _floor(_random() * maximum);
     };
 
     /**
@@ -7073,7 +7078,10 @@ if (!("swf2js" in window)){(function(window)
                 mc.setVariable(stack.pop(), -1);
                 break;
             case "getlanguage":
-                var language = _navigator.userLanguage || _navigator.language || _navigator.browserLanguage || '';
+                var language = _navigator.userLanguage ||
+                    _navigator.language ||
+                    _navigator.browserLanguage ||
+                    "en";
                 mc.setVariable(stack.pop(), language);
                 mc.setVariable(stack.pop(), 0);
                 break;
@@ -7261,6 +7269,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
+     * @param mc
      */
     ActionScript.prototype.ActionDelete2 = function(stack, mc)
     {
@@ -7716,8 +7725,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionPushDuplicate = function(stack)
     {
-        var value = stack[0];
-        stack[stack.length] = value;
+        stack[stack.length] = stack[0];
     };
 
     /**
@@ -7800,9 +7808,9 @@ if (!("swf2js" in window)){(function(window)
         var superClass = stack.pop();
         var subClass = stack.pop();
         if (superClass && subClass) {
-            subClass.prototype = {};
-            subClass.prototype = superClass.prototype;
-            subClass.constructor = superClass;
+            //subClass.prototype = {};
+            //subClass.prototype = superClass.prototype;
+            //subClass.constructor = superClass;
         }
     };
 
@@ -8986,7 +8994,7 @@ if (!("swf2js" in window)){(function(window)
         var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
         var isClipDepth = _this.isClipDepth || stage.isClipDepth;
         if (isClipDepth) {
-            ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
+            setTransform(ctx, rMatrix);
             _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
         } else {
             var xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
@@ -9014,7 +9022,8 @@ if (!("swf2js" in window)){(function(window)
                     canvas.width = W;
                     canvas.height = H;
                     cache = canvas.getContext("2d");
-                    cache.setTransform(xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale);
+                    var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
+                    setTransform(cache, cMatrix);
                     cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, isClipDepth, stage, localStage);
                     cacheStore.set(cacheKey, cache);
                 }
@@ -9024,7 +9033,7 @@ if (!("swf2js" in window)){(function(window)
                 canvas = cache.canvas;
                 if (canvas.width > 0 && canvas.height > 0) {
                     var m2 = _multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
-                    ctx.setTransform(m2[0], m2[1], m2[2], m2[3], m2[4], m2[5]);
+                    setTransform(ctx, m2);
                     if (isAndroid4x && !isChrome) {
                         ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                         ctx.fillRect(0, 0, W, H);
@@ -9033,7 +9042,7 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
             } else {
-                ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
+                setTransform(ctx, rMatrix);
                 _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
             }
         }
@@ -9391,7 +9400,7 @@ if (!("swf2js" in window)){(function(window)
                 canvas.height = H;
                 cache = canvas.getContext("2d");
                 var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
-                cache.setTransform(xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale);
+                setTransform(cache, cMatrix);
                 cache = _this.executeRender(cache, cMatrix, colorTransform);
                 cacheStore.set(cacheKey, cache);
             }
@@ -9401,7 +9410,7 @@ if (!("swf2js" in window)){(function(window)
             canvas = cache.canvas;
             if (canvas.width > 0 && canvas.height > 0) {
                 var m2 = _multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
-                ctx.setTransform(m2[0], m2[1], m2[2], m2[3], m2[4], m2[5]);
+                setTransform(ctx, m2);
                 if (isAndroid4x && !isChrome) {
                     ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                     ctx.fillRect(0, 0, W, H);
@@ -9410,7 +9419,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         } else {
-            ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
+            setTransform(ctx, rMatrix);
             _this.executeRender(ctx, rMatrix, colorTransform);
         }
     };
@@ -9441,7 +9450,7 @@ if (!("swf2js" in window)){(function(window)
             }
 
             var matrix2 = _multiplicationMatrix(matrix, record.getMatrix());
-            ctx.setTransform(matrix2[0], matrix2[1], matrix2[2], matrix2[3], matrix2[4], matrix2[5]);
+            setTransform(ctx, matrix2);
             var color = record.getColor();
             color = _generateColorTransform(color, colorTransform);
             var css = "rgb("+ color.R +","+ color.G +","+ color.B +")";
@@ -9701,7 +9710,7 @@ if (!("swf2js" in window)){(function(window)
 
         ctx.textBaseline = "top";
         var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
-        ctx.setTransform(rMatrix[0], rMatrix[1], rMatrix[2], rMatrix[3], rMatrix[4], rMatrix[5]);
+        setTransform(ctx, rMatrix);
 
         var bounds = _this.getBounds();
         var xMax = bounds.xMax - 2;
@@ -9814,7 +9823,7 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
                 var m2 = _multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
-                ctx.setTransform(m2[0], m2[1], m2[2], m2[3], m2[4], m2[5]);
+                setTransform(ctx, m2);
                 _this.renderGlyph(GlyphShapeTable[index], ctx);
                 XOffset += FontAdvanceTable[index] * fontScale;
             }
@@ -9880,7 +9889,8 @@ if (!("swf2js" in window)){(function(window)
         var size = variables["size"];
         var context = stage.context;
         context.setTransform(1,0,0,1,0,0);
-        ctx.setTransform(matrix[0] * 20, matrix[1] * 20, matrix[2] * 20, matrix[3] * 20, matrix[4], matrix[5]);
+        var m2 = [matrix[0] * 20, matrix[1] * 20, matrix[2] * 20, matrix[3] * 20, matrix[4], matrix[5]];
+        setTransform(ctx, m2);
 
         var length = splitData.length;
         for (var i = 0; i < length; i++) {
@@ -10620,7 +10630,6 @@ if (!("swf2js" in window)){(function(window)
         _this.filters = [];
         _this.buttonStatus = "up";
 
-        // 判定用
         _this.stopFlag = false;
         _this.isAction = true;
         _this.isLoad = false;
@@ -10972,7 +10981,6 @@ if (!("swf2js" in window)){(function(window)
                         var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
                         loadStage.parse(data);
 
-                        // 入れ替え
                         if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
                             loadStage.setId(stage.getId());
                             loadStage.setName(stage.getName());
