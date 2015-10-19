@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.11)
+ * swf2js (version 0.5.12)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -12,6 +12,8 @@ if (!("swf2js" in window)){(function(window)
 {
     "use strict";
     var _document = window.document;
+    var alert = window.alert;
+    var _NamedNodeMap = window.NamedNodeMap;
     var isBtoa = ("btoa" in window);
     var _Math = Math;
     var _min = _Math.min;
@@ -39,8 +41,6 @@ if (!("swf2js" in window)){(function(window)
     var _clearTimeout = clearTimeout;
     var _setInterval = setInterval;
     var _clearInterval = clearInterval;
-    var _escape = escape;
-    var _unescape = unescape;
     var isWebGL = (window.WebGLRenderingContext &&
     _document.createElement("canvas").getContext("webgl")) ? true : false;
     var requestAnimationFrame =
@@ -115,15 +115,6 @@ if (!("swf2js" in window)){(function(window)
             }
         );
     }
-
-    var utf8uri = new RegExp(
-        "%[0-7][0-9A-F]|"+
-        "%C[2-9A-F]%[89AB][0-9A-F]|%D[0-9A-F]%[89AB][0-9A-F]|"+
-        "%E[0-F](?:%[89AB][0-9A-F]){2}|"+
-        "%F[0-7](?:%[89AB][0-9A-F]){3}|"+
-        "%F[89AB](?:%[89AB][0-9A-F]){4}|"+
-        "%F[CD](?:%[89AB][0-9A-F]){5}","ig"
-    );
 
     /**
      * @param src
@@ -1257,14 +1248,13 @@ if (!("swf2js" in window)){(function(window)
         if (value !== null) {
             for (i = 0; i < n; i++) {
                 var code = data[bo + i];
+                if (code === 10 || code === 13) {
+                    array[array.length] = "@LFCR";
+                }
                 if (code < 32) {
                     continue;
                 }
-                if (code === 10 || code === 13) {
-                    array[array.length] = "@LFCR";
-                } else {
-                    array[array.length] = "%" + code.toString(16);
-                }
+                array[array.length] = "%" + code.toString(16);
             }
 
             if (array.length) {
@@ -2481,7 +2471,6 @@ if (!("swf2js" in window)){(function(window)
             case 61: // VideoFrame
                 _this.parseVideoFrame(tagType, length);
                 break;
-            // TODO Tag
             case 3:  // FreeCharacter
             case 16: // StopSound
             case 23: // DefineButtonCxform
@@ -3497,10 +3486,10 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 var fontName;
-                if (obj.FontFlagsShiftJIS) {
+                if (obj.FontFlagsShiftJIS || obj.LanguageCode === 2) {
                     fontName = decodeToShiftJis(str);
                 } else {
-                    fontName = _this.encodeToUtf8(str);
+                    fontName = decodeURIComponent(str);
                 }
 
                 obj.FontName = _this.getFontName(fontName);
@@ -3632,24 +3621,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param str
-     * @returns {string}
-     */
-    SwfTag.prototype.encodeToUtf8 = function(str)
-    {
-        str = _unescape(str);
-        str = str.replace(/%(?:25)+([0-9A-F][0-9A-F])/g, function(whole, m1)
-        {
-            return "%"+m1;
-        });
-
-        return str.replace(utf8uri, function()
-        {
-            return decodeURIComponent(str);
-        });
-    };
-
-    /**
      * @param tagType
      * @param length
      */
@@ -3687,7 +3658,7 @@ if (!("swf2js" in window)){(function(window)
         if (obj.FontFlagsShiftJIS || obj.LanguageCode === 2) {
             fontName = decodeToShiftJis(str);
         } else {
-            fontName = _this.encodeToUtf8(str);
+            fontName = decodeURIComponent(str);
         }
         obj.FontName = _this.getFontName(fontName);
 
@@ -3714,6 +3685,12 @@ if (!("swf2js" in window)){(function(window)
      */
     SwfTag.prototype.getFontName = function(fontName)
     {
+        var length = fontName.length;
+        var str = fontName.substr(length-1);
+        if (str.charCodeAt(0) === 0) {
+            fontName = fontName.slice(0, -1);
+        }
+
         switch (fontName) {
             case "_sans":
                 return "sans-serif";
@@ -3902,8 +3879,9 @@ if (!("swf2js" in window)){(function(window)
             var text = bitio.getDataUntil("\0", isJis);
             if (obj.HTML) {
                 if (text.indexOf("<sbr />") !== -1) {
-                    text = text.replace(/<sbr \/>/gi, "@LFCR");
+                    text = text.replace(new RegExp("<sbr />", "gi"), "@LFCR");
                 }
+
                 var span = _document.createElement("span");
                 span.innerHTML = text;
                 var tags = span.getElementsByTagName("font");
@@ -5796,16 +5774,16 @@ if (!("swf2js" in window)){(function(window)
                     console.log('ActionTry');
                     pBitio.getUIBits(5); // Reserved
                     var CatchInRegisterFlag = pBitio.getUIBits(1);
-                    var FinallyBlockFlag = pBitio.getUIBits(1);
-                    var CatchBlockFlag = pBitio.getUIBits(1);
+                    obj.FinallyBlockFlag = pBitio.getUIBits(1);
+                    obj.CatchBlockFlag = pBitio.getUIBits(1);
                     var TrySize = pBitio.getUI16();
                     var CatchSize = pBitio.getUI16();
                     var FinallySize = pBitio.getUI16();
 
                     if (!CatchInRegisterFlag) {
-                        var CatchName = pBitio.getDataUntil("\0");
+                        obj.CatchName = pBitio.getDataUntil("\0");
                     } else {
-                        var CatchRegister = pBitio.getUI8();
+                        obj.CatchRegister = pBitio.getUI8();
                     }
 
                     i = 0;
@@ -5815,18 +5793,23 @@ if (!("swf2js" in window)){(function(window)
                             TryBody[TryBody.length] = pBitio.getUI8();
                         }
                     }
+                    obj.TryBody = TryBody;
+
                     var CatchBody = [];
                     if (CatchSize) {
                         for (i = CatchSize; i--;) {
                             CatchBody[CatchBody.length] = pBitio.getUI8();
                         }
                     }
+                    obj.CatchBody = CatchBody;
+
                     var FinallyBody = [];
                     if (FinallySize) {
                         for (i = FinallySize; i--;) {
                             FinallyBody[FinallyBody.length] = pBitio.getUI8();
                         }
                     }
+                    obj.FinallyBody = FinallyBody;
 
                     break;
                 // SWF 9 ***********************************
@@ -5876,7 +5859,7 @@ if (!("swf2js" in window)){(function(window)
         var calc;
         switch (typeof value) {
             case "boolean":
-                calc = value;
+                calc = Number(value);
                 break;
             case "string":
                 if (value === "") {
@@ -6436,9 +6419,9 @@ if (!("swf2js" in window)){(function(window)
         var a = _this.calc(stack.pop());
         var b = _this.calc(stack.pop());
         if (version > 4) {
-            stack[stack.length] = (a == b);
+            stack[stack.length] = (a === b);
         } else {
-            stack[stack.length] = (a == b) ? 1 : 0;
+            stack[stack.length] = (a === b) ? 1 : 0;
         }
     };
 
@@ -6468,9 +6451,9 @@ if (!("swf2js" in window)){(function(window)
         var a = _this.calc(stack.pop());
         var b = _this.calc(stack.pop());
         if (version > 4) {
-            stack[stack.length] = (a != 0 && b != 0);
+            stack[stack.length] = (a !== 0 && b !== 0);
         } else {
-            stack[stack.length] = (a != 0 && b != 0) ? 1 : 0;
+            stack[stack.length] = (a !== 0 && b !== 0) ? 1 : 0;
         }
     };
 
@@ -6484,9 +6467,9 @@ if (!("swf2js" in window)){(function(window)
         var a = _this.calc(stack.pop());
         var b = _this.calc(stack.pop());
         if (version > 4) {
-            stack[stack.length] = (a != 0 || b != 0);
+            stack[stack.length] = (a !== 0 || b !== 0);
         } else {
-            stack[stack.length] = (a != 0 || b != 0) ? 1 : 0;
+            stack[stack.length] = (a !== 0 || b !== 0) ? 1 : 0;
         }
     };
 
@@ -6499,9 +6482,9 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var a = _this.calc(stack.pop());
         if (version > 4) {
-            stack[stack.length] = (a == 0);
+            stack[stack.length] = (a === 0);
         } else {
-            stack[stack.length] = (a == 0) ? 1 : 0;
+            stack[stack.length] = (a === 0) ? 1 : 0;
         }
     };
 
@@ -6527,17 +6510,14 @@ if (!("swf2js" in window)){(function(window)
     {
         var value = stack.pop();
         value = this.valueToString(value);
-        var src = _escape(value.toString());
         var length = 0;
-        var sLen = src.length;
+        var sLen = value.length;
         for (var i = 0; i < sLen; i++, length++) {
-            if (src.charAt(i) === "%") {
-                if (src.charAt(++i) === "u") {
-                    i += 3;
-                    length++;
-                }
-                i++;
+            var code = value.charCodeAt(i);
+            if (code < 255) {
+                continue;
             }
+            length++;
         }
         stack[stack.length] = length;
     };
@@ -6860,6 +6840,7 @@ if (!("swf2js" in window)){(function(window)
         var PlayFlag = aScript.PlayFlag; // 0=stop, 1=play
         if (SceneBiasFlag === 1) {
             var SceneBias = aScript.SceneBias;
+            console.log("SceneBias", SceneBias);
         }
 
         var frame = stack.pop();
@@ -7366,7 +7347,7 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
             } else {
-                if (object instanceof NamedNodeMap) {
+                if (object instanceof _NamedNodeMap) {
                     object = object.getNamedItem(name);
                     name = "value";
                 }
@@ -9522,6 +9503,14 @@ if (!("swf2js" in window)){(function(window)
         obj = new Common(_this);
         obj = new Property(_this);
 
+        if (name) {
+            _this.setName(name);
+        }
+
+        if (depth) {
+            mc.swapDepths(mc, depth);
+        }
+
         _this.fontId = 0;
         _this.parent = mc;
         _this.matrix = _cloneArray([1,0,0,1,x,y]);
@@ -9760,7 +9749,6 @@ if (!("swf2js" in window)){(function(window)
 
         var splitData = text.split("@LFCR");
         if (variables["embedFonts"]) {
-            // out line
             var fontData = localStage.getCharacter(_this.fontId);
             _this.renderOutLine(ctx, fontData, splitData, rMatrix, xMin, W, variables["align"]);
         } else {
@@ -9864,8 +9852,6 @@ if (!("swf2js" in window)){(function(window)
     TextField.prototype.renderText = function(ctx, splitData, matrix, variables, stage)
     {
         var _this = this;
-        var dx = 0;
-        var dy = 0;
         var txt = "";
         var bounds = _this.getBounds();
         var xMax = bounds.xMax / 20 - 2;
@@ -9878,14 +9864,16 @@ if (!("swf2js" in window)){(function(window)
         var leftMargin = variables["leftMargin"] / 20;
         var indent = variables["indent"] / 20;
         var align = variables["align"];
+        var dx = xMin;
+        var dy = 0;
         if (align === "right") {
             ctx.textAlign = "end";
-            dx += xMax - rightMargin;
+            dx += width - rightMargin;
         } else if (align === "center") {
             ctx.textAlign = "center";
-            dx += (indent + leftMargin) + (((xMax + xMin) - indent - leftMargin - rightMargin) / 2);
+            dx += (indent + leftMargin) + ((xMax - indent - leftMargin - rightMargin) / 2);
         } else {
-            dx += xMin + indent + leftMargin;
+            dx += indent + leftMargin;
         }
 
         var areaWidth = width - indent - leftMargin - rightMargin;
@@ -11538,6 +11526,7 @@ if (!("swf2js" in window)){(function(window)
         var depth = arguments[2];
         var targetMc = this.getMovieClip(name);
         var parent;
+        var object;
         if (stage.getVersion() > 4) {
             target = arguments[0];
             depth = arguments[1];
@@ -11551,7 +11540,7 @@ if (!("swf2js" in window)){(function(window)
                     depth = 16384;
                 }
             }
-            var object = arguments[2];
+            object = arguments[2];
             targetMc = _this;
         }
 
@@ -11618,6 +11607,15 @@ if (!("swf2js" in window)){(function(window)
                         controller[frame] = [];
                     }
                     controller[frame][depth] = controller[frame-1][depth];
+                }
+            }
+
+            if (object) {
+                for (var prop in object) {
+                    if (!object.hasOwnProperty(prop)) {
+                        continue;
+                    }
+                    cloneMc.setProperty(prop, object[prop]);
                 }
             }
 
@@ -12653,11 +12651,10 @@ if (!("swf2js" in window)){(function(window)
      * @param ctx
      * @param matrix
      * @param colorTransform
-     * @param stage
-     * @param visible
      */
-    MovieClip.prototype.preFilter = function(ctx, matrix, colorTransform, stage, visible)
+    MovieClip.prototype.preFilter = function(ctx, matrix, colorTransform)
     {
+        // stage, visible
         var _this = this;
         var filters = _this.filters;
         var length = filters.length;
@@ -12711,8 +12708,10 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ctx
      */
-    MovieClip.prototype.postFilter = function(ctx, matrix, colorTransform, stage, visible)
+    MovieClip.prototype.postFilter = function(ctx)
     {
+        // matrix, colorTransform, stage, visible
+
         var _this = this;
         var filters = _this.filters;
         var length = filters.length;
@@ -12723,7 +12722,7 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
 
-                var filter = filters[id];
+                //var filter = filters[id];
                 switch (id) {
                     case 0:
                         ctx.globalCompositeOperation = 'source-over';
@@ -12770,9 +12769,9 @@ if (!("swf2js" in window)){(function(window)
      * @param n
      * @param allowFalse
      */
-    MovieClip.prototype.ASSetPropFlags = function(object, properties, n, allowFalse)
+    MovieClip.prototype.ASSetPropFlags = function()
     {
-
+        // object, properties, n, allowFalse
     };
 
     /**
@@ -14501,7 +14500,7 @@ if (!("swf2js" in window)){(function(window)
      */
     Swf2js.prototype.load = function(url, options)
     {
-        // TODO 開発用
+        // develop only
         if (url === "develop") {
             url = location.search.substr(1).split("&")[0];
         }
