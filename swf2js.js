@@ -227,6 +227,23 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
+     * @param as
+     * @param mc
+     */
+    function actionRun(as, mc)
+    {
+        if (as instanceof ActionScript) {
+            as.execute(mc);
+        } else if (typeof as === "function") {
+            if ("cache" in as) {
+                as(as.cache, mc, []);
+            } else {
+                as.apply(mc);
+            }
+        }
+    }
+
+    /**
      * @param bounds
      * @param matrix
      * @param object
@@ -7081,7 +7098,7 @@ if (!("swf2js" in window)){(function(window)
                 var language = _navigator.userLanguage ||
                     _navigator.language ||
                     _navigator.browserLanguage ||
-                    "en";
+                    "ja-JP";
                 mc.setVariable(stack.pop(), language);
                 mc.setVariable(stack.pop(), 0);
                 break;
@@ -7808,6 +7825,7 @@ if (!("swf2js" in window)){(function(window)
         var superClass = stack.pop();
         var subClass = stack.pop();
         if (superClass && subClass) {
+            console.log(superClass, subClass);
             //subClass.prototype = {};
             //subClass.prototype = superClass.prototype;
             //subClass.constructor = superClass;
@@ -9741,7 +9759,6 @@ if (!("swf2js" in window)){(function(window)
         ctx.rect(xMin, yMin, W, H);
         ctx.clip();
 
-        // 文字色
         color = _generateColorTransform(variables["color"], colorTransform);
         ctx.fillStyle = "rgb("+ color.R +","+ color.G +","+ color.B +")";
         ctx.globalAlpha = color.A;
@@ -12521,19 +12538,12 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var actions = _this.getActions(frame);
+        var stage = _this.getStage();
         if (actions !== undefined) {
             var length = actions.length;
+            var _actionRun = actionRun;
             for (var i = 0; i < length; i++) {
-                var as = actions[i];
-                if (as instanceof ActionScript) {
-                    as.execute(_this);
-                } else if (typeof as === 'function') {
-                    if ('cache' in as) {
-                        as(as.cache, _this, []);
-                    } else {
-                        as.apply(_this);
-                    }
-                }
+                _actionRun(actions[i], _this);
             }
         }
     };
@@ -13861,6 +13871,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         if (_this.actions.length) {
+            var _actionRun = actionRun;
             for (var i = 0; i < _this.actions.length; i++) {
                 var obj = _this.actions[i];
                 var mc = obj.mc;
@@ -13870,16 +13881,7 @@ if (!("swf2js" in window)){(function(window)
                 var as = obj.as;
                 var length = as.length;
                 for (var idx = 0; idx < length; idx++) {
-                    var action = as[idx];
-                    if (action instanceof ActionScript) {
-                        action.execute(mc);
-                    } else if (typeof action === "function") {
-                        if ("cache" in action) {
-                            action(action.cache, mc, []);
-                        } else {
-                            action.apply(mc);
-                        }
-                    }
+                    _actionRun(as[idx], mc);
                 }
             }
         }
@@ -14330,21 +14332,9 @@ if (!("swf2js" in window)){(function(window)
         var actions = obj.as;
         var mc = obj.mc;
         var length = actions.length;
+        var _actionRun = actionRun;
         for (var i = 0; i < length; i++) {
-            var as = actions[i];
-            if (!as) {
-                continue;
-            }
-
-            if (as instanceof ActionScript) {
-                as.execute(mc);
-            } else if (typeof as === "function") {
-                if ('cache' in as) {
-                    as(as.cache, mc, []);
-                } else {
-                    as.apply(mc);
-                }
-            }
+            _actionRun(actions[i], mc);
         }
         if (_this.actions.length) {
             _this.executeAction();
