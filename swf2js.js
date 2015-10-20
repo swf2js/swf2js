@@ -1623,13 +1623,15 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var length = tags.length;
-        var _showFrame = _this.showFrame;
-        var originTags = [];
-        for (var frame = 1; frame < length; frame++) {
-            if (!(frame in tags)) {
-                continue;
+        if (length) {
+            var _showFrame = _this.showFrame;
+            var originTags = [];
+            for (var frame = 1; frame < length; frame++) {
+                if (!(frame in tags)) {
+                    continue;
+                }
+                _showFrame.call(_this, tags[frame], parent, originTags);
             }
-            _showFrame.call(_this, tags[frame], parent, originTags);
         }
     };
 
@@ -1643,7 +1645,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var _buildTag = _this.buildTag;
         var newDepth = [];
-        var length = 0;
+        var length;
         var i = 0;
         var tag;
         var frame = obj.frame;
@@ -1729,21 +1731,23 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 length = prevTags.length;
-                for (; length--;) {
-                    if (!(length in prevTags) || length in newDepth) {
-                        continue;
-                    }
-
-                    addTags[frame][length] = prevTags[length];
-                    tag = prevTags[length];
-                    if (tag instanceof MovieClip) {
-                        var prevController = controller[prevFrame];
-                        if (!(frame in controller)) {
-                            controller[frame] = [];
+                if (length) {
+                    for (; length--;) {
+                        if (!(length in prevTags) || length in newDepth) {
+                            continue;
                         }
-                        controller[frame][length] = prevController[length];
+
+                        addTags[frame][length] = prevTags[length];
+                        tag = prevTags[length];
+                        if (tag instanceof MovieClip) {
+                            var prevController = controller[prevFrame];
+                            if (!(frame in controller)) {
+                                controller[frame] = [];
+                            }
+                            controller[frame][length] = prevController[length];
+                        }
+                        originTags[frame][length] = originTags[prevFrame][length];
                     }
-                    originTags[frame][length] = originTags[prevFrame][length];
                 }
             }
         }
@@ -2508,6 +2512,9 @@ if (!("swf2js" in window)){(function(window)
             case 61: // VideoFrame
                 _this.parseVideoFrame(tagType, length);
                 break;
+            case 78: // DefineScalingGrid
+                _this.parseDefineScalingGrid();
+                break;
             case 3:  // FreeCharacter
             case 16: // StopSound
             case 23: // DefineButtonCxform
@@ -2530,7 +2537,6 @@ if (!("swf2js" in window)){(function(window)
             case 65: // ScriptLimits
             case 66: // SetTabIndex
             case 71: // ImportAssets2
-            case 78: // DefineScalingGrid
             case 87: // DefineBinaryData
             case 91: // DefineFont4
             case 93: // EnableTelemetry
@@ -5425,6 +5431,18 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * parseDefineScalingGrid
+     */
+    SwfTag.prototype.parseDefineScalingGrid = function()
+    {
+        var _this = this;
+        var bitio = _this.bitio;
+        var obj = {};
+        obj.CharacterId = bitio.getUI16();
+        obj.Splitter = _this.rect();
+    };
+
+    /**
      * @param data
      * @param constantPool
      * @param register
@@ -7143,7 +7161,8 @@ if (!("swf2js" in window)){(function(window)
             method = checkMethod(method);
 
             var func = object[method];
-            var caller = mc;
+            var scope = this.scope;
+            var caller = (scope) ? scope : mc;
             if (!func && object instanceof MovieClip) {
                 func = object.getVariable(method);
                 if (func) {
@@ -7155,6 +7174,9 @@ if (!("swf2js" in window)){(function(window)
             if (func) {
                 if (method === "call" || method === "apply") {
                     caller = params.shift();
+                    if (!(caller instanceof MovieClip)) {
+                        caller = (scope) ? scope : mc;
+                    }
                     func = object;
                 }
 
@@ -7165,6 +7187,7 @@ if (!("swf2js" in window)){(function(window)
                     params[params.length] = caller;
                     params[params.length] = paramCache;
                 }
+
                 value = func.apply(object, params);
             }
         }
@@ -7373,6 +7396,7 @@ if (!("swf2js" in window)){(function(window)
         var property;
         if (object instanceof Object) {
             if ("getProperty" in object) {
+                property = object[name];
                 if (property === undefined) {
                     property = object.getProperty(name);
                 }
@@ -7462,7 +7486,12 @@ if (!("swf2js" in window)){(function(window)
         if (method === "") {
             constructor = object.apply(object, params);
         } else if (method in window) {
-            constructor = new window[method](params);
+            if (method === "CSSStyleDeclaration") {
+                constructor = undefined;
+            } else {
+                constructor = new window[method](params);
+            }
+
         } else if (method in object) {
             var func = object[method];
             constructor = this.CreateNewActionScript(func, mc, params);
@@ -7490,6 +7519,8 @@ if (!("swf2js" in window)){(function(window)
             switch (object) {
                 case "MovieClip":
                     obj = new MovieClip();
+                    obj.stage = mc.stage;
+                    obj.setParent(mc.getParent());
                     break;
                 case "Sound":
                     obj = new Sound();
@@ -7536,8 +7567,10 @@ if (!("swf2js" in window)){(function(window)
 
             Constr.cache.scope = mc;
             return new AS(Constr.cache, mc, params);
-        } else {
+        } else if (Constr) {
             return new Constr();
+        } else {
+            return undefined;
         }
     };
 
@@ -10410,33 +10443,46 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var sounds = _this.sounds;
+
+        var init = function(audio, time)
+        {
+            return function () {
+                audio.currentTime = time;
+            };
+        };
+
+        var end = function(audio, sound)
+        {
+            return function () {
+                var volume = sound.volume;
+                audio.loopCount--;
+                if (audio.loopCount > 0) {
+                    audio.volume = volume / 100;
+                    audio.currentTime = 0;
+                    audio.play();
+                }
+
+                var as = sound["onSoundComplete"];
+                if (as) {
+                    as(as.cache, sound.movieClip, [true]);
+                }
+            };
+        };
+
+        var audio;
         for (var id in sounds) {
             if (!sounds.hasOwnProperty(id)) {
                 continue;
             }
-            var audio = sounds[id];
+            audio = sounds[id];
             audio.load();
 
             if (currentTime) {
-                audio.addEventListener("canplay", (function(audio, time){
-                    audio.currentTime = time;
-                })(this, currentTime));
+                audio.addEventListener("canplay", init(this, currentTime));
             }
-
             if (typeof loopCount === "number" && loopCount > 0) {
                 audio.loopCount = loopCount;
-                audio.addEventListener("ended", (function(audio, volume, isStreamin, as, mc){
-                    audio.loopCount--;
-                    if (audio.loopCount > 0) {
-                        audio.volume = volume / 100;
-                        audio.currentTime = 0;
-                        audio.play();
-                    }
-
-                    if (!isStreamin && as) {
-                        as(as.cache, mc, [true]);
-                    }
-                })(this, _this.volume, _this.isStreamin, _this["onSoundComplete"], _this.movieClip));
+                audio.addEventListener("ended", end(audio, _this));
             }
 
             audio.play();
@@ -10475,16 +10521,14 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var sounds = _this.sounds;
         var audio = _document.createElement("audio");
-        audio.onload = function () {
-            this.load();
-            this.preload = "auto";
-            this.autoplay = false;
-            this.loop = false;
-        };
 
         var onLoad = function ()
         {
             audio.removeEventListener("canplaythrough", onLoad);
+            audio.load();
+            audio.preload = "auto";
+            audio.autoplay = false;
+            audio.loop = false;
             if ("onLoad" in _this) {
                 var as = _this["onLoad"];
                 if (as) {
@@ -12257,7 +12301,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var clipEvent = _this.clipEvent;
-        var stage = _this.getStage();
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
         var moveEventHits = stage.moveEventHits;
         var downEventHits = stage.downEventHits;
         var upEventHits = stage.upEventHits;
