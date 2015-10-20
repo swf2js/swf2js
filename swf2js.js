@@ -227,6 +227,15 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
+     * @param color
+     * @returns {string}
+     */
+    function rgba(color)
+    {
+        return "rgba("+ color.R+","+ color.G +","+ color.B +","+ color.A +")";
+    }
+
+    /**
      * @param as
      * @param mc
      */
@@ -9154,7 +9163,7 @@ if (!("swf2js" in window)){(function(window)
                 case 0x00:
                     color = styleObj.Color;
                     color = _generateColorTransform(color, colorTransform);
-                    css = "rgba("+ color.R+","+ color.G +","+ color.B +","+ color.A +")";
+                    css = rgba(color);
                     if (isStroke) {
                         ctx.strokeStyle = css;
                         ctx.lineWidth = _max(obj.Width, 1 / minScale);
@@ -9181,7 +9190,7 @@ if (!("swf2js" in window)){(function(window)
                         var record = records[rIdx];
                         color = record.Color;
                         color = _generateColorTransform(color, colorTransform);
-                        css.addColorStop(record.Ratio, "rgba("+ color.R +", "+ color.G +", "+ color.B +", "+ color.A +")");
+                        css.addColorStop(record.Ratio, rgba(color));
                     }
 
                     ctx.save();
@@ -9515,9 +9524,7 @@ if (!("swf2js" in window)){(function(window)
             setTransform(ctx, matrix2);
             var color = record.getColor();
             color = _generateColorTransform(color, colorTransform);
-            var css = "rgb("+ color.R +","+ color.G +","+ color.B +")";
-            ctx.fillStyle = css;
-            ctx.globalAlpha = color.A;
+            ctx.fillStyle = rgba(color);
             for (var idx = 0; idx < shapeLength; idx++) {
                 var styleObj = shapes[idx];
                 var cmd = styleObj.cmd;
@@ -9789,9 +9796,9 @@ if (!("swf2js" in window)){(function(window)
             ctx.beginPath();
             ctx.rect(xMin, yMin, W, H);
             color = _generateColorTransform(variables["backgroundColor"], colorTransform);
-            ctx.fillStyle = "rgba("+ color.R +","+ color.G +","+ color.B +","+ color.A +")";
+            ctx.fillStyle = rgba(color);
             color = _generateColorTransform(variables["borderColor"], colorTransform);
-            ctx.strokeStyle = "rgba("+ color.R +","+ color.G +","+ color.B +","+ color.A +")";
+            ctx.strokeStyle = rgba(color);
             ctx.lineWidth = _min(20, 1 / _min(rMatrix[0], rMatrix[3]));
             ctx.globalAlpha = 1;
             ctx.fill();
@@ -9804,8 +9811,7 @@ if (!("swf2js" in window)){(function(window)
         ctx.clip();
 
         color = _generateColorTransform(variables["color"], colorTransform);
-        ctx.fillStyle = "rgb("+ color.R +","+ color.G +","+ color.B +")";
-        ctx.globalAlpha = color.A;
+        ctx.fillStyle = rgba(color);
 
         // font type
         var fontType = "";
@@ -11519,11 +11525,6 @@ if (!("swf2js" in window)){(function(window)
                     controller[frame][depth] = obj;
                 }
 
-                var _controller = parent._controller;
-                if (!(1 in _controller)) {
-                    _controller[1] = [];
-                }
-
                 if (object) {
                     for (var prop in object) {
                         if (!object.hasOwnProperty(prop)) {
@@ -11534,6 +11535,10 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 var cTag = controller[1][depth];
+                var _controller = parent._controller;
+                if (!(1 in _controller)) {
+                    _controller[1] = [];
+                }
                 _controller[1][depth] = {
                     instanceId: movieClip.instanceId,
                     _colorTransform: _cloneArray(cTag.colorTransform),
@@ -12732,13 +12737,10 @@ if (!("swf2js" in window)){(function(window)
 
                 var filter = filters[id];
                 var color;
-                var css;
                 switch (id) {
                     case 0:
                         color = _generateColorTransform(filter.color, colorTransform);
-                        css = "rgba("+ color.R +","+ color.G +","+ color.B +","+ color.A +")";
-
-                        ctx.shadowColor = css;
+                        ctx.shadowColor = rgba(color);
 
                         //var point = filter.Angle / 20 * _PI / 180;
                         var r = 45 * _PI / 180;
@@ -12758,9 +12760,7 @@ if (!("swf2js" in window)){(function(window)
                         break;
                     case 2:
                         color = _generateColorTransform(filter.color, colorTransform);
-                        css = "rgba("+ color.R +","+ color.G +","+ color.B +","+ color.A +")";
-
-                        ctx.shadowColor = css;
+                        ctx.shadowColor = rgba(color);
                         ctx.shadowBlur = filter.Strength * 3.5 * filter.Passes;
                         //ctx.shadowOffsetX = filter.BlurX;
                         //ctx.shadowOffsetY = filter.BlurY;
@@ -13699,15 +13699,16 @@ if (!("swf2js" in window)){(function(window)
         var scale = 1;
         var width = 0;
         var height = 0;
+        var innerWidth = window.innerWidth;
+        var innerHeight = window.innerHeight;
 
         var parent = div.parentNode;
-        if (parent.tagName === "BODY") {
-            screenWidth  = (oWidth > 0) ? oWidth : window.innerWidth;
-            screenHeight = (oHeight > 0) ? oHeight : window.innerHeight;
-        } else {
-            screenWidth  = (oWidth > 0) ? oWidth : parent.offsetWidth;
-            screenHeight = (oHeight > 0) ? oHeight : parent.offsetHeight;
+        if (parent.tagName !== "BODY") {
+            innerWidth  = parent.offsetWidth;
+            innerHeight = parent.offsetHeight;
         }
+        screenWidth  = (oWidth > 0) ? oWidth : innerWidth;
+        screenHeight = (oHeight > 0) ? oHeight : innerHeight;
 
         var baseWidth  = _this.getBaseWidth();
         var baseHeight = _this.getBaseHeight();
