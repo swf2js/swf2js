@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.12)
+ * swf2js (version 0.5.13)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -343,6 +343,10 @@ if (!("swf2js" in window)){(function(window)
      */
     function checkMethod(method)
     {
+        if (!method) {
+            return method;
+        }
+
         var methods = {
             gotoandstop: "gotoAndStop",
             gotoandplay: "gotoAndPlay",
@@ -1905,6 +1909,13 @@ if (!("swf2js" in window)){(function(window)
             _controlTag._matrix = _cloneArray(matrix);
             _controlTag._colorTransform = _cloneArray(colorTransform);
             _controller[frame][tag.Depth] = _controlTag;
+
+            var as = stage.initActions[obj.getCharacterId()];
+            if (as) {
+                obj.active = true;
+                as.execute(obj);
+                obj.active = false;
+            }
         } else {
             obj.setMatrix(_cloneArray(matrix));
             obj.setColorTransform(_cloneArray(colorTransform));
@@ -4947,11 +4958,12 @@ if (!("swf2js" in window)){(function(window)
         var spriteId = bitio.getUI16();
 
         var mc = new MovieClip();
-        mc.stage = stage;
         mc.active = true;
+        mc.stage = stage;
 
         var as = new ActionScript(bitio.getData(length - 2), undefined, undefined, true);
         as.execute(mc);
+
         stage.initActions[spriteId] = as;
     };
 
@@ -5429,6 +5441,7 @@ if (!("swf2js" in window)){(function(window)
         this.variables = [];
         this.initAction = (initAction) ? true : false;
         this.scope = null;
+        this.arg = null;
         this.__init__(data);
     };
 
@@ -5458,6 +5471,7 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.initVariable = function(values)
     {
         var _this = this;
+        _this.arg = values;
         var register = _this.register;
         var length = register.length;
         var variables = [];
@@ -5489,10 +5503,16 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.getVariable = function(name)
     {
         var _this = this;
-        var value = _this.variables[name];
-        if (value === undefined) {
-            value = _this[name];
+        var value;
+        if (name === "arguments") {
+            return _this.arg;
+        } else {
+            value = _this.variables[name];
+            if (value === undefined) {
+                value = _this[name];
+            }
         }
+
         return value;
     };
 
@@ -7441,7 +7461,7 @@ if (!("swf2js" in window)){(function(window)
         var constructor;
         if (method === "") {
             constructor = object.apply(object, params);
-        } else if (object in window) {
+        } else if (method in window) {
             constructor = new window[method](params);
         } else if (method in object) {
             var func = object[method];
@@ -7530,7 +7550,6 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var name = stack.pop();
         var object = stack.pop();
-
         if (object) {
             if (typeof object === "string") {
                 var targetMc = mc.getMovieClip(object);
@@ -7539,9 +7558,9 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
 
-            if ("setProperty" in object) {
+            if ("setProperty" in object && object !== MovieClip.prototype) {
                 object.setProperty(name, value);
-            } else if (object instanceof Object) {
+            } else if (typeof object === "object" || typeof object === "function") {
                 object[name] = value;
             }
         }
@@ -7814,14 +7833,10 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionExtends = function(stack)
     {
-        console.log('ActionExtends');
         var superClass = stack.pop();
         var subClass = stack.pop();
         if (superClass && subClass) {
-            console.log(superClass, subClass);
-            //subClass.prototype = {};
-            //subClass.prototype = superClass.prototype;
-            //subClass.constructor = superClass;
+            subClass.prototype = superClass.prototype;
         }
     };
 
@@ -8065,6 +8080,9 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case "$version":
                 value = "swf2js 8,0,0";
+                break;
+            case "MovieClip":
+                value = MovieClip;
                 break;
             default:
                 value = _this.getVariable(name);
@@ -11329,7 +11347,7 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     *
+     * swapDepths
      */
     MovieClip.prototype.swapDepths = function()
     {
@@ -11462,12 +11480,6 @@ if (!("swf2js" in window)){(function(window)
                     _controller[1] = [];
                 }
 
-                _controller[1][depth] = {
-                    instanceId: movieClip.instanceId,
-                    _colorTransform: _cloneArray([1,1,1,1,0,0,0,0]),
-                    _matrix: _cloneArray([1,0,0,1,0,0])
-                };
-
                 if (object) {
                     for (var prop in object) {
                         if (!object.hasOwnProperty(prop)) {
@@ -11476,6 +11488,14 @@ if (!("swf2js" in window)){(function(window)
                         movieClip.setProperty(prop, object[prop]);
                     }
                 }
+
+                var cTag = controller[1][depth];
+                _controller[1][depth] = {
+                    instanceId: movieClip.instanceId,
+                    _colorTransform: _cloneArray(cTag.colorTransform),
+                    _matrix: _cloneArray(cTag.matrix)
+                };
+
                 movieClip.addActions();
             }
         }
@@ -11874,17 +11894,6 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.setTotalFrames = function(frame)
     {
         this._totalframes = frame;
-    };
-
-    /**
-     * @param name
-     */
-    MovieClip.prototype.deleteVariable = function(name)
-    {
-        var variables = this.variables;
-        if (name in variables) {
-            delete variables[name];
-        }
     };
 
     /**
