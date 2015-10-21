@@ -7367,7 +7367,6 @@ if (!("swf2js" in window)){(function(window)
         if (b instanceof MovieClip) {
             B = b.getTarget();
         }
-
         if (typeof A === "boolean") {
             A = Number(A);
         }
@@ -11056,7 +11055,6 @@ if (!("swf2js" in window)){(function(window)
                     case 200:
                     case 304:
                         var loadStage = new Stage();
-                        targetMc.removable = true;
                         targetMc.loadStage = loadStage;
                         loadStage.parent = targetMc;
                         var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
@@ -11086,15 +11084,13 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var targetMc = null;
-
         if (target instanceof MovieClip) {
             targetMc = target;
         } else {
             targetMc = _this.getMovieClip(target);
-        }
-
-        if (!targetMc || !targetMc.removable) {
-            return 0;
+            if (!targetMc) {
+                return 0;
+            }
         }
 
         // delete
@@ -13507,7 +13503,6 @@ if (!("swf2js" in window)){(function(window)
             bitio.init(data);
         }
 
-        // Header
         if (_this.setSwfHeader(bitio, swftag)) {
             var mc = _this.getParent();
             var tags = swftag.parse(mc);
