@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.13)
+ * swf2js (version 0.5.14)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -4612,11 +4612,12 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var bitio = _this.bitio;
         var obj = {};
-        obj.EventFlags = _this.parseClipEventFlags();
+        var EventFlags = _this.parseClipEventFlags();
         var ActionRecordSize = bitio.getUI32();
-        if (obj.EventFlags.ClipEventKeyPress) {
+        if (EventFlags.keyPress) {
             obj.KeyCode = bitio.getUI8();
         }
+        obj.EventFlags = EventFlags;
         obj.Actions = _this.parseDoAction(ActionRecordSize);
         return obj;
     };
@@ -7366,16 +7367,17 @@ if (!("swf2js" in window)){(function(window)
         if (b instanceof MovieClip) {
             B = b.getTarget();
         }
+
         if (typeof A === "boolean") {
             A = Number(A);
         }
         if (typeof B === "boolean") {
             B = Number(B);
         }
-        if (typeof A === "string" && !_isNaN(A)) {
+        if (A !== "" && typeof A === "string" && !_isNaN(A)) {
             A = _parseFloat(A);
         }
-        if (typeof B === "string" && !_isNaN(B)) {
+        if (B !== "" && typeof B === "string" && !_isNaN(B)) {
             B = _parseFloat(B);
         }
         stack[stack.length] = (B === A);
@@ -7816,8 +7818,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionStoreRegister = function(stack, number)
     {
-        var value = stack[stack.length-1];
-        this.params[number] = value;
+        this.params[number] = stack[stack.length-1];
     };
 
     /**
@@ -9828,7 +9829,7 @@ if (!("swf2js" in window)){(function(window)
             var fontData = localStage.getCharacter(_this.fontId);
             _this.renderOutLine(ctx, fontData, splitData, rMatrix, xMin, W, variables["align"]);
         } else {
-            _this.renderText(ctx, splitData, rMatrix, variables, stage);
+            _this.renderText(ctx, splitData, rMatrix, variables);
         }
 
         ctx.restore();
@@ -9923,9 +9924,8 @@ if (!("swf2js" in window)){(function(window)
      * @param splitData
      * @param matrix
      * @param variables
-     * @param stage
      */
-    TextField.prototype.renderText = function(ctx, splitData, matrix, variables, stage)
+    TextField.prototype.renderText = function(ctx, splitData, matrix, variables)
     {
         var _this = this;
         var txt = "";
@@ -9952,26 +9952,29 @@ if (!("swf2js" in window)){(function(window)
             dx += indent + leftMargin;
         }
 
-        var areaWidth = width - indent - leftMargin - rightMargin;
         var size = variables["size"];
-        var context = stage.context;
-        context.setTransform(1,0,0,1,0,0);
         var m2 = [matrix[0] * 20, matrix[1] * 20, matrix[2] * 20, matrix[3] * 20, matrix[4], matrix[5]];
         setTransform(ctx, m2);
+
+        var ratio = 1 / _devicePixelRatio;
+        var m3 = multiplicationMatrix(m2, [ratio, 0, 0, ratio, 0, 0]);
+        var scale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
+        bounds = _this.getBounds(m3);
+        var areaWidth = (_ceil((bounds.xMax - 2) - (bounds.xMin + 2)) - leftMargin - rightMargin);
 
         var length = splitData.length;
         for (var i = 0; i < length; i++) {
             txt = splitData[i];
             if (wordWrap && multiline) {
-                var measureText = context.measureText(txt);
-                var txtTotalWidth = measureText.width;
+                var measureText = ctx.measureText(txt);
+                var txtTotalWidth = measureText.width * scale;
                 if (txtTotalWidth > areaWidth) {
                     var txtLength = txt.length;
-                    var joinTxt = '';
+                    var joinTxt = "";
                     var joinWidth = size;
                     for (var t = 0; t < txtLength; t++) {
                         var textOne = ctx.measureText(txt[t]);
-                        joinWidth += textOne.width;
+                        joinWidth += textOne.width * scale;
                         joinTxt += txt[t];
                         if (joinWidth > areaWidth || (t + 1) === txtLength) {
                             ctx.fillText(joinTxt, dx, dy, width);
@@ -11119,7 +11122,7 @@ if (!("swf2js" in window)){(function(window)
      * @param url
      * @param target
      * @param method
-     * @returns {number}
+     * @returns {*}
      */
     MovieClip.prototype.getURL = function(url, target, method)
     {
@@ -11295,10 +11298,10 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.startDrag = function()
     {
         var lock = arguments[0];
-        var left = arguments[1];
-        var top = arguments[2];
-        var right = arguments[3];
-        var bottom = arguments[4];
+        var left = _parseFloat(arguments[1]);
+        var top = _parseFloat(arguments[2]);
+        var right = _parseFloat(arguments[3]);
+        var bottom = _parseFloat(arguments[4]);
 
         var _this = this;
         var _root = _this.getMovieClip('_root');
@@ -11362,14 +11365,14 @@ if (!("swf2js" in window)){(function(window)
         var moveX = x+xmouse;
         var moveY = y+ymouse;
 
-        if (left) {
-            if (!top) {
+        if (!_isNaN(left)) {
+            if (_isNaN(top)) {
                 top = 0;
             }
-            if (!right) {
+            if (_isNaN(right)) {
                 right = 0;
             }
-            if (!bottom) {
+            if (_isNaN(bottom)) {
                 bottom = 0;
             }
 
@@ -12829,10 +12832,7 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param object
-     * @param properties
-     * @param n
-     * @param allowFalse
+     * ASSetPropFlags
      */
     MovieClip.prototype.ASSetPropFlags = function()
     {
@@ -13694,8 +13694,6 @@ if (!("swf2js" in window)){(function(window)
         var oWidth = _this.optionWidth;
         var oHeight = _this.optionHeight;
 
-        var screenWidth = 0;
-        var screenHeight = 0;
         var scale = 1;
         var width = 0;
         var height = 0;
@@ -13707,8 +13705,8 @@ if (!("swf2js" in window)){(function(window)
             innerWidth  = parent.offsetWidth;
             innerHeight = parent.offsetHeight;
         }
-        screenWidth  = (oWidth > 0) ? oWidth : innerWidth;
-        screenHeight = (oHeight > 0) ? oHeight : innerHeight;
+        var screenWidth  = (oWidth > 0) ? oWidth : innerWidth;
+        var screenHeight = (oHeight > 0) ? oHeight : innerHeight;
 
         var baseWidth  = _this.getBaseWidth();
         var baseHeight = _this.getBaseHeight();
@@ -14172,7 +14170,7 @@ if (!("swf2js" in window)){(function(window)
      * @param frame
      * @param width
      * @param height
-     * @returns {boolean}
+     * @returns {*}
      */
     Stage.prototype.output = function(outputPath, frame, width, height)
     {
