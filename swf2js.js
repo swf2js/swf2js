@@ -9946,9 +9946,9 @@ if (!("swf2js" in window)){(function(window)
             dx += width - rightMargin;
         } else if (align === "center") {
             ctx.textAlign = "center";
-            dx += (indent + leftMargin) + ((xMax - indent - leftMargin - rightMargin) / 2);
+            dx += leftMargin + indent + ((width - leftMargin - indent - rightMargin) / 2);
         } else {
-            dx += indent + leftMargin;
+            dx += leftMargin + indent;
         }
 
         var size = variables["size"];
@@ -9957,23 +9957,22 @@ if (!("swf2js" in window)){(function(window)
 
         var ratio = 1 / _devicePixelRatio;
         var m3 = multiplicationMatrix(m2, [ratio, 0, 0, ratio, 0, 0]);
-        var scale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
+        var xScale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
         bounds = _this.getBounds(m3);
-        var areaWidth = (_ceil((bounds.xMax - 2) - (bounds.xMin + 2)) - leftMargin - rightMargin);
-
+        var areaWidth = (_ceil((bounds.xMax) - (bounds.xMin)) - leftMargin - rightMargin);
         var length = splitData.length;
         for (var i = 0; i < length; i++) {
             txt = splitData[i];
             if (wordWrap && multiline) {
                 var measureText = ctx.measureText(txt);
-                var txtTotalWidth = measureText.width * scale;
+                var txtTotalWidth = measureText.width * xScale;
                 if (txtTotalWidth > areaWidth) {
                     var txtLength = txt.length;
                     var joinTxt = "";
                     var joinWidth = size;
                     for (var t = 0; t < txtLength; t++) {
                         var textOne = ctx.measureText(txt[t]);
-                        joinWidth += textOne.width * scale;
+                        joinWidth += textOne.width * xScale;
                         joinTxt += txt[t];
                         if (joinWidth > areaWidth || (t + 1) === txtLength) {
                             ctx.fillText(joinTxt, dx, dy, width);
