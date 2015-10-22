@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.14)
+ * swf2js (version 0.5.15)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -227,6 +227,27 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
+     * @param m
+     * @returns {*[]}
+     */
+    function linearGradientXY(m)
+    {
+        var x0 = -16384 * m[0] - 16384 * m[2] + m[4];
+        var x1 =  16384 * m[0] - 16384 * m[2] + m[4];
+        var x2 = -16384 * m[0] + 16384 * m[2] + m[4];
+        var y0 = -16384 * m[1] - 16384 * m[3] + m[5];
+        var y1 =  16384 * m[1] - 16384 * m[3] + m[5];
+        var y2 = -16384 * m[1] + 16384 * m[3] + m[5];
+        var vx2 = x2 - x0;
+        var vy2 = y2 - y0;
+        var sr1 = _sqrt(vx2 * vx2 + vy2 * vy2);
+        vx2 /= sr1;
+        vy2 /= sr1;
+        var sr2 = (x1 - x0) * vx2 + (y1 - y0) * vy2;
+        return [x0 + sr2 * vx2, y0 + sr2 * vy2, x1, y1];
+    }
+
+    /**
      * @param color
      * @returns {string}
      */
@@ -344,55 +365,6 @@ if (!("swf2js" in window)){(function(window)
 
             audio.play();
         }
-    }
-
-    /**
-     * @param method
-     * @returns {*}
-     */
-    function checkMethod(method)
-    {
-        if (!method) {
-            return method;
-        }
-
-        var methods = {
-            gotoandstop: "gotoAndStop",
-            gotoandplay: "gotoAndPlay",
-            play: "play",
-            stop: "stop",
-            duplicatemovieclip: "duplicateMovieClip",
-            getproperty: "getProperty",
-            onclipevent: "onClipEvent",
-            removemovieclip: "removeMovieClip",
-            setproperty: "setProperty",
-            startdrag: "startDrag",
-            stopdrag: "stopDrag",
-            targetpath: "targetPath",
-            updateafterevent: "updateAfterEvent",
-            nextframe: "nextFrame",
-            nextscene: "nextScene",
-            prevframe: "prevFrame",
-            prevscene: "prevScene",
-            stopallsounds: "stopAllSounds",
-            setmask: "setMask",
-            geturl: "getURL",
-            loadmovie: "loadMovie",
-            loadmovienum: "loadMovieNum",
-            loadvariables : "loadVariables",
-            loadvariablesnum: "loadVariablesNum",
-            unloadmovie: "unloadMovie",
-            unloadmovienum: "unloadMovieNum",
-            swapdepths: "swapDepths",
-            attachmovie: "attachMovie",
-            getnexthighestdepth: "getNextHighestDepth",
-            getbytesloaded: "getBytesLoaded",
-            getbytestotal: "getBytesTotal",
-            assetpropflags: "ASSetPropFlags"
-        };
-
-        var lowerMethod = method.toLowerCase();
-        return (lowerMethod in methods) ? methods[lowerMethod] : method;
     }
 
     /**
@@ -6324,6 +6296,58 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @type {{}}
+     */
+    ActionScript.prototype.methods = {
+        gotoandstop: "gotoAndStop",
+        gotoandplay: "gotoAndPlay",
+        play: "play",
+        stop: "stop",
+        duplicatemovieclip: "duplicateMovieClip",
+        getproperty: "getProperty",
+        onclipevent: "onClipEvent",
+        removemovieclip: "removeMovieClip",
+        setproperty: "setProperty",
+        startdrag: "startDrag",
+        stopdrag: "stopDrag",
+        targetpath: "targetPath",
+        updateafterevent: "updateAfterEvent",
+        nextframe: "nextFrame",
+        nextscene: "nextScene",
+        prevframe: "prevFrame",
+        prevscene: "prevScene",
+        stopallsounds: "stopAllSounds",
+        setmask: "setMask",
+        geturl: "getURL",
+        loadmovie: "loadMovie",
+        loadmovienum: "loadMovieNum",
+        loadvariables : "loadVariables",
+        loadvariablesnum: "loadVariablesNum",
+        unloadmovie: "unloadMovie",
+        unloadmovienum: "unloadMovieNum",
+        swapdepths: "swapDepths",
+        attachmovie: "attachMovie",
+        getnexthighestdepth: "getNextHighestDepth",
+        getbytesloaded: "getBytesLoaded",
+        getbytestotal: "getBytesTotal",
+        assetpropflags: "ASSetPropFlags"
+    };
+
+    /**
+     * @param method
+     * @returns {*}
+     */
+    ActionScript.prototype.checkMethod = function(method)
+    {
+        if (!method) {
+            return method;
+        }
+        var _methods = this.methods;
+        var lowerMethod = method.toLowerCase();
+        return (lowerMethod in _methods) ? _methods[lowerMethod] : method;
+    };
+
+    /**
      * @param mc
      * @param frame
      */
@@ -7168,7 +7192,7 @@ if (!("swf2js" in window)){(function(window)
 
         var value;
         if (object) {
-            method = checkMethod(method);
+            method = this.checkMethod(method);
 
             var func = object[method];
             var scope = this.scope;
@@ -7221,7 +7245,7 @@ if (!("swf2js" in window)){(function(window)
 
         var ret;
         if (mc) {
-            name = checkMethod(name);
+            name = _this.checkMethod(name);
             if (window[name]) {
                 var targetMc = mc;
                 if (params[0] instanceof MovieClip) {
@@ -9061,8 +9085,7 @@ if (!("swf2js" in window)){(function(window)
             return 0;
         }
 
-        var _multiplicationMatrix = multiplicationMatrix;
-        var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
+        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
         var isClipDepth = _this.isClipDepth || stage.isClipDepth;
         if (isClipDepth) {
             setTransform(ctx, rMatrix);
@@ -9088,7 +9111,7 @@ if (!("swf2js" in window)){(function(window)
             cache = cacheStore.get(cacheKey);
             var canvas;
             if (!cache) {
-                if (stage.width > W && stage.height > H && cacheStore.size > W*H) {
+                if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W*H) {
                     canvas = cacheStore.getCanvas();
                     canvas.width = W;
                     canvas.height = H;
@@ -9103,7 +9126,7 @@ if (!("swf2js" in window)){(function(window)
             if (cache) {
                 canvas = cache.canvas;
                 if (canvas.width > 0 && canvas.height > 0) {
-                    var m2 = _multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
+                    var m2 = multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
                     setTransform(ctx, m2);
                     if (isAndroid4x && !isChrome) {
                         ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
@@ -9154,11 +9177,10 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            var styleType = styleObj.fillStyleType;
-
             ctx.beginPath();
             cmd(ctx);
 
+            var styleType = styleObj.fillStyleType;
             switch (styleType) {
                 case 0x00:
                     color = styleObj.Color;
@@ -9181,9 +9203,17 @@ if (!("swf2js" in window)){(function(window)
                 case 0x10:
                 case 0x12:
                 case 0x13:
-                    var gMatrix = styleObj.gradientMatrix;
+                    var m = styleObj.gradientMatrix;
                     var type = styleObj.fillStyleType;
-                    css = (type === 18 || type === 19) ? ctx.createRadialGradient(0, 0, 0, 0, 0, 16384) : ctx.createLinearGradient(-16384, 0, 16384, 0);
+                    if (type !== 16) {
+                        ctx.save();
+                        ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+                        css =ctx.createRadialGradient(0, 0, 0, 0, 0, 16384);
+                    } else {
+                        var xy = linearGradientXY(m);
+                        css = ctx.createLinearGradient(xy[0], xy[1], xy[2], xy[3]);
+                    }
+
                     var records = styleObj.gradient.GradientRecords;
                     var rLength = records.length;
                     for (var rIdx = 0; rIdx < rLength; rIdx++) {
@@ -9193,8 +9223,6 @@ if (!("swf2js" in window)){(function(window)
                         css.addColorStop(record.Ratio, rgba(color));
                     }
 
-                    ctx.save();
-                    ctx.transform(gMatrix[0], gMatrix[1], gMatrix[2], gMatrix[3], gMatrix[4], gMatrix[5]);
                     if (isStroke) {
                         ctx.strokeStyle = css;
                         ctx.lineWidth = _max(obj.Width, 1 / minScale);
@@ -9206,7 +9234,10 @@ if (!("swf2js" in window)){(function(window)
                         ctx.fill();
                     }
 
-                    ctx.restore();
+                    if (type !== 16) {
+                        ctx.restore();
+                    }
+
                     break;
 
                 // bitmap
