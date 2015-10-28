@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.16)
+ * swf2js (version 0.5.17)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -27,7 +27,6 @@ if (!("swf2js" in window)){(function(window)
     var _cos = _Math.cos;
     var _sin = _Math.sin;
     var _log = _Math.log;
-    var _abs = _Math.abs;
     var _SQRT2 = _Math.SQRT2;
     var _LN2 = _Math.LN2;
     var _PI = _Math.PI;
@@ -3339,13 +3338,11 @@ if (!("swf2js" in window)){(function(window)
         {
             var width = this.width;
             var height = this.height;
-
             var canvas = cacheStore.getCanvas();
             canvas.width = width;
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
-            var _drawImage = imageContext.drawImage;
-            _drawImage.call(imageContext, this, 0, 0);
+            imageContext.drawImage(this, 0, 0, width, height);
 
             if (BitmapAlphaData) {
                 var data = unzip(BitmapAlphaData, false);
@@ -4500,15 +4497,17 @@ if (!("swf2js" in window)){(function(window)
                 obj.PlaceFlagHasColorTransform = 1;
             }
         } else {
-            var placeFlag = bitio.getUI8();
-            obj.PlaceFlagHasClipActions = (placeFlag >> 7) & 0x01;
-            obj.PlaceFlagHasClipDepth = (placeFlag >> 6) & 0x01;
-            obj.PlaceFlagHasName = (placeFlag >> 5) & 0x01;
-            obj.PlaceFlagHasRatio = (placeFlag >> 4) & 0x01;
-            obj.PlaceFlagHasColorTransform = (placeFlag >> 3) & 0x01;
-            obj.PlaceFlagHasMatrix = (placeFlag >> 2) & 0x01;
-            obj.PlaceFlagHasCharacter = (placeFlag >> 1) & 0x01;
-            obj.PlaceFlagMove =  placeFlag & 0x01;
+            obj.PlaceFlagHasClipActions = bitio.getUIBits(1);
+            if (stage.getVersion() < 5) {
+                obj.PlaceFlagHasClipActions = 0;
+            }
+            obj.PlaceFlagHasClipDepth = bitio.getUIBits(1);
+            obj.PlaceFlagHasName = bitio.getUIBits(1);
+            obj.PlaceFlagHasRatio = bitio.getUIBits(1);
+            obj.PlaceFlagHasColorTransform = bitio.getUIBits(1);
+            obj.PlaceFlagHasMatrix = bitio.getUIBits(1);
+            obj.PlaceFlagHasCharacter = bitio.getUIBits(1);
+            obj.PlaceFlagMove = bitio.getUIBits(1);
 
             // PlaceObject3
             if (tagType === 70) {
@@ -4524,7 +4523,9 @@ if (!("swf2js" in window)){(function(window)
 
             obj.Depth = bitio.getUI16();
 
-            if (obj.PlaceFlagHasClassName || (obj.PlaceFlagHasImage && obj.PlaceFlagHasCharacter)) {
+            if (obj.PlaceFlagHasClassName ||
+                (obj.PlaceFlagHasImage && obj.PlaceFlagHasCharacter)
+            ) {
                 obj.ClassName = bitio.getDataUntil("\0");
             }
             if (obj.PlaceFlagHasCharacter) {
@@ -9148,41 +9149,41 @@ if (!("swf2js" in window)){(function(window)
             var W = _ceil((xMax - xMin) * xScale);
             var H = _ceil((yMax - yMin) * yScale);
 
-            var cacheId = _this.getCharacterId() +"_"+ localStage.getId();
-            if (_this.isMorphing()) {
-                cacheId += "_"+ _this.getRatio();
-            }
-            var cacheKey = cacheStore.generateKey("Shape", cacheId, [xScale, yScale], colorTransform);
-            cache = cacheStore.get(cacheKey);
-            var canvas;
-            if (!cache) {
-                if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W*H) {
-                    canvas = cacheStore.getCanvas();
-                    canvas.width = W;
-                    canvas.height = H;
-                    cache = canvas.getContext("2d");
-                    var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
-                    setTransform(cache, cMatrix);
-                    cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, isClipDepth, stage, localStage);
-                    cacheStore.set(cacheKey, cache);
+            if (W > 0 && H > 0) {
+                var cacheId = _this.getCharacterId() + "_" + localStage.getId();
+                if (_this.isMorphing()) {
+                    cacheId += "_" + _this.getRatio();
                 }
-            }
+                var cacheKey = cacheStore.generateKey("Shape", cacheId, [xScale, yScale], colorTransform);
+                cache = cacheStore.get(cacheKey);
+                var canvas;
+                if (!cache) {
+                    if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W * H) {
+                        canvas = cacheStore.getCanvas();
+                        canvas.width = W;
+                        canvas.height = H;
+                        cache = canvas.getContext("2d");
+                        var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
+                        setTransform(cache, cMatrix);
+                        cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, isClipDepth, stage, localStage);
+                        cacheStore.set(cacheKey, cache);
+                    }
+                }
 
-            if (cache) {
-                canvas = cache.canvas;
-                if (canvas.width > 0 && canvas.height > 0) {
+                if (cache) {
+                    canvas = cache.canvas;
                     var m2 = multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
                     setTransform(ctx, m2);
                     if (isAndroid4x && !isChrome) {
                         ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                         ctx.fillRect(0, 0, W, H);
                     } else {
-                        ctx.drawImage(canvas, 0, 0);
+                        ctx.drawImage(canvas, 0, 0, W, H);
                     }
+                } else {
+                    setTransform(ctx, rMatrix);
+                    _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
                 }
-            } else {
-                setTransform(ctx, rMatrix);
-                _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
             }
         }
     };
@@ -9290,6 +9291,8 @@ if (!("swf2js" in window)){(function(window)
                 case 0x41:
                 case 0x42:
                 case 0x43:
+                    var width;
+                    var height;
                     var bitmapId = styleObj.bitmapId;
                     var bMatrix = styleObj.bitmapMatrix;
                     var repeat = (styleType === 0x40 || styleType === 0x42) ? "repeat" : "no-repeat";
@@ -9314,34 +9317,41 @@ if (!("swf2js" in window)){(function(window)
                             colorTransform[5] ||
                             colorTransform[6]
                         ) {
-                            canvas = cacheStore.getCanvas();
-                            canvas.width = image.canvas.width;
-                            canvas.height = image.canvas.height;
-
-                            var imageContext = canvas.getContext("2d");
-                            imageContext.drawImage(image.canvas, 0, 0);
-
-                            image = _generateImageTransform.call(_this, imageContext, colorTransform);
-                            cacheStore.set(bitmapCacheKey, image);
+                            var imgCanvas = image.canvas;
+                            width = imgCanvas.width;
+                            height = imgCanvas.height;
+                            if (width > 0 && height > 0) {
+                                canvas = cacheStore.getCanvas();
+                                canvas.width = width;
+                                canvas.height = height;
+                                var imageContext = canvas.getContext("2d");
+                                imageContext.drawImage(image.canvas, 0, 0, width, height);
+                                image = _generateImageTransform.call(_this, imageContext, colorTransform);
+                                cacheStore.set(bitmapCacheKey, image);
+                            }
                         } else {
                             ctx.globalAlpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
                         }
                     }
 
-                    ctx.save();
-                    if (styleType === 0x41 || styleType === 0x43) {
-                        ctx.clip();
-                        ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
+                    if (image) {
+                        ctx.save();
                         canvas = image.canvas;
-                        if (canvas.width > 0 && canvas.height > 0) {
-                            ctx.drawImage(canvas, 0, 0);
+                        width = canvas.width;
+                        height = canvas.height;
+                        if (width > 0 && height > 0) {
+                            if (styleType === 0x41 || styleType === 0x43) {
+                                ctx.clip();
+                                ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
+                                ctx.drawImage(canvas, 0, 0, width, height);
+                            } else {
+                                ctx.fillStyle = stage.context.createPattern(canvas, repeat);
+                                ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
+                                ctx.fill();
+                            }
                         }
-                    } else {
-                        ctx.fillStyle = stage.context.createPattern(image.canvas, repeat);
-                        ctx.transform(bMatrix[0], bMatrix[1], bMatrix[2], bMatrix[3], bMatrix[4], bMatrix[5]);
-                        ctx.fill();
+                        ctx.restore();
                     }
-                    ctx.restore();
 
                     break;
             }
@@ -9353,7 +9363,6 @@ if (!("swf2js" in window)){(function(window)
             if (isAndroid && isChrome) {
                 var tmpCanvas = tmpContext.canvas;
                 canvas = ctx.canvas;
-
                 tmpCanvas.width = canvas.width;
                 tmpCanvas.height = canvas.height;
                 tmpContext.drawImage(canvas, 0, 0);
@@ -9533,39 +9542,38 @@ if (!("swf2js" in window)){(function(window)
         var yMin = bounds.yMin;
         var W = _ceil((xMax - xMin) * xScale);
         var H = _ceil((yMax - yMin) * yScale);
-
-        var cacheId = _this.getCharacterId() +"_"+ localStage.getId();
-        var cacheKey = cacheStore.generateKey("Text", cacheId, [xScale, yScale], colorTransform);
-        var cache = cacheStore.get(cacheKey);
-        var canvas;
-        if (!cache) {
-            if (stage.width > W && stage.height > H && cacheStore.size > W*H) {
-                canvas = cacheStore.getCanvas();
-                canvas.width = W;
-                canvas.height = H;
-                cache = canvas.getContext("2d");
-                var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
-                setTransform(cache, cMatrix);
-                cache = _this.executeRender(cache, cMatrix, colorTransform);
-                cacheStore.set(cacheKey, cache);
+        if (W > 0 && H > 0) {
+            var cacheId = _this.getCharacterId() + "_" + localStage.getId();
+            var cacheKey = cacheStore.generateKey("Text", cacheId, [xScale, yScale], colorTransform);
+            var cache = cacheStore.get(cacheKey);
+            var canvas;
+            if (!cache) {
+                if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W * H) {
+                    canvas = cacheStore.getCanvas();
+                    canvas.width = W;
+                    canvas.height = H;
+                    cache = canvas.getContext("2d");
+                    var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
+                    setTransform(cache, cMatrix);
+                    cache = _this.executeRender(cache, cMatrix, colorTransform);
+                    cacheStore.set(cacheKey, cache);
+                }
             }
-        }
 
-        if (cache) {
-            canvas = cache.canvas;
-            if (canvas.width > 0 && canvas.height > 0) {
+            if (cache) {
+                canvas = cache.canvas;
                 var m2 = _multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
                 setTransform(ctx, m2);
                 if (isAndroid4x && !isChrome) {
                     ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                     ctx.fillRect(0, 0, W, H);
                 } else {
-                    ctx.drawImage(canvas, 0, 0);
+                    ctx.drawImage(canvas, 0, 0, W, H);
                 }
+            } else {
+                setTransform(ctx, rMatrix);
+                _this.executeRender(ctx, rMatrix, colorTransform);
             }
-        } else {
-            setTransform(ctx, rMatrix);
-            _this.executeRender(ctx, rMatrix, colorTransform);
         }
     };
 
@@ -9863,50 +9871,52 @@ if (!("swf2js" in window)){(function(window)
         var W = _ceil(xMax - xMin);
         var H = _ceil(yMax - yMin);
 
-        // border
-        var border = variables["border"];
-        var color;
-        if (border) {
+        if (W > 0 && H > 0) {
+            // border
+            var border = variables["border"];
+            var color;
+            if (border) {
+                ctx.beginPath();
+                ctx.rect(xMin, yMin, W, H);
+                color = _generateColorTransform(variables["backgroundColor"], colorTransform);
+                ctx.fillStyle = rgba(color);
+                color = _generateColorTransform(variables["borderColor"], colorTransform);
+                ctx.strokeStyle = rgba(color);
+                ctx.lineWidth = _min(20, 1 / _min(rMatrix[0], rMatrix[3]));
+                ctx.globalAlpha = 1;
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            ctx.save();
             ctx.beginPath();
             ctx.rect(xMin, yMin, W, H);
-            color = _generateColorTransform(variables["backgroundColor"], colorTransform);
+            ctx.clip();
+
+            color = _generateColorTransform(variables["color"], colorTransform);
             ctx.fillStyle = rgba(color);
-            color = _generateColorTransform(variables["borderColor"], colorTransform);
-            ctx.strokeStyle = rgba(color);
-            ctx.lineWidth = _min(20, 1 / _min(rMatrix[0], rMatrix[3]));
+
+            // font type
+            var fontType = "";
+            if (variables["italic"]) {
+                fontType += "italic ";
+            }
+            if (variables["bold"]) {
+                fontType += "bold ";
+            }
+            ctx.font = fontType + variables["size"] + "px " + variables["font"];
+
+            var splitData = text.split("@LFCR");
+            if (variables["embedFonts"]) {
+                var fontData = localStage.getCharacter(_this.fontId);
+                _this.renderOutLine(ctx, fontData, splitData, rMatrix, xMin, W, variables["align"]);
+            } else {
+                _this.renderText(ctx, splitData, rMatrix, variables);
+            }
+
+            ctx.restore();
             ctx.globalAlpha = 1;
-            ctx.fill();
-            ctx.stroke();
         }
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(xMin, yMin, W, H);
-        ctx.clip();
-
-        color = _generateColorTransform(variables["color"], colorTransform);
-        ctx.fillStyle = rgba(color);
-
-        // font type
-        var fontType = "";
-        if (variables["italic"]) {
-            fontType += "italic ";
-        }
-        if (variables["bold"]) {
-            fontType += "bold ";
-        }
-        ctx.font = fontType + variables["size"] +"px "+ variables["font"];
-
-        var splitData = text.split("@LFCR");
-        if (variables["embedFonts"]) {
-            var fontData = localStage.getCharacter(_this.fontId);
-            _this.renderOutLine(ctx, fontData, splitData, rMatrix, xMin, W, variables["align"]);
-        } else {
-            _this.renderText(ctx, splitData, rMatrix, variables);
-        }
-
-        ctx.restore();
-        ctx.globalAlpha = 1;
     };
 
     /**
@@ -12687,6 +12697,7 @@ if (!("swf2js" in window)){(function(window)
         var tags = _this.getTags();
         var length = tags.length;
         var clips = [];
+        var bounds;
         var _multiplicationMatrix = multiplicationMatrix;
         var _multiplicationColor = multiplicationColor;
 
@@ -12751,7 +12762,7 @@ if (!("swf2js" in window)){(function(window)
                             "onRelease" in variables
                         ) {
                             var buttonHits = stage.buttonHits;
-                            var bounds = obj.getBounds(renderMatrix);
+                            bounds = obj.getBounds(renderMatrix);
                             buttonHits[buttonHits.length] = {
                                 xMax: bounds.xMax,
                                 xMin: bounds.xMin,
@@ -12772,16 +12783,22 @@ if (!("swf2js" in window)){(function(window)
                 if (obj.getBlendMode() < 3) {
                     obj.render(ctx, renderMatrix, renderColorTransform, stage, isVisible, _this.getStage());
                 } else {
-                    var canvas = cacheStore.getCanvas();
-                    var width = stage.getWidth();
-                    var height = stage.getHeight();
-                    canvas.width = width;
-                    canvas.height = height;
-                    var blendCtx = canvas.getContext("2d");
-                    obj.render(blendCtx, renderMatrix, renderColorTransform, stage, isVisible, _this.getStage());
-                    var bCanvas = blendCtx.canvas;
-                    if (bCanvas.width > 0 && bCanvas.height > 0) {
-                        obj.blend(ctx, blendCtx, renderMatrix, renderColorTransform, stage);
+                    var scale = stage.getScale();
+                    bounds = obj.getBounds(renderMatrix);
+                    var xMin = bounds.xMin;
+                    var yMin = bounds.yMin;
+                    var width = _ceil((bounds.xMax - xMin) * scale);
+                    var height = _ceil((bounds.yMax - yMin) * scale);
+                    if (width > 0 && height > 0) {
+                        var canvas = cacheStore.getCanvas();
+                        canvas.width = width;
+                        canvas.height = height;
+                        var blendCtx = canvas.getContext("2d");
+                        var ratio = 1 / _devicePixelRatio;
+                        var m2 = [ratio, 0, 0, ratio, -xMin*20/_devicePixelRatio, -yMin*20/_devicePixelRatio];
+                        var bMatrix = _multiplicationMatrix(m2, renderMatrix);
+                        obj.render(blendCtx, bMatrix, renderColorTransform, stage, isVisible, _this.getStage());
+                        obj.blend(ctx, blendCtx, xMin*scale, yMin*scale);
                     }
                 }
 
@@ -12807,111 +12824,73 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ctx
      * @param blendCtx
-     * @param matrix
-     * @param colorTransform
-     * @param stage
+     * @param xMin
+     * @param yMin
      */
-    MovieClip.prototype.blend = function(ctx, blendCtx, matrix, colorTransform, stage)
+    MovieClip.prototype.blend = function(ctx, blendCtx, xMin, yMin)
     {
         var _this = this;
-        var m2 = multiplicationMatrix(stage.getMatrix(), matrix);
+        var mode = _this.blendMode;
+        var operation = "source-over";
+        var canvas = blendCtx.canvas;
+        var width = canvas.width;
+        var height = canvas.height;
+        blendCtx.setTransform(1, 0, 0, 1, 0, 0);
 
-        var xScale = _sqrt(m2[0] * m2[0] + m2[1] * m2[1]);
-        var yScale = _sqrt(m2[2] * m2[2] + m2[3] * m2[3]);
-        xScale = _pow(_SQRT2, _ceil(_log(xScale) / (_LN2 / 2)));
-        yScale = _pow(_SQRT2, _ceil(_log(yScale) / (_LN2 / 2)));
-
-        var bounds = _this.getBounds();
-        var width = _ceil((bounds.xMax - bounds.xMin) * xScale * 20);
-        var height = _ceil((bounds.yMax - bounds.yMin) * yScale * 20);
-        if (width > 0 && height > 0) {
-            ctx.setTransform(1,0,0,1,0,0);
-            blendCtx.setTransform(1,0,0,1,0,0);
-
-            var mode = _this.blendMode;
-            var func;
-            switch (mode) {
-                case 3: // multiply
-                    func = function(a, b){ return a * b / 255; };
-                    break;
-                case 4: // screen
-                    func = function(a, b){ return a + b - a * b / 255; };
-                    break;
-                case 5: // lighten
-                    func = function(a, b){ return _max(a, b); };
-                    break;
-                case 6: // darken
-                    func = function(a, b){ return _min(a, b); };
-                    break;
-                case 7: // difference
-                    func = function(a, b){ return _abs(a - b); };
-                    break;
-                case 8: // add
-                    func = function(a, b){ return _min(a + b, 255); };
-                    break;
-                case 9: // subtract
-                    func = function(a, b){ return _max(a - b, 0); };
-                    break;
-                case 10: // invert
-                    func = function(a){ return 255 - a; };
-                    break;
-                default:
-                case 11: // alpha
-                case 12: // erase
-                    func = function(){ return arguments[1]; };
-                    break;
-                case 13: // overlay
-                    func = function(a, b){ return (a < 128) ? 2 * a * b / 255 : 255 - (a + b - 2 * a * b / 255); };
-                    break;
-                case 14: // hardlight
-                    func = function(a, b){ return (b < 128) ? 2 * a * b / 255 : 255 - (a + b - 2 * a * b / 255); };
-                    break;
-            }
-
-            var cacheId = _this.getCharacterId() +"_"+ _this.getStage().getId() +"_"+ mode;
-            var cacheKey = cacheStore.generateKey("MovieClip", cacheId, [xScale, yScale], colorTransform);
-            var cache = cacheStore.get(cacheKey);
-            if (!cache) {
-                var x = _ceil(m2[4]);
-                var y = _ceil(m2[5]);
-
-                var aData = ctx.getImageData(x, y, width, height);
-                var aPixel = aData.data;
-
-                var bData = blendCtx.getImageData(x, y, width, height);
-                var bPixel = bData.data;
-
-                var canvas = cacheStore.getCanvas();
-                canvas.width = width;
-                canvas.height = height;
-                cache = canvas.getContext("2d");
-                var pxData = cache.createImageData(width, height);
-                var pixelImage = pxData.data;
-                var size = pixelImage.length;
-                for (var px = 0; px < size; px += 4) {
-                    var aR = aPixel[px];
-                    var aG = aPixel[px + 1];
-                    var aB = aPixel[px + 2];
-
-                    var bR = bPixel[px];
-                    var bG = bPixel[px + 1];
-                    var bB = bPixel[px + 2];
-
-                    pixelImage[px] = func(aR, bR);
-                    pixelImage[px + 1] = func(aG, bG);
-                    pixelImage[px + 2] = func(aB, bB);
-                    pixelImage[px + 3] = aPixel[px + 3];
-                }
-
-                cache.putImageData(pxData, 0, 0);
-                //cacheStore.set(cacheKey, cache);
-                cacheStore.destroy(blendCtx);
-            }
-
-            if (cache) {
-                ctx.drawImage(cache.canvas, m2[4], m2[5]);
-            }
+        switch (mode) {
+            case 3: // multiply
+                operation = "multiply";
+                break;
+            case 4: // screen
+                operation = "screen";
+                break;
+            case 5: // lighten
+                operation = "lighten";
+                break;
+            case 6: // darken
+                operation = "darken";
+                break;
+            case 7: // difference
+                operation = "difference";
+                break;
+            case 8: // add
+                operation = "lighter";
+                break;
+            case 9: // subtract
+                blendCtx.globalCompositeOperation = "difference";
+                blendCtx.fillStyle = "rgb(255,255,255)";
+                blendCtx.fillRect(0, 0, width, height);
+                blendCtx.globalCompositeOperation = "darken";
+                blendCtx.fillStyle = "rgb(255,255,255)";
+                blendCtx.fillRect(0, 0, width, height);
+                operation = "color-burn";
+                break;
+            case 10: // invert
+                blendCtx.globalCompositeOperation = "difference";
+                blendCtx.fillStyle = "rgb(255,255,255)";
+                blendCtx.fillRect(0, 0, width, height);
+                blendCtx.globalCompositeOperation = "lighter";
+                blendCtx.fillStyle = "rgb(255,255,255)";
+                blendCtx.fillRect(0, 0, width, height);
+                operation = "difference";
+                break;
+            case 11: // alpha
+            case 12: // erase
+                operation = "source-over";
+                break;
+            case 13: // overlay
+                operation = "overlay";
+                break;
+            case 14: // hardlight
+                operation = "hard-light";
+                break;
         }
+
+        ctx.globalCompositeOperation = operation;
+        ctx.setTransform(_devicePixelRatio,0,0,_devicePixelRatio,0,0);
+        ctx.drawImage(canvas, xMin, yMin, width, height);
+        ctx.globalCompositeOperation = "source-over";
+        cacheStore.destroy(blendCtx);
     };
 
     /**
@@ -13777,8 +13756,7 @@ if (!("swf2js" in window)){(function(window)
             canvas.width = width;
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
-            var _drawImage = imageContext.drawImage;
-            _drawImage.call(imageContext, this, 0, 0);
+            imageContext.drawImage(this, 0, 0, width, height);
             _this.setCharacter(2, imageContext);
 
             var shapeWidth = width * 20;
@@ -14154,8 +14132,7 @@ if (!("swf2js" in window)){(function(window)
         var preCanvas = preContext.canvas;
         var ctx = _this.context;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        //ctx.clearRect(0, 0, _this.width + 1, _this.height + 1);
-        ctx.drawImage(preCanvas, 0, 0);
+        ctx.drawImage(preCanvas, 0, 0, preCanvas.width, preCanvas.height);
     };
 
     /**
