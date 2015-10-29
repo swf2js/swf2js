@@ -2115,6 +2115,7 @@ if (!("swf2js" in window)){(function(window)
                     var div = _document.getElementById(stage.getName());
                     if (div) {
                         var element = _document.getElementById(textField.getTagName());
+                        element.removeEventListener("blur", onBlur);
                         textField.setProperty("text", element.value);
                         textField.inputActive = false;
                         div.removeChild(element);
@@ -13218,8 +13219,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var xmlHttpRequest = _this.xmlHttpRequest;
-        xmlHttpRequest.open(sendMethod, url);
         var sendMethod = method ? method.toUpperCase() : "GET";
+        xmlHttpRequest.open(sendMethod, url);
         if (sendMethod === "POST") {
             xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
         }
@@ -13441,6 +13442,25 @@ if (!("swf2js" in window)){(function(window)
         return keyCode;
     };
     var keyClass = new Key();
+
+    /**
+     * @param event
+     */
+    function mouseOver(event)
+    {
+        var length = stages.length;
+        for (var i = 0; i < length; i++) {
+            if (!(i in stages)) {
+                continue;
+            }
+            var stage = stages[i];
+            stage.hitCheck(event);
+            if (stage.isHit) {
+                conosle.log('koko')
+            }
+
+        }
+    }
 
     /**
      * @param event
@@ -14561,6 +14581,7 @@ if (!("swf2js" in window)){(function(window)
                     _event = event;
                     _this.touchEnd(event);
                 });
+                window.addEventListener("mouseover", mouseOver);
             }
 
             _this.context = canvas.getContext("2d");
@@ -14811,7 +14832,14 @@ if (!("swf2js" in window)){(function(window)
                             element.style.height = _ceil(height * scale) + 6 + "px";
 
                             div.appendChild(element);
-                            _setTimeout(element.focus, 0);
+                            var focus = function(e)
+                            {
+                                return function()
+                                {
+                                    e.focus();
+                                };
+                            };
+                            _setTimeout(focus(element), 0);
                         }
                     } else {
                         var clipEvent = mc.clipEvent;
