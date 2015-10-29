@@ -12123,6 +12123,7 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.setTotalFrames = function(frame)
     {
         this._totalframes = frame;
+        this._framesloaded = frame;
     };
 
     /**
@@ -12422,8 +12423,10 @@ if (!("swf2js" in window)){(function(window)
                 cTag.matrix = _cloneArray(_cTag._matrix);
                 cTag.colorTransform = _cloneArray(_cTag._colorTransform);
 
-                var obj = tags[depth];
-                obj.reset();
+                if (depth in tags) {
+                    var obj = tags[depth];
+                    obj.reset();
+                }
             }
         }
 
