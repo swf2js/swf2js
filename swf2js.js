@@ -2093,38 +2093,35 @@ if (!("swf2js" in window)){(function(window)
         if (obj.type === "input") {
             var element = _document.createElement("textarea");
             if (!obj.multiline) {
-                element.wrap ="off";
+                element.onkeypress = function(e)
+                {
+                    if (e.keyCode === 13) {
+                        return false;
+                    }
+                };
             }
             element.style.position = "absolute";
             element.style.webkitBorderRadius = "0px";
-            element.style.webkitAppearance = "none";
             element.style.padding = "1px";
             element.style.margin = "0px";
-            element.style.overflow = "hidden";
+            element.style.webkitAppearance = "none";
             element.style.resize = "none";
             element.style.border = "none";
+            element.style.overflow = "hidden";
             element.style.backgroundColor = "transparent";
             element.style.zIndex = 2147483647;
             element.style.textAlign = obj.align;
             element.value = textField.initialText;
             element.id = textField.getTagName();
-
-            var onBlur = function(stage, textField)
+            element.onblur = function()
             {
-                return function()
-                {
-                    var div = _document.getElementById(stage.getName());
-                    if (div) {
-                        var element = _document.getElementById(textField.getTagName());
-                        element.removeEventListener("blur", onBlur);
-                        textField.setProperty("text", element.value);
-                        textField.inputActive = false;
-                        div.removeChild(element);
-                    }
-                };
+                var div = _document.getElementById(stage.getName());
+                if (div) {
+                    textField.setProperty("text", element.value);
+                    textField.inputActive = false;
+                    div.removeChild(element);
+                }
             };
-
-            element.addEventListener("blur", onBlur(stage, textField));
             textField.input = element;
         }
 
@@ -14780,6 +14777,13 @@ if (!("swf2js" in window)){(function(window)
         _this.isHit = false;
         _this.touchEndAction = null;
         var parent;
+        var focus = function(e)
+        {
+            return function()
+            {
+                e.focus();
+            };
+        };
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -14840,13 +14844,6 @@ if (!("swf2js" in window)){(function(window)
                             element.style.height = _ceil(height * scale) + 6 + "px";
 
                             div.appendChild(element);
-                            var focus = function(e)
-                            {
-                                return function()
-                                {
-                                    e.focus();
-                                };
-                            };
                             _setTimeout(focus(element), 0);
                         }
                     } else {
