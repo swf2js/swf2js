@@ -2101,6 +2101,7 @@ if (!("swf2js" in window)){(function(window)
             element.style.padding = "1px";
             element.style.margin = "0px";
             element.style.overflow = "hidden";
+            element.style.resize = "none";
             element.style.border = "none";
             element.style.backgroundColor = "transparent";
             element.style.zIndex = 2147483647;
@@ -8762,7 +8763,14 @@ if (!("swf2js" in window)){(function(window)
                 return window[name];
             }
             if (_this instanceof MovieClip) {
-                return _this.getMovieClip(name);
+                value = _this.getMovieClip(name);
+                if (!value) {
+                    var parent = _this.getParent();
+                    if (parent) {
+                        value = parent.getMovieClip(name);
+                    }
+                }
+                return value;
             }
         }
         return undefined;
@@ -10614,259 +10622,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @constructor
      */
-    var Sound = function()
-    {
-        var _this = this;
-        _this.sounds = [];
-        _this.volume = 100;
-        _this.pan = 0;
-        _this.transform = {ll:100, lr:100, rl:100,rr:100};
-        _this.isStreamin = false;
-        _this.movieClip = null;
-    };
-
-    /**
-     * @param currentTime
-     * @param loopCount
-     */
-    Sound.prototype.start = function(currentTime, loopCount)
-    {
-        var _this = this;
-        var sounds = _this.sounds;
-
-        var init = function(audio, time)
-        {
-            return function () {
-                audio.currentTime = time;
-            };
-        };
-
-        var end = function(audio, sound)
-        {
-            return function () {
-                var volume = sound.volume;
-                audio.loopCount--;
-                if (audio.loopCount > 0) {
-                    audio.volume = volume / 100;
-                    audio.currentTime = 0;
-                    audio.play();
-                }
-
-                var as = sound["onSoundComplete"];
-                if (as) {
-                    as(as.cache, sound.movieClip, [true]);
-                }
-            };
-        };
-
-        var audio;
-        for (var id in sounds) {
-            if (!sounds.hasOwnProperty(id)) {
-                continue;
-            }
-            audio = sounds[id];
-            audio.load();
-
-            if (currentTime) {
-                audio.addEventListener("canplay", init(this, currentTime));
-            }
-            if (typeof loopCount === "number" && loopCount > 0) {
-                audio.loopCount = loopCount;
-                audio.addEventListener("ended", end(audio, _this));
-            }
-
-            audio.play();
-        }
-    };
-
-    /**
-     * stop
-     */
-    Sound.prototype.stop = function(id)
-    {
-        var sounds = this.sounds;
-        var audio;
-        if (id) {
-            audio = sounds[id];
-            if (audio) {
-                audio.stop();
-            }
-        } else {
-            for (var key in sounds) {
-                if (!sounds.hasOwnProperty(key)) {
-                    continue;
-                }
-                audio = sounds[key];
-                audio.stop();
-            }
-        }
-    };
-
-    /**
-     * @param url
-     * @param bool
-     */
-    Sound.prototype.loadSound = function(url, bool)
-    {
-        var _this = this;
-        var sounds = _this.sounds;
-        var audio = _document.createElement("audio");
-
-        var onLoad = function ()
-        {
-            audio.removeEventListener("canplaythrough", onLoad);
-            audio.load();
-            audio.preload = "auto";
-            audio.autoplay = false;
-            audio.loop = false;
-            if ("onLoad" in _this) {
-                var as = _this["onLoad"];
-                if (as) {
-                    as(as.cache, _this.movieClip, [true]);
-                }
-            }
-        };
-        audio.addEventListener("canplaythrough", onLoad);
-
-        var onError = function()
-        {
-            audio.removeEventListener("error", onLoad);
-            if ("onLoad" in _this) {
-                var as = _this["onLoad"];
-                if (as) {
-                    as(as.cache, _this.movieClip, [true]);
-                }
-            }
-        };
-        audio.addEventListener('error', onError);
-
-        audio.src = url;
-        sounds[0] = audio;
-
-        _this.isStreamin = bool;
-    };
-
-    /**
-     * @param id
-     */
-    Sound.prototype.attachSound = function(id)
-    {
-        var _this = this;
-        var sounds = _this.sounds;
-        if (!(id in sounds)) {
-            var movieClip = _this.movieClip;
-            var stage = movieClip.getStage();
-            var exportAssets = stage.exportAssets;
-            if (id in exportAssets) {
-                var characterId = exportAssets[id];
-                var tag = stage.sounds[characterId];
-                if (tag) {
-                    var audio = _document.createElement("audio");
-                    audio.onload = function () {
-                        this.load();
-                        this.preload = "auto";
-                        this.autoplay = false;
-                        this.loop = false;
-                    };
-                    audio.src = tag.base64;
-                    sounds[id] = audio;
-                }
-            }
-        }
-    };
-
-    /**
-     *
-     * @returns {number}
-     */
-    Sound.prototype.getVolume = function()
-    {
-        return this.volume;
-    };
-
-    /**
-     *
-     * @param volume
-     */
-    Sound.prototype.setVolume = function(volume)
-    {
-        var _this = this;
-        var sounds = _this.sounds;
-        _this.volume = volume;
-        for (var id in sounds) {
-            if (!sounds.hasOwnProperty(id)) {
-                continue;
-            }
-            var audio = sounds[id];
-            audio.volume = volume / 100;
-        }
-    };
-
-    /**
-     * @returns {number|*}
-     */
-    Sound.prototype.getPan = function()
-    {
-        return this.pan;
-    };
-
-    /**
-     * @param pan
-     */
-    Sound.prototype.setPan = function(pan)
-    {
-        this.pan = pan;
-    };
-
-    /**
-     * @param object
-     */
-    Sound.prototype.setTransform = function(object)
-    {
-        var transform = this.transform;
-        for (var name in object) {
-            if (!object.hasOwnProperty(name)) {
-                continue;
-            }
-            switch (name) {
-                case "ll":
-                case "lr":
-                case "rl":
-                case "rr":
-                    transform[name] = object[name];
-                    break;
-            }
-        }
-    };
-
-    /**
-     * @returns {{ll: number, lr: number, rl: number, rr: number}|*}
-     */
-    Sound.prototype.getTransform = function()
-    {
-        return this.transform;
-    };
-
-    /**
-     * @returns {number}
-     */
-    Sound.prototype.getBytesLoaded = function()
-    {
-        return 1;
-    };
-
-    /**
-     * @returns {number}
-     */
-    Sound.prototype.getBytesTotal = function()
-    {
-        return 1;
-    };
-
-
-    /**
-     * @constructor
-     */
     var MovieClip = function()
     {
         var _this = this;
@@ -11695,7 +11450,8 @@ if (!("swf2js" in window)){(function(window)
                 var totalFrame = parent.getTotalFrames() + 1;
                 var addTags = parent.addTags;
                 var controller = parent.controller;
-                for (var frame = 1; frame < totalFrame; frame++) {
+                var currentFrame = 1;
+                for (var frame = currentFrame; frame < totalFrame; frame++) {
                     if (!(frame in addTags)) {
                         addTags[frame] = [];
                     }
@@ -11715,12 +11471,12 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
 
-                var cTag = controller[1][depth];
+                var cTag = controller[currentFrame][depth];
                 var _controller = parent._controller;
-                if (!(1 in _controller)) {
-                    _controller[1] = [];
+                if (!(currentFrame in _controller)) {
+                    _controller[currentFrame] = [];
                 }
-                _controller[1][depth] = {
+                _controller[currentFrame][depth] = {
                     instanceId: movieClip.instanceId,
                     _colorTransform: _cloneArray(cTag.colorTransform),
                     _matrix: _cloneArray(cTag.matrix)
@@ -13387,6 +13143,258 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @constructor
      */
+    var Sound = function()
+    {
+        var _this = this;
+        _this.sounds = [];
+        _this.volume = 100;
+        _this.pan = 0;
+        _this.transform = {ll:100, lr:100, rl:100,rr:100};
+        _this.isStreamin = false;
+        _this.movieClip = null;
+    };
+
+    /**
+     * @param currentTime
+     * @param loopCount
+     */
+    Sound.prototype.start = function(currentTime, loopCount)
+    {
+        var _this = this;
+        var sounds = _this.sounds;
+
+        var init = function(audio, time)
+        {
+            return function () {
+                audio.currentTime = time;
+            };
+        };
+
+        var end = function(audio, sound)
+        {
+            return function () {
+                var volume = sound.volume;
+                audio.loopCount--;
+                if (audio.loopCount > 0) {
+                    audio.volume = volume / 100;
+                    audio.currentTime = 0;
+                    audio.play();
+                }
+
+                var as = sound["onSoundComplete"];
+                if (as) {
+                    as(as.cache, sound.movieClip, [true]);
+                }
+            };
+        };
+
+        var audio;
+        for (var id in sounds) {
+            if (!sounds.hasOwnProperty(id)) {
+                continue;
+            }
+            audio = sounds[id];
+            audio.load();
+
+            if (currentTime) {
+                audio.addEventListener("canplay", init(this, currentTime));
+            }
+            if (typeof loopCount === "number" && loopCount > 0) {
+                audio.loopCount = loopCount;
+                audio.addEventListener("ended", end(audio, _this));
+            }
+
+            audio.play();
+        }
+    };
+
+    /**
+     * stop
+     */
+    Sound.prototype.stop = function(id)
+    {
+        var sounds = this.sounds;
+        var audio;
+        if (id) {
+            audio = sounds[id];
+            if (audio) {
+                audio.stop();
+            }
+        } else {
+            for (var key in sounds) {
+                if (!sounds.hasOwnProperty(key)) {
+                    continue;
+                }
+                audio = sounds[key];
+                audio.stop();
+            }
+        }
+    };
+
+    /**
+     * @param url
+     * @param bool
+     */
+    Sound.prototype.loadSound = function(url, bool)
+    {
+        var _this = this;
+        var sounds = _this.sounds;
+        var audio = _document.createElement("audio");
+
+        var onLoad = function ()
+        {
+            audio.removeEventListener("canplaythrough", onLoad);
+            audio.load();
+            audio.preload = "auto";
+            audio.autoplay = false;
+            audio.loop = false;
+            if ("onLoad" in _this) {
+                var as = _this["onLoad"];
+                if (as) {
+                    as(as.cache, _this.movieClip, [true]);
+                }
+            }
+        };
+        audio.addEventListener("canplaythrough", onLoad);
+
+        var onError = function()
+        {
+            audio.removeEventListener("error", onLoad);
+            if ("onLoad" in _this) {
+                var as = _this["onLoad"];
+                if (as) {
+                    as(as.cache, _this.movieClip, [true]);
+                }
+            }
+        };
+        audio.addEventListener('error', onError);
+
+        audio.src = url;
+        sounds[0] = audio;
+
+        _this.isStreamin = bool;
+    };
+
+    /**
+     * @param id
+     */
+    Sound.prototype.attachSound = function(id)
+    {
+        var _this = this;
+        var sounds = _this.sounds;
+        if (!(id in sounds)) {
+            var movieClip = _this.movieClip;
+            var stage = movieClip.getStage();
+            var exportAssets = stage.exportAssets;
+            if (id in exportAssets) {
+                var characterId = exportAssets[id];
+                var tag = stage.sounds[characterId];
+                if (tag) {
+                    var audio = _document.createElement("audio");
+                    audio.onload = function () {
+                        this.load();
+                        this.preload = "auto";
+                        this.autoplay = false;
+                        this.loop = false;
+                    };
+                    audio.src = tag.base64;
+                    sounds[id] = audio;
+                }
+            }
+        }
+    };
+
+    /**
+     *
+     * @returns {number}
+     */
+    Sound.prototype.getVolume = function()
+    {
+        return this.volume;
+    };
+
+    /**
+     *
+     * @param volume
+     */
+    Sound.prototype.setVolume = function(volume)
+    {
+        var _this = this;
+        var sounds = _this.sounds;
+        _this.volume = volume;
+        for (var id in sounds) {
+            if (!sounds.hasOwnProperty(id)) {
+                continue;
+            }
+            var audio = sounds[id];
+            audio.volume = volume / 100;
+        }
+    };
+
+    /**
+     * @returns {number|*}
+     */
+    Sound.prototype.getPan = function()
+    {
+        return this.pan;
+    };
+
+    /**
+     * @param pan
+     */
+    Sound.prototype.setPan = function(pan)
+    {
+        this.pan = pan;
+    };
+
+    /**
+     * @param object
+     */
+    Sound.prototype.setTransform = function(object)
+    {
+        var transform = this.transform;
+        for (var name in object) {
+            if (!object.hasOwnProperty(name)) {
+                continue;
+            }
+            switch (name) {
+                case "ll":
+                case "lr":
+                case "rl":
+                case "rr":
+                    transform[name] = object[name];
+                    break;
+            }
+        }
+    };
+
+    /**
+     * @returns {{ll: number, lr: number, rl: number, rr: number}|*}
+     */
+    Sound.prototype.getTransform = function()
+    {
+        return this.transform;
+    };
+
+    /**
+     * @returns {number}
+     */
+    Sound.prototype.getBytesLoaded = function()
+    {
+        return 1;
+    };
+
+    /**
+     * @returns {number}
+     */
+    Sound.prototype.getBytesTotal = function()
+    {
+        return 1;
+    };
+
+    /**
+     * @constructor
+     */
     var Key = function(){};
 
     /**
@@ -13456,9 +13464,8 @@ if (!("swf2js" in window)){(function(window)
             var stage = stages[i];
             stage.hitCheck(event);
             if (stage.isHit) {
-                conosle.log('koko')
-            }
 
+            }
         }
     }
 
@@ -14009,6 +14016,7 @@ if (!("swf2js" in window)){(function(window)
             var mc = _this.getParent();
             var tags = swftag.parse(mc);
             swftag.build(tags, mc);
+            console.log(mc);
         }
 
         _this.isLoad = true;
@@ -14822,12 +14830,12 @@ if (!("swf2js" in window)){(function(window)
                                 element.style.backgroundColor = rgba(backgroundColor);
                             }
 
-                            var left = hitObj.xMin + x;
-                            var top = hitObj.yMin + y;
-                            var width =hitObj.xMax - left;
+                            var left = hitObj.xMin;
+                            var top = hitObj.yMin;
+                            var width = hitObj.xMax - left;
                             var height = hitObj.yMax - top;
-                            element.style.left = _ceil(left * scale) - 2 + "px";
-                            element.style.top = _ceil(top * scale) - 2 + "px";
+                            element.style.left = _ceil(left * scale) - 3 + "px";
+                            element.style.top = _ceil(top * scale) - 3 + "px";
                             element.style.width = _ceil(width * scale) + 6 + "px";
                             element.style.height = _ceil(height * scale) + 6 + "px";
 
