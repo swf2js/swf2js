@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.18)
+ * swf2js (version 0.5.19)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -338,7 +338,7 @@ if (!("swf2js" in window)){(function(window)
     function startSound(audio, soundInfo)
     {
         if (soundInfo.SyncStop) {
-            audio.stop();
+            audio.pause();
         } else {
             if (soundInfo.HasLoops) {
                 audio.loopCount = soundInfo.LoopCount;
@@ -2113,15 +2113,19 @@ if (!("swf2js" in window)){(function(window)
             element.style.textAlign = obj.align;
             element.value = textField.initialText;
             element.id = textField.getTagName();
-            element.onblur = function()
+            var onBlur = function(stage, textField, el)
             {
-                var div = _document.getElementById(stage.getName());
-                if (div) {
-                    textField.setProperty("text", element.value);
-                    textField.inputActive = false;
-                    div.removeChild(element);
-                }
+                return function()
+                {
+                    var div = _document.getElementById(stage.getName());
+                    if (div) {
+                        textField.setProperty("text", el.value);
+                        textField.inputActive = false;
+                        div.removeChild(el);
+                    }
+                };
             };
+            element.onblur = onBlur(stage, textField, element);
             textField.input = element;
         }
 
@@ -7302,7 +7306,9 @@ if (!("swf2js" in window)){(function(window)
         var ret;
         if (mc) {
             name = _this.checkMethod(name);
-            if (window[name]) {
+            if (name in _this.methods && mc[name]) {
+                ret = mc[name].apply(mc, params);
+            } else if (window[name]) {
                 var targetMc = mc;
                 if (params[0] instanceof MovieClip) {
                     targetMc = params.shift();
@@ -7325,8 +7331,6 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 ret = window[name].apply(window, params);
-            } else if (mc[name]) {
-                ret = mc[name].apply(mc, params);
             } else {
                 var func = mc.getVariable(name);
                 if (!func) {
@@ -7351,10 +7355,10 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.ActionDefineFunction = function(stack, aScript, mc)
     {
         var as = aScript.ActionScript;
+        var name = aScript.FunctionName;
         var scope = this.scope;
         as.cache.scope = (scope) ? scope : mc;
-        var name = aScript.FunctionName;
-        if (name) {
+        if (name !== "") {
             mc.setVariable(name, as);
         } else {
             stack[stack.length] = as;
@@ -8217,6 +8221,9 @@ if (!("swf2js" in window)){(function(window)
             case "blendMode":
                 value = _this.getBlendMode();
                 break;
+            //case "SharedObject":
+            //    value = new SharedObject();
+            //    break;
             default:
                 value = _this.getVariable(name);
                 break;
@@ -9759,7 +9766,7 @@ if (!("swf2js" in window)){(function(window)
         obj.thickness = 0;
         obj.type = "dynamic";
         obj.wordWrap = 0;
-        obj.text = null;
+        obj.text = "";
         for (var key in obj) {
             if (!obj.hasOwnProperty(key)) {
                 continue;
@@ -9973,12 +9980,25 @@ if (!("swf2js" in window)){(function(window)
             }
 
             ctx.font = fontType + variables["size"] + "px " + variables["font"];
-            if (_this.input) {
-                var scale = stage.getScale();
+            if (_this.input !== null) {
                 var input = _this.input;
-                input.style.color = rgba(color);
+                var scale = stage.getScale();
                 var fontSize = _ceil(variables["size"]*scale*_min(matrix[0], matrix[3]));
                 input.style.font = fontType + fontSize + "px " + variables["font"];
+                input.style.color = rgba(color);
+
+                var as = variables["onChanged"];
+                if (as && !input.onchange) {
+                    var onChanged = function(as, textField, el)
+                    {
+                        return function()
+                        {
+                            textField.setProperty("text", el.value);
+                            return as(as.cache, textField.getParent(), []);
+                        };
+                    };
+                    input.onchange = onChanged(as, _this, input);
+                }
             }
 
             if (text) {
@@ -11422,15 +11442,10 @@ if (!("swf2js" in window)){(function(window)
             var tag = stage.getCharacter(characterId);
             if (tag) {
                 var swfTag = new SwfTag(stage, null);
-                var parent = _this.getParent();
-                if (!parent) {
-                    parent = stage.getParent();
-                }
-
                 movieClip = new MovieClip();
                 movieClip.stage = stage;
                 movieClip.setCharacterId(characterId);
-                movieClip.setParent(parent);
+                movieClip.setParent(_this);
                 movieClip.setLevel(depth);
                 movieClip.setName(name);
                 movieClip.setTarget(_this.getTarget()+"/"+name);
@@ -11444,9 +11459,11 @@ if (!("swf2js" in window)){(function(window)
                     matrix: _cloneArray([1,0,0,1,0,0])
                 };
 
-                var totalFrame = parent.getTotalFrames() + 1;
-                var addTags = parent.addTags;
-                var controller = parent.controller;
+                var totalFrame = _this.getTotalFrames() + 1;
+                var addTags = _this.addTags;
+                var controller = _this.controller;
+
+
                 var currentFrame = 1;
                 for (var frame = currentFrame; frame < totalFrame; frame++) {
                     if (!(frame in addTags)) {
@@ -11469,7 +11486,7 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 var cTag = controller[currentFrame][depth];
-                var _controller = parent._controller;
+                var _controller = _this._controller;
                 if (!(currentFrame in _controller)) {
                     _controller[currentFrame] = [];
                 }
@@ -13194,7 +13211,7 @@ if (!("swf2js" in window)){(function(window)
             audio.load();
 
             if (currentTime) {
-                audio.addEventListener("canplay", init(this, currentTime));
+                audio.addEventListener("canplay", init(audio, currentTime));
             }
             if (typeof loopCount === "number" && loopCount > 0) {
                 audio.loopCount = loopCount;
@@ -13215,7 +13232,7 @@ if (!("swf2js" in window)){(function(window)
         if (id) {
             audio = sounds[id];
             if (audio) {
-                audio.stop();
+                audio.pause();
             }
         } else {
             for (var key in sounds) {
@@ -13223,7 +13240,7 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
                 audio = sounds[key];
-                audio.stop();
+                audio.pause();
             }
         }
     };
@@ -13408,6 +13425,9 @@ if (!("swf2js" in window)){(function(window)
      */
     Key.prototype.getCode = function()
     {
+        if (isTouch) {
+            return 13;
+        }
         var keyCode = (_event) ? _event.keyCode : null;
         if (96 <= keyCode && keyCode <= 105) {
             var n = keyCode - 96;
@@ -13447,24 +13467,6 @@ if (!("swf2js" in window)){(function(window)
         return keyCode;
     };
     var keyClass = new Key();
-
-    /**
-     * @param event
-     */
-    function mouseOver(event)
-    {
-        var length = stages.length;
-        for (var i = 0; i < length; i++) {
-            if (!(i in stages)) {
-                continue;
-            }
-            var stage = stages[i];
-            stage.hitCheck(event);
-            if (stage.isHit) {
-
-            }
-        }
-    }
 
     /**
      * @param event
@@ -14013,7 +14015,6 @@ if (!("swf2js" in window)){(function(window)
             var mc = _this.getParent();
             var tags = swftag.parse(mc);
             swftag.build(tags, mc);
-            console.log(mc);
         }
 
         _this.isLoad = true;
@@ -14586,7 +14587,6 @@ if (!("swf2js" in window)){(function(window)
                     _event = event;
                     _this.touchEnd(event);
                 });
-                window.addEventListener("mouseover", mouseOver);
             }
 
             _this.context = canvas.getContext("2d");
@@ -14816,10 +14816,10 @@ if (!("swf2js" in window)){(function(window)
                                 parent = mc.getParent();
                                 text = parent.getProperty(variable);
                                 if (text === undefined) {
-                                    text = mc.getProperty("text");
+                                    text = mc.getVariable("text");
                                 }
                             }
-                            if (text) {
+                            if (text !== undefined) {
                                 element.value = text;
                             }
 
@@ -14903,12 +14903,14 @@ if (!("swf2js" in window)){(function(window)
                     }
 
                     var keyPress = cond.CondKeyPress;
-                    if (keyPress === 0 || keyPress === 13 || (keyPress >= 48 && keyPress <= 57)) {
+                    if (keyPress === 0 ||
+                        keyPress === 13 ||
+                        (keyPress >= 48 && keyPress <= 57) ||
+                        cond.CondOverUpToOverDown
+                    ) {
                         _this.touchObj.ActionScript = cond.ActionScript;
-                        if (cond.CondOverUpToOverDown || (isTouch && keyPress)) {
-                            var as = cond.ActionScript;
-                            _this.buttonAction(mc, as);
-                        }
+                        var as = cond.ActionScript;
+                        _this.buttonAction(mc, as);
                     }
                 }
 
