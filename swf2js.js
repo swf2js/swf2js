@@ -7306,7 +7306,8 @@ if (!("swf2js" in window)){(function(window)
         var ret;
         if (mc) {
             name = _this.checkMethod(name);
-            if (name in _this.methods && mc[name]) {
+            var _name = name.toLowerCase();
+            if (_name in _this.methods && mc[name]) {
                 ret = mc[name].apply(mc, params);
             } else if (window[name]) {
                 var targetMc = mc;
