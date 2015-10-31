@@ -9909,7 +9909,6 @@ if (!("swf2js" in window)){(function(window)
         _this.active = false;
         var input = _this.input;
         if (_this.inputActive) {
-            input.onblur = null;
             input.onchange = null;
             var stage = _this.getStage();
             var div = _document.getElementById(stage.getName());
