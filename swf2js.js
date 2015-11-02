@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.20)
+ * swf2js (version 0.5.21)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -2049,7 +2049,6 @@ if (!("swf2js" in window)){(function(window)
         // TextFormat
         obj.blockIndent = 0;
         obj.bullet = 0;
-        obj.color = data.TextColor;
 
         if (fontData) {
             obj.bold = fontData.FontFlagsBold;
@@ -5506,6 +5505,7 @@ if (!("swf2js" in window)){(function(window)
         this.initAction = (initAction) ? true : false;
         this.scope = null;
         this.arg = null;
+        this.version = 0;
         this.__init__(data);
     };
 
@@ -5643,7 +5643,7 @@ if (!("swf2js" in window)){(function(window)
             switch (actionCode) {
                 // GotoFrame
                 case 0x81:
-                    obj.frame = _floor(pBitio.getUI16()) + 1;
+                    obj.frame = _parseInt(pBitio.getUI16()) + 1;
                     break;
                 // WaitForFrame
                 case 0x8A:
@@ -5965,17 +5965,7 @@ if (!("swf2js" in window)){(function(window)
         var calc;
         switch (typeof value) {
             case "boolean":
-                calc = Number(value);
-                break;
-            case "string":
-                if (value === "") {
-                    calc = 0;
-                } else {
-                    calc = _parseFloat(value);
-                    if (_isNaN(calc)) {
-                        calc = 1;
-                    }
-                }
+                calc = (value) ? 1 : 0;
                 break;
             case "object":
                 if (value === null) {
@@ -5983,6 +5973,52 @@ if (!("swf2js" in window)){(function(window)
                 } else if (value instanceof Array) {
                     calc = value.length;
                 } else if (value instanceof Object) {
+                    calc = 1;
+                }
+                break;
+            case "string":
+                if (value === "") {
+                    calc = 0;
+                } else {
+                    calc = _parseFloat(value);
+                }
+                break;
+            default:
+                calc = _parseFloat(value);
+                break;
+        }
+
+        if (_isNaN(calc)) {
+            calc = 0;
+        }
+
+        return calc;
+    };
+
+    /**
+     * @param value
+     * @returns {*}
+     */
+    ActionScript.prototype.logicValue = function(value)
+    {
+        var calc;
+        switch (typeof value) {
+            case "boolean":
+                calc = (value) ? 1 : 0;
+                break;
+            case "object":
+                if (value === null) {
+                    calc = 0;
+                } else if (value instanceof Array) {
+                    calc = value.length;
+                } else if (value instanceof Object) {
+                    calc = 1;
+                }
+                break;
+            case "string":
+                if (value === "") {
+                    calc = 0;
+                } else {
                     calc = 1;
                 }
                 break;
@@ -6023,8 +6059,8 @@ if (!("swf2js" in window)){(function(window)
         var stack = [];
         var movieClip = mc;
         var stage = mc.getStage();
-        var version = stage.getVersion();
-        stage = null;
+        _this.version = stage.getVersion();
+
         var cache = _this.cache;
         var cLength = cache.length;
         for (var cIdx = 0; cIdx < cLength; cIdx++) {
@@ -6077,34 +6113,34 @@ if (!("swf2js" in window)){(function(window)
                 // SWF 4
                 // ********************************************
                 case 0x0A: // ActionAdd
-                    _this.ActionOperation(stack, "+");
+                    _this.ActionOperation(stack, 0);
                     break;
                 case 0x0B: // ActionSubtract
-                    _this.ActionOperation(stack, "-");
+                    _this.ActionOperation(stack, 1);
                     break;
                 case 0x0C: // ActionMultiply
-                    _this.ActionOperation(stack, "*");
+                    _this.ActionOperation(stack, 2);
                     break;
                 case 0x0D: // ActionDivide
-                    _this.ActionOperation(stack, "/");
+                    _this.ActionOperation(stack, 3);
                     break;
                 case 0x0E:
-                    _this.ActionEquals(stack, version);
+                    _this.ActionEquals(stack);
                     break;
                 case 0x0F:
-                    _this.ActionLess(stack, version);
+                    _this.ActionLess(stack);
                     break;
                 case 0x10:
-                    _this.ActionAnd(stack, version);
+                    _this.ActionAnd(stack);
                     break;
                 case 0x11:
-                    _this.ActionOr(stack, version);
+                    _this.ActionOr(stack);
                     break;
                 case 0x12:
-                    _this.ActionNot(stack, version);
+                    _this.ActionNot(stack);
                     break;
                 case 0x13:
-                    _this.ActionStringEquals(stack, version);
+                    _this.ActionStringEquals(stack);
                     break;
                 case 0x14: // ActionStringLength
                 case 0x31: // ActionMBStringLength
@@ -6118,7 +6154,7 @@ if (!("swf2js" in window)){(function(window)
                     _this.ActionStringExtract(stack);
                     break;
                 case 0x29:
-                    _this.ActionStringLess(stack, version);
+                    _this.ActionStringLess(stack);
                     break;
                 case 0x17: // ActionPop
                     stack.pop();
@@ -6532,32 +6568,33 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var a = _this.operationValue(stack.pop());
         var b = _this.operationValue(stack.pop());
+        var value;
         switch (operation) {
-            case "+":
-                stack[stack.length] = b + a;
+            case 0:
+                value = b + a;
                 break;
-            case "-":
-                stack[stack.length] = b - a;
+            case 1:
+                value = b - a;
                 break;
-            case "*":
-                stack[stack.length] = b * a;
+            case 2:
+                value = b * a;
                 break;
-            case "/":
-                stack[stack.length] = b / a;
+            case 3:
+                value = b / a;
                 break;
         }
+        stack[stack.length] = value;
     };
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionEquals = function(stack, version)
+    ActionScript.prototype.ActionEquals = function(stack)
     {
         var _this = this;
         var a = _this.calc(stack.pop());
         var b = _this.calc(stack.pop());
-        if (version > 4) {
+        if (_this.version > 4) {
             stack[stack.length] = (a === b);
         } else {
             stack[stack.length] = (a === b) ? 1 : 0;
@@ -6566,14 +6603,13 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionLess = function(stack, version)
+    ActionScript.prototype.ActionLess = function(stack)
     {
         var _this = this;
         var a = _this.calc(stack.pop());
         var b = _this.calc(stack.pop());
-        if (version > 4) {
+        if (_this.version > 4) {
             stack[stack.length] = (b < a);
         } else {
             stack[stack.length] = (b < a) ? 1 : 0;
@@ -6582,60 +6618,66 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionAnd = function(stack, version)
+    ActionScript.prototype.ActionAnd = function(stack)
     {
         var _this = this;
-        var a = _this.calc(stack.pop());
-        var b = _this.calc(stack.pop());
-        if (version > 4) {
+        var a = stack.pop();
+        var b = stack.pop();
+        if (_this.version > 4) {
+            a = _this.logicValue(a);
+            b = _this.logicValue(b);
             stack[stack.length] = (a !== 0 && b !== 0);
         } else {
+            a = _this.calc(a);
+            b = _this.calc(b);
             stack[stack.length] = (a !== 0 && b !== 0) ? 1 : 0;
         }
     };
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionOr = function(stack, version)
+    ActionScript.prototype.ActionOr = function(stack)
     {
         var _this = this;
-        var a = _this.calc(stack.pop());
-        var b = _this.calc(stack.pop());
-        if (version > 4) {
+        var a = stack.pop();
+        var b = stack.pop();
+        if (_this.version > 4) {
+            a = _this.logicValue(a);
+            b = _this.logicValue(b);
             stack[stack.length] = (a !== 0 || b !== 0);
         } else {
+            a = _this.calc(a);
+            b = _this.calc(b);
             stack[stack.length] = (a !== 0 || b !== 0) ? 1 : 0;
         }
     };
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionNot = function(stack, version)
+    ActionScript.prototype.ActionNot = function(stack)
     {
         var _this = this;
-        var a = _this.calc(stack.pop());
-        if (version > 4) {
+        var a = stack.pop();
+        if (_this.version > 4) {
+            a = _this.logicValue(a);
             stack[stack.length] = (a === 0);
         } else {
+            a = _this.calc(a);
             stack[stack.length] = (a === 0) ? 1 : 0;
         }
     };
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionStringEquals = function(stack, version)
+    ActionScript.prototype.ActionStringEquals = function(stack)
     {
         var a = stack.pop() + "";
         var b = stack.pop() + "";
-        if (version > 4) {
+        if (this.version > 4) {
             stack[stack.length] = (b === a);
         } else {
             stack[stack.length] = (b === a) ? 1 : 0;
@@ -6697,13 +6739,12 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
-     * @param version
      */
-    ActionScript.prototype.ActionStringLess = function(stack, version)
+    ActionScript.prototype.ActionStringLess = function(stack)
     {
         var a = stack.pop();
         var b = stack.pop();
-        if (version > 4) {
+        if (this.version > 4) {
             stack[stack.length] = (b < a);
         } else {
             stack[stack.length] = (b < a) ? 1 : 0;
@@ -6995,6 +7036,10 @@ if (!("swf2js" in window)){(function(window)
                 } else {
                     frame = mc.getLabel(splitData[0]);
                 }
+            }
+
+            if (typeof frame === "string") {
+                frame = _parseInt(frame);
             }
 
             if (typeof frame === "number" && frame > 0) {
@@ -7965,10 +8010,10 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionExtends = function(stack)
     {
-        var superClass = stack.pop();
-        var subClass = stack.pop();
-        if (superClass && subClass) {
-            subClass.prototype = superClass.prototype;
+        var SuperClass = stack.pop();
+        var SubClass = stack.pop();
+        if (SuperClass && SubClass) {
+            SubClass.prototype = new SuperClass();
         }
     };
 
@@ -8060,6 +8105,8 @@ if (!("swf2js" in window)){(function(window)
         proto.getBlendMode = _this.getBlendMode;
         proto.setBlendMode = _this.setBlendMode;
         proto.getMovieClip = _this.getMovieClip;
+        proto.getEnabled = _this.getEnabled;
+        proto.setEnabled = _this.setEnabled;
 
         caller.variables = [];
         caller._currentframe = 1;
@@ -8076,6 +8123,7 @@ if (!("swf2js" in window)){(function(window)
         caller._framesloaded = 0;
         caller._target = "";
         caller.blendMode = 0;
+        caller.enabled = true;
     };
 
     /**
@@ -8225,12 +8273,16 @@ if (!("swf2js" in window)){(function(window)
             case "MovieClip":
                 value = MovieClip;
                 break;
+            case "enabled":
+                value = _this.getEnabled();
+                break;
             case "blendMode":
                 value = _this.getBlendMode();
                 break;
             //case "SharedObject":
             //    value = new SharedObject();
             //    break;
+
             default:
                 value = _this.getVariable(name);
                 break;
@@ -8407,6 +8459,9 @@ if (!("swf2js" in window)){(function(window)
                 if (!_isNaN(value)) {
                     _this.setBlendMode(value);
                 }
+                break;
+            case "enabled":
+                _this.setEnabled(value);
                 break;
             default:
                 _this.setVariable(target, value);
@@ -8832,6 +8887,22 @@ if (!("swf2js" in window)){(function(window)
     Property.prototype.setBlendMode = function(value)
     {
         this.blendMode = value;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Property.prototype.getEnabled = function()
+    {
+        return this.enabled;
+    };
+
+    /**
+     * @param bool
+     */
+    Property.prototype.setEnabled = function(bool)
+    {
+        this.enabled = bool;
     };
 
     /**
@@ -9775,7 +9846,7 @@ if (!("swf2js" in window)){(function(window)
         obj.multiline = 0;
         obj.selectable = 0;
         obj.sharpness = 0;
-        obj.textColor = {R:255,G:255,B:255,A:1};
+        obj.textColor = 0;
         obj.thickness = 0;
         obj.type = "dynamic";
         obj.wordWrap = 0;
@@ -9987,7 +10058,18 @@ if (!("swf2js" in window)){(function(window)
                 ctx.stroke();
             }
 
-            color = _generateColorTransform(variables["color"], colorTransform);
+            var textColor = variables["textColor"];
+            var objRGBA = textColor;
+            if (typeof  textColor === "number") {
+                objRGBA = {
+                    R: (textColor & 0xff0000) >> 16,
+                    G: (textColor & 0x00ff00) >> 8,
+                    B: (textColor & 0x0000ff),
+                    A: 1
+                };
+            }
+
+            color = _generateColorTransform(objRGBA, colorTransform);
             ctx.fillStyle = rgba(color);
 
             // font type
@@ -10354,6 +10436,7 @@ if (!("swf2js" in window)){(function(window)
         _this.actions = [];
         _this.buttonStatus = "up";
         _this.renderMatrix = null;
+        _this.enabled = true;
     };
 
     /**
@@ -10560,27 +10643,27 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = multiplicationMatrix;
         var _multiplicationColor = multiplicationColor;
 
-        // enter
-        var actions = _this.getActions();
-        var aLen = actions.length;
-        if (aLen) {
-            for (var idx = 0; idx < aLen; idx++) {
-                var cond = actions[idx];
-                if (cond.CondKeyPress === 13) {
-                    buttonHits[buttonHits.length] = {
-                        button: _this,
-                        xMin: 0,
-                        xMax: stage.getWidth(),
-                        yMin: 0,
-                        yMax: stage.getHeight(),
-                        CondKeyPress: cond.CondKeyPress,
-                        parent: _this.getParent()
-                    };
+        if (visible && _this.getEnabled()) {
+            // enter
+            var actions = _this.getActions();
+            var aLen = actions.length;
+            if (aLen) {
+                for (var idx = 0; idx < aLen; idx++) {
+                    var cond = actions[idx];
+                    if (cond.CondKeyPress === 13) {
+                        buttonHits[buttonHits.length] = {
+                            button: _this,
+                            xMin: 0,
+                            xMax: stage.getWidth(),
+                            yMin: 0,
+                            yMax: stage.getHeight(),
+                            CondKeyPress: cond.CondKeyPress,
+                            parent: _this.getParent()
+                        };
+                    }
                 }
             }
-        }
 
-        if (visible) {
             var status = "hit";
             var hitTest = _this.getButtonCharacter(status);
             var hitTags = hitTest.getTags();
@@ -11983,7 +12066,7 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.addLabel = function(frame, name)
     {
-        this.labels[name] = _parseFloat(frame);
+        this.labels[name] = _parseInt(frame);
     };
 
     /**
@@ -12652,7 +12735,7 @@ if (!("swf2js" in window)){(function(window)
                 var buttonHits;
                 if (obj instanceof MovieClip) {
                     var buttonStatus = obj.getButtonStatus();
-                    if (isVisible && buttonStatus === "up") {
+                    if (isVisible && obj.getEnabled() && buttonStatus === "up") {
                         var variables = obj.variables;
                         var clipEvent = obj.clipEvent;
                         if ("press" in clipEvent ||
@@ -13522,7 +13605,6 @@ if (!("swf2js" in window)){(function(window)
             var buttonHits = stage.buttonHits;
             var len = buttonHits.length;
             var isEnd = false;
-
             for (var i = len; i--;) {
                 if (!(i in buttonHits)) {
                     continue;
@@ -14933,13 +15015,12 @@ if (!("swf2js" in window)){(function(window)
                     }
 
                     // enter
-                    if (hitObj.CondKeyPress === 13 && hitObj.CondKeyPress !== cond.CondKeyPress) {
+                    var keyPress = cond.CondKeyPress;
+                    if (hitObj.CondKeyPress === 13 && hitObj.CondKeyPress !== keyPress) {
                         continue;
                     }
 
-                    var keyPress = cond.CondKeyPress;
-                    if (keyPress === 0 ||
-                        keyPress === 13 ||
+                    if (keyPress === 13 ||
                         (keyPress >= 48 && keyPress <= 57) ||
                         cond.CondOverUpToOverDown
                     ) {
