@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.21)
+ * swf2js (version 0.5.22)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -254,6 +254,24 @@ if (!("swf2js" in window)){(function(window)
     function rgba(color)
     {
         return "rgba("+ color.R+","+ color.G +","+ color.B +","+ color.A +")";
+    }
+
+    /**
+     * @param int
+     * @param alpha
+     * @returns {{R: number, G: number, B: number, A: number}}
+     */
+    function intToRGBA(int, alpha)
+    {
+        if (!alpha) {
+            alpha = 100;
+        }
+        return {
+            R: (int & 0xff0000) >> 16,
+            G: (int & 0x00ff00) >> 8,
+            B: (int & 0x0000ff),
+            A: (alpha / 100)
+        };
     }
 
     /**
@@ -1012,7 +1030,6 @@ if (!("swf2js" in window)){(function(window)
                     break;
             }
         }
-        cache.str = str;
         return new Func('ctx', str);
     };
     var vtc = new VectorToCanvas();
@@ -6335,7 +6352,7 @@ if (!("swf2js" in window)){(function(window)
                 case 0x4c:
                     _this.ActionPushDuplicate(stack);
                     break;
-                case 0x3e: // ActionReturnActionReturn
+                case 0x3e: // ActionReturn
                     return stack.pop();
                 case 0x4d:
                     _this.ActionStackSwap(stack);
@@ -6430,7 +6447,16 @@ if (!("swf2js" in window)){(function(window)
         getnexthighestdepth: "getNextHighestDepth",
         getbytesloaded: "getBytesLoaded",
         getbytestotal: "getBytesTotal",
-        assetpropflags: "ASSetPropFlags"
+        assetpropflags: "ASSetPropFlags",
+        linestyle: "lineStyle",
+        linegradientstyle: "lineGradientStyle",
+        beginfill: "beginFill",
+        begingradientfill: "beginGradientFill",
+        beginbitmapfill: "beginBitmapFill",
+        moveto: "moveTo",
+        lineto: "lineTo",
+        curveto: "curveTo",
+        endfill: "endFill"
     };
 
     /**
@@ -10061,12 +10087,7 @@ if (!("swf2js" in window)){(function(window)
             var textColor = variables["textColor"];
             var objRGBA = textColor;
             if (typeof  textColor === "number") {
-                objRGBA = {
-                    R: (textColor & 0xff0000) >> 16,
-                    G: (textColor & 0x00ff00) >> 8,
-                    B: (textColor & 0x0000ff),
-                    A: 1
-                };
+                objRGBA = intToRGBA(textColor, 100);
             }
 
             color = _generateColorTransform(objRGBA, colorTransform);
@@ -10794,6 +10815,13 @@ if (!("swf2js" in window)){(function(window)
 
         // event
         _this.clipEvent = {};
+
+        // shape
+        _this.draw = false;
+        _this.fillRecodes = [];
+        _this.lineRecodes = [];
+        _this.isFillDraw = false;
+        _this.isLineDraw = false;
     };
 
     /**
@@ -12760,6 +12788,10 @@ if (!("swf2js" in window)){(function(window)
                         isFilter = true;
                         obj.preFilter(ctx, matrix, renderColorTransform, stage, isVisible);
                     }
+
+                    if (isVisible && obj.draw) {
+                        obj.executeDraw(ctx, renderMatrix, renderColorTransform, stage);
+                    }
                 }
 
                 if (obj instanceof TextField) {
@@ -13008,6 +13040,238 @@ if (!("swf2js" in window)){(function(window)
     {
         // object, properties, n, allowFalse
     };
+
+    /**
+     * @param color
+     */
+    MovieClip.prototype.pushFillRecode = function(color)
+    {
+        var obj = {
+            recodes: [],
+            style: color,
+            cmd: null
+        };
+        var recodes = this.fillRecodes;
+        recodes[recodes.length] = obj;
+    };
+
+    /**
+     * @returns {Array}
+     */
+    MovieClip.prototype.getFillRecode = function()
+    {
+        var recodes = this.fillRecodes;
+        var obj = recodes[recodes.length - 1];
+        return obj.recodes;
+    };
+
+    /**
+     * @param color
+     * @param width
+     */
+    MovieClip.prototype.pushLineRecode = function(color, width)
+    {
+        var obj = {
+            recodes: [],
+            Width: (width * 20),
+            style: color,
+            cmd: null
+        };
+        var recodes = this.lineRecodes;
+        recodes[recodes.length] = obj;
+    };
+
+    /**
+     * @returns {Array}
+     */
+    MovieClip.prototype.getLineRecode = function()
+    {
+        var recodes = this.lineRecodes;
+        var obj = recodes[recodes.length - 1];
+        return obj.recodes;
+    };
+
+    /**
+     * @param rgb
+     * @param alpha
+     */
+    MovieClip.prototype.beginFill = function(rgb, alpha)
+    {
+        var _this = this;
+        var color = intToRGBA(rgb, alpha);
+        _this.pushFillRecode(color);
+        _this.isFillDraw = true;
+        _this.draw = true;
+    };
+
+    /**
+     * @param width
+     * @param rgb
+     * @param alpha
+     */
+    MovieClip.prototype.lineStyle = function(width, rgb, alpha)
+    {
+        var _this = this;
+        var color = intToRGBA(rgb, alpha);
+        _this.pushLineRecode(color, width);
+        _this.isLineDraw = true;
+        _this.draw = true;
+    };
+
+    /**
+     * @param x
+     * @param y
+     */
+    MovieClip.prototype.moveTo = function(x, y)
+    {
+        var _this = this;
+        if (_this.isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [0, (x * 20), (y * 20)];
+        }
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [0, (x * 20), (y * 20)];
+        }
+    };
+
+    /**
+     * @param x
+     * @param y
+     */
+    MovieClip.prototype.lineTo = function(x, y)
+    {
+        var _this = this;
+        if (_this.isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [2, (x * 20), (y * 20)];
+        }
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [2, (x * 20), (y * 20)];
+        }
+    };
+
+    /**
+     * @param cx
+     * @param cy
+     * @param dx
+     * @param dy
+     */
+    MovieClip.prototype.curveTo = function(cx, cy, dx, dy)
+    {
+        var _this = this;
+        if (_this.isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [1, (cx * 20), (cy * 20), (dx * 20), (dy * 20)];
+        }
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [1, (cx * 20), (cy * 20), (dx * 20), (dy * 20)];
+        }
+    };
+
+    /**
+     * clear
+     */
+    MovieClip.prototype.clear = function()
+    {
+        var _this = this;
+        _this.draw = false;
+        _this.isFillDraw = false;
+        _this.isLineDraw = false;
+        _this.fillRecodes = [];
+        _this.lineRecodes = [];
+    };
+
+    /**
+     * endFill
+     */
+    MovieClip.prototype.endFill = function()
+    {
+        this.isFillDraw = false;
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     */
+    MovieClip.prototype.executeDraw = function(ctx, matrix, colorTransform, stage)
+    {
+        var _this = this;
+        var alpha = colorTransform[3] + (colorTransform[7] / 255);
+        if (!alpha) {
+            return 0;
+        }
+
+        var isClipDepth = _this.isClipDepth || stage.isClipDepth;
+        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
+        var fillRecodes = _this.fillRecodes;
+        var lineRecodes = _this.lineRecodes;
+        var length;
+        var i;
+        var obj;
+        var recodes;
+        var color;
+        var _generateColorTransform = generateColorTransform;
+        var _rgba = rgba;
+        var cmd;
+
+        setTransform(ctx, rMatrix);
+        length = fillRecodes.length;
+        if (length) {
+            for (i = 0; i < length; i++) {
+                obj = fillRecodes[i];
+                color = _generateColorTransform(obj.style, colorTransform);
+                cmd = obj.cmd;
+                if (cmd === null) {
+                    recodes = obj.recodes;
+                    cmd = vtc.buildCommand(recodes);
+                    obj.cmd = cmd;
+                }
+
+                ctx.beginPath();
+                ctx.fillStyle = _rgba(color);
+                cmd(ctx);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        if (!isClipDepth) {
+            length = lineRecodes.length;
+            if (length) {
+                var minScale = _min(rMatrix[0], rMatrix[3]);
+                for (i = 0; i < length; i++) {
+                    obj = lineRecodes[i];
+                    color = _generateColorTransform(obj.style, colorTransform);
+                    cmd = obj.cmd;
+                    if (cmd === null) {
+                        recodes = obj.recodes;
+                        cmd = vtc.buildCommand(recodes);
+                        obj.cmd = cmd;
+                    }
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = _rgba(color);
+                    ctx.lineWidth = _max(obj.Width, 1 / minScale);
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    cmd(ctx);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        var resetCss = "rgba(0,0,0,1)";
+        ctx.strokeStyle = resetCss;
+        ctx.fillStyle = resetCss;
+        ctx.globalAlpha = 1;
+    };
+
 
     /**
      * @param mc
