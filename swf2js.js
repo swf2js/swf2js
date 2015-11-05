@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.22)
+ * swf2js (version 0.5.23)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -13,6 +13,7 @@ if (!("swf2js" in window)){(function(window)
     "use strict";
     var _document = window.document;
     var alert = window.alert;
+    var console = window.console;
     var _NamedNodeMap = window.NamedNodeMap;
     var isBtoa = ("btoa" in window);
     var _Math = Math;
@@ -2138,7 +2139,11 @@ if (!("swf2js" in window)){(function(window)
                         textField.inputActive = false;
                         var element = _document.getElementById(textField.getTagName());
                         if (element) {
-                            div.removeChild(element);
+                            try {
+                                div.removeChild(element);
+                            } catch (e) {
+
+                            }
                         }
                     }
                 };
@@ -3724,7 +3729,7 @@ if (!("swf2js" in window)){(function(window)
         obj.FontId = bitio.getUI16();
         var len = bitio.getUI8();
         var data = bitio.getData(len);
-        var str = '';
+        var str = "";
         for (var i = 0; i < len; i++) {
             if (data[i] > 127) {
                 continue;
@@ -3752,8 +3757,9 @@ if (!("swf2js" in window)){(function(window)
         obj.FontName = _this.getFontName(fontName);
 
         var CodeTable = [];
+        bitio.byteAlign();
         var tLen = endOffset - bitio.byte_offset;
-        if (obj.FontFlagsWideCodes) {
+        if (obj.FontFlagsWideCodes || tagType === 62) {
             for (; tLen;) {
                 CodeTable[CodeTable.length] = bitio.getUI16();
                 tLen--;
@@ -6050,11 +6056,12 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param value
-     * @returns {Number|*}
+     * @param stack
+     * @returns {Number}
      */
-    ActionScript.prototype.operationValue = function(value)
+    ActionScript.prototype.operationValue = function(stack)
     {
+        var value = stack.pop();
         value = _parseFloat(value);
         if (_isNaN(value)) {
             value = 0;
@@ -6592,8 +6599,8 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.ActionOperation = function(stack, operation)
     {
         var _this = this;
-        var a = _this.operationValue(stack.pop());
-        var b = _this.operationValue(stack.pop());
+        var a = _this.operationValue(stack);
+        var b = _this.operationValue(stack);
         var value;
         switch (operation) {
             case 0:
@@ -6672,6 +6679,7 @@ if (!("swf2js" in window)){(function(window)
         if (_this.version > 4) {
             a = _this.logicValue(a);
             b = _this.logicValue(b);
+
             stack[stack.length] = (a !== 0 || b !== 0);
         } else {
             a = _this.calc(a);
@@ -6736,10 +6744,10 @@ if (!("swf2js" in window)){(function(window)
     {
         var a = stack.pop();
         var b = stack.pop();
-        if (a === null) {
+        if (a === null || a === undefined) {
             a = "";
         }
-        if (b === null) {
+        if (b === null || b === undefined) {
             b = "";
         }
         stack[stack.length] = b +""+ a;
@@ -6923,7 +6931,12 @@ if (!("swf2js" in window)){(function(window)
         var name = stack.pop();
         var scope = _this.scope;
         if (scope) {
-            scope.setProperty(name, value);
+            var _variables = _this.variables;
+            if (name in _variables) {
+                _this.setVariable(name, value);
+            } else {
+                scope.setProperty(name, value);
+            }
         } else if (mc) {
             mc.setProperty(name, value);
         }
@@ -7445,9 +7458,12 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionDefineLocal = function(stack, mc)
     {
+        var _this = this;
         var value = stack.pop();
         var name = stack.pop();
-        if (mc) {
+        if (_this.scope !== null) {
+            _this.setVariable(name, value);
+        } else if (mc) {
             mc.setVariable(name, value);
         }
     };
@@ -7458,8 +7474,11 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionDefineLocal2 = function(stack, mc)
     {
+        var _this = this;
         var name = stack.pop();
-        if (mc) {
+        if (_this.scope !== null) {
+            _this.setVariable(name, undefined);
+        } else if (mc) {
             mc.setVariable(name, undefined);
         }
     };
@@ -7536,6 +7555,12 @@ if (!("swf2js" in window)){(function(window)
         }
         if (B !== "" && typeof B === "string" && !_isNaN(B)) {
             B = _parseFloat(B);
+        }
+        if (typeof A === "number") {
+            A = _parseInt(A);
+        }
+        if (typeof B === "number") {
+            B = _parseInt(B);
         }
         stack[stack.length] = (B === A);
     };
@@ -7880,7 +7905,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var a = stack.pop();
         var b = stack.pop();
-        stack[stack.length] = a & b;
+        stack[stack.length] = b & a;
     };
 
     /**
@@ -8962,6 +8987,7 @@ if (!("swf2js" in window)){(function(window)
             return this;
         }
         var stage = _root.getStage();
+        var version = stage.getVersion();
         if (path === "_global") {
             return stage.getGlobal();
         }
@@ -9044,25 +9070,31 @@ if (!("swf2js" in window)){(function(window)
 
             var tagLength = tags.length;
             var setTarget = false;
-            if (!tagLength) {
-                return undefined;
-            }
+            if (tagLength > 0) {
+                for (;tagLength--;) {
+                    if (!(tagLength in tags)) {
+                        continue;
+                    }
 
-            for (;tagLength--;) {
-                if (!(tagLength in tags)) {
-                    continue;
-                }
+                    tag = tags[tagLength];
+                    var tagName = tag.getName();
+                    if (!tagName) {
+                        continue;
+                    }
 
-                tag = tags[tagLength];
-                var tagName = tag.getName();
-                if (!tagName) {
-                    continue;
-                }
-
-                if (tagName === name) {
-                    mc = tag;
-                    setTarget = true;
-                    break;
+                    if (version < 7) {
+                        if (tagName.toLowerCase() === name.toLowerCase()) {
+                            mc = tag;
+                            setTarget = true;
+                            break;
+                        }
+                    } else {
+                        if (tagName === name) {
+                            mc = tag;
+                            setTarget = true;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -10014,7 +10046,11 @@ if (!("swf2js" in window)){(function(window)
                 _this.inputActive = false;
                 var el = _document.getElementById(_this.getTagName());
                 if (el) {
-                    div.removeChild(el);
+                    try {
+                        div.removeChild(el);
+                    } catch (e) {
+
+                    }
                 }
             }
         }
@@ -10296,11 +10332,12 @@ if (!("swf2js" in window)){(function(window)
                     }
                 } else {
                     ctx.fillText(txt, dx, dy, width);
+                    dy += leading + size;
                 }
             } else {
                 ctx.fillText(txt, dx, dy, width);
+                dy += leading + size;
             }
-            dy += leading + size;
         }
     };
 
@@ -10666,21 +10703,23 @@ if (!("swf2js" in window)){(function(window)
 
         if (visible && _this.getEnabled()) {
             // enter
-            var actions = _this.getActions();
-            var aLen = actions.length;
-            if (aLen) {
-                for (var idx = 0; idx < aLen; idx++) {
-                    var cond = actions[idx];
-                    if (cond.CondKeyPress === 13) {
-                        buttonHits[buttonHits.length] = {
-                            button: _this,
-                            xMin: 0,
-                            xMax: stage.getWidth(),
-                            yMin: 0,
-                            yMax: stage.getHeight(),
-                            CondKeyPress: cond.CondKeyPress,
-                            parent: _this.getParent()
-                        };
+            if (isTouch) {
+                var actions = _this.getActions();
+                var aLen = actions.length;
+                if (aLen) {
+                    for (var idx = 0; idx < aLen; idx++) {
+                        var cond = actions[idx];
+                        if (cond.CondKeyPress === 13) {
+                            buttonHits[buttonHits.length] = {
+                                button: _this,
+                                xMin: 0,
+                                xMax: stage.getWidth(),
+                                yMin: 0,
+                                yMax: stage.getHeight(),
+                                CondKeyPress: cond.CondKeyPress,
+                                parent: _this.getParent()
+                            };
+                        }
                     }
                 }
             }
@@ -11025,14 +11064,13 @@ if (!("swf2js" in window)){(function(window)
         if (typeof frame !== "number") {
             frame = _this.getLabel(frame);
         }
-        if (typeof frame !== "number" || !frame) {
-            frame = _this.getFrame();
-            frame++;
-            if (frame > _this.getTotalFrames()) {
-                frame = 1;
-            }
+        if (typeof frame === "number" && frame > _this.getTotalFrames()) {
+            frame = _this.getTotalFrames();
+            _this.isAction = false;
         }
-        _this.setNextFrame(frame);
+        if (frame > 0) {
+            _this.setNextFrame(frame);
+        }
         _this.stop();
     };
 
@@ -11164,6 +11202,8 @@ if (!("swf2js" in window)){(function(window)
                         } else {
                             targetMc.initParams();
                         }
+                        targetMc.addActions();
+
                         break;
                 }
             }
@@ -11707,7 +11747,7 @@ if (!("swf2js" in window)){(function(window)
         var targetMc = this.getMovieClip(name);
         var parent;
         var object;
-        if (stage.getVersion() > 4) {
+        if (!targetMc && stage.getVersion() > 4) {
             target = arguments[0];
             depth = arguments[1];
             if (_isNaN(depth)) {
@@ -12769,7 +12809,9 @@ if (!("swf2js" in window)){(function(window)
                         if ("press" in clipEvent ||
                             "release" in clipEvent ||
                             "onPress" in variables ||
-                            "onRelease" in variables
+                            "onRelease" in variables ||
+                            "onRollOver" in variables ||
+                            "onRollOut" in variables
                         ) {
                             buttonHits = stage.buttonHits;
                             bounds = obj.getBounds(renderMatrix);
@@ -13235,7 +13277,6 @@ if (!("swf2js" in window)){(function(window)
                 ctx.beginPath();
                 ctx.fillStyle = _rgba(color);
                 cmd(ctx);
-                ctx.closePath();
                 ctx.fill();
             }
         }
@@ -13260,7 +13301,6 @@ if (!("swf2js" in window)){(function(window)
                     ctx.lineCap = "round";
                     ctx.lineJoin = "round";
                     cmd(ctx);
-                    ctx.closePath();
                     ctx.stroke();
                 }
             }
@@ -14054,6 +14094,8 @@ if (!("swf2js" in window)){(function(window)
         _this._global = new Global();
         _this.initActions = [];
         _this.touchObj = null;
+        _this.overObj = null;
+        _this.dragStatus = "in";
         _this.touchEndAction = null;
         _this.imgUnLoadCount = 0;
         _this.scale = 1;
@@ -14591,21 +14633,9 @@ if (!("swf2js" in window)){(function(window)
 
         var baseWidth  = _this.getBaseWidth();
         var baseHeight = _this.getBaseHeight();
-        var minSize = _min(screenWidth, screenHeight);
-
-        if(baseWidth > baseHeight){
-            scale = (screenWidth / baseWidth);
-            width  = baseWidth * scale;
-            height = baseHeight * scale;
-        } else if (baseWidth === baseHeight) {
-            scale  = minSize / baseWidth;
-            width  = baseWidth * scale;
-            height = baseHeight * scale;
-        } else {
-            scale = _min((screenWidth / baseWidth), (screenHeight / baseHeight));
-            width  = baseWidth * scale;
-            height = baseHeight * scale;
-        }
+        scale = _min((screenWidth / baseWidth), (screenHeight / baseHeight));
+        width = baseWidth * scale;
+        height = baseHeight * scale;
 
         // div
         var style = div.style;
@@ -14661,14 +14691,8 @@ if (!("swf2js" in window)){(function(window)
         _this.deleteNode();
         var div = _document.getElementById(_this.getName());
         if (div) {
-            // backgroundColor
-            //var style = div.style;
-            //style.backgroundColor = _this.getBackgroundColor();
-
             // _root
             var mc = _this.getParent();
-
-            // action
             mc.addActions();
             _this.executeAction();
 
@@ -15156,15 +15180,6 @@ if (!("swf2js" in window)){(function(window)
 
         // reset
         _this.isHit = false;
-        _this.touchEndAction = null;
-        var parent;
-        var focus = function(e)
-        {
-            return function()
-            {
-                e.focus();
-            };
-        };
         for (var i = len; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -15182,134 +15197,11 @@ if (!("swf2js" in window)){(function(window)
             ){
                 event.preventDefault();
                 _this.isHit = true;
-
-                var mc = hitObj.parent;
-                if (event.type === startEvent && mc.getButtonStatus() === "up") {
-                    mc.setButtonStatus("down");
-                    if (mc instanceof TextField) {
-                        mc.inputActive = true;
-                        var element = _document.getElementById(mc.getTagName());
-                        if (!element) {
-                            element = mc.input;
-                            var variable = mc.getProperty("variable");
-                            var text;
-                            if (variable) {
-                                parent = mc.getParent();
-                                text = parent.getProperty(variable);
-                                if (text === undefined) {
-                                    text = mc.getVariable("text");
-                                }
-                            }
-                            if (text !== undefined) {
-                                element.value = text;
-                            }
-
-                            var maxLength = mc.getVariable("maxChars");
-                            if (maxLength) {
-                                element.maxLength = maxLength;
-                            }
-                            var border = mc.getVariable("border");
-                            if (border) {
-                                element.style.border = "1px solid black";
-                                var backgroundColor = mc.getVariable("backgroundColor");
-                                element.style.backgroundColor = rgba(backgroundColor);
-                            }
-
-                            var left = hitObj.xMin;
-                            var top = hitObj.yMin;
-                            var width = hitObj.xMax - left;
-                            var height = hitObj.yMax - top;
-                            element.style.left = _ceil(left * scale) - 3 + "px";
-                            element.style.top = _ceil(top * scale) - 3 + "px";
-                            element.style.width = _ceil(width * scale) + 6 + "px";
-                            element.style.height = _ceil(height * scale) + 6 + "px";
-
-                            div.appendChild(element);
-                            _setTimeout(focus(element), 0);
-                        }
-                    } else {
-                        var clipEvent = mc.clipEvent;
-                        if ("press" in clipEvent) {
-                            _this.executeEventAction({as:clipEvent["press"], mc: mc});
-                        }
-                        var variables = mc.variables;
-                        if ("onPress" in variables) {
-                            _this.executeEventAction({as:[variables["onPress"]], mc: mc});
-                        }
-                    }
-                }
-
-                if (event.type === startEvent) {
-                    _this.touchObj = hitObj;
-                }
-                if (!_this.touchObj) {
-                    break;
-                }
-                var button = hitObj.button;
-                if (!button) {
-                    break;
-                }
-
-                parent = null;
-                if (_this.touchObj !== null) {
-                    parent = _this.touchObj.parent;
-                }
-                var hitButton = _this.touchObj.button;
-                if (hitButton && button === hitButton) {
-                    button.setButtonStatus("down");
-                }
-
-                var actions = button.getActions();
-                var aLen = actions.length;
-                for (var idx = 0; idx < aLen; idx++) {
-                    if (!(idx in actions)) {
-                        continue;
-                    }
-
-                    var cond = actions[idx];
-                    if (cond.CondOverDownToOverUp) {
-                        if (event.type === startEvent || parent === mc) {
-                            _this.touchEndAction = cond.ActionScript;
-                        }
-                        continue;
-                    }
-
-                    if (event.type !== startEvent) {
-                        continue;
-                    }
-
-                    // enter
-                    var keyPress = cond.CondKeyPress;
-                    if (hitObj.CondKeyPress === 13 && hitObj.CondKeyPress !== keyPress) {
-                        continue;
-                    }
-
-                    if (keyPress === 13 ||
-                        (keyPress >= 48 && keyPress <= 57) ||
-                        cond.CondOverUpToOverDown
-                    ) {
-                        var action = cond.ActionScript;
-                        _this.touchObj.ActionScript = action;
-                        _this.buttonAction(mc, action);
-                    }
-                }
-
-                if (event.type === startEvent) {
-                    var func = button.getVariable("onPress");
-                    if (typeof func === "function") {
-                        var as = func.cache;
-                        as.setVariable("this", button);
-                        as.execute(mc);
-                        _this.executeAction();
-                    }
-
-                    _this.touchRender();
-                    var buttonCharacter = button.getButtonCharacter();
-                    buttonCharacter.startSound();
-                }
-                break;
+                return hitObj;
             }
         }
+
+        return 0;
     };
 
     /**
@@ -15325,9 +15217,7 @@ if (!("swf2js" in window)){(function(window)
         for (var i = 0; i < length; i++) {
             _actionRun(actions[i], mc);
         }
-        if (_this.actions.length) {
-            _this.executeAction();
-        }
+        _this.executeAction();
     };
 
     /**
@@ -15336,6 +15226,7 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchStart = function(event)
     {
         var _this = this;
+        _this.isHit = false;
         _this.isTouchEvent = true;
         _this.touchObj = null;
         _this.touchEndAction = null;
@@ -15349,7 +15240,145 @@ if (!("swf2js" in window)){(function(window)
                 _executeEventAction.call(_this, obj);
             }
         }
-        _this.hitCheck(event);
+
+        var hitObj = _this.hitCheck(event);
+        if (_this.isHit) {
+            _this.touchObj = hitObj;
+            var mc = hitObj.parent;
+            if (mc.active) {
+                mc.setButtonStatus("down");
+                if (mc instanceof TextField) {
+                    _this.appendTextArea(mc, hitObj);
+                } else {
+                    _this.executePress(mc, hitObj);
+                }
+            }
+        }
+    };
+
+    /**
+     * @param mc
+     * @param hitObj
+     */
+    Stage.prototype.executePress = function(mc, hitObj)
+    {
+        var _this = this;
+        if (mc instanceof MovieClip) {
+            var clipEvent = mc.clipEvent;
+            if ("press" in clipEvent) {
+                _this.executeEventAction({as:clipEvent["press"], mc: mc});
+            }
+            var variables = mc.variables;
+            if ("onPress" in variables) {
+                _this.executeEventAction({as:[variables["onPress"]], mc: mc});
+            }
+        }
+
+        var button = hitObj.button;
+        if (button) {
+            button.setButtonStatus("down");
+            var actions = button.getActions();
+            var length = actions.length;
+            if (length) {
+                for (var idx = 0; idx < length; idx++) {
+                    if (!(idx in actions)) {
+                        continue;
+                    }
+
+                    var cond = actions[idx];
+                    if (cond.CondOverDownToOverUp) {
+                        _this.touchEndAction = cond.ActionScript;
+                        continue;
+                    }
+
+                    // enter
+                    var keyPress = cond.CondKeyPress;
+                    if (hitObj.CondKeyPress === 13 && hitObj.CondKeyPress !== keyPress) {
+                        continue;
+                    }
+
+                    if (isTouch) {
+                        if (keyPress === 13 ||
+                            (keyPress >= 48 && keyPress <= 57) ||
+                            cond.CondOverUpToOverDown ||
+                            (isTouch && cond.CondIdleToOverUp)
+                        ) {
+                            _this.buttonAction(mc, cond.ActionScript);
+                        }
+                    } else {
+                        if (cond.CondOverUpToOverDown) {
+                            _this.buttonAction(mc, cond.ActionScript);
+                        }
+                    }
+                }
+            }
+
+            var func = button.getVariable("onPress");
+            if (typeof func === "function") {
+                var as = func.cache;
+                as.setVariable("this", button);
+                as.execute(mc);
+                _this.executeAction();
+            }
+
+            _this.touchRender();
+            var buttonCharacter = button.getButtonCharacter();
+            buttonCharacter.startSound();
+        }
+    };
+
+    /**
+     * @param textField
+     * @param hitObj
+     */
+    Stage.prototype.appendTextArea = function(textField, hitObj)
+    {
+        var _this = this;
+        textField.inputActive = true;
+        var element = _document.getElementById(textField.getTagName());
+        if (!element) {
+            element = textField.input;
+            var variable = textField.getProperty("variable");
+            var text;
+            if (variable) {
+                var mc = textField.getParent();
+                text = mc.getProperty(variable);
+                if (text === undefined) {
+                    text = textField.getVariable("text");
+                }
+            }
+            if (text !== undefined) {
+                element.value = text;
+            }
+
+            var maxLength = textField.getVariable("maxChars");
+            if (maxLength) {
+                element.maxLength = maxLength;
+            }
+            var border = textField.getVariable("border");
+            if (border) {
+                element.style.border = "1px solid black";
+                var backgroundColor = textField.getVariable("backgroundColor");
+                element.style.backgroundColor = rgba(backgroundColor);
+            }
+
+            var scale = _this.getScale();
+            var left = hitObj.xMin;
+            var top = hitObj.yMin;
+            var width = hitObj.xMax - left;
+            var height = hitObj.yMax - top;
+            element.style.left = _ceil(left * scale) - 3 + "px";
+            element.style.top = _ceil(top * scale) - 3 + "px";
+            element.style.width = _ceil(width * scale) + 6 + "px";
+            element.style.height = _ceil(height * scale) + 6 + "px";
+
+            var div = _document.getElementById(_this.getName());
+            if (div) {
+                div.appendChild(element);
+                var focus = function(el){ return function(){ el.focus(); }; };
+                _setTimeout(focus(element), 0);
+            }
+        }
     };
 
     /**
@@ -15358,6 +15387,12 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchMove = function(event)
     {
         var _this = this;
+        var mc;
+        var as;
+        var button;
+        var func;
+        var variables;
+        var overObj = _this.overObj;
         var moveEventHits = _this.moveEventHits;
         var length = moveEventHits.length;
         if (length) {
@@ -15369,34 +15404,136 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        if (_this.isTouchEvent) {
-            var isHit = _this.isHit;
-            _this.hitCheck(event);
+        if (!isTouch || (isTouch && _this.isTouchEvent)) {
+            var hitObj = _this.hitCheck(event);
+            var touchObj = _this.touchObj;
+            var buttonCharacter;
+            var isRender = false;
+            if (touchObj) {
+                button = touchObj.button;
+                mc = touchObj.parent;
+                if (mc.active) {
+                    _this.overObj = hitObj;
 
-            if (isHit && !_this.isHit || !isHit && _this.isHit) {
-                var touchObj = _this.touchObj;
-                if (touchObj) {
-                    var mc = touchObj.parent;
-                    if (mc.getButtonStatus() === "down") {
-                        mc.setButtonStatus("up");
-                    }
-
-                    var button = touchObj.button;
-                    if (button) {
-                        var buttonCharacter;
-                        if (button.getButtonStatus() === "down") {
-                            button.setButtonStatus("up");
-                            buttonCharacter = button.getButtonCharacter();
-                            buttonCharacter.startSound();
-                            _this.touchRender();
+                    if (hitObj && hitObj.parent.instanceId === mc.instanceId) {
+                        if (mc instanceof MovieClip && mc.getButtonStatus() === "up") {
+                            mc.setButtonStatus("down");
+                            variables = mc.variables;
+                            if ("onDragOver" in variables) {
+                                _this.executeEventAction({as: [variables["onDragOver"]], mc: mc});
+                            }
                         }
 
-                        if (!isHit && _this.isHit) {
-                            buttonCharacter = button.getButtonCharacter("over");
+                        if (button && button.getButtonStatus() === "up") {
+                            button.setButtonStatus("down");
+                            buttonCharacter = button.getButtonCharacter();
                             buttonCharacter.startSound();
+
+                            func = button.getVariable("onDragOver");
+                            if (typeof func === "function") {
+                                as = func.cache;
+                                as.setVariable("this", button);
+                                as.execute(mc);
+                                _this.executeAction();
+                            }
+                            isRender = true;
+                        }
+                    } else {
+                        mc.setButtonStatus("up");
+                        if (mc instanceof MovieClip && mc.getButtonStatus() === "down") {
+                            variables = mc.variables;
+                            if ("onDragOut" in variables) {
+                                _this.executeEventAction({as: [variables["onDragOut"]], mc: mc});
+                            }
+                        }
+
+                        if (button) {
+                            if (button.getButtonStatus() === "down") {
+                                button.setButtonStatus("up");
+                                func = button.getVariable("onDragOut");
+                                if (typeof func === "function") {
+                                    as = func.cache;
+                                    as.setVariable("this", button);
+                                    as.execute(mc);
+                                    _this.executeAction();
+                                }
+                                isRender = true;
+                            }
                         }
                     }
                 }
+            } else if (hitObj) {
+                if (overObj) {
+                    button = overObj.button;
+                    if (button && button !== hitObj.button) {
+                        mc = overObj.parent;
+                        if (mc.active) {
+                            button.setButtonStatus("up");
+                            _this.executeButtonAction(button, mc, "CondOverUpToIdle");
+                        }
+                    }
+                }
+
+                _this.overObj = hitObj;
+                button = hitObj.button;
+                mc = hitObj.parent;
+                if (!isTouch && mc instanceof MovieClip && mc.active) {
+                    if (!overObj || overObj.parent !== mc) {
+                        variables = mc.variables;
+                        if ("onRollOver" in variables) {
+                            _this.executeEventAction({as: [variables["onRollOver"]], mc: mc});
+                        }
+                    }
+                }
+
+                if (button) {
+                    button.setButtonStatus("over");
+                    buttonCharacter = button.getButtonCharacter();
+                    buttonCharacter.startSound();
+                    if (!isTouch) {
+                        _this.executeButtonAction(button, mc, "CondIdleToOverUp");
+                        if (!overObj || overObj.button !== button) {
+                            func = button.getVariable("onRollOver");
+                            if (typeof func === "function") {
+                                as = func.cache;
+                                as.setVariable("this", button);
+                                as.execute(mc);
+                                _this.executeAction();
+                            }
+                        }
+                    }
+                    isRender = true;
+                }
+            } else {
+                _this.overObj = null;
+                if (overObj) {
+                    button = overObj.button;
+                    mc = overObj.parent;
+                    if (mc.active) {
+                        mc.setButtonStatus("up");
+                        variables = mc.variables;
+                        if ("onRollOut" in variables) {
+                            _this.executeEventAction({as: [variables["onRollOut"]], mc: mc});
+                        }
+
+                        if (button) {
+                            button.setButtonStatus("up");
+                            _this.executeButtonAction(button, mc, "CondOverUpToIdle");
+                            func = button.getVariable("onRollOut");
+                            if (typeof func === "function") {
+                                as = func.cache;
+                                as.setVariable("this", button);
+                                as.execute(mc);
+                                _this.executeAction();
+                            }
+                        }
+                    }
+                    isRender = true;
+                }
+            }
+
+            if (isRender) {
+                _this.touchRender();
             }
 
             var dragMc = _this.dragMc;
@@ -15430,43 +15567,55 @@ if (!("swf2js" in window)){(function(window)
             var isRender = false;
             var touchEndAction = _this.touchEndAction;
             var mc = touchObj.parent;
-            if (touchEndAction !== null) {
-                event.preventDefault();
-                _this.buttonAction(mc, touchEndAction);
-                isRender = true;
-            }
-            var button = touchObj.button;
-            if (button) {
-                var func = button.getVariable("onRelease");
-                if (typeof func === "function") {
-                    var as = func.cache;
-                    as.setVariable("this", button);
-                    as.execute(mc);
-                    _this.executeAction();
-                }
-
-                button.setButtonStatus("up");
-                var buttonCharacter = button.getButtonCharacter("hit");
-                buttonCharacter.startSound();
-                isRender = true;
-            }
-
-            if (mc instanceof MovieClip) {
-                var clipEvent = mc.clipEvent;
-                if ('release' in clipEvent) {
-                    _this.executeEventAction({as:clipEvent["release"], mc:mc});
-                    isRender = true;
-                }
-                var variables = mc.variables;
-                if ('onRelease' in variables) {
-                    _this.executeEventAction({as:[variables["onRelease"]], mc:mc});
-                    isRender = true;
-                }
-            }
-
             mc.setButtonStatus("up");
-            if (isRender) {
-                _this.touchRender();
+
+            if (mc.active) {
+                if (touchEndAction !== null) {
+                    event.preventDefault();
+                    _this.buttonAction(mc, touchEndAction);
+                    isRender = true;
+                }
+
+                if (mc instanceof MovieClip) {
+                    var clipEvent = mc.clipEvent;
+                    if ('release' in clipEvent) {
+                        _this.executeEventAction({as: clipEvent["release"], mc: mc});
+                        isRender = true;
+                    }
+                    var variables = mc.variables;
+                    if ('onRelease' in variables) {
+                        _this.executeEventAction({as: [variables["onRelease"]], mc: mc});
+                        isRender = true;
+                    }
+                }
+
+                var button = touchObj.button;
+                if (button) {
+                    var func = button.getVariable("onRelease");
+                    if (typeof func === "function") {
+                        var as = func.cache;
+                        as.setVariable("this", button);
+                        as.execute(mc);
+                        _this.executeAction();
+                    }
+
+                    var status = "up";
+                    if (!isTouch) {
+                        var hitObj = _this.hitCheck(event);
+                        if (hitObj && hitObj.button === button) {
+                            status = "over";
+                        }
+                    }
+                    button.setButtonStatus(status);
+
+                    var buttonCharacter = button.getButtonCharacter("hit");
+                    buttonCharacter.startSound();
+                    isRender = true;
+                }
+
+                if (isRender) {
+                    _this.touchRender();
+                }
             }
         }
 
@@ -15475,6 +15624,34 @@ if (!("swf2js" in window)){(function(window)
         _this.touchObj = null;
         _event = null;
     };
+
+    /**
+     * @param button
+     * @param mc
+     * @param status
+     */
+    Stage.prototype.executeButtonAction = function(button, mc, status)
+    {
+        var _this = this;
+        var actions = button.getActions();
+        var length = actions.length;
+        if (length) {
+            for (var idx = 0; idx < length; idx++) {
+                if (!(idx in actions)) {
+                    continue;
+                }
+
+                var cond = actions[idx];
+                if (!cond[status]) {
+                    continue;
+                }
+
+                _this.buttonAction(mc, cond.ActionScript);
+            }
+        }
+    };
+
+
 
     /**
      * touchRender
