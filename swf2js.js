@@ -1907,6 +1907,19 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (obj instanceof MovieClip) {
+            var controlTag = {};
+            controlTag.matrix = _cloneArray(matrix);
+            controlTag.colorTransform = _cloneArray(colorTransform);
+
+            var _controlTag = {};
+            _controlTag.instanceId = obj.instanceId;
+            _controlTag.isReset = 1;
+            _controlTag._matrix = _cloneArray(matrix);
+            _controlTag._colorTransform = _cloneArray(colorTransform);
+
+            controller[frame][tag.Depth] = controlTag;
+            _controller[frame][tag.Depth] = _controlTag;
+
             var as = stage.initActions[obj.getCharacterId()];
             if (as) {
                 obj.active = true;
@@ -1916,24 +1929,6 @@ if (!("swf2js" in window)){(function(window)
         } else {
             obj.setMatrix(_cloneArray(matrix));
             obj.setColorTransform(_cloneArray(colorTransform));
-        }
-
-        if (!(obj instanceof Shape)) {
-            var controlTag = {};
-            var _controlTag = {};
-            _controlTag.instanceId = obj.instanceId;
-            _controlTag.isReset = 0;
-            if (obj instanceof MovieClip) {
-                controlTag.matrix = _cloneArray(matrix);
-                controlTag.colorTransform = _cloneArray(colorTransform);
-
-                _controlTag.isReset = 1;
-                _controlTag._matrix = _cloneArray(matrix);
-                _controlTag._colorTransform = _cloneArray(colorTransform);
-            }
-
-            controller[frame][tag.Depth] = controlTag;
-            _controller[frame][tag.Depth] = _controlTag;
         }
 
         return obj;
@@ -11005,6 +11000,7 @@ if (!("swf2js" in window)){(function(window)
 
         _controller[frame][depth] = {
             instanceId: mc.instanceId,
+            isReset: 1,
             _colorTransform: _cloneArray([1,1,1,1,0,0,0,0]),
             _matrix: _cloneArray([1,0,0,1,0,0])
         };
@@ -11727,6 +11723,7 @@ if (!("swf2js" in window)){(function(window)
                 }
                 _controller[currentFrame][depth] = {
                     instanceId: movieClip.instanceId,
+                    isReset: 1,
                     _colorTransform: _cloneArray(cTag.colorTransform),
                     _matrix: _cloneArray(cTag.matrix)
                 };
@@ -11866,6 +11863,7 @@ if (!("swf2js" in window)){(function(window)
             }
             _controller[frame][depth] = {
                 instanceId: cloneMc.instanceId,
+                isReset: 1,
                 _matrix: _cloneArray(matrix),
                 _colorTransform: _cloneArray(colorTransform)
             };
@@ -12421,11 +12419,11 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 _cTag = _cTags[depth];
-                if (_cTag.isReset) {
+                //if (_cTag.isReset) {
                     cTag = controller[frame][depth];
                     cTag.matrix = _cloneArray(_cTag._matrix);
                     cTag.colorTransform = _cloneArray(_cTag._colorTransform);
-                }
+                //}
 
                 if (depth in tags) {
                     var obj = tags[depth];
@@ -15723,8 +15721,8 @@ if (!("swf2js" in window)){(function(window)
         _this.touchObj = null;
         _event = null;
 
-        _this.hitCheck(event);
         if (!isTouch) {
+            _this.hitCheck(event);
             var canvas = _this.canvas;
             if (_this.isHit) {
                 canvas.style.cursor = "pointer";
