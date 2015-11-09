@@ -1,7 +1,7 @@
 /*jshint bitwise: false*/
 /*jshint sub:true*/
 /**
- * swf2js (version 0.5.24)
+ * swf2js (version 0.5.25)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -1727,6 +1727,7 @@ if (!("swf2js" in window)){(function(window)
                 var prevTags = addTags[prevFrame];
                 if (!(frame in addTags)) {
                     addTags[frame] = [];
+                    controller[frame] = [];
                 }
 
                 length = prevTags.length;
@@ -1906,19 +1907,18 @@ if (!("swf2js" in window)){(function(window)
             colorTransform = tag.ColorTransform;
         }
 
+        var controlTag = {};
+        var _controlTag = {};
+        _controlTag.isReset = 0;
+
         if (obj instanceof MovieClip) {
-            var controlTag = {};
             controlTag.matrix = _cloneArray(matrix);
             controlTag.colorTransform = _cloneArray(colorTransform);
 
-            var _controlTag = {};
             _controlTag.instanceId = obj.instanceId;
             _controlTag.isReset = 1;
             _controlTag._matrix = _cloneArray(matrix);
             _controlTag._colorTransform = _cloneArray(colorTransform);
-
-            controller[frame][tag.Depth] = controlTag;
-            _controller[frame][tag.Depth] = _controlTag;
 
             var as = stage.initActions[obj.getCharacterId()];
             if (as) {
@@ -1929,6 +1929,14 @@ if (!("swf2js" in window)){(function(window)
         } else {
             obj.setMatrix(_cloneArray(matrix));
             obj.setColorTransform(_cloneArray(colorTransform));
+        }
+
+        if (obj instanceof MovieClip ||
+            obj instanceof TextField ||
+            obj instanceof Button
+        ) {
+            controller[frame][tag.Depth] = controlTag;
+            _controller[frame][tag.Depth] = _controlTag;
         }
 
         return obj;
@@ -2015,6 +2023,8 @@ if (!("swf2js" in window)){(function(window)
         textField.setRatio(tag.Ratio || 0);
         textField.setTagType(character.tagType);
         textField.setBounds(character.bounds);
+        textField.setLevel(tag.Depth);
+
         if (tag.PlaceFlagHasName) {
             textField.setName(tag.Name);
         }
@@ -2171,6 +2181,7 @@ if (!("swf2js" in window)){(function(window)
         text.setRatio(tag.Ratio || 0);
         text.setTagType(character.tagType);
         text.setBounds(character.bounds);
+        text.setLevel(tag.Depth);
 
         var records = character.textRecords;
         var length = records.length;
@@ -2242,6 +2253,7 @@ if (!("swf2js" in window)){(function(window)
         shape.setTagType(character.tagType);
         shape.setBounds(character.bounds);
         shape.setData(character.data);
+        shape.setLevel(tag.Depth);
         return shape;
     };
 
@@ -2259,6 +2271,8 @@ if (!("swf2js" in window)){(function(window)
         var button = new Button();
         button.setParent(parent);
         button.setStage(_this.stage);
+        button.setLevel(tag.Depth);
+
         if ("actions" in character) {
             button.setActions(character.actions);
         }
@@ -8183,6 +8197,8 @@ if (!("swf2js" in window)){(function(window)
         proto.getMovieClip = _this.getMovieClip;
         proto.getEnabled = _this.getEnabled;
         proto.setEnabled = _this.setEnabled;
+        proto.getLevel = _this.getLevel;
+        proto.setLevel = _this.setLevel;
 
         caller.variables = [];
         caller._currentframe = 1;
@@ -8982,6 +8998,22 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @returns {number}
+     */
+    Property.prototype.getLevel = function()
+    {
+        return this._level;
+    };
+
+    /**
+     * @param level
+     */
+    Property.prototype.setLevel = function(level)
+    {
+        this._level = level;
+    };
+
+    /**
      * @param path
      * @returns {*}
      */
@@ -9211,6 +9243,7 @@ if (!("swf2js" in window)){(function(window)
         caller.bounds = null;
         caller.matrix = null;
         caller.colorTransform = null;
+        caller._level = 0;
         var proto = Object.getPrototypeOf(caller);
         proto.getBounds = _this.getBounds;
         proto.setBounds = _this.setBounds;
@@ -9218,6 +9251,8 @@ if (!("swf2js" in window)){(function(window)
         proto.setMatrix = _this.setMatrix;
         proto.getColorTransform = _this.getColorTransform;
         proto.setColorTransform = _this.setColorTransform;
+        proto.getLevel = _this.getLevel;
+        proto.setLevel = _this.setLevel;
     };
 
     /**
@@ -9277,6 +9312,22 @@ if (!("swf2js" in window)){(function(window)
     ShapeAndText.prototype.setColorTransform = function(colorTransform)
     {
         this.colorTransform = colorTransform;
+    };
+
+    /**
+     * @returns {number}
+     */
+    ShapeAndText.prototype.getLevel = function()
+    {
+        return this._level;
+    };
+
+    /**
+     * @param level
+     */
+    ShapeAndText.prototype.setLevel = function(level)
+    {
+        this._level = level;
     };
 
     /**
@@ -9897,7 +9948,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (depth) {
-            mc.swapDepths(mc, depth);
+            mc.s(mc, depth);
         }
 
         _this.fontId = 0;
@@ -12129,22 +12180,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    MovieClip.prototype.getLevel = function()
-    {
-        return this._level;
-    };
-
-    /**
-     * @param level
-     */
-    MovieClip.prototype.setLevel = function(level)
-    {
-        this._level = level;
-    };
-
-    /**
-     * @returns {number}
-     */
     MovieClip.prototype.getDepth = function()
     {
         var _this = this;
@@ -12164,14 +12199,30 @@ if (!("swf2js" in window)){(function(window)
         var parent = _this.getParent();
         var _depth = _this._depth;
         var level  = (_depth) ? _depth : _this.getLevel();
-        var tags = parent.getTags();
-        if (!swapMc) {
-            delete tags[level];
-        } else {
-            tags[swapDepth] = swapMc;
-        }
+        var totalFrame = parent.getTotalFrames() + 1;
+        for (var frame = 1; frame < totalFrame; frame++) {
+            var tags = parent.getTags(frame);
+            if (!tags.length) {
+                continue;
+            }
 
-        tags[depth] = _this;
+            if (!(level in tags)) {
+                continue;
+            }
+
+            var tag = tags[level];
+            if (tag.instanceId !== _this.instanceId) {
+                continue;
+            }
+
+            if (!swapMc) {
+                delete tags[level];
+            } else {
+                tags[swapDepth] = swapMc;
+            }
+
+            tags[depth] = _this;
+        }
 
         _this._depth = 0;
         if (depth >= 16384) {
@@ -12258,8 +12309,8 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.getTags = function(frame)
     {
         var _this = this;
-        var addFrame = (!frame) ? _this.getFrame() : frame;
-        return (addFrame in _this.addTags) ? _this.addTags[addFrame] : [];
+        var key = (!frame) ? _this.getFrame() : frame;
+        return (key in _this.addTags) ? _this.addTags[key] : [];
     };
 
     /**
@@ -12349,9 +12400,9 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * reset
+     * @param clearParent
      */
-    MovieClip.prototype.reset = function()
+    MovieClip.prototype.reset = function(clearParent)
     {
         var _this = this;
         var _cloneArray = cloneArray;
@@ -12364,47 +12415,39 @@ if (!("swf2js" in window)){(function(window)
         var _cTags;
         var _cTag;
         var cTag;
+        var tag = null;
+        var tags = [];
+        var resetTags = [];
 
         for (var frame = 1; frame < totalFrames; frame++) {
-            if (!(frame in _controller)) {
-                continue;
-            }
-
-            var tags = _this.getTags(frame);
+            tags = _this.getTags(frame);
             length = tags.length;
             if (length) {
-                var isMoveDepth = false;
-                var resetTags = [];
+                resetTags = [];
                 for (depth = 1; depth < length; depth++) {
                     if (!(depth in tags)) {
                         continue;
                     }
 
-                    var tag = tags[depth];
-                    if (!(tag instanceof MovieClip)) {
-                        resetTags[depth] = tag;
-                        continue;
+                    tag = tags[depth];
+                    if (tag.getLevel() !== depth) {
+                        resetTags[tag.getLevel()] = tag;
                     }
-
-                    level = tag.getLevel();
-                    if (level === depth) {
-                        resetTags[depth] = tag;
-                        continue;
-                    }
-
-                    isMoveDepth = true;
-                    delete tags[depth];
-                    resetTags[level] = tag;
                 }
 
-                if (isMoveDepth) {
-                    for (var rLength = resetTags.length; rLength--;) {
-                        if (!(rLength in resetTags)) {
+                length = resetTags.length;
+                if (length) {
+                    for (depth = 1; depth < length; depth++) {
+                        if (!(depth in resetTags)) {
                             continue;
                         }
-                        tags[rLength] = resetTags[rLength];
+                        tags[depth] = resetTags[depth];
                     }
                 }
+            }
+
+            if (!(frame in _controller)) {
+                continue;
             }
 
             _cTags = _controller[frame];
@@ -12419,48 +12462,74 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 _cTag = _cTags[depth];
-                //if (_cTag.isReset) {
+                if (_cTag.isReset) {
                     cTag = controller[frame][depth];
                     cTag.matrix = _cloneArray(_cTag._matrix);
                     cTag.colorTransform = _cloneArray(_cTag._colorTransform);
-                //}
+                }
 
                 if (depth in tags) {
                     var obj = tags[depth];
-                    obj.reset();
+                    obj.reset(false);
                 }
             }
         }
 
-        var parent = _this.getParent();
-        if (!parent) {
-            parent = _this.getStage().getParent();
-        }
 
-        _controller = parent._controller;
-        controller = parent.controller;
-        totalFrames = _controller.length;
-        level = _this.getLevel();
-        for (frame = 1; frame < totalFrames; frame++) {
-            if (!(frame in _controller)) {
-                continue;
+        if (clearParent !== false) {
+            var parent = _this.getParent();
+            if (parent) {
+                _controller = parent._controller;
+                controller = parent.controller;
+                totalFrames = _controller.length;
+                level = _this.getLevel();
+                for (frame = 1; frame < totalFrames; frame++) {
+                    tags = parent.getTags(frame);
+                    length = tags.length;
+                    if (length) {
+                        resetTags = [];
+                        for (depth = 1; depth < length; depth++) {
+                            if (!(depth in tags)) {
+                                continue;
+                            }
+
+                            tag = tags[depth];
+                            if (tag.getLevel() !== depth) {
+                                resetTags[tag.getLevel()] = tag;
+                            }
+                        }
+
+                        length = resetTags.length;
+                        if (length) {
+                            for (depth = 1; depth < length; depth++) {
+                                if (!(depth in resetTags)) {
+                                    continue;
+                                }
+
+                                tags[depth] = resetTags[depth];
+                            }
+                        }
+                    }
+
+                    if (!(frame in _controller)) {
+                        continue;
+                    }
+
+                    _cTags = _controller[frame];
+                    if (!(level in _cTags)) {
+                        continue;
+                    }
+
+                    _cTag = _cTags[level];
+                    if (_this.instanceId !== _cTag.instanceId) {
+                        continue;
+                    }
+
+                    cTag = controller[frame][level];
+                    cTag.matrix = _cloneArray(_cTag._matrix);
+                    cTag.colorTransform = _cloneArray(_cTag._colorTransform);
+                }
             }
-
-            _cTags = _controller[frame];
-            if (!(level in _cTags)) {
-                continue;
-            }
-
-            _cTag = _cTags[level];
-            if (_this.instanceId !== _cTag.instanceId) {
-                continue;
-            }
-
-            cTag = controller[frame][level];
-            cTag.matrix = _cloneArray(_cTag._matrix);
-            cTag.colorTransform = _cloneArray(_cTag._colorTransform);
-
-            break;
         }
 
         _this.initParams();
@@ -13602,7 +13671,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var sendMethod = method ? method.toUpperCase() : "GET";
         if (target) {
-
+            console.log(target);
         }
         var xmlHttpRequest = new XMLHttpRequest();
         xmlHttpRequest.open(sendMethod, url);
@@ -14645,6 +14714,7 @@ if (!("swf2js" in window)){(function(window)
             obj.setBounds(bounds);
             obj.setMatrix(cloneArray([1,0,0,1,0,0]));
             obj.setColorTransform(cloneArray([1,1,1,1,0,0,0,0]));
+            obj.setLevel(1);
 
             var mc = _this.getParent();
             mc.addTags[1] = [];
@@ -14776,7 +14846,6 @@ if (!("swf2js" in window)){(function(window)
                             var audio = loadSounds[i];
                             audio.load();
                         }
-                        _this.loadSounds = [];
                     };
                     canvas.addEventListener(startEvent, loadSound);
                 }
