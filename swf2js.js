@@ -11636,7 +11636,7 @@ if (!("swf2js" in window)){(function(window)
             var tags = parent.getTags();
             var tag;
             if (mc instanceof MovieClip) {
-                if (_this.getParent() === mc.getParent()) {
+                if (parent === mc.getParent()) {
                     depth = mc.getLevel();
                     swapDepth = _this.getLevel();
                     swapMc = mc;
@@ -11644,7 +11644,15 @@ if (!("swf2js" in window)){(function(window)
                     if (depth in tags) {
                         tag = tags[depth];
                         if (tag.instanceId !== mc.instanceId) {
-                            tags[tag.getLevel()] = tag;
+                            var totalFrames = parent.getTotalFrames() + 1;
+                            for (var frame = 1; frame < totalFrames; frame++) {
+                                tags = parent.getTags(frame);
+                                if (depth in tags) {
+                                    tag = tags[depth];
+                                    tags[depth] = mc;
+                                    tags[tag.getLevel()] = tag;
+                                }
+                            }
                         }
                     }
 
@@ -12210,11 +12218,6 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            var tag = tags[level];
-            if (tag.instanceId !== _this.instanceId) {
-                continue;
-            }
-
             if (!swapMc) {
                 delete tags[level];
             } else {
@@ -12505,7 +12508,6 @@ if (!("swf2js" in window)){(function(window)
                                 if (!(depth in resetTags)) {
                                     continue;
                                 }
-
                                 tags[depth] = resetTags[depth];
                             }
                         }
