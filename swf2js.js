@@ -8204,10 +8204,7 @@ if (!("swf2js" in window)){(function(window)
             } else if (path.indexOf(".") !== -1) {
                 split = path.split(".");
                 target = split.pop();
-                var length = split.length;
-                for (var i = 0; i < length; i++) {
-                    targetPath += split[i];
-                }
+                targetPath += split.join(".");
             }
 
             if (targetPath !== "") {
