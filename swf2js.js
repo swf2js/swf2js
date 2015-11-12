@@ -13913,7 +13913,44 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @constructor
      */
-    var Key = function(){};
+    var Key = function()
+    {
+        var _this = this;
+        _this.keyDownEvent = [];
+        _this.keyUpEvent = [];
+    };
+
+    /**
+     * @param listener
+     */
+    Key.prototype.addListener = function(listener)
+    {
+        var _this = this;
+        var onKeyDown;
+        var onKeyUp;
+        if ("getProperty" in listener) {
+            onKeyDown = listener.getProperty("onKeyDown");
+            onKeyUp = listener.getProperty("onKeyUp");
+        } else {
+            onKeyDown = listener.onKeyDown;
+            onKeyUp = listener.onKeyUp;
+        }
+
+        var as;
+        if (onKeyDown) {
+            as = onKeyDown.cache;
+            as.setVariable("this", listener);
+            var keyDownEvent = _this.keyDownEvent;
+            keyDownEvent[keyDownEvent.length] = onKeyDown;
+        }
+
+        if (onKeyUp) {
+            as = onKeyUp.cache;
+            as.setVariable("this", listener);
+            var keyUpEvent = _this.keyUpEvent;
+            keyUpEvent[keyUpEvent.length] = onKeyUp;
+        }
+    };
 
     /**
      * @param code
@@ -13975,12 +14012,47 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param event
      */
-    function keyAction(event)
+    function keyDownAction(event)
+    {
+        _event = event;
+        var keyUpEvent = keyClass.keyUpEvent;
+        var length = keyUpEvent.length;
+        if (length) {
+            for (var i = 0; i < length; i++) {
+                var func = keyUpEvent[i];
+                var as = func.cache;
+                var mc = as.getVariable("this");
+                func(as, mc, []);
+            }
+        }
+    }
+
+    /**
+     * @param event
+     */
+    function keyUpAction(event)
     {
         _event = event;
         var keyCode = keyClass.getCode();
-        var length = stages.length;
+        var i;
+        var length;
+        var func;
+        var as;
+        var mc;
+        var keyDownEvent = keyClass.keyDownEvent;
+        length = keyDownEvent.length;
+        if (length) {
+            for (i = 0; i < length; i++) {
+                func = keyDownEvent[i];
+                as = func.cache;
+                mc = as.getVariable("this");
+                func(as, mc, []);
+            }
+        }
+
+
         var idx;
+        length = stages.length;
         for (var pIdx = 0; pIdx < length; pIdx++) {
             if (!(pIdx in stages)) {
                 continue;
@@ -14000,7 +14072,7 @@ if (!("swf2js" in window)){(function(window)
             var buttonHits = stage.buttonHits;
             var len = buttonHits.length;
             var isEnd = false;
-            for (var i = len; i--;) {
+            for (i = len; i--;) {
                 if (!(i in buttonHits)) {
                     continue;
                 }
@@ -15077,7 +15149,8 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (!isTouch) {
-                window.addEventListener("keydown", keyAction);
+                window.addEventListener("keydown", keyUpAction);
+                window.addEventListener("keyup", keyDownAction);
                 window.addEventListener("keyup", function (event)
                 {
                     _event = event;
