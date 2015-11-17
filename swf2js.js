@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.28)
+ * swf2js (version 0.5.29)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -2513,7 +2513,6 @@ if (!("swf2js" in window)){(function(window)
             case 35: // DefineBitsJPEG3
             case 90: // DefineBitsJPEG4
                 _this.parseDefineBits(tagType, length, _this.jpegTables);
-                _this.jpegTables = null;
                 break;
             case 8: // JPEGTables
                 _this.jpegTables = _this.parseJPEGTables(length);
@@ -8480,6 +8479,10 @@ if (!("swf2js" in window)){(function(window)
                     } else {
                         _this.setVariable("text", value);
                     }
+                    var input = _this.input;
+                    if (input) {
+                        input.value = value;
+                    }
                 } else {
                     _this.setVariable(target, value);
                 }
@@ -9910,7 +9913,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (depth) {
-            mc.s(mc, depth);
+            _this.setLevel(depth);
         }
 
         _this.fontId = 0;
@@ -11042,8 +11045,8 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.createTextField = function(name, depth, x, y, width, height)
     {
-        console.log("createTextField");
-        return new TextField(name, depth, x, y, width, height);
+        console.log("createTextField", name, depth, x, y, width, height);
+        return new TextField(this, name, depth, x, y, width, height);
     };
 
     /**
@@ -12442,7 +12445,11 @@ if (!("swf2js" in window)){(function(window)
 
                 if (depth in tags) {
                     var obj = tags[depth];
-                    obj.reset(false);
+                    if (obj instanceof MovieClip && obj.removable) {
+                        obj.removeMovieClip();
+                    } else {
+                        obj.reset(false);
+                    }
                 }
             }
         }
