@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.29)
+ * swf2js (version 0.5.30)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -7584,7 +7584,7 @@ if (!("swf2js" in window)){(function(window)
         var property;
         if (object instanceof Object) {
             if ("getProperty" in object) {
-                property = object.getProperty(name);
+                property = object.getProperty(name, false);
             } else {
                 if (object instanceof _NamedNodeMap) {
                     object = object.getNamedItem(name);
@@ -7773,8 +7773,9 @@ if (!("swf2js" in window)){(function(window)
                     object = targetMc;
                 }
             }
+
             if ("setProperty" in object && object !== MovieClip.prototype) {
-                object.setProperty(name, value);
+                object.setProperty(name, value, false);
             } else if (typeof object === "object" || typeof object === "function") {
                 object[name] = value;
             }
@@ -8216,15 +8217,19 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param name
+     * @param parse
      * @returns {undefined}
      */
-    Property.prototype.getProperty = function(name)
+    Property.prototype.getProperty = function(name, parse)
     {
         var _this = this;
-        var obj = _this.splitPath(name);
+        var target = name;
+        if (parse !== false) {
+            var obj = _this.splitPath(name);
+            _this = obj.scope;
+            target = obj.target;
+        }
 
-        _this = obj.scope;
-        var target = obj.target;
         var value;
         switch (target) {
             case 0:
@@ -8350,10 +8355,10 @@ if (!("swf2js" in window)){(function(window)
                 value = _this.getBlendMode();
                 break;
             case "SharedObject":
-                value = null;//new SharedObject();
+                value = new SharedObject();
                 break;
             default:
-                value = _this.getVariable(target);
+                value = _this.getVariable(target, parse);
                 break;
         }
 
@@ -8363,14 +8368,18 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param name
      * @param value
+     * @param parse
      */
-    Property.prototype.setProperty = function(name, value)
+    Property.prototype.setProperty = function(name, value, parse)
     {
         var _this = this;
-        var obj = _this.splitPath(name);
+        var target = name;
+        if (parse !== false) {
+            var obj = _this.splitPath(name);
+            _this = obj.scope;
+            target = obj.target;
+        }
 
-        _this = obj.scope;
-        var target = obj.target;
         switch (target) {
             case 0:
             case "_x":
@@ -8495,9 +8504,6 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case "enabled":
                 _this.setEnabled(value);
-                break;
-            case "SharedObject":
-
                 break;
             default:
                 _this.setVariable(target, value);
@@ -8857,9 +8863,10 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param name
+     * @param parse
      * @returns {*}
      */
-    Property.prototype.getVariable = function(name)
+    Property.prototype.getVariable = function(name, parse)
     {
         var _this = this;
         var variables = _this.variables;
@@ -8888,14 +8895,15 @@ if (!("swf2js" in window)){(function(window)
             if (name in window) {
                 return window[name];
             }
+
             if (_this instanceof MovieClip) {
-                value = _this.getMovieClip(name);
-                if (!value) {
-                    var parent = _this.getParent();
-                    if (parent) {
-                        value = parent.getMovieClip(name);
-                    }
-                }
+                value = _this.getMovieClip(name, parse);
+                //if (!value) {
+                //    var parent = _this.getParent();
+                //    if (parent) {
+                //        value = parent.getMovieClip(name);
+                //    }
+                //}
                 return value;
             }
         }
@@ -8980,9 +8988,10 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param path
+     * @param parse
      * @returns {*}
      */
-    Property.prototype.getMovieClip = function(path)
+    Property.prototype.getMovieClip = function(path, parse)
     {
         var _this = this;
         var mc = _this;
@@ -9042,17 +9051,19 @@ if (!("swf2js" in window)){(function(window)
 
         var len = 1;
         var splitData = [path];
-        if (path.indexOf("/") !== -1) {
-            splitData = path.split("/");
-            len = splitData.length;
-            if (splitData[0] === "") {
-                mc = _root;
-            }
-        } else if (path.indexOf(".") !== -1) {
-            splitData = path.split(".");
-            len = splitData.length;
-            if (splitData[0] === "_root") {
-                mc = _root;
+        if (parse !== false) {
+            if (path.indexOf("/") !== -1) {
+                splitData = path.split("/");
+                len = splitData.length;
+                if (splitData[0] === "") {
+                    mc = _root;
+                }
+            } else if (path.indexOf(".") !== -1) {
+                splitData = path.split(".");
+                len = splitData.length;
+                if (splitData[0] === "_root") {
+                    mc = _root;
+                }
             }
         }
 
@@ -13984,6 +13995,44 @@ if (!("swf2js" in window)){(function(window)
     Sound.prototype.getBytesTotal = function()
     {
         return 1;
+    };
+
+    /**
+     * @constructor
+     */
+    var SharedObject = function()
+    {
+        var _this = this;
+        _this.data = null;
+        _this.name = null;
+    };
+
+    /**
+     * @param name
+     * @returns {SharedObject}
+     */
+    SharedObject.prototype.getLocal = function(name)
+    {
+        var _this = this;
+        _this.name = name;
+        var data = window.localStorage.getItem(name);
+        if (!data) {
+            data = {};
+        } else {
+            data = JSON.parse(data);
+        }
+        _this.data = data;
+        return _this;
+    };
+
+    /**
+     * flush
+     */
+    SharedObject.prototype.flush = function()
+    {
+        var _this = this;
+        window.localStorage.setItem(_this.name, JSON.stringify(_this.data));
+        return true;
     };
 
     /**
