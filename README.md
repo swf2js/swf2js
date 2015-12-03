@@ -1,8 +1,8 @@
-FlashをHTML5に変換してiPhone、Androidで再生可能にする「swf2js」
+FlashをHTML5に変換してiPhone、Androidで再生可能にするJavaScript製FlashPlayer「swf2js」
 ======
 
-swfをJavaScriptで直接バイナリ分解してcanvas出力  
-変換と再生をリアルタイムで行っているので動的なswfも再生可能。  
+swfをJavaScriptで直接バイナリ分解してcanvasに出力  
+分解と変換をリアルタイムで行っているので動的なswfも再生可能。  
 対応バージョン: 
 * FlashLite 1.x, 2.x
 * ActionScript 1.0, 2.0
