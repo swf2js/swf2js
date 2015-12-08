@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.31)
+ * swf2js (version 0.5.32)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -4722,6 +4722,8 @@ if (!("swf2js" in window)){(function(window)
         }
 
         obj.ClipEventData = bitio.getUIBits(1);
+        bitio.byteAlign();
+
         if (stage.getVersion() >= 6) {
             bitio.getUIBits(5); // Reserved
             obj.construct = bitio.getUIBits(1);
@@ -4729,8 +4731,6 @@ if (!("swf2js" in window)){(function(window)
             obj.dragOut = bitio.getUIBits(1);
             bitio.getUIBits(8); // Reserved
         }
-
-        bitio.byteAlign();
 
         return obj;
     };
@@ -4802,7 +4802,7 @@ if (!("swf2js" in window)){(function(window)
         obj.color = _this.rgba();
         obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
         obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Angle = [bitio.getFloat16(), bitio.getFloat16()];
+        obj.Angle = bitio.getFloat32();
         obj.Distance = bitio.getFloat16() | bitio.getFloat16();
         obj.Strength = bitio.getFloat16() / 256;
         obj.InnerShadow = bitio.getUIBits(1);
@@ -8870,6 +8870,10 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var variables = _this.variables;
+        if (!variables) {
+            return undefined;
+        }
+
         if (name in variables) {
             return variables[name];
         }
@@ -8898,12 +8902,6 @@ if (!("swf2js" in window)){(function(window)
 
             if (_this instanceof MovieClip) {
                 value = _this.getMovieClip(name, parse);
-                //if (!value) {
-                //    var parent = _this.getParent();
-                //    if (parent) {
-                //        value = parent.getMovieClip(name);
-                //    }
-                //}
                 return value;
             }
         }
@@ -12641,6 +12639,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         _this.initParams();
+        _this.variables = {};
     };
 
     /**
@@ -12707,6 +12706,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var variables =_this.variables;
+
         as = variables.onMouseDown;
         if (as) {
             downEventHits[downEventHits.length] = {as: [as], mc: _this};
@@ -16006,8 +16006,10 @@ if (!("swf2js" in window)){(function(window)
                 mc = touchObj.parent;
                 if (mc.active) {
                     _this.overObj = hitObj;
-
-                    if (hitObj && hitObj.parent.instanceId === mc.instanceId) {
+                    if (hitObj &&
+                        hitObj.parent.instanceId === mc.instanceId &&
+                        hitObj.button === button
+                    ) {
                         if (mc instanceof MovieClip && mc.getButtonStatus() === "up") {
                             mc.setButtonStatus("down");
                             variables = mc.variables;
@@ -16236,7 +16238,6 @@ if (!("swf2js" in window)){(function(window)
         _this.isHit = false;
         _this.isTouchEvent = false;
         _this.touchObj = null;
-        _event = null;
 
         if (!isTouch) {
             _this.hitCheck(event);
