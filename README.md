@@ -1,4 +1,4 @@
-FlashをHTML5に変換してiPhone、Androidで再生可能にするJavaScript製FlashPlayer「swf2js」
+JavaScript製FlashPlayer「swf2js」Flash(swf)をHTML5に変換してiPhone、Androidで再生可能に!
 ======
 
 swfをJavaScriptで直接バイナリ分解してcanvasに出力  
@@ -17,9 +17,9 @@ Supports:
 * ActionScript 1.0, 2.0
 
 
-## Latest Version *0.5.31*  
+## Latest Version *0.5.32*  
 
--- Release Date: 02 Dec 2015  
+-- Release Date: 08 Dec 2015  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
