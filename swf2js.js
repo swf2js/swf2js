@@ -12115,18 +12115,26 @@ if (!("swf2js" in window)){(function(window)
             var depth = targetMc.getDepth() + 16384;
             var parent = targetMc.getParent();
             var addTags = parent.addTags;
-            for (var frame = parent.getTotalFrames() + 1; --frame;) {
-                delete addTags[frame][depth];
-            }
-
             var controller = parent.controller;
             var _controller = parent._controller;
-            for (frame = parent.getTotalFrames(); --frame;) {
+            for (var frame = parent.getTotalFrames() + 1; --frame;) {
                 if (frame in _controller && depth in _controller[frame]) {
-                    delete _controller[frame][depth];
+                    delete _controller[frame][targetMc.getLevel()];
                 }
+
                 if (frame in controller && depth in controller[frame]) {
-                    delete controller[frame][depth];
+                    delete controller[frame][targetMc.getLevel()];
+                }
+
+                if (!(frame in addTags)) {
+                    continue;
+                }
+
+                var tags = addTags[frame];
+                if (depth in tags) {
+                    delete addTags[frame][depth];
+                } else {
+                    delete addTags[frame][targetMc.getLevel()];
                 }
             }
         }
@@ -12362,16 +12370,20 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            if (tags[level] !== _this) {
-                continue;
-            }
-
             if (swapMc) {
+
+
+                if (tags[level] !== _this) {
+                    continue;
+                }
+
                 tags[swapDepth] = _this;
                 tags[depth] = swapMc;
             } else {
+                if (level in tags) {
+                    delete tags[level];
+                }
                 tags[depth] = _this;
-                delete tags[level];
             }
         }
 
