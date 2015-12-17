@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.33)
+ * swf2js (version 0.5.34)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -6709,8 +6709,21 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionStringEquals = function(stack)
     {
-        var a = stack.pop() + "";
-        var b = stack.pop() + "";
+        var a = stack.pop();
+        var b = stack.pop();
+
+        if (a instanceof MovieClip) {
+            a = a.getTarget();
+        } else {
+            a += "";
+        }
+
+        if (b instanceof MovieClip) {
+            b = b.getTarget();
+        } else {
+            b += "";
+        }
+
         if (this.version > 4) {
             stack[stack.length] = (b === a);
         } else {
@@ -9460,34 +9473,55 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
         var minScale = _min(rMatrix[0], rMatrix[3]);
-        setTransform(ctx, rMatrix);
+
+        var hitCanvas = ctx.canvas;
+        var width = hitCanvas.width;
+        var height = hitCanvas.height;
 
         var shapes = _this.getData();
         var length = shapes.length;
         var hit = false;
         for (var idx = 0; idx < length; idx++) {
-            var data = shapes[idx];
-            var obj = data.obj;
-            var isStroke = (obj.Width !== undefined);
+            var cacheId = _this.getCharacterId() + "_" + idx + "_" + stage.getId();
+            var cacheKey = cacheStore.generateKey("HitTest", cacheId, rMatrix);
+            var cache = cacheStore.get(cacheKey);
 
-            ctx.beginPath();
-            var cmd = data.cmd;
-            cmd(ctx);
+            if (!cache) {
+                var canvas = cacheStore.getCanvas();
+                canvas.width = width;
+                canvas.height = height;
+                cache = canvas.getContext("2d");
+                setTransform(cache, rMatrix);
 
-            if (isStroke) {
-                ctx.lineWidth = _max(obj.Width, 1 / minScale);
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                hit = ctx.isPointInStroke(x, y);
-            } else {
-                hit = ctx.isPointInPath(x, y);
+                var data = shapes[idx];
+                var obj = data.obj;
+                var isStroke = (obj.Width !== undefined);
+
+                cache.beginPath();
+                var cmd = data.cmd;
+                cmd(cache);
+
+                if (isStroke) {
+                    cache.lineWidth = _max(obj.Width, 1 / minScale);
+                    cache.lineCap = "round";
+                    cache.lineJoin = "round";
+                }
+
+                cacheStore.set(cacheKey, cache);
             }
 
+            hit = cache.isPointInPath(x, y);
+            if (hit) {
+                return hit;
+            }
+
+            hit = cache.isPointInStroke(x, y);
             if (hit) {
                 return hit;
             }
         }
-        return false;
+
+        return hit;
     };
 
     /**
@@ -10830,7 +10864,7 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = multiplicationMatrix;
         var _multiplicationColor = multiplicationColor;
 
-        if (visible && _this.getEnabled() && matrix[0] !== 0 && matrix[3] !== 0) {
+        if (visible && _this.getEnabled()) {
             // enter
             if (isTouch) {
                 var actions = _this.getActions();
@@ -11815,6 +11849,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             } else {
                 depth = arguments[0];
+                console.log(depth);
                 if (_isNaN(depth)) {
                     depth = parent.getNextHighestDepth();
                 }
@@ -11928,7 +11963,6 @@ if (!("swf2js" in window)){(function(window)
                 };
 
                 movieClip.addActions();
-                cacheStore.reset();
             }
         }
         return movieClip;
@@ -12113,17 +12147,19 @@ if (!("swf2js" in window)){(function(window)
 
         if (targetMc instanceof MovieClip && targetMc.getDepth() >= 0) {
             var depth = targetMc.getDepth() + 16384;
+            var level = targetMc.getLevel();
             var parent = targetMc.getParent();
             var addTags = parent.addTags;
             var controller = parent.controller;
             var _controller = parent._controller;
+            var tag;
             for (var frame = parent.getTotalFrames() + 1; --frame;) {
                 if (frame in _controller && depth in _controller[frame]) {
-                    delete _controller[frame][targetMc.getLevel()];
+                    delete _controller[frame][level];
                 }
 
                 if (frame in controller && depth in controller[frame]) {
-                    delete controller[frame][targetMc.getLevel()];
+                    delete controller[frame][level];
                 }
 
                 if (!(frame in addTags)) {
@@ -12132,9 +12168,17 @@ if (!("swf2js" in window)){(function(window)
 
                 var tags = addTags[frame];
                 if (depth in tags) {
-                    delete addTags[frame][depth];
-                } else {
-                    delete addTags[frame][targetMc.getLevel()];
+                    tag = tags[depth];
+                    if (tag.instanceId === targetMc.instanceId) {
+                        delete addTags[frame][depth];
+                    }
+                }
+
+                if (level in tags) {
+                    tag = tags[level];
+                    if (tag.instanceId === targetMc.instanceId) {
+                        delete addTags[frame][level];
+                    }
                 }
             }
         }
@@ -12371,18 +12415,10 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (swapMc) {
-
-
-                if (tags[level] !== _this) {
-                    continue;
-                }
-
                 tags[swapDepth] = _this;
                 tags[depth] = swapMc;
             } else {
-                if (level in tags) {
-                    delete tags[level];
-                }
+                delete tags[level];
                 tags[depth] = _this;
             }
         }
@@ -13244,10 +13280,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var tags = _this.getTags();
         var length = tags.length;
-        var _multiplicationMatrix = multiplicationMatrix;
         var hit = false;
 
         if (length) {
+            var _multiplicationMatrix = multiplicationMatrix;
             for (var depth = 1; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
@@ -15806,7 +15842,6 @@ if (!("swf2js" in window)){(function(window)
             ){
                 var matrix = hitObj.matrix;
                 if (matrix) {
-
                     var mc = hitObj.parent;
                     var button = hitObj.button;
 
@@ -16036,8 +16071,9 @@ if (!("swf2js" in window)){(function(window)
             var div = _document.getElementById(_this.getName());
             if (div) {
                 div.appendChild(element);
+                element.focus();
                 var focus = function(el){ return function(){ el.focus(); }; };
-                _setTimeout(focus(element), 0);
+                _setTimeout(focus(element), 10);
             }
         }
     };
