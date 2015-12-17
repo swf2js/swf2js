@@ -9472,50 +9472,33 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
+        setTransform(ctx, rMatrix);
+
         var minScale = _min(rMatrix[0], rMatrix[3]);
-
-        var hitCanvas = ctx.canvas;
-        var width = hitCanvas.width;
-        var height = hitCanvas.height;
-
         var shapes = _this.getData();
         var length = shapes.length;
         var hit = false;
         for (var idx = 0; idx < length; idx++) {
-            var cacheId = _this.getCharacterId() + "_" + idx + "_" + stage.getId();
-            var cacheKey = cacheStore.generateKey("HitTest", cacheId, rMatrix);
-            var cache = cacheStore.get(cacheKey);
+            var data = shapes[idx];
+            var obj = data.obj;
+            var isStroke = (obj.Width !== undefined);
 
-            if (!cache) {
-                var canvas = cacheStore.getCanvas();
-                canvas.width = width;
-                canvas.height = height;
-                cache = canvas.getContext("2d");
-                setTransform(cache, rMatrix);
+            ctx.beginPath();
+            var cmd = data.cmd;
+            cmd(ctx);
 
-                var data = shapes[idx];
-                var obj = data.obj;
-                var isStroke = (obj.Width !== undefined);
-
-                cache.beginPath();
-                var cmd = data.cmd;
-                cmd(cache);
-
-                if (isStroke) {
-                    cache.lineWidth = _max(obj.Width, 1 / minScale);
-                    cache.lineCap = "round";
-                    cache.lineJoin = "round";
-                }
-
-                cacheStore.set(cacheKey, cache);
+            if (isStroke) {
+                ctx.lineWidth = _max(obj.Width, 1 / minScale);
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
             }
 
-            hit = cache.isPointInPath(x, y);
+            hit = ctx.isPointInPath(x, y);
             if (hit) {
                 return hit;
             }
 
-            hit = cache.isPointInStroke(x, y);
+            hit = ctx.isPointInStroke(x, y);
             if (hit) {
                 return hit;
             }
@@ -11370,7 +11353,6 @@ if (!("swf2js" in window)){(function(window)
                     target = _parseFloat(target.substr(6));
                 }
             }
-
             if (typeof target === "number") {
                 var parent = stage.getParent();
                 if (!parent) {
@@ -11423,6 +11405,7 @@ if (!("swf2js" in window)){(function(window)
                         var loadStage = new Stage();
                         targetMc.loadStage = loadStage;
                         loadStage.parent = targetMc;
+
                         var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
                         loadStage.parse(data);
 
@@ -11430,9 +11413,14 @@ if (!("swf2js" in window)){(function(window)
                             loadStage.setId(stage.getId());
                             loadStage.setName(stage.getName());
                             loadStage.backgroundColor = stage.backgroundColor;
+                            loadStage.setCanvas();
+                            loadStage.loadStatus = 2;
                             loadStage.loadEvent();
                             stages[stage.getId()] = loadStage;
+                            stage.stop();
+                            stage = null;
                         } else {
+                            loadStage.stop();
                             targetMc.initParams();
                         }
                         targetMc._url = url;
@@ -11475,8 +11463,8 @@ if (!("swf2js" in window)){(function(window)
         targetMc._controller = [];
         targetMc.removeTags = [];
         targetMc.variables = {};
-        targetMc.colorTransform = null;
-        targetMc.matrix = null;
+        targetMc.colorTransform = cloneArray([1,1,1,1,0,0,0,0]);
+        targetMc.matrix = cloneArray([1,0,0,1,0,0]);
         targetMc._currentframe = 1;
         targetMc._totalframes = 1;
         targetMc._url = null;
@@ -11849,7 +11837,6 @@ if (!("swf2js" in window)){(function(window)
                 }
             } else {
                 depth = arguments[0];
-                console.log(depth);
                 if (_isNaN(depth)) {
                     depth = parent.getNextHighestDepth();
                 }
@@ -15592,52 +15579,103 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (!_this.canvas) {
-            var canvas = _document.createElement("canvas");
-            canvas.width = 1;
-            canvas.height = 1;
+            _this.setCanvas();
 
-            style = canvas.style;
-            style.zIndex = 0;
-            style.position = "absolute";
-            style.zoom = 100 / _devicePixelRatio + "%";
-            style["-webkit-tap-highlight-color"] = "rgba(0,0,0,0)";
-
-            style.MozTransformOrigin = "0 0";
-            style.MozTransform = "scale(" + 1 / _devicePixelRatio +")";
-
-            if (isAndroid) {
-                canvas.addEventListener("touchcancel", function ()
-                {
-                    _this.touchEnd(_event);
-                });
-            }
-
-            if (!isTouch) {
-                window.addEventListener("keydown", keyUpAction);
-                window.addEventListener("keyup", keyDownAction);
-                window.addEventListener("keyup", function (event)
-                {
-                    _event = event;
-                    _this.touchEnd(event);
-                });
-            }
-
-            _this.context = canvas.getContext("2d");
-            _this.canvas = canvas;
-
-            var preCanvas = _document.createElement("canvas");
-            preCanvas.width = 1;
-            preCanvas.height = 1;
-            _this.preContext = preCanvas.getContext("2d");
-
-            var hitCanvas = _document.createElement("canvas");
-            hitCanvas.width = 1;
-            hitCanvas.height = 1;
-            _this.hitContext = hitCanvas.getContext("2d");
+            //var canvas = _document.createElement("canvas");
+            //canvas.width = 1;
+            //canvas.height = 1;
+            //
+            //style = canvas.style;
+            //style.zIndex = 0;
+            //style.position = "absolute";
+            //style.zoom = 100 / _devicePixelRatio + "%";
+            //style["-webkit-tap-highlight-color"] = "rgba(0,0,0,0)";
+            //
+            //style.MozTransformOrigin = "0 0";
+            //style.MozTransform = "scale(" + 1 / _devicePixelRatio +")";
+            //
+            //if (isAndroid) {
+            //    canvas.addEventListener("touchcancel", function ()
+            //    {
+            //        _this.touchEnd(_event);
+            //    });
+            //}
+            //
+            //if (!isTouch) {
+            //    window.addEventListener("keydown", keyUpAction);
+            //    window.addEventListener("keyup", keyDownAction);
+            //    window.addEventListener("keyup", function (event)
+            //    {
+            //        _event = event;
+            //        _this.touchEnd(event);
+            //    });
+            //}
+            //
+            //_this.context = canvas.getContext("2d");
+            //_this.canvas = canvas;
+            //
+            //var preCanvas = _document.createElement("canvas");
+            //preCanvas.width = 1;
+            //preCanvas.height = 1;
+            //_this.preContext = preCanvas.getContext("2d");
+            //
+            //var hitCanvas = _document.createElement("canvas");
+            //hitCanvas.width = 1;
+            //hitCanvas.height = 1;
+            //_this.hitContext = hitCanvas.getContext("2d");
         }
 
         _this.loadStatus++;
         _this.loadEvent();
+    };
+
+
+    Stage.prototype.setCanvas = function()
+    {
+        var _this = this;
+        var style;
+        var canvas = _document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+
+        style = canvas.style;
+        style.zIndex = 0;
+        style.position = "absolute";
+        style.zoom = 100 / _devicePixelRatio + "%";
+        style["-webkit-tap-highlight-color"] = "rgba(0,0,0,0)";
+
+        style.MozTransformOrigin = "0 0";
+        style.MozTransform = "scale(" + 1 / _devicePixelRatio +")";
+
+        if (isAndroid) {
+            canvas.addEventListener("touchcancel", function ()
+            {
+                _this.touchEnd(_event);
+            });
+        }
+
+        if (!isTouch) {
+            window.addEventListener("keydown", keyUpAction);
+            window.addEventListener("keyup", keyDownAction);
+            window.addEventListener("keyup", function (event)
+            {
+                _event = event;
+                _this.touchEnd(event);
+            });
+        }
+
+        _this.context = canvas.getContext("2d");
+        _this.canvas = canvas;
+
+        var preCanvas = _document.createElement("canvas");
+        preCanvas.width = 1;
+        preCanvas.height = 1;
+        _this.preContext = preCanvas.getContext("2d");
+
+        var hitCanvas = _document.createElement("canvas");
+        hitCanvas.width = 1;
+        hitCanvas.height = 1;
+        _this.hitContext = hitCanvas.getContext("2d");
     };
 
     /**
@@ -16261,13 +16299,13 @@ if (!("swf2js" in window)){(function(window)
             if (isRender) {
                 _this.touchRender();
             }
+        }
 
-            var dragMc = _this.dragMc;
-            if (dragMc) {
-                event.preventDefault();
-                dragMc.executeDrag();
-                _this.isHit = true;
-            }
+        var dragMc = _this.dragMc;
+        if (dragMc) {
+            event.preventDefault();
+            dragMc.executeDrag();
+            _this.isHit = true;
         }
     };
 
@@ -16297,6 +16335,14 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var hitObj = _this.hitCheck(event);
+        if (!_this.isHit) {
+            var dragMc = _this.dragMc;
+            if (dragMc) {
+                hitObj = touchObj;
+                _this.isHit = true;
+            }
+        }
+
         if (_this.isHit && touchObj) {
             var isRender = false;
             mc = touchObj.parent;
