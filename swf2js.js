@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.34)
+ * swf2js (version 0.5.35)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -834,7 +834,7 @@ if (!("swf2js" in window)){(function(window)
             if (i in fills1) {
                 var fill1 = fills1[i];
                 var fLen = fills.length;
-                for (var depth = 1; depth < fLen; depth++) {
+                for (var depth = 0; depth < fLen; depth++) {
                     if (!(depth in fills)) {
                         continue;
                     }
@@ -861,7 +861,7 @@ if (!("swf2js" in window)){(function(window)
 
             var fills = fills0[i];
             var fLen = fills.length;
-            for (var depth = 1; depth < fLen; depth++) {
+            for (var depth = 0; depth < fLen; depth++) {
                 if (!(depth in fills)) {
                     continue;
                 }
@@ -916,7 +916,7 @@ if (!("swf2js" in window)){(function(window)
             var array = [];
             var fills = fills1[i];
             var fLen = fills.length;
-            for (var depth = 1; depth < fLen; depth++) {
+            for (var depth = 0; depth < fLen; depth++) {
                 if (!(depth in fills)) {
                     continue;
                 }
@@ -936,26 +936,33 @@ if (!("swf2js" in window)){(function(window)
                         continue;
                     }
 
-                    var comparison = array.shift();
-                    if (!comparison) {
+                    var mLen = array.length;
+                    if (!mLen) {
                         break;
                     }
 
-                    if (comparison.startX === fill.endX && comparison.startY === fill.endY) {
-                        fill.endX = comparison.endX;
-                        fill.endY = comparison.endY;
-                        var cache0 = fill.cache;
-                        var cache1 = comparison.cache;
-                        var cLen = cache1.length;
-                        for (var cIdx = 0; cIdx < cLen; cIdx++) {
-                            cache0[cache0.length] = cache1[cIdx];
+                    var isMatch = 0;
+                    for (;mLen--;) {
+                        var comparison = array[mLen];
+                        if (comparison.startX === fill.endX && comparison.startY === fill.endY) {
+                            fill.endX = comparison.endX;
+                            fill.endY = comparison.endY;
+                            var cache0 = fill.cache;
+                            var cache1 = comparison.cache;
+                            var cLen = cache1.length;
+                            for (var cIdx = 0; cIdx < cLen; cIdx++) {
+                                cache0[cache0.length] = cache1[cIdx];
+                            }
+                            array.splice(mLen, 1);
+                            array.unshift(fill);
+                            isMatch = 1;
+                            break;
                         }
-                        array.unshift(fill);
-                        continue;
                     }
 
-                    array.unshift(fill);
-                    array[array.length] = comparison;
+                    if (!isMatch) {
+                        array.unshift(fill);
+                    }
                 }
             } else {
                 adjustment = array;
@@ -2302,7 +2309,7 @@ if (!("swf2js" in window)){(function(window)
             up.soundInfo = character.ButtonStateUpSoundInfo;
         }
 
-        for (var depth = 1; depth < length; depth++) {
+        for (var depth = 0; depth < length; depth++) {
             if (!(depth in characters)) {
                 continue;
             }
@@ -4722,7 +4729,6 @@ if (!("swf2js" in window)){(function(window)
         }
 
         obj.ClipEventData = bitio.getUIBits(1);
-        bitio.byteAlign();
 
         if (stage.getVersion() >= 6) {
             bitio.getUIBits(5); // Reserved
@@ -4731,6 +4737,8 @@ if (!("swf2js" in window)){(function(window)
             obj.dragOut = bitio.getUIBits(1);
             bitio.getUIBits(8); // Reserved
         }
+
+        bitio.byteAlign();
 
         return obj;
     };
@@ -8186,7 +8194,7 @@ if (!("swf2js" in window)){(function(window)
         caller._soundbuftime = null;
         caller._totalframes = 1;
         caller._level = 0;
-        caller._depth = 0;
+        caller._depth = null;
         caller._name = null;
         caller._framesloaded = 0;
         caller._target = "";
@@ -9126,6 +9134,10 @@ if (!("swf2js" in window)){(function(window)
                     }
 
                     tag = tags[tagLength];
+                    if (!tag) {
+                        continue;
+                    }
+
                     var tagName = tag.getName();
                     if (!tagName) {
                         continue;
@@ -10738,7 +10750,7 @@ if (!("swf2js" in window)){(function(window)
             xMin = no;
             yMin = no;
 
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -10822,7 +10834,7 @@ if (!("swf2js" in window)){(function(window)
         var length = tags.length;
         if (length) {
             length++;
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -10900,7 +10912,7 @@ if (!("swf2js" in window)){(function(window)
         var tags = buttonCharacter.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -10937,7 +10949,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (length) {
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -10962,7 +10974,7 @@ if (!("swf2js" in window)){(function(window)
         var tags = buttonCharacter.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -11413,7 +11425,7 @@ if (!("swf2js" in window)){(function(window)
                             loadStage.setId(stage.getId());
                             loadStage.setName(stage.getName());
                             loadStage.backgroundColor = stage.backgroundColor;
-                            loadStage.setCanvas();
+                            loadStage.initCanvas();
                             loadStage.loadStatus = 2;
                             loadStage.loadEvent();
                             stages[stage.getId()] = loadStage;
@@ -11470,7 +11482,6 @@ if (!("swf2js" in window)){(function(window)
         targetMc._url = null;
         targetMc._lockroot = true;
         targetMc.reset();
-        cacheStore.reset();
     };
 
     /**
@@ -11837,18 +11848,20 @@ if (!("swf2js" in window)){(function(window)
                 }
             } else {
                 depth = arguments[0];
-                if (_isNaN(depth)) {
+                if (_Number.isNaN(depth)) {
                     depth = parent.getNextHighestDepth();
                 }
-                depth += 16384;
-
-                if (depth in tags) {
-                    var tag = tags[depth];
-                    if (tag.instanceId !== _this.instanceId) {
-                        _this.swapDepths(tag);
+                depth = _parseInt(depth);
+                if (!_isNaN(depth)) {
+                    depth += 16384;
+                    if (depth in tags) {
+                        var tag = tags[depth];
+                        if (tag.instanceId !== _this.instanceId) {
+                            _this.swapDepths(tag);
+                        }
+                    } else {
+                        _this.setDepth(depth, null, null);
                     }
-                } else {
-                    _this.setDepth(depth, null, null);
                 }
             }
         }
@@ -12206,6 +12219,10 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
                 var tag = tags[depth];
+                if (!tag) {
+                    continue;
+                }
+
                 tag.putFrame();
             }
         }
@@ -12288,7 +12305,7 @@ if (!("swf2js" in window)){(function(window)
             var tag;
             var length = _max(tags.length, nextTags.length);
             if (length) {
-                for (depth = 1; depth < length; depth++) {
+                for (depth = 0; depth < length; depth++) {
                     if (!(depth in tags) && !(depth in nextTags)) {
                         continue;
                     }
@@ -12327,7 +12344,7 @@ if (!("swf2js" in window)){(function(window)
                     }
 
                     var aLen = addTags.length;
-                    for (depth = 1; depth < aLen; depth++) {
+                    for (depth = 0; depth < aLen; depth++) {
                         if (!(depth in addTags)) {
                             continue;
                         }
@@ -12374,7 +12391,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var _depth = _this._depth;
-        var depth = (_depth) ? _depth : _this.getLevel();
+        var depth = (_depth !== null) ? _depth : _this.getLevel();
         return depth - 16384;
     };
 
@@ -12388,33 +12405,43 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var parent = _this.getParent();
         var _depth = _this._depth;
-        var level  = (_depth) ? _depth : _this.getLevel();
+        var level  = (_depth !== null) ? _depth : _this.getLevel();
         var totalFrame = parent.getTotalFrames() + 1;
-
-        for (var frame = 1; frame < totalFrame; frame++) {
-            var tags = parent.getTags(frame);
-            if (!tags.length) {
-                continue;
-            }
-
-            if (!(level in tags)) {
-                continue;
-            }
-
-            if (swapMc) {
-                tags[swapDepth] = _this;
-                tags[depth] = swapMc;
-            } else {
-                delete tags[level];
-                tags[depth] = _this;
-            }
-        }
 
         if (!swapMc) {
             _this._depth = depth;
         } else {
             _this._depth = swapDepth;
             swapMc._depth = depth;
+        }
+
+        var addTags = parent.addTags;
+        for (var frame = 1; frame < totalFrame; frame++) {
+            if (!(frame in addTags)) {
+                continue;
+            }
+
+            var tags = addTags[frame];
+            if (!tags.length) {
+                continue;
+            }
+
+            if (swapMc) {
+                if (level in tags && tags[level] === _this) {
+                    tags[depth] = swapMc;
+                }
+
+                if (swapDepth in tags && tags[swapDepth] === swapMc) {
+                    tags[swapDepth] = _this;
+                }
+            } else {
+                if (level in tags && tags[level] === _this) {
+                    delete tags[level];
+                    tags[depth] = _this;
+                }
+            }
+
+            addTags[frame] = tags;
         }
     };
 
@@ -12512,7 +12539,7 @@ if (!("swf2js" in window)){(function(window)
         var length = tags.length;
         for (var i = 0; i < length; i++) {
             var tag = tags[i];
-            rTags[frame][i] = tag.Depth;
+            rTags[frame][tag.Depth] = 1;
         }
     };
 
@@ -12534,15 +12561,33 @@ if (!("swf2js" in window)){(function(window)
         var removeTags = _this.getRemoveTags(_this.getCurrentFrame());
         if (removeTags) {
             var tags = _this.getTags(_this.getCurrentFrame() - 1);
-            for (var length = removeTags.length; length--;) {
-                var depth = removeTags[length];
-                if (!(depth in tags)) {
+            for (var length = tags.length; length--;) {
+                if (!(length in tags)) {
                     continue;
                 }
 
-                var tag = tags[depth];
-                _this.dispatchClipEvent("unload");
-                tag.reset();
+                var tag = tags[length];
+                if (!tag) {
+                    continue;
+                }
+
+                if (tag instanceof MovieClip) {
+                    var depth = tag.getDepth() + 16384;
+                    if (!(depth in removeTags)) {
+                        continue;
+                    }
+
+                    if (depth === tag.getLevel()) {
+                        _this.dispatchClipEvent("unload");
+                        tag.reset();
+                    }
+                } else {
+                    if (!(length in removeTags)) {
+                        continue;
+                    }
+
+                    tag.reset();
+                }
             }
         }
     };
@@ -12568,7 +12613,7 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
 
-                for (var depth = 1; depth < length; depth++) {
+                for (var depth = 0; depth < length; depth++) {
                     if (!(depth in _cTags)) {
                         continue;
                     }
@@ -12612,20 +12657,25 @@ if (!("swf2js" in window)){(function(window)
             length = tags.length;
             if (length) {
                 resetTags = [];
-                for (depth = 1; depth < length; depth++) {
+                for (depth = 0; depth < length; depth++) {
                     if (!(depth in tags)) {
                         continue;
                     }
 
                     tag = tags[depth];
+                    if (!tag) {
+                        delete tags[depth];
+                    }
+
                     if (tag.getLevel() !== depth) {
+                        tag._depth = null;
                         resetTags[tag.getLevel()] = tag;
                     }
                 }
 
                 length = resetTags.length;
                 if (length) {
-                    for (depth = 1; depth < length; depth++) {
+                    for (depth = 0; depth < length; depth++) {
                         if (!(depth in resetTags)) {
                             continue;
                         }
@@ -12644,7 +12694,7 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            for (depth = 1; depth < length; depth++) {
+            for (depth = 0; depth < length; depth++) {
                 if (!(depth in _cTags)) {
                     continue;
                 }
@@ -12667,7 +12717,6 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-
         if (clearParent !== false) {
             var parent = _this.getParent();
             if (parent) {
@@ -12687,6 +12736,7 @@ if (!("swf2js" in window)){(function(window)
 
                             tag = tags[depth];
                             if (tag.getLevel() !== depth) {
+                                tag._depth = null;
                                 resetTags[tag.getLevel()] = tag;
                             }
                         }
@@ -12744,7 +12794,7 @@ if (!("swf2js" in window)){(function(window)
         _this.isAction = true;
         _this.soundStopFlag = false;
         _this._droptarget = null;
-        _this._depth = 0;
+        _this._depth = null;
         _this.buttonStatus = "up";
     };
 
@@ -12836,11 +12886,14 @@ if (!("swf2js" in window)){(function(window)
         var tags = _this.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
                 var tag = tags[depth];
+                if (!tag) {
+                    continue;
+                }
                 tag.addActions();
             }
         }
@@ -12951,13 +13004,13 @@ if (!("swf2js" in window)){(function(window)
             }
 
             var _multiplicationMatrix = multiplicationMatrix;
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
 
                 var tag = tags[depth];
-                if (tag.isClipDepth) {
+                if (!tag || tag.isClipDepth) {
                     continue;
                 }
 
@@ -13017,7 +13070,7 @@ if (!("swf2js" in window)){(function(window)
 
         var tags = parent.getTags();
         var length = tags.length + 1;
-        for (var depth = 1; depth < length; depth++) {
+        for (var depth = 0; depth < length; depth++) {
             if (!(depth in tags)) {
                 continue;
             }
@@ -13120,13 +13173,16 @@ if (!("swf2js" in window)){(function(window)
 
         var lastDepth = 0;
         if (length) {
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
 
                 lastDepth = _max(depth, lastDepth);
                 var obj = tags[depth];
+                if (!obj) {
+                    continue;
+                }
 
                 // mask end
                 var cLen = clips.length;
@@ -13271,7 +13327,7 @@ if (!("swf2js" in window)){(function(window)
 
         if (length) {
             var _multiplicationMatrix = multiplicationMatrix;
-            for (var depth = 1; depth < length; depth++) {
+            for (var depth = 0; depth < length; depth++) {
                 if (!(depth in tags)) {
                     continue;
                 }
@@ -14707,6 +14763,7 @@ if (!("swf2js" in window)){(function(window)
         _this._global = new Global();
         _this.initActions = [];
         _this.touchObj = null;
+        _this.touchStatus = "up";
         _this.overObj = null;
         _this.dragStatus = "in";
         _this.touchEndAction = null;
@@ -14816,10 +14873,7 @@ if (!("swf2js" in window)){(function(window)
         _this.stopFlag = false;
         var enterFrame = function(stage)
         {
-            return function()
-            {
-                requestAnimationFrame(function(){stage.onEnterFrame();},0);
-            };
+            return function(){requestAnimationFrame(function(){stage.onEnterFrame();},0);};
         };
         _this.intervalId = _setInterval(enterFrame(_this), _this.getFps());
     };
@@ -15211,7 +15265,6 @@ if (!("swf2js" in window)){(function(window)
             mc.addTags[1][1] = obj;
 
             _this.init();
-            cacheStore.reset();
         };
 
         image.src = "data:image/jpeg;base64,"+ swftag.base64encode(swftag.parseJpegData(data));
@@ -15311,7 +15364,7 @@ if (!("swf2js" in window)){(function(window)
             mc.addActions();
             _this.executeAction();
 
-            // API
+            // callback
             if (typeof _this.callback === "function") {
                 _this.callback.call(window, mc);
             }
@@ -15548,89 +15601,56 @@ if (!("swf2js" in window)){(function(window)
         }
 
         div = _document.getElementById(_this.getName());
-        var style;
         if (div) {
-            style = div.style;
-            style.position = "relative";
-            style.top = "0";
-            style.backgroundColor = "#000000";
-            style.overflow = "hidden";
-            style["-webkit-backface-visibility"] = "hidden";
-
-            var parent = div.parentNode;
-            var oWidth = _this.optionWidth;
-            var oHeight = _this.optionHeight;
-            var width;
-            var height;
-            if (parent.tagName === "BODY") {
-                width = (oWidth > 0) ? oWidth : window.innerWidth;
-                height = (oHeight > 0) ? oHeight :window.innerHeight;
-            } else {
-                width  = (oWidth > 0) ? oWidth : parent.offsetWidth;
-                height = (oHeight > 0) ? oHeight : parent.offsetHeight;
-            }
-
-            style.width = width + "px";
-            style.height = height + "px";
-            style['-webkit-user-select'] = "none";
-
-            // loading
+            _this.initStyle(div);
             _this.loading();
         }
 
         if (!_this.canvas) {
-            _this.setCanvas();
-
-            //var canvas = _document.createElement("canvas");
-            //canvas.width = 1;
-            //canvas.height = 1;
-            //
-            //style = canvas.style;
-            //style.zIndex = 0;
-            //style.position = "absolute";
-            //style.zoom = 100 / _devicePixelRatio + "%";
-            //style["-webkit-tap-highlight-color"] = "rgba(0,0,0,0)";
-            //
-            //style.MozTransformOrigin = "0 0";
-            //style.MozTransform = "scale(" + 1 / _devicePixelRatio +")";
-            //
-            //if (isAndroid) {
-            //    canvas.addEventListener("touchcancel", function ()
-            //    {
-            //        _this.touchEnd(_event);
-            //    });
-            //}
-            //
-            //if (!isTouch) {
-            //    window.addEventListener("keydown", keyUpAction);
-            //    window.addEventListener("keyup", keyDownAction);
-            //    window.addEventListener("keyup", function (event)
-            //    {
-            //        _event = event;
-            //        _this.touchEnd(event);
-            //    });
-            //}
-            //
-            //_this.context = canvas.getContext("2d");
-            //_this.canvas = canvas;
-            //
-            //var preCanvas = _document.createElement("canvas");
-            //preCanvas.width = 1;
-            //preCanvas.height = 1;
-            //_this.preContext = preCanvas.getContext("2d");
-            //
-            //var hitCanvas = _document.createElement("canvas");
-            //hitCanvas.width = 1;
-            //hitCanvas.height = 1;
-            //_this.hitContext = hitCanvas.getContext("2d");
+            _this.initCanvas();
         }
 
         _this.loadStatus++;
         _this.loadEvent();
     };
 
+    /**
+     * @param div
+     */
+    Stage.prototype.initStyle = function(div)
+    {
+        var style;
+        var _this = this;
 
-    Stage.prototype.setCanvas = function()
+        style = div.style;
+        style.position = "relative";
+        style.top = "0";
+        style.backgroundColor = "#000000";
+        style.overflow = "hidden";
+        style["-webkit-backface-visibility"] = "hidden";
+
+        var parent = div.parentNode;
+        var oWidth = _this.optionWidth;
+        var oHeight = _this.optionHeight;
+        var width;
+        var height;
+        if (parent.tagName === "BODY") {
+            width = (oWidth > 0) ? oWidth : window.innerWidth;
+            height = (oHeight > 0) ? oHeight :window.innerHeight;
+        } else {
+            width  = (oWidth > 0) ? oWidth : parent.offsetWidth;
+            height = (oHeight > 0) ? oHeight : parent.offsetHeight;
+        }
+
+        style.width = width + "px";
+        style.height = height + "px";
+        style['-webkit-user-select'] = "none";
+    };
+
+    /**
+     * init canvas
+     */
+    Stage.prototype.initCanvas = function()
     {
         var _this = this;
         var style;
@@ -15748,17 +15768,20 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param outputPath
+     * @param url
      * @param frame
      * @param width
      * @param height
      * @returns {*}
      */
-    Stage.prototype.output = function(outputPath, frame, width, height)
+    Stage.prototype.output = function(url, frame, width, height)
     {
         var _this = this;
         if (!_this.isLoad || _this.stopFlag) {
-            _setTimeout(function(){_this.output(outputPath, frame, width, height);}, 500);
+            _setTimeout(function()
+            {
+                _this.output(url, frame, width, height);
+            }, 500);
             return 0;
         }
 
@@ -15794,10 +15817,9 @@ if (!("swf2js" in window)){(function(window)
         // render
         _this.render();
 
-        // base64
-        var base64 = canvas.toDataURL();
+        // output
         var xmlHttpRequest = new XMLHttpRequest();
-        xmlHttpRequest.open("POST", outputPath);
+        xmlHttpRequest.open("POST", url);
         xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
         xmlHttpRequest.onreadystatechange = function()
         {
@@ -15815,6 +15837,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         };
+        var base64 = canvas.toDataURL();
         xmlHttpRequest.send("data="+ encodeURIComponent(base64));
     };
 
@@ -15927,39 +15950,42 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchStart = function(event)
     {
         var _this = this;
-        _this.isHit = false;
-        _this.isTouchEvent = true;
-        _this.touchEndAction = null;
-        var downEventHits = _this.downEventHits;
-        var length = downEventHits.length;
-        var mc;
-        if (length) {
-            event.preventDefault();
-            var _executeEventAction = _this.executeEventAction;
-            for (var i = 0; i < length; i++) {
-                var obj = downEventHits[i];
-                var downEvent = obj.event;
-                if (downEvent) {
-                    mc = obj.mc;
-                    obj.as = mc.getEvent("onMouseDown");
+        if (_this.touchStatus === "up") {
+            _this.touchStatus = "down";
+            _this.isHit = false;
+            _this.isTouchEvent = true;
+            _this.touchEndAction = null;
+            var downEventHits = _this.downEventHits;
+            var length = downEventHits.length;
+            var mc;
+            if (length) {
+                event.preventDefault();
+                var _executeEventAction = _this.executeEventAction;
+                for (var i = 0; i < length; i++) {
+                    var obj = downEventHits[i];
+                    var downEvent = obj.event;
+                    if (downEvent) {
+                        mc = obj.mc;
+                        obj.as = mc.getEvent("onMouseDown");
+                    }
+                    _executeEventAction.call(_this, obj);
                 }
-                _executeEventAction.call(_this, obj);
             }
-        }
 
-        var hitObj = _this.hitCheck(event);
-        if (_this.isHit) {
-            mc = hitObj.parent;
-            if (mc.active) {
-                mc.setButtonStatus("down");
-                if (mc instanceof TextField) {
-                    _this.appendTextArea(mc, hitObj);
-                } else {
-                    _this.executePress(mc, hitObj);
+            var hitObj = _this.hitCheck(event);
+            if (_this.isHit) {
+                mc = hitObj.parent;
+                if (mc.active) {
+                    mc.setButtonStatus("down");
+                    if (mc instanceof TextField) {
+                        _this.appendTextArea(mc, hitObj);
+                    } else {
+                        _this.executePress(mc, hitObj);
+                    }
                 }
-            }
-            if (_this.touchObj === null) {
-                _this.touchObj = hitObj;
+                if (_this.touchObj === null) {
+                    _this.touchObj = hitObj;
+                }
             }
         }
     };
@@ -15972,6 +15998,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var as;
+        var isRender = false;
         if (mc instanceof MovieClip) {
             var variables = mc.variables;
             var clipEvent = mc.clipEvent;
@@ -15981,17 +16008,20 @@ if (!("swf2js" in window)){(function(window)
                     as = onRollOver.cache;
                     as.setVariable("this", mc);
                     _this.executeEventAction({as:[onRollOver], mc: mc});
+                    isRender = true;
                 }
             }
             var press = clipEvent.press;
             if (press !== undefined) {
                 _this.executeEventAction({as:press, mc: mc});
+                isRender = true;
             }
             var onPress = variables.onPress;
             if (onPress !== undefined) {
                 as = onPress.cache;
                 as.setVariable("this", mc);
                 _this.executeEventAction({as:[onPress], mc: mc});
+                isRender = true;
             }
         }
 
@@ -16055,10 +16085,16 @@ if (!("swf2js" in window)){(function(window)
                 _this.executeAction();
             }
 
-            _this.touchRender();
             var buttonCharacter = button.getButtonCharacter();
             buttonCharacter.startSound();
+
+            isRender = true;
         }
+
+        if (isRender) {
+            _this.touchRender();
+        }
+
     };
 
     /**
@@ -16145,8 +16181,12 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (!isTouch || (isTouch && _this.isTouchEvent)) {
-            var hitObj = _this.hitCheck(event);
+            var hitObj = null;
             var touchObj = _this.touchObj;
+            if (touchObj || _this.touchStatus === "up") {
+                hitObj = _this.hitCheck(event);
+            }
+
             var buttonCharacter;
             var isRender = false;
 
@@ -16265,7 +16305,7 @@ if (!("swf2js" in window)){(function(window)
                     }
                     isRender = true;
                 }
-            } else {
+            } else if (_this.touchStatus === "up") {
                 _this.overObj = null;
                 if (overObj) {
                     button = overObj.button;
@@ -16291,8 +16331,9 @@ if (!("swf2js" in window)){(function(window)
                                 _this.executeAction();
                             }
                         }
+
+                        isRender = true;
                     }
-                    isRender = true;
                 }
             }
 
@@ -16335,12 +16376,10 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var hitObj = _this.hitCheck(event);
-        if (!_this.isHit) {
-            var dragMc = _this.dragMc;
-            if (dragMc) {
-                hitObj = touchObj;
-                _this.isHit = true;
-            }
+        var dragMc = _this.dragMc;
+        if (dragMc) {
+            hitObj = touchObj;
+            _this.isHit = true;
         }
 
         if (_this.isHit && touchObj) {
@@ -16410,6 +16449,7 @@ if (!("swf2js" in window)){(function(window)
         _this.isHit = false;
         _this.isTouchEvent = false;
         _this.touchObj = null;
+        _this.touchStatus = "up";
 
         if (!isTouch) {
             _this.hitCheck(event);
