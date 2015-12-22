@@ -1,6 +1,8 @@
 JavaScript製FlashPlayer「swf2js」Flash(swf)をHTML5に変換してiPhone、Androidで再生可能に!
 ======
 
+[![Join the chat at https://gitter.im/ienaga/swf2js](https://badges.gitter.im/ienaga/swf2js.svg)](https://gitter.im/ienaga/swf2js?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 swfをJavaScriptで直接バイナリ分解してcanvasに出力  
 分解と変換をリアルタイムで行っているので動的なswfも再生可能。  
 対応バージョン: 
