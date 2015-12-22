@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.35)
+ * swf2js (version 0.5.36)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -1838,7 +1838,7 @@ if (!("swf2js" in window)){(function(window)
      * @param frame
      * @returns {*}
      */
-    SwfTag.prototype.buildObject = function(tag, parent, copy, frame)
+    SwfTag.prototype.buildObject = function(tag, parent, copy, frame, isButton)
     {
         var _this = this;
         var _cloneArray = cloneArray;
@@ -1937,12 +1937,14 @@ if (!("swf2js" in window)){(function(window)
             obj.setColorTransform(_cloneArray(colorTransform));
         }
 
-        if (obj instanceof MovieClip ||
-            obj instanceof TextField ||
-            obj instanceof Button
-        ) {
-            controller[frame][tag.Depth] = controlTag;
-            _controller[frame][tag.Depth] = _controlTag;
+        if (!isButton) {
+            if (obj instanceof MovieClip ||
+                obj instanceof TextField ||
+                obj instanceof Button
+            ) {
+                controller[frame][tag.Depth] = controlTag;
+                _controller[frame][tag.Depth] = _controlTag;
+            }
         }
 
         return obj;
@@ -1970,7 +1972,6 @@ if (!("swf2js" in window)){(function(window)
             target = tag.Name;
         }
         mc.setTarget(parent.getTarget()+"/"+target);
-
         _this.build(character, mc);
 
         if (tag.PlaceFlagHasClipActions) {
@@ -2322,7 +2323,7 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 var bTag = tags[idx];
-                var obj = _this.buildObject(bTag, parent, false, 1);
+                var obj = _this.buildObject(bTag, parent, false, 1, true);
                 var Depth = bTag.Depth;
                 if (bTag.ButtonStateDown) {
                     down.addTag(Depth, obj, bTag);
@@ -5156,6 +5157,7 @@ if (!("swf2js" in window)){(function(window)
         obj.Name = bitio.getDataUntil("\0");
         var moveOffset = bitio.byte_offset - startOffset;
         obj.ABCData = _this.parseDoAction(length - moveOffset);
+
         return obj;
     };
 
