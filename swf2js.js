@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.36)
+ * swf2js (version 0.5.37)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -172,9 +172,8 @@ if (!("swf2js" in window)){(function(window)
      */
     function onResizeCanvas()
     {
-        var length = stages.length;
-        for (var i = 0; i < length; i++) {
-            if (!(i in stages)) {
+        for (var i in stages) {
+            if (!stage.hasOwnProperty(i)) {
                 continue;
             }
             var stage = stages[i];
@@ -824,18 +823,15 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         fills0 = _this.fillReverse(fills0);
-        var length = fills0.length;
-        for (var i = 0; i < length; i++) {
-            if (!(i in fills0)) {
+        for (var i in fills0) {
+            if (!fills0.hasOwnProperty(i)) {
                 continue;
             }
-
             var fills = fills0[i];
             if (i in fills1) {
                 var fill1 = fills1[i];
-                var fLen = fills.length;
-                for (var depth = 0; depth < fLen; depth++) {
-                    if (!(depth in fills)) {
+                for (var depth in fills) {
+                    if (!fills.hasOwnProperty(depth)) {
                         continue;
                     }
                     fill1[fill1.length] = fills[depth];
@@ -853,28 +849,27 @@ if (!("swf2js" in window)){(function(window)
      */
     VectorToCanvas.prototype.fillReverse = function(fills0)
     {
-        var length = fills0.length;
-        for (var i = 0; i < length; i++) {
-            if (!(i in fills0)) {
+        for (var i in fills0) {
+            if (!fills0.hasOwnProperty(i)) {
                 continue;
             }
-
             var fills = fills0[i];
-            var fLen = fills.length;
-            for (var depth = 0; depth < fLen; depth++) {
-                if (!(depth in fills)) {
+            for (var depth in fills) {
+                if (!fills.hasOwnProperty(depth)) {
                     continue;
                 }
-
                 var AnchorX = 0;
                 var AnchorY = 0;
                 var obj = fills[depth];
                 var cacheX = obj.startX;
                 var cacheY = obj.startY;
                 var cache = obj.cache;
-                var cLen = cache.length;
-                if (cLen) {
-                    for (var idx = 0; idx < cLen; idx++) {
+                var length = cache.length;
+                if (length) {
+                    for (var idx in cache) {
+                        if (!cache.hasOwnProperty(idx)) {
+                            continue;
+                        }
                         var recode = cache[idx];
                         AnchorX = recode.AnchorX;
                         AnchorY = recode.AnchorY;
@@ -884,8 +879,8 @@ if (!("swf2js" in window)){(function(window)
                         cacheY = AnchorY;
                     }
                     var array = [];
-                    for (; cLen--;) {
-                        array[array.length] = cache[cLen];
+                    for (; length--;) {
+                        array[array.length] = cache[length];
                     }
                     obj.cache = array;
                 }
@@ -907,17 +902,14 @@ if (!("swf2js" in window)){(function(window)
      */
     VectorToCanvas.prototype.coordinateAdjustment = function(fills1, isMorph)
     {
-        var length = fills1.length;
-        for (var i = 0; i < length; i++) {
-            if (!(i in fills1)) {
+        for (var i in fills1) {
+            if (!fills1.hasOwnProperty(i)) {
                 continue;
             }
-
             var array = [];
             var fills = fills1[i];
-            var fLen = fills.length;
-            for (var depth = 0; depth < fLen; depth++) {
-                if (!(depth in fills)) {
+            for (var depth in fills) {
+                if (!fills.hasOwnProperty(depth)) {
                     continue;
                 }
                 array[array.length] = fills[depth];
@@ -1000,10 +992,9 @@ if (!("swf2js" in window)){(function(window)
     VectorToCanvas.prototype.setStack = function(stack, array)
     {
         var _this = this;
-        var length = array.length;
         var _buildCommand = _this.buildCommand;
-        for (var i = 0; i < length; i++) {
-            if (!(i in array)) {
+        for (var i in array) {
+            if (!array.hasOwnProperty(i)) {
                 continue;
             }
             var data = array[i];
@@ -1664,8 +1655,8 @@ if (!("swf2js" in window)){(function(window)
         var actions = obj.actionScript;
         length = actions.length;
         if (length) {
-            for (i = 0; i < length; i++) {
-                if (!(i in actions)) {
+            for (i in actions) {
+                if (!actions.hasOwnProperty(i)) {
                     continue;
                 }
                 mc.setActions(frame, actions[i]);
@@ -1676,11 +1667,11 @@ if (!("swf2js" in window)){(function(window)
         var labels = obj.labels;
         length = labels.length;
         if (length) {
-            for (; length--;) {
-                if (!(length in labels)) {
+            for (i in labels) {
+                if (!labels.hasOwnProperty(i)) {
                     continue;
                 }
-                var label = labels[length];
+                var label = labels[i];
                 mc.addLabel(label.frame, label.name);
             }
         }
@@ -1689,19 +1680,19 @@ if (!("swf2js" in window)){(function(window)
         var sounds = obj.sounds;
         length = sounds.length;
         if (length) {
-            for (; length--;) {
-                if (!(length in sounds)) {
+            for (i in sounds) {
+                if (!sounds.hasOwnProperty(i)) {
                     continue;
                 }
-                mc.addSound(frame, sounds[length]);
+                mc.addSound(frame, sounds[i]);
             }
         }
 
         var cTags = obj.cTags;
         length = cTags.length;
         if (length) {
-            for (i = 0; i < length; i++) {
-                if (!(i in cTags)) {
+            for (i in cTags) {
+                if (!cTags.hasOwnProperty(i)) {
                     continue;
                 }
                 tag = cTags[i];
@@ -1715,11 +1706,11 @@ if (!("swf2js" in window)){(function(window)
         length = tags.length;
         if (length) {
             mc.setRemoveTag(frame, tags);
-            for (; length--;) {
-                if (!(length in tags)) {
+            for (i in tags) {
+                if (!tags.hasOwnProperty(i)) {
                     continue;
                 }
-                var rTag = tags[length];
+                var rTag = tags[i];
                 newDepth[rTag.Depth] = true;
             }
         }
@@ -1961,6 +1952,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var mc = new MovieClip();
         mc.stage = _this.stage;
+        mc._url = parent._url;
         mc.setParent(parent);
         mc.setCharacterId(tag.CharacterId);
         mc.setRatio(tag.Ratio || 0);
@@ -2274,7 +2266,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var characters = character.characters;
-        var length = characters.length;
         var button = new Button();
         button.setParent(parent);
         button.setStage(_this.stage);
@@ -2310,15 +2301,14 @@ if (!("swf2js" in window)){(function(window)
             up.soundInfo = character.ButtonStateUpSoundInfo;
         }
 
-        for (var depth = 0; depth < length; depth++) {
-            if (!(depth in characters)) {
+        for (var depth in characters) {
+            if (!characters.hasOwnProperty(depth)) {
                 continue;
             }
 
             var tags = characters[depth];
-            var tLen = tags.length;
-            for (var idx = 0; idx < tLen; idx++) {
-                if (!(idx in tags)) {
+            for (var idx in tags) {
+                if (!tags.hasOwnProperty(idx)) {
                     continue;
                 }
 
@@ -4472,7 +4462,7 @@ if (!("swf2js" in window)){(function(window)
         var characters = [];
         var _this = this;
         var bitio = _this.bitio;
-        for (; bitio.getUI8() !== 0; ) {
+        for (; bitio.getUI8() !== 0;) {
             bitio.incrementOffset(-1, 0);
             var record = _this.buttonRecord();
             var depth = record.Depth;
@@ -4729,7 +4719,7 @@ if (!("swf2js" in window)){(function(window)
             obj.initialize = bitio.getUIBits(1);
         }
 
-        obj.ClipEventData = bitio.getUIBits(1);
+        obj.data = bitio.getUIBits(1);
 
         if (stage.getVersion() >= 6) {
             bitio.getUIBits(5); // Reserved
@@ -7596,9 +7586,11 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionGetMember = function(stack, mc)
     {
+        var property;
         var _this = this;
         var name = stack.pop();
         var object = stack.pop();
+
         if (typeof object === "string") {
             var targetMc = mc.getMovieClip(object);
             if (targetMc instanceof MovieClip) {
@@ -7606,7 +7598,6 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var property;
         if (object instanceof Object) {
             if ("getProperty" in object) {
                 property = object.getProperty(name, false);
@@ -7637,6 +7628,7 @@ if (!("swf2js" in window)){(function(window)
         } else if (object !== undefined) {
             property = object[name];
         }
+
 
         stack[stack.length] = property;
     };
@@ -8543,7 +8535,7 @@ if (!("swf2js" in window)){(function(window)
     Property.prototype.getX = function()
     {
         var matrix = this.getMatrix();
-        return matrix[4]/20;
+        return (matrix) ? matrix[4]/20 : undefined;
     };
 
     /**
@@ -8561,7 +8553,7 @@ if (!("swf2js" in window)){(function(window)
     Property.prototype.getY = function()
     {
         var matrix = this.getMatrix();
-        return matrix[5]/20;
+        return (matrix) ? matrix[5]/20 : undefined;
     };
 
     /**
@@ -9130,12 +9122,12 @@ if (!("swf2js" in window)){(function(window)
             var tagLength = tags.length;
             var setTarget = false;
             if (tagLength > 0) {
-                for (;tagLength--;) {
-                    if (!(tagLength in tags)) {
+                for (var idx in tags) {
+                    if (!tags.hasOwnProperty(idx)) {
                         continue;
                     }
 
-                    tag = tags[tagLength];
+                    tag = tags[idx];
                     if (!tag) {
                         continue;
                     }
@@ -10752,8 +10744,8 @@ if (!("swf2js" in window)){(function(window)
             xMin = no;
             yMin = no;
 
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -10835,9 +10827,8 @@ if (!("swf2js" in window)){(function(window)
         var tags = buttonCharacter.getTags();
         var length = tags.length;
         if (length) {
-            length++;
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -10914,8 +10905,8 @@ if (!("swf2js" in window)){(function(window)
         var tags = buttonCharacter.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -10951,8 +10942,8 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (length) {
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -10976,8 +10967,8 @@ if (!("swf2js" in window)){(function(window)
         var tags = buttonCharacter.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -10993,15 +10984,17 @@ if (!("swf2js" in window)){(function(window)
     {
         var buttonCharacter = this.getButtonCharacter();
         var tags = buttonCharacter.getTags();
-        var depth = tags.length;
-        if (depth) {
-            for (; depth--;) {
-                if (!(depth in tags)) {
+        var length = tags.length;
+        if (length) {
+            tags.reverse();
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
                 tag.putFrame();
             }
+            tags.reverse();
         }
     };
 
@@ -11338,9 +11331,9 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.onClipEvent = function(event, actionScript)
     {
         var _this = this;
-        var clipEvents = _this.clipEvent;
-        clipEvents[event] = [];
-        clipEvents[event][0] = actionScript;
+        var clipEvent = _this.clipEvent;
+        clipEvent[event] = [];
+        clipEvent[event][0] = actionScript;
     };
 
     /**
@@ -11379,72 +11372,84 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        if (!targetMc) {
-            return 0;
-        }
+        if (targetMc) {
+            _this.unloadMovie(targetMc);
 
-        _this.unloadMovie(targetMc);
-
-        var xmlHttpRequest = new XMLHttpRequest();
-        var method = "GET";
-        var targetUrl = url;
-        var body = null;
-        if (SendVarsMethod === 2) {
-            method = "POST";
-            var urls = url.split("?");
-            if (urls[1] !== undefined) {
-                body = urls[1];
-            }
-            targetUrl =  urls[0];
-            xmlHttpRequest.open(method, targetUrl);
-            xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        } else {
-            xmlHttpRequest.open(method, targetUrl);
-        }
-
-        if (isXHR2) {
-            xmlHttpRequest.responseType = "arraybuffer";
-        } else {
-            xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
-        }
-
-        xmlHttpRequest.onreadystatechange = function()
-        {
-            var readyState = xmlHttpRequest.readyState;
-            if (readyState === 4) {
-                var status = xmlHttpRequest.status;
-                switch (status) {
-                    case 200:
-                    case 304:
-                        var loadStage = new Stage();
-                        targetMc.loadStage = loadStage;
-                        loadStage.parent = targetMc;
-
-                        var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
-                        loadStage.parse(data);
-
-                        if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
-                            loadStage.setId(stage.getId());
-                            loadStage.setName(stage.getName());
-                            loadStage.backgroundColor = stage.backgroundColor;
-                            loadStage.initCanvas();
-                            loadStage.loadStatus = 2;
-                            loadStage.loadEvent();
-                            stages[stage.getId()] = loadStage;
-                            stage.stop();
-                            stage = null;
-                        } else {
-                            loadStage.stop();
-                            targetMc.initParams();
-                        }
-                        targetMc._url = url;
-                        targetMc.addActions();
-
-                        break;
+            var xmlHttpRequest = new XMLHttpRequest();
+            var targetUrl = url;
+            var body = null;
+            if (SendVarsMethod === 2) {
+                var urls = url.split("?");
+                if (urls[1] !== undefined) {
+                    body = urls[1];
                 }
+                targetUrl = urls[0];
+                xmlHttpRequest.open("POST", targetUrl);
+                xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            } else {
+                xmlHttpRequest.open("GET", targetUrl);
             }
-        };
-        xmlHttpRequest.send(body);
+
+            if (isXHR2) {
+                xmlHttpRequest.responseType = "arraybuffer";
+            } else {
+                xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
+            }
+
+            xmlHttpRequest.onreadystatechange = function () {
+                var readyState = xmlHttpRequest.readyState;
+                if (readyState === 4) {
+                    var status = xmlHttpRequest.status;
+                    switch (status) {
+                        case 200:
+                        case 304:
+                            var loadStage = new Stage();
+                            targetMc.loadStage = loadStage;
+                            loadStage.parent = targetMc;
+
+                            var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
+                            loadStage.parse(data);
+
+                            if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
+                                loadStage.setId(stage.getId());
+                                loadStage.setName(stage.getName());
+                                loadStage.backgroundColor = stage.backgroundColor;
+                                loadStage.initCanvas();
+                                loadStage.loadStatus = 2;
+                                loadStage.loadEvent();
+                                stages[stage.getId()] = loadStage;
+                                stage.stop();
+                                stage = null;
+                            } else {
+                                loadStage.stop();
+                            }
+                            targetMc._url = url;
+
+                            var as;
+                            var onData = targetMc.getVariable("onData");
+                            if (onData !== undefined) {
+                                as = onData.cache;
+                                as.setVariable("this", targetMc);
+                                loadStage.executeEventAction({
+                                    as: [onData],
+                                    mc: targetMc
+                                });
+                            }
+
+                            var clipEvent = targetMc.clipEvent;
+                            if ("data" in clipEvent) {
+                                as = clipEvent.data[0];
+                                as.execute(targetMc);
+                            }
+
+                            targetMc.addActions();
+
+                            break;
+                    }
+                }
+            };
+            xmlHttpRequest.send(body);
+        }
     };
 
     /**
@@ -11583,43 +11588,63 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.loadVariables = function(url, target, method)
     {
         var _this = this;
-        var xmlHttpRequest = new XMLHttpRequest();
-        var body = null;
-        if (method === "POST") {
-            var urls = url.split("?");
-            if (urls[1] !== undefined) {
-                body = urls[1];
-            }
-            xmlHttpRequest.open(method, urls[0]);
-            xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        } else {
-            xmlHttpRequest.open(method, url);
+        var targetMc = _this;
+        if (target) {
+            targetMc = _this.getMovieClip(target);
         }
 
-        xmlHttpRequest.onreadystatechange = function()
-        {
-            var readyState = xmlHttpRequest.readyState;
-            if (readyState === 4) {
-                var status = xmlHttpRequest.status;
-                switch (status) {
-                    case 200:
-                    case 304:
-                        var responseText = decodeURIComponent(xmlHttpRequest.responseText);
-                        var pairs = responseText.split("&");
-                        var length = pairs.length;
-                        var targetMc = _this.getMovieClip(target);
-                        if (targetMc !== undefined) {
+        if (targetMc) {
+            var xmlHttpRequest = new XMLHttpRequest();
+            var body = null;
+            if (method === "POST") {
+                var urls = url.split("?");
+                if (urls[1] !== undefined) {
+                    body = urls[1];
+                }
+                xmlHttpRequest.open(method, urls[0]);
+                xmlHttpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            } else {
+                xmlHttpRequest.open("GET", url);
+            }
+
+
+            xmlHttpRequest.onreadystatechange = function () {
+                var readyState = xmlHttpRequest.readyState;
+                if (readyState === 4) {
+                    var status = xmlHttpRequest.status;
+                    switch (status) {
+                        case 200:
+                        case 304:
+                            var responseText = decodeURIComponent(xmlHttpRequest.responseText);
+                            var pairs = responseText.split("&");
+                            var length = pairs.length;
                             for (var idx = 0; idx < length; idx++) {
                                 var pair = pairs[idx];
                                 var values = pair.split("=");
                                 targetMc.setVariable(values[0], values[1]);
                             }
-                        }
-                        break;
+
+                            var stage = _this.getStage();
+                            var as;
+                            var onData = targetMc.getVariable("onData");
+                            if (onData !== undefined) {
+                                as = onData.cache;
+                                as.setVariable("this", targetMc);
+                                stage.executeEventAction({as: [onData], mc: targetMc});
+                            }
+
+                            var clipEvent = targetMc.clipEvent;
+                            if ("data" in clipEvent) {
+                                as = clipEvent.data[0];
+                                as.execute(targetMc);
+                            }
+
+                            break;
+                    }
                 }
-            }
-        };
-        xmlHttpRequest.send(body);
+            };
+            xmlHttpRequest.send(body);
+        }
     };
 
     /**
@@ -11978,11 +12003,11 @@ if (!("swf2js" in window)){(function(window)
         var depth = 0;
         var _this = this;
         var tags = _this.addTags;
-        for (var length = tags.length; length--;) {
-            if (!(length in tags)) {
+        for (var idx in tags) {
+            if (!tags.hasOwnProperty(idx)) {
                 continue;
             }
-            var tag = tags[length];
+            var tag = tags[idx];
             depth = _max(depth, tag.length);
         }
 
@@ -12214,19 +12239,20 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var tags = _this.getTags();
-        var depth = tags.length;
-        if (depth) {
-            for (;depth--;) {
-                if (!(depth in tags)) {
+        var length = tags.length;
+        if (length) {
+            tags.reverse();
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
                 if (!tag) {
                     continue;
                 }
-
                 tag.putFrame();
             }
+            tags.reverse();
         }
 
         if (_this.isLoad) {
@@ -12345,12 +12371,10 @@ if (!("swf2js" in window)){(function(window)
                         continue;
                     }
 
-                    var aLen = addTags.length;
-                    for (depth = 0; depth < aLen; depth++) {
-                        if (!(depth in addTags)) {
+                    for (depth in addTags) {
+                        if (!addTags.hasOwnProperty(depth)) {
                             continue;
                         }
-
                         tag = addTags[depth];
                         var instanceId = tag.instanceId;
                         if (instanceId in checked) {
@@ -12454,7 +12478,10 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.addLabel = function(frame, name)
     {
-        this.labels[name] = _parseInt(frame);
+        if (typeof name !== "string") {
+            name += "";
+        }
+        this.labels[name.toLowerCase()] = _parseInt(frame);
     };
 
     /**
@@ -12463,7 +12490,10 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.getLabel = function(name)
     {
-        return this.labels[name];
+        if (typeof name !== "string") {
+            name += "";
+        }
+        return this.labels[name.toLowerCase()];
     };
 
     /**
@@ -12563,12 +12593,12 @@ if (!("swf2js" in window)){(function(window)
         var removeTags = _this.getRemoveTags(_this.getCurrentFrame());
         if (removeTags) {
             var tags = _this.getTags(_this.getCurrentFrame() - 1);
-            for (var length = tags.length; length--;) {
-                if (!(length in tags)) {
+            for (var idx in tags) {
+                if (!tags.hasOwnProperty(idx)) {
                     continue;
                 }
 
-                var tag = tags[length];
+                var tag = tags[idx];
                 if (!tag) {
                     continue;
                 }
@@ -12615,11 +12645,10 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
 
-                for (var depth = 0; depth < length; depth++) {
-                    if (!(depth in _cTags)) {
+                for (var depth in _cTags) {
+                    if (!_cTags.hasOwnProperty(depth)) {
                         continue;
                     }
-
                     var addTags = _this.getTags(frame);
                     var obj = addTags[depth];
                     if (!obj || !obj.getRatio()) {
@@ -12659,11 +12688,10 @@ if (!("swf2js" in window)){(function(window)
             length = tags.length;
             if (length) {
                 resetTags = [];
-                for (depth = 0; depth < length; depth++) {
-                    if (!(depth in tags)) {
+                for (depth in tags) {
+                    if (!tags.hasOwnProperty(depth)) {
                         continue;
                     }
-
                     tag = tags[depth];
                     if (!tag) {
                         delete tags[depth];
@@ -12677,8 +12705,8 @@ if (!("swf2js" in window)){(function(window)
 
                 length = resetTags.length;
                 if (length) {
-                    for (depth = 0; depth < length; depth++) {
-                        if (!(depth in resetTags)) {
+                    for (depth in resetTags) {
+                        if (!resetTags.hasOwnProperty(depth)) {
                             continue;
                         }
                         tags[depth] = resetTags[depth];
@@ -12696,11 +12724,10 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            for (depth = 0; depth < length; depth++) {
-                if (!(depth in _cTags)) {
+            for (depth in _cTags) {
+                if (!_cTags.hasOwnProperty(depth)) {
                     continue;
                 }
-
                 _cTag = _cTags[depth];
                 if (_cTag.isReset) {
                     cTag = controller[frame][depth];
@@ -12731,11 +12758,10 @@ if (!("swf2js" in window)){(function(window)
                     length = tags.length;
                     if (length) {
                         resetTags = [];
-                        for (depth = 1; depth < length; depth++) {
-                            if (!(depth in tags)) {
+                        for (depth in tags) {
+                            if (!tags.hasOwnProperty(depth)) {
                                 continue;
                             }
-
                             tag = tags[depth];
                             if (tag.getLevel() !== depth) {
                                 tag._depth = null;
@@ -12745,8 +12771,8 @@ if (!("swf2js" in window)){(function(window)
 
                         length = resetTags.length;
                         if (length) {
-                            for (depth = 1; depth < length; depth++) {
-                                if (!(depth in resetTags)) {
+                            for (depth in resetTags) {
+                                if (!resetTags.hasOwnProperty(depth)) {
                                     continue;
                                 }
                                 tags[depth] = resetTags[depth];
@@ -12869,6 +12895,15 @@ if (!("swf2js" in window)){(function(window)
         if (_this.isAction) {
             _this.isAction = false;
             if (!_this.isLoad) {
+                var clipEvent = _this.clipEvent;
+                if ("initialize" in clipEvent) {
+                    as = clipEvent.initialize[0];
+                    as.execute(_this);
+                }
+                if ("construct" in clipEvent) {
+                    as = clipEvent.construct[0];
+                    as.execute(_this);
+                }
                 _this.dispatchClipEvent("load");
 
                 var variables = _this.variables;
@@ -12888,8 +12923,8 @@ if (!("swf2js" in window)){(function(window)
         var tags = _this.getTags();
         var length = tags.length;
         if (length) {
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
                 var tag = tags[depth];
@@ -12950,7 +12985,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var controller = _this.getController();
-        return controller.matrix;
+        return (controller) ? controller.matrix : undefined;
     };
 
     /**
@@ -13006,11 +13041,10 @@ if (!("swf2js" in window)){(function(window)
             }
 
             var _multiplicationMatrix = multiplicationMatrix;
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-
                 var tag = tags[depth];
                 if (!tag || tag.isClipDepth) {
                     continue;
@@ -13071,9 +13105,8 @@ if (!("swf2js" in window)){(function(window)
         var y = _root.getYMouse();
 
         var tags = parent.getTags();
-        var length = tags.length + 1;
-        for (var depth = 0; depth < length; depth++) {
-            if (!(depth in tags)) {
+        for (var depth in tags) {
+            if (!tags.hasOwnProperty(depth)) {
                 continue;
             }
 
@@ -13175,8 +13208,8 @@ if (!("swf2js" in window)){(function(window)
 
         var lastDepth = 0;
         if (length) {
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
 
@@ -13329,11 +13362,10 @@ if (!("swf2js" in window)){(function(window)
 
         if (length) {
             var _multiplicationMatrix = multiplicationMatrix;
-            for (var depth = 0; depth < length; depth++) {
-                if (!(depth in tags)) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-
                 var obj = tags[depth];
                 var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
                 hit = obj.renderHitTest(ctx, renderMatrix, stage, x, y);
@@ -15103,6 +15135,7 @@ if (!("swf2js" in window)){(function(window)
 
         if (_this.setSwfHeader(bitio, swftag)) {
             var mc = _this.getParent();
+            mc._url = location.href;
             var tags = swftag.parse(mc);
             swftag.build(tags, mc);
         }
@@ -15851,8 +15884,8 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         _this.isHit = false;
         var buttonHits = _this.buttonHits;
-        var len = buttonHits.length;
-        if (!len) {
+        var length = buttonHits.length;
+        if (!length) {
             return 0;
         }
 
@@ -15887,7 +15920,7 @@ if (!("swf2js" in window)){(function(window)
         var chkY = touchY * scale * _devicePixelRatio;
 
         // reset
-        for (var i = len; i--;) {
+        for (var i = length; i--;) {
             if (!(i in buttonHits)) {
                 continue;
             }
@@ -16566,8 +16599,8 @@ if (!("swf2js" in window)){(function(window)
             return this.load(url, options);
         }
         var stage = stages[0];
-        for (var i = 0; i < stageId; i++) {
-            if (!(i in stages)) {
+        for (var i in stage) {
+            if (!stage.hasOwnProperty(i)) {
                 continue;
             }
             var p = stages[i];
