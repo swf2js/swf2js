@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.37)
+ * swf2js (version 0.5.38)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -69,6 +69,7 @@ if (!("swf2js" in window)){(function(window)
     var devicePixelRatio = window.devicePixelRatio || 1;
     var _devicePixelRatio = devicePixelRatio * 0.75;
     var _event = null;
+    var _keyEvent = null;
     var startEvent = "mousedown";
     var moveEvent  = "mousemove";
     var endEvent   = "mouseup";
@@ -173,7 +174,7 @@ if (!("swf2js" in window)){(function(window)
     function onResizeCanvas()
     {
         for (var i in stages) {
-            if (!stage.hasOwnProperty(i)) {
+            if (!stages.hasOwnProperty(i)) {
                 continue;
             }
             var stage = stages[i];
@@ -12614,10 +12615,9 @@ if (!("swf2js" in window)){(function(window)
                         tag.reset();
                     }
                 } else {
-                    if (!(length in removeTags)) {
+                    if (!(idx in removeTags)) {
                         continue;
                     }
-
                     tag.reset();
                 }
             }
@@ -12700,16 +12700,17 @@ if (!("swf2js" in window)){(function(window)
                     if (tag.getLevel() !== depth) {
                         tag._depth = null;
                         resetTags[tag.getLevel()] = tag;
+                        delete tags[depth];
                     }
                 }
 
                 length = resetTags.length;
                 if (length) {
-                    for (depth in resetTags) {
-                        if (!resetTags.hasOwnProperty(depth)) {
+                    for (level in resetTags) {
+                        if (!resetTags.hasOwnProperty(level)) {
                             continue;
                         }
-                        tags[depth] = resetTags[depth];
+                        tags[level] = resetTags[level];
                     }
                 }
             }
@@ -12815,7 +12816,7 @@ if (!("swf2js" in window)){(function(window)
         _this.setVisible(true);
         _this.setEnabled(true);
         _this.setCurrentFrame(1);
-        _this.clear(); // draw
+        _this.clear();
         _this.active = false;
         _this.isLoad = false;
         _this.isEnterFrame = false;
@@ -14508,7 +14509,7 @@ if (!("swf2js" in window)){(function(window)
         if (isTouch) {
             return 13;
         }
-        var keyCode = (_event) ? _event.keyCode : null;
+        var keyCode = (_keyEvent) ? _keyEvent.keyCode : null;
         if (96 <= keyCode && keyCode <= 105) {
             var n = keyCode - 96;
             switch (n) {
@@ -14553,7 +14554,7 @@ if (!("swf2js" in window)){(function(window)
      */
     function keyDownAction(event)
     {
-        _event = event;
+        _keyEvent = event;
         var keyUpEvent = keyClass.keyUpEvent;
         var length = keyUpEvent.length;
         if (length) {
@@ -14571,7 +14572,7 @@ if (!("swf2js" in window)){(function(window)
      */
     function keyUpAction(event)
     {
-        _event = event;
+        _keyEvent = event;
         var keyCode = keyClass.getCode();
         var i;
         var length;
@@ -15714,7 +15715,7 @@ if (!("swf2js" in window)){(function(window)
             window.addEventListener("keyup", keyDownAction);
             window.addEventListener("keyup", function (event)
             {
-                _event = event;
+                _keyEvent = event;
                 _this.touchEnd(event);
             });
         }
@@ -16495,6 +16496,8 @@ if (!("swf2js" in window)){(function(window)
                 canvas.style.cursor = "auto";
             }
         }
+
+        _keyEvent = null;
     };
 
     /**
