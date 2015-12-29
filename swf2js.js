@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.38)
+ * swf2js (version 0.5.39)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -5865,14 +5865,14 @@ if (!("swf2js" in window)){(function(window)
                     if (obj.PreloadSuperFlag) {
                         values[values.length] = "super";
                     }
-                    if (obj.PreloadGlobalFlag) {
-                        values[values.length] = "_global";
-                    }
                     if (obj.PreloadRootFlag) {
                         values[values.length] = "_root";
                     }
                     if (obj.PreloadParentFlag) {
                         values[values.length] = "_parent";
+                    }
+                    if (obj.PreloadGlobalFlag) {
+                        values[values.length] = "_global";
                     }
                     for (idx = 1; idx < RegisterCount; idx++) {
                         var rIdx = idx - 1;
