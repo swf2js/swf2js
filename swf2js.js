@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.39)
+ * swf2js (version 0.5.40)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -662,7 +662,7 @@ if (!("swf2js" in window)){(function(window)
      * @param isMorph
      * @returns {Array}
      */
-    VectorToCanvas.prototype.execute = function(shapes, isMorph)
+    VectorToCanvas.prototype.convert = function(shapes, isMorph)
     {
         var _this = this;
         var lineStyles = shapes.lineStyles.lineStyles;
@@ -2226,7 +2226,7 @@ if (!("swf2js" in window)){(function(window)
             for (var idx = 0; idx < count; idx++) {
                 var entry = entries[idx];
                 var shapes = ShapeTable[entry.GlyphIndex];
-                var data = vtc.execute(shapes);
+                var data = vtc.convert(shapes);
                 var matrix = [scale, cMatrix[1], cMatrix[2], scale, cMatrix[4]+offsetX, cMatrix[5]+offsetY];
                 var textRecode = new TextRecord();
                 textRecode.setData(data);
@@ -3247,7 +3247,7 @@ if (!("swf2js" in window)){(function(window)
     {
         this.stage.setCharacter(characterId, {
             tagType: tagType,
-            data: vtc.execute(shapes, false),
+            data: vtc.convert(shapes, false),
             bounds: shapeBounds
         });
     };
@@ -4381,7 +4381,7 @@ if (!("swf2js" in window)){(function(window)
         };
 
         return {
-            data: vtc.execute(shapes, true),
+            data: vtc.convert(shapes, true),
             bounds: bounds
         };
     };
@@ -5592,6 +5592,23 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @type {{*}}
+     */
+    ActionScript.prototype.ignoreProperty =
+    {
+        "id": 1,
+        "cache": 1,
+        "params": 1,
+        "constantPool": 1,
+        "register": 1,
+        "variables": 1,
+        "initAction": 1,
+        "scope": 1,
+        "arg": 1,
+        "version": 1
+    };
+
+    /**
      * @param name
      * @param value
      */
@@ -5612,11 +5629,10 @@ if (!("swf2js" in window)){(function(window)
             return _this.arg;
         } else {
             value = _this.variables[name];
-            if (value === undefined) {
+            if (value === undefined && !(name in _this.ignoreProperty)) {
                 value = _this[name];
             }
         }
-
         return value;
     };
 
@@ -10395,7 +10411,7 @@ if (!("swf2js" in window)){(function(window)
     TextField.prototype.renderGlyph = function (records, ctx)
     {
         if (!("data" in records)) {
-            records.data = vtc.execute(records);
+            records.data = vtc.convert(records);
         }
         var shapes = records.data;
         var shapeLength = shapes.length;
@@ -10869,7 +10885,8 @@ if (!("swf2js" in window)){(function(window)
                                 yMin: 0,
                                 yMax: stage.getHeight(),
                                 CondKeyPress: cond.CondKeyPress,
-                                parent: _this.getParent()
+                                parent: _this.getParent(),
+                                active: true
                             };
                         }
                     }
@@ -10896,7 +10913,8 @@ if (!("swf2js" in window)){(function(window)
                         yMax: bounds.yMax,
                         CondKeyPress: 0,
                         parent: _this.getParent(),
-                        matrix: cloneArray(matrix)
+                        matrix: cloneArray(matrix),
+                        active: true
                     };
                 }
             }
@@ -13274,7 +13292,8 @@ if (!("swf2js" in window)){(function(window)
                                 yMax: bounds.yMax,
                                 yMin: bounds.yMin,
                                 parent: obj,
-                                matrix: _cloneArray(renderMatrix)
+                                matrix: _cloneArray(renderMatrix),
+                                active: (clips.length) ? false : true
                             };
                         }
                     }
@@ -13300,7 +13319,8 @@ if (!("swf2js" in window)){(function(window)
                             xMin: bounds.xMin,
                             yMax: bounds.yMax,
                             yMin: bounds.yMin,
-                            parent: obj
+                            parent: obj,
+                            active: (clips.length) ? false : true
                         };
                     }
                 }
@@ -15283,12 +15303,12 @@ if (!("swf2js" in window)){(function(window)
 
             _this.setCharacter(1, {
                 tagType: 22,
-                data: vtc.execute(shape),
+                data: vtc.convert(shape),
                 bounds: bounds
             });
 
             var obj = new Shape();
-            obj.setData(vtc.execute(shape));
+            obj.setData(vtc.convert(shape));
             obj.setTagType(22);
             obj.setCharacterId(1);
             obj.setBounds(bounds);
@@ -16229,7 +16249,11 @@ if (!("swf2js" in window)){(function(window)
             if (!isTouch) {
                 var canvas = _this.canvas;
                 if (_this.isHit || touchObj) {
-                    canvas.style.cursor = "pointer";
+                    if (!hitObj || hitObj.active) {
+                        canvas.style.cursor = "pointer";
+                    } else {
+                        canvas.style.cursor = "auto";
+                    }
                 } else {
                     canvas.style.cursor = "auto";
                 }
