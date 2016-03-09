@@ -11,9 +11,8 @@
     swf2js.load('swf/mogura.swf', {callback: function(_root)
     {
         var mc = _root.getMovieClip("hm");
-        var x = 10;
         mc.addEvent("onEnterFrame", function(){
-            this.setY(x++);
+            this.x++;
         });
     }});
 </script>

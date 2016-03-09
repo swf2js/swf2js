@@ -11,19 +11,19 @@
     var _root = swf2js.createRootMovieClip(240, 240, 30);
     var mc1 = _root.createEmptyMovieClip('MC1', 1);
     mc1.loadMovie("swf/model.swf");
-    mc1.setProperty("_xscale", 50);
-    mc1.setProperty("_yscale", 50);
+    mc1._xscale = 50;
+    mc1._yscale = 50;
 
-    mc1.onClipEvent("press", function()
+    mc1.addEventListener("press", function()
     {
         this.startDrag();
-        this.setProperty("_alpha", 50);
+        this._alpha = 50;
     });
 
-    mc1.onClipEvent("release", function()
+    mc1.addEventListener("release", function()
     {
         this.stopDrag();
-        this.setProperty("_alpha", 100);
+        this._alpha = 100;
     });
 </script>
 </body>

@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.5.40)
+ * swf2js (version 0.6.0)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -11,7 +11,6 @@ if (!("swf2js" in window)){(function(window)
 {
     "use strict";
     var _document = window.document;
-    var _NamedNodeMap = window.NamedNodeMap;
     var _Math = Math;
     var _min = _Math.min;
     var _max = _Math.max;
@@ -24,6 +23,7 @@ if (!("swf2js" in window)){(function(window)
     var _cos = _Math.cos;
     var _sin = _Math.sin;
     var _log = _Math.log;
+    var _abs = _Math.abs;
     var _SQRT2 = _Math.SQRT2;
     var _LN2 = _Math.LN2;
     var _PI = _Math.PI;
@@ -41,7 +41,7 @@ if (!("swf2js" in window)){(function(window)
     var console = window.console;
     var isBtoa = ("btoa" in window);
     var isWebGL = (window.WebGLRenderingContext &&
-    _document.createElement("canvas").getContext("webgl")) ? true : false;
+        _document.createElement("canvas").getContext("webgl")) ? true : false;
     var requestAnimationFrame =
         window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
@@ -52,7 +52,7 @@ if (!("swf2js" in window)){(function(window)
     var resizeId = 0;
     var stageId = 0;
     var stages = [];
-    var asId = 0;
+    var loadStages = [];
     var instanceId = 0;
     var tmpContext;
     var StartDate = new Date();
@@ -96,6 +96,41 @@ if (!("swf2js" in window)){(function(window)
         isAlphaBug = (pixelArray[0] === 255);
         imageData = null;
         pixelArray = null;
+    }
+
+    if (typeof Object.defineProperty !== "function") {
+        Object.defineProperty = function(obj, prop, desc)
+        {
+            if ("value" in desc) {
+                obj[prop] = desc.value;
+            }
+            if ("get" in desc) {
+                obj.__defineGetter__(prop, desc.get);
+            }
+            if ("set" in desc) {
+                obj.__defineSetter__(prop, desc.set);
+            }
+            return obj;
+        };
+    }
+
+    if (typeof Object.defineProperties !== "function") {
+        Object.defineProperties = function(obj, descs)
+        {
+            for (var prop in descs) {
+                if (descs.hasOwnProperty(prop)) {
+                    Object.defineProperty(obj, prop, descs[prop]);
+                }
+            }
+            return obj;
+        };
+    }
+
+    if (typeof Object.getPrototypeOf !== "function") {
+        Object.getPrototypeOf = function(obj)
+        {
+            return obj.__proto__;
+        };
     }
 
     // shift-jis
@@ -159,9 +194,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var arr = [];
         var length = src.length;
-        if (isArrayBuffer) {
-            arr = new Float32Array(length);
-        }
         for (var i = 0; i < length; i++) {
             arr[i] = src[i];
         }
@@ -169,9 +201,9 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
-     * Resize
+     * resize
      */
-    function onResizeCanvas()
+    function resizeCanvas()
     {
         for (var i in stages) {
             if (!stages.hasOwnProperty(i)) {
@@ -223,7 +255,7 @@ if (!("swf2js" in window)){(function(window)
      */
     function setTransform(ctx, m)
     {
-        ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5], m[6]);
+        ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
     }
 
     /**
@@ -240,11 +272,11 @@ if (!("swf2js" in window)){(function(window)
         var y2 = -16384 * m[1] + 16384 * m[3] + m[5];
         var vx2 = x2 - x0;
         var vy2 = y2 - y0;
-        var sr1 = _sqrt(vx2 * vx2 + vy2 * vy2);
-        vx2 /= sr1;
-        vy2 /= sr1;
-        var sr2 = (x1 - x0) * vx2 + (y1 - y0) * vy2;
-        return [x0 + sr2 * vx2, y0 + sr2 * vy2, x1, y1];
+        var r1 = _sqrt(vx2 * vx2 + vy2 * vy2);
+        vx2 /= r1;
+        vy2 /= r1;
+        var r2 = (x1 - x0) * vx2 + (y1 - y0) * vy2;
+        return [x0 + r2 * vx2, y0 + r2 * vy2, x1, y1];
     }
 
     /**
@@ -253,7 +285,7 @@ if (!("swf2js" in window)){(function(window)
      */
     function rgba(color)
     {
-        return "rgba("+ color.R+","+ color.G +","+ color.B +","+ color.A +")";
+        return "rgba("+ color.R +","+ color.G +","+ color.B +","+ color.A +")";
     }
 
     /**
@@ -275,20 +307,213 @@ if (!("swf2js" in window)){(function(window)
     }
 
     /**
-     * @param as
-     * @param mc
+     * @param imgData
+     * @param color
+     * @param inner
+     * @returns {*}
      */
-    function actionRun(as, mc)
+    function pxCoatOfColor(imgData, color, inner)
     {
-        if (as instanceof ActionScript) {
-            as.execute(mc);
-        } else if (typeof as === "function") {
-            if ("cache" in as) {
-                as(as.cache, mc, []);
+        var pxData = imgData.data;
+        var R = color.R;
+        var G = color.G;
+        var B = color.B;
+        var length = pxData.length;
+        for (var i = 0; i < length; i += 4) {
+            var aKey = i + 3;
+            var alpha = pxData[aKey];
+            if (!inner) {
+                if (alpha !== 0) {
+                    pxData[i] = R;
+                    pxData[i + 1] = G;
+                    pxData[i + 2] = B;
+                    pxData[aKey] = alpha;
+                }
             } else {
-                as.apply(mc);
+                if (alpha !== 255) {
+                    pxData[i] = R;
+                    pxData[i + 1] = G;
+                    pxData[i + 2] = B;
+                    pxData[aKey] = 255 - alpha;
+                }
             }
         }
+        return imgData;
+    }
+
+    /**
+     * @param ctx
+     * @param color
+     * @param inner
+     * @param strength
+     * @returns {*}
+     */
+    function coatOfColor(ctx, color, inner, strength)
+    {
+        var canvas = ctx.canvas;
+        var imgData = ctx.getImageData(0, 0, canvas.width ,canvas.height);
+        imgData = pxCoatOfColor(imgData, color, inner);
+        ctx.putImageData(imgData, 0, 0);
+        if (strength > 0) {
+            for (var i = 1; i < strength; i++) {
+                ctx.drawImage(ctx.canvas, 0, 0);
+            }
+        }
+        return ctx;
+    }
+
+    /**
+     * @param inner
+     * @param knockout
+     * @param hideObject
+     * @returns {*}
+     */
+    function filterOperation(inner, knockout, hideObject)
+    {
+        var operation = "source-over";
+        if (knockout === true) {
+            if (inner) {
+                operation = "source-in";
+            } else {
+                operation = "source-out";
+            }
+        } else {
+            if (hideObject === true) {
+                if (inner) {
+                    operation = "source-in";
+                } else {
+                    operation = "copy";
+                }
+            } else {
+                if (inner) {
+                    operation = "source-atop";
+                } else {
+                    operation = "destination-over";
+                }
+            }
+        }
+        return operation;
+    }
+
+    /**
+     * @param a
+     * @param b
+     * @returns {*}
+     */
+    function comparison(a, b)
+    {
+        var ret;
+        while((ret = a % b) !== 0) {
+            a = b;
+            b = ret;
+        }
+        return b;
+    }
+
+    /**
+     * @param mc
+     * @param script
+     * @param parent
+     * @returns {*}
+     */
+    function createActionScript(mc, script, parent)
+    {
+        return (function(clip, origin, chain)
+        {
+            return function ()
+            {
+                var as = new ActionScript([], origin.constantPool, origin.register, origin.initAction);
+                as.cache = origin.cache;
+                as.scope = clip;
+                as.parent = (chain) ? chain : null;
+                if (arguments.length) {
+                    as.initVariable(arguments);
+                }
+                as.setVariable("this", this);
+                return as.execute(clip);
+            };
+        })(mc, script, parent);
+    }
+
+    /**
+     * @param blendMode
+     * @returns {*}
+     */
+    function getBlendName(blendMode)
+    {
+        var mode = null;
+        switch (blendMode) {
+            case 1:
+            case "normal":
+                mode = "normal";
+                break;
+            case 2:
+            case "layer":
+                mode = "layer";
+                break;
+            case 3:
+            case "multiply":
+                mode = "multiply";
+                break;
+            case 4:
+            case "screen":
+                mode = "screen";
+                break;
+            case 5:
+            case "lighten":
+                mode = "lighten";
+                break;
+            case 6:
+            case "darken":
+                mode = "darken";
+                break;
+            case 7:
+            case "difference":
+                mode = "difference";
+                break;
+            case 8:
+            case "add":
+                mode = "add";
+                break;
+            case 9:
+            case "subtract":
+                mode = "subtract";
+                break;
+            case 10:
+            case "invert":
+                mode = "invert";
+                break;
+            case 11:
+            case "alpha":
+                mode = "alpha";
+                break;
+            case 12:
+            case "erase":
+                mode = "erase";
+                break;
+            case 13:
+            case "overlay":
+                mode = "overlay";
+                break;
+            case 14:
+            case "hardlight":
+                mode = "hardlight";
+                break;
+        }
+        return mode;
+    }
+
+    /**
+     * @param matrix
+     * @returns {*[]}
+     */
+    function cacheScaleXY(matrix)
+    {
+        var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+        var yScale = _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]);
+        xScale = _pow(_SQRT2, _ceil(_log(xScale) / (_LN2 / 2)));
+        yScale = _pow(_SQRT2, _ceil(_log(yScale) / (_LN2 / 2)));
+        return [xScale, yScale];
     }
 
     /**
@@ -359,8 +584,7 @@ if (!("swf2js" in window)){(function(window)
         } else {
             if (soundInfo.HasLoops) {
                 audio.loopCount = soundInfo.LoopCount;
-                var loopSound = function()
-                {
+                var loopSound = function () {
                     audio.loopCount--;
                     if (!this.loopCount) {
                         audio.removeEventListener("ended", loopSound);
@@ -376,13 +600,25 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (soundInfo.HasInPoint) {
-                audio.addEventListener("canplay", function() {
+                audio.addEventListener("canplay", function () {
                     this.currentTime = soundInfo.InPoint;
                 });
             }
 
             audio.play();
         }
+    }
+
+    /**
+     * @param compressed
+     * @returns {Array}
+     */
+    function unlzma(compressed)
+    {
+        var data = [];
+        var bitio = new BitIO();
+        bitio.setData(compressed);
+        return data;
     }
 
     /**
@@ -628,7 +864,7 @@ if (!("swf2js" in window)){(function(window)
     window.addEventListener('resize', function()
     {
         _clearTimeout(resizeId);
-        resizeId = _setTimeout(onResizeCanvas, 300);
+        resizeId = _setTimeout(resizeCanvas, 300);
     });
 
     /**
@@ -637,6 +873,7 @@ if (!("swf2js" in window)){(function(window)
     function unload()
     {
         stages = null;
+        loadStages = null;
         window.removeEventListener('unload', unload);
     }
     window.addEventListener('unload', unload);
@@ -824,21 +1061,23 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         fills0 = _this.fillReverse(fills0);
-        for (var i in fills0) {
-            if (!fills0.hasOwnProperty(i)) {
-                continue;
-            }
-            var fills = fills0[i];
-            if (i in fills1) {
-                var fill1 = fills1[i];
-                for (var depth in fills) {
-                    if (!fills.hasOwnProperty(depth)) {
-                        continue;
-                    }
-                    fill1[fill1.length] = fills[depth];
+        if (fills0.length) {
+            for (var i in fills0) {
+                if (!fills0.hasOwnProperty(i)) {
+                    continue;
                 }
-            } else {
-                fills1[i] = fills;
+                var fills = fills0[i];
+                if (i in fills1) {
+                    var fill1 = fills1[i];
+                    for (var depth in fills) {
+                        if (!fills.hasOwnProperty(depth)) {
+                            continue;
+                        }
+                        fill1[fill1.length] = fills[depth];
+                    }
+                } else {
+                    fills1[i] = fills;
+                }
             }
         }
         return _this.coordinateAdjustment(fills1, isMorph);
@@ -850,6 +1089,10 @@ if (!("swf2js" in window)){(function(window)
      */
     VectorToCanvas.prototype.fillReverse = function(fills0)
     {
+        if (!fills0.length) {
+            return fills0;
+        }
+
         for (var i in fills0) {
             if (!fills0.hasOwnProperty(i)) {
                 continue;
@@ -909,6 +1152,7 @@ if (!("swf2js" in window)){(function(window)
             }
             var array = [];
             var fills = fills1[i];
+
             for (var depth in fills) {
                 if (!fills.hasOwnProperty(depth)) {
                     continue;
@@ -994,15 +1238,17 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var _buildCommand = _this.buildCommand;
-        for (var i in array) {
-            if (!array.hasOwnProperty(i)) {
-                continue;
+        if (array.length) {
+            for (var i in array) {
+                if (!array.hasOwnProperty(i)) {
+                    continue;
+                }
+                var data = array[i];
+                stack[stack.length] = {
+                    obj: data.obj,
+                    cmd: _buildCommand.call(_this, data.cache)
+                };
             }
-            var data = array[i];
-            stack[stack.length] = {
-                obj: data.obj,
-                cmd: _buildCommand.call(_this, data.cache)
-            };
         }
         return stack;
     };
@@ -1012,6 +1258,20 @@ if (!("swf2js" in window)){(function(window)
      * @returns {*}
      */
     VectorToCanvas.prototype.buildCommand = function(cache)
+    {
+        var _this = this;
+        if (isWebGL) {
+            return _this.toCanvas2D(cache); // TODO WebGL
+        } else {
+            return _this.toCanvas2D(cache);
+        }
+    };
+
+    /**
+     * @param cache
+     * @returns {*}
+     */
+    VectorToCanvas.prototype.toCanvas2D = function(cache)
     {
         var length = cache.length;
         var str = "";
@@ -1027,9 +1287,33 @@ if (!("swf2js" in window)){(function(window)
                 case 2:
                     str += "ctx.lineTo("+a[1]+","+a[2]+");";
                     break;
+                case 3:
+                    str += "ctx.bezierCurveTo("+a[1]+","+a[2]+","+a[3]+","+a[4]+","+a[5]+","+a[6]+");";
+                    break;
+                case 4:
+                    str += "ctx.arc("+a[1]+","+a[2]+","+a[3]+","+a[4]+","+a[5]+",false);";
+                    break;
+                case 5:
+                    str += "ctx.scale("+a[1]+","+a[2]+");";
+                    str += "ctx.arc("+a[3]+","+a[4]+","+a[5]+",0,Math.PI*2,false);";
+                    str += "ctx.scale(1,1);";
+                    break;
+                case 6:
+                    str += "ctx.closePath();";
+                    break;
             }
         }
         return new Func('ctx', str);
+    };
+
+    /**
+     * TODO
+     * @param cache
+     * @returns {*}
+     */
+    VectorToCanvas.prototype.toWebGL = function(cache)
+    {
+        return cache;
     };
     var vtc = new VectorToCanvas();
 
@@ -1073,8 +1357,8 @@ if (!("swf2js" in window)){(function(window)
         var pool = this.pool;
         var canvas = ctx.canvas;
         ctx.clearRect(0, 0, canvas.width+1, canvas.height+1);
-        canvas.width = 0;
-        canvas.height = 0;
+        canvas.width = 1;
+        canvas.height = 1;
         pool[pool.length] = canvas;
     };
 
@@ -1090,7 +1374,7 @@ if (!("swf2js" in window)){(function(window)
      * @param key
      * @returns {*}
      */
-    CacheStore.prototype.get = function(key)
+    CacheStore.prototype.getCache = function(key)
     {
         return this.store[key];
     };
@@ -1099,7 +1383,7 @@ if (!("swf2js" in window)){(function(window)
      * @param key
      * @param value
      */
-    CacheStore.prototype.set = function(key, value)
+    CacheStore.prototype.setCache = function(key, value)
     {
         var _this = this;
         if (value instanceof CanvasRenderingContext2D) {
@@ -1119,20 +1403,11 @@ if (!("swf2js" in window)){(function(window)
     CacheStore.prototype.generateKey = function(name, id, matrix, cxForm)
     {
         var key = name +"_"+ id;
-        var i = 0;
-        var length = 0;
-        if (matrix !== undefined) {
-            length = matrix.length;
-            for (i = 0; i < length; i++) {
-                key += "_"+ matrix[i];
-            }
+        if (matrix instanceof Array) {
+            key += "_"+ matrix.join("_");
         }
-
-        if (cxForm !== undefined) {
-            length = cxForm.length;
-            for (i = 0; i < length; i++) {
-                key += "_"+ cxForm[i];
-            }
+        if (cxForm instanceof Array) {
+            key += "_"+ cxForm.join("_");
         }
         return key;
     };
@@ -1143,10 +1418,11 @@ if (!("swf2js" in window)){(function(window)
      */
     var BitIO = function()
     {
-        this.data = null;
-        this.bit_offset = 0;
-        this.byte_offset = 0;
-        this.bit_buffer = null;
+        var _this = this;
+        _this.data = null;
+        _this.bit_offset = 0;
+        _this.byte_offset = 0;
+        _this.bit_buffer = null;
     };
 
     /**
@@ -1442,7 +1718,6 @@ if (!("swf2js" in window)){(function(window)
         if (!rv || rv === 0x80000000) {
             return 0;
         }
-
         return (sign ? -1 : 1) * (fraction | 0x800000) *  _pow(2, (exp - 127 - 23));
     };
 
@@ -1511,19 +1786,58 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    BitIO.prototype.getEncodedU32 = function()
+    BitIO.prototype.getU30 = function()
     {
         var _this = this;
         var value = 0;
         var data = _this.data;
         for (var i = 0; i < 5; i++) {
             var num = data[_this.byte_offset++];
-            value = value | ((num & 0x7f) << (7 * i));
+            value |= ((num & 0x7f) << (7 * i));
             if (!(num & 0x80)) {
                 break;
             }
         }
         return value;
+    };
+
+    /**
+     * @param offset
+     * @returns {number}
+     */
+    BitIO.prototype.ReadU30 = function(offset)
+    {
+        var _this = this;
+        var value = 0;
+        var data = _this.data;
+        for (var i = 0; i < 5; i++) {
+            var num = data[offset++];
+            value |= ((num & 0x7f) << (7 * i));
+            if (!(num & 0x80)) {
+                break;
+            }
+        }
+        return value;
+    };
+
+    /**
+     * @returns {string}
+     */
+    BitIO.prototype.AbcReadString = function()
+    {
+        var _this = this;
+        var offset = _this.byte_offset;
+        var data = _this.data;
+        var length = _this.ReadU30(offset) + 1;
+        var ret = [];
+        for (var i = 0; i < length; i++) {
+            var code = data[_this.byte_offset++];
+            if (code === 10 || code === 13 || code < 32) {
+                continue;
+            }
+            ret[ret.length] = _fromCharCode(code);
+        }
+        return ret.join("");
     };
 
     /**
@@ -1561,30 +1875,130 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {*}
+     * @param size
+     * @param mode
      */
-    BitIO.prototype.deCompress = function(length)
+    BitIO.prototype.deCompress = function(size, mode)
     {
         var _this = this;
         var key = 0;
-        var bo = _this.byte_offset;
-        var data = _this.getData(bo);
-        var deCompress = unzip(_this.data, true);
-        var array = _this.createArray(length);
+        var length;
+        var i;
+        var array = _this.createArray(size);
+        var cacheOffset = _this.byte_offset;
+        _this.byte_offset = 0;
+        var data = _this.getData(cacheOffset);
 
+        var deCompress;
+        if (mode === "ZLIB") {
+            deCompress = unzip(_this.data, true);
+        } else {
+            deCompress = unlzma(_this.data);
+        }
         _this.data = null;
 
-        var dataLength = data.length;
-        for (var i = 0; i < dataLength; i++) {
+        length = data.length;
+        for (i = 0; i < length; i++) {
             array[key++] = data[i];
         }
-        var compLength = deCompress.length;
-        for (i = 0; i < compLength; i++) {
+
+        length = deCompress.length;
+        for (i = 0; i < length; i++) {
             array[key++] = deCompress[i];
         }
 
         _this.data = array;
-        _this.byte_offset = bo;
+        _this.byte_offset = cacheOffset;
+    };
+
+    /**
+     * @constructor
+     */
+    var PlaceObject = function()
+    {
+        var _this = this;
+        _this.matrix = cloneArray([1,0,0,1,0,0]);
+        _this.colorTransform = cloneArray([1,1,1,1,0,0,0,0]);
+        _this.filters = null;
+        _this.blendMode = "normal";
+    };
+
+    /**
+     * @returns {PlaceObject}
+     */
+    PlaceObject.prototype.clone = function()
+    {
+        var _this = this;
+        var placeObject = new PlaceObject();
+        placeObject.setMatrix(_this.getMatrix());
+        placeObject.setColorTransform(_this.getColorTransform());
+        placeObject.setFilters(_this.getFilters());
+        placeObject.setBlendMode(_this.getBlendMode());
+        return placeObject;
+    };
+
+    /**
+     * @returns {*}
+     */
+    PlaceObject.prototype.getMatrix = function()
+    {
+        return this.matrix;
+    };
+
+    /**
+     * @param matrix
+     */
+    PlaceObject.prototype.setMatrix = function(matrix)
+    {
+        this.matrix = cloneArray(matrix);
+    };
+
+    /**
+     * @returns {*}
+     */
+    PlaceObject.prototype.getColorTransform = function()
+    {
+        return this.colorTransform;
+    };
+
+    /**
+     * @param colorTransform
+     */
+    PlaceObject.prototype.setColorTransform = function(colorTransform)
+    {
+        this.colorTransform = cloneArray(colorTransform);
+    };
+
+    /**
+     * @returns {*}
+     */
+    PlaceObject.prototype.getFilters = function()
+    {
+        return this.filters;
+    };
+
+    /**
+     * @param filters
+     */
+    PlaceObject.prototype.setFilters = function(filters)
+    {
+        this.filters = filters;
+    };
+
+    /**
+     * @returns {string}
+     */
+    PlaceObject.prototype.getBlendMode = function()
+    {
+        return this.blendMode;
+    };
+
+    /**
+     * @param blendMode
+     */
+    PlaceObject.prototype.setBlendMode = function(blendMode)
+    {
+        this.blendMode = getBlendName(blendMode);
     };
 
     /**
@@ -1623,11 +2037,12 @@ if (!("swf2js" in window)){(function(window)
         if (length) {
             var _showFrame = _this.showFrame;
             var originTags = [];
-            for (var frame = 1; frame < length; frame++) {
-                if (!(frame in tags)) {
+            for (var frame in tags) {
+                if (!tags.hasOwnProperty(frame)) {
                     continue;
                 }
-                _showFrame.call(_this, tags[frame], parent, originTags);
+                var tag = tags[frame];
+                _showFrame.call(_this, tag, parent, originTags);
             }
         }
     };
@@ -1642,10 +2057,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var _buildTag = _this.buildTag;
         var newDepth = [];
-        var length;
-        var i = 0;
+        var i;
         var tag;
         var frame = obj.frame;
+        var stage = _this.stage;
 
         if (!(frame in originTags)) {
             originTags[frame] = [];
@@ -1654,8 +2069,7 @@ if (!("swf2js" in window)){(function(window)
 
         // add ActionScript
         var actions = obj.actionScript;
-        length = actions.length;
-        if (length) {
+        if (actions.length) {
             for (i in actions) {
                 if (!actions.hasOwnProperty(i)) {
                     continue;
@@ -1666,8 +2080,7 @@ if (!("swf2js" in window)){(function(window)
 
         // add label
         var labels = obj.labels;
-        length = labels.length;
-        if (length) {
+        if (labels.length) {
             for (i in labels) {
                 if (!labels.hasOwnProperty(i)) {
                     continue;
@@ -1679,8 +2092,7 @@ if (!("swf2js" in window)){(function(window)
 
         // add sounds
         var sounds = obj.sounds;
-        length = sounds.length;
-        if (length) {
+        if (sounds.length) {
             for (i in sounds) {
                 if (!sounds.hasOwnProperty(i)) {
                     continue;
@@ -1690,8 +2102,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var cTags = obj.cTags;
-        length = cTags.length;
-        if (length) {
+        if (cTags.length) {
             for (i in cTags) {
                 if (!cTags.hasOwnProperty(i)) {
                     continue;
@@ -1704,8 +2115,7 @@ if (!("swf2js" in window)){(function(window)
 
         // remove tag
         var tags = obj.removeTags;
-        length = tags.length;
-        if (length) {
+        if (tags.length) {
             mc.setRemoveTag(frame, tags);
             for (i in tags) {
                 if (!tags.hasOwnProperty(i)) {
@@ -1719,32 +2129,24 @@ if (!("swf2js" in window)){(function(window)
         // copy
         if (frame > 1) {
             var prevFrame = frame - 1;
-            var addTags = mc.addTags;
-            var controller = mc.controller;
-            if (prevFrame in addTags) {
-                var prevTags = addTags[prevFrame];
-                if (!(frame in addTags)) {
-                    addTags[frame] = [];
-                    controller[frame] = [];
+            var container = mc.container;
+            if (prevFrame in container) {
+                var prevTags = container[prevFrame];
+                if (!(frame in container)) {
+                    container[frame] = [];
                 }
 
-                length = prevTags.length;
+                var length = prevTags.length;
                 if (length) {
-                    for (; length--;) {
-                        if (!(length in prevTags) || length in newDepth) {
+                    var parentId = mc.instanceId;
+                    for (var d = 0; d < length; d++) {
+                        if (!(d in prevTags) || d in newDepth) {
                             continue;
                         }
 
-                        addTags[frame][length] = prevTags[length];
-                        tag = prevTags[length];
-                        if (tag instanceof MovieClip) {
-                            var prevController = controller[prevFrame];
-                            if (!(frame in controller)) {
-                                controller[frame] = [];
-                            }
-                            controller[frame][length] = prevController[length];
-                        }
-                        originTags[frame][length] = originTags[prevFrame][length];
+                        container[frame][d] = prevTags[d];
+                        stage.copyPlaceObject(parentId, d, frame);
+                        originTags[frame][d] = originTags[prevFrame][d];
                     }
                 }
             }
@@ -1762,9 +2164,9 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var _clone = clone;
 
-        var addTags = parent.addTags;
-        if (!(frame in addTags)) {
-            addTags[frame] = [];
+        var container = parent.container;
+        if (!(frame in container)) {
+            container[frame] = [];
         }
 
         var isCopy = true;
@@ -1811,6 +2213,7 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 if (!tag.PlaceFlagHasBlendMode && oTag.PlaceFlagHasBlendMode) {
+                    tag.PlaceFlagHasBlendMode = oTag.PlaceFlagHasBlendMode;
                     tag.BlendMode = oTag.BlendMode;
                 }
             }
@@ -1819,65 +2222,73 @@ if (!("swf2js" in window)){(function(window)
         originTags[frame][tag.Depth] = _clone(tag);
         var buildObject = _this.buildObject(tag, parent, isCopy, frame);
         if (buildObject) {
-            addTags[frame][tag.Depth] = buildObject;
+            var stage = _this.stage;
+            var placeObject = _this.buildPlaceObject(tag);
+            stage.setPlaceObject(placeObject, parent.instanceId, tag.Depth, frame);
+            container[frame][tag.Depth] = buildObject.instanceId;
         }
     };
 
     /**
      * @param tag
      * @param parent
-     * @param copy
+     * @param isCopy
      * @param frame
      * @returns {*}
      */
-    SwfTag.prototype.buildObject = function(tag, parent, copy, frame, isButton)
+    SwfTag.prototype.buildObject = function(tag, parent, isCopy, frame)
     {
         var _this = this;
-        var _cloneArray = cloneArray;
         var stage = _this.stage;
         var char = stage.getCharacter(tag.CharacterId);
+        var tagType = char.tagType;
+        var isMorphShape = false;
+        if (tagType === 46 || tagType ===84) {
+            isMorphShape = true;
+        }
 
         var obj = {};
-        if (char instanceof Array) {
-            obj = (tag.PlaceFlagMove && copy) ?
-                parent.addTags[frame - 1][tag.Depth] :
-                _this.buildMovieClip(tag, char, parent);
-
-            if (obj.isStatic && obj.getTotalFrames() > 1) {
-                obj.isStatic = false;
-            }
-            if (parent.isStatic) {
-                parent.isStatic = _min(obj.isStatic, parent.isStatic);
-            }
+        if (!isMorphShape && tag.PlaceFlagMove && isCopy) {
+            var id = parent.container[frame - 1][tag.Depth];
+            obj = stage.getInstance(id);
         } else {
-            var tagType = char.tagType;
-            switch (tagType) {
-                case 11: // DefineText
-                case 33: // DefineText2
-                    obj = _this.buildText(tag, char);
-                    break;
-                case 37: // DefineEditText
-                    obj = _this.buildTextField(tag, char, parent);
-                    break;
-                case 2:  // DefineShape
-                case 22: // DefineShape2
-                case 32: // DefineShape3
-                case 83: // DefineShape4
-                    obj = _this.buildShape(tag, char);
-                    break;
-                case 46: // MorphShape
-                case 84: // MorphShape2
-                    var MorphShape = _this.buildMorphShape(char, tag.Ratio);
-                    MorphShape.tagType = tagType;
-                    obj = _this.buildShape(tag, MorphShape);
-                    break;
-                case 7: // DefineButton
-                case 34: // DefineButton2
-                    obj = _this.buildButton(char, tag, parent);
-                    break;
-                default:
-                    return 0;
+            if (char instanceof Array) {
+                obj = _this.buildMovieClip(tag, char, parent);
+            } else {
+
+                switch (tagType) {
+                    case 11: // DefineText
+                    case 33: // DefineText2
+                        obj = _this.buildText(tag, char);
+                        break;
+                    case 37: // DefineEditText
+                        obj = _this.buildTextField(tag, char, parent);
+                        break;
+                    case 2:  // DefineShape
+                    case 22: // DefineShape2
+                    case 32: // DefineShape3
+                    case 83: // DefineShape4
+                        obj = _this.buildShape(tag, char);
+                        break;
+                    case 46: // MorphShape
+                    case 84: // MorphShape2
+                        var MorphShape = _this.buildMorphShape(char, tag.Ratio);
+                        MorphShape.tagType = tagType;
+                        obj = _this.buildShape(tag, MorphShape);
+                        break;
+                    case 7: // DefineButton
+                    case 34: // DefineButton2
+                        obj = _this.buildButton(char, tag, parent);
+                        break;
+                    default:
+                        return 0;
+                }
             }
+            obj.setParent(parent);
+            obj.setStage(stage);
+            obj.setCharacterId(tag.CharacterId);
+            obj.setRatio(tag.Ratio || 0);
+            obj.setLevel(tag.Depth);
         }
 
         if (tag.PlaceFlagHasClipDepth) {
@@ -1885,62 +2296,35 @@ if (!("swf2js" in window)){(function(window)
             obj.clipDepth = tag.ClipDepth;
         }
 
-        var controller = parent.controller;
-        if (!(frame in controller)) {
-            controller[frame] = [];
-        }
-
-        var _controller = parent._controller;
-        if (!(frame in _controller)) {
-            _controller[frame] = [];
-        }
-
-        var matrix = [1,0,0,1,0,0];
-        if (tag.PlaceFlagHasMatrix) {
-            matrix = tag.Matrix;
-        }
-
-        var colorTransform = [1,1,1,1,0,0,0,0];
-        if (tag.PlaceFlagHasColorTransform) {
-            colorTransform = tag.ColorTransform;
-        }
-
-        var controlTag = {};
-        var _controlTag = {};
-        _controlTag.isReset = 0;
-
-        if (obj instanceof MovieClip) {
-            controlTag.matrix = _cloneArray(matrix);
-            controlTag._matrix = _cloneArray(matrix);
-            controlTag.colorTransform = _cloneArray(colorTransform);
-            controlTag._colorTransform = _cloneArray(colorTransform);
-
-            _controlTag.instanceId = obj.instanceId;
-            _controlTag.isReset = 1;
-
-            var as = stage.initActions[obj.getCharacterId()];
-            if (as) {
-                obj.active = true;
-                as.execute(obj);
-                obj.active = false;
-            }
-        } else {
-            obj.setMatrix(_cloneArray(matrix));
-            obj.setColorTransform(_cloneArray(colorTransform));
-        }
-
-        if (!isButton) {
-            if (obj instanceof MovieClip ||
-                obj instanceof TextField ||
-                obj instanceof Button
-            ) {
-                controller[frame][tag.Depth] = controlTag;
-                _controller[frame][tag.Depth] = _controlTag;
-            }
-        }
-
         return obj;
     };
+
+    /**
+     * @param tag
+     * @returns {PlaceObject}
+     */
+    SwfTag.prototype.buildPlaceObject = function(tag)
+    {
+        var placeObject = new PlaceObject();
+        // Matrix
+        if (tag.PlaceFlagHasMatrix) {
+            placeObject.setMatrix(tag.Matrix);
+        }
+        // ColorTransform
+        if (tag.PlaceFlagHasColorTransform) {
+            placeObject.setColorTransform(tag.ColorTransform);
+        }
+        // Filter
+        if (tag.PlaceFlagHasFilterList) {
+            placeObject.setFilters(tag.SurfaceFilterList);
+        }
+        // BlendMode
+        if (tag.PlaceFlagHasBlendMode) {
+            placeObject.setBlendMode(tag.BlendMode);
+        }
+        return placeObject;
+    };
+
 
     /**
      * @param tag
@@ -1951,17 +2335,13 @@ if (!("swf2js" in window)){(function(window)
     SwfTag.prototype.buildMovieClip = function(tag, character, parent)
     {
         var _this = this;
+        var stage = _this.stage;
         var mc = new MovieClip();
-        mc.stage = _this.stage;
+        mc.setStage(stage);
         mc._url = parent._url;
-        mc.setParent(parent);
-        mc.setCharacterId(tag.CharacterId);
-        mc.setRatio(tag.Ratio || 0);
-        mc.setLevel(tag.Depth);
         var target = "instance" + mc.instanceId;
         if (tag.PlaceFlagHasName) {
             mc.setName(tag.Name);
-            mc.isStatic = false;
             target = tag.Name;
         }
         mc.setTarget(parent.getTarget()+"/"+target);
@@ -1969,10 +2349,9 @@ if (!("swf2js" in window)){(function(window)
 
         if (tag.PlaceFlagHasClipActions) {
             var ClipActionRecords = tag.ClipActionRecords;
-            var rLength = ClipActionRecords.length;
-            var eventArray = [];
+            var length = ClipActionRecords.length;
             var eventName;
-            for (var i = 0; i < rLength; i++) {
+            for (var i = 0; i < length; i++) {
                 var actionRecord = ClipActionRecords[i];
                 var eventFlag = actionRecord.EventFlags;
                 for (eventName in eventFlag) {
@@ -1982,29 +2361,16 @@ if (!("swf2js" in window)){(function(window)
                     if (!eventFlag[eventName]) {
                         continue;
                     }
-                    if (!(eventName in eventArray)) {
-                        eventArray[eventName] = [];
-                    }
-                    eventArray[eventName].push(actionRecord.Actions);
+
+                    var action = createActionScript(mc, actionRecord.Actions);
+                    mc.addEventListener(eventName, action);
                 }
-            }
-            for (eventName in eventArray) {
-                if (!eventArray.hasOwnProperty(eventName)) {
-                    continue;
-                }
-                mc.clipEvent[eventName] = eventArray[eventName];
             }
         }
 
-        // Filter
-        if (tag.PlaceFlagHasFilterList) {
-            //console.log(tag.SurfaceFilterList)
-            mc.setFilters(tag.SurfaceFilterList);
-        }
-
-        // BlendMode
-        if (tag.BlendMode) {
-            mc.blendMode = tag.BlendMode;
+        var initMovieClip = stage.initMovieClip[tag.CharacterId];
+        if (initMovieClip) {
+            mc.variables = initMovieClip.variables;
         }
         return mc;
     };
@@ -2018,18 +2384,20 @@ if (!("swf2js" in window)){(function(window)
     SwfTag.prototype.buildTextField = function(tag, character, parent)
     {
         var _this = this;
-        var textField = new TextField(parent);
-        textField.setCharacterId(tag.CharacterId);
-        textField.setRatio(tag.Ratio || 0);
+        var stage = _this.stage;
+
+        var textField = new TextField();
+        textField.setStage(stage);
+        textField.setInitParams();
         textField.setTagType(character.tagType);
         textField.setBounds(character.bounds);
-        textField.setLevel(tag.Depth);
-
+        var target = "instance" + textField.instanceId;
         if (tag.PlaceFlagHasName) {
             textField.setName(tag.Name);
+            target = tag.Name;
         }
+        textField.setTarget(parent.getTarget()+"/"+target);
 
-        var stage = _this.stage;
         var data = character.data;
         var obj = {};
         var fontData = null;
@@ -2137,7 +2505,7 @@ if (!("swf2js" in window)){(function(window)
             element.style.border = "none";
             element.style.overflow = "hidden";
             element.style.backgroundColor = "transparent";
-            element.style.zIndex = 2147483647;
+            element.style.zIndex = 0x7fffffff;
             element.style.textAlign = obj.align;
             element.value = textField.initialText;
             element.id = textField.getTagName();
@@ -2170,18 +2538,15 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param tag
      * @param character
-     * @returns {DefineText}
+     * @returns {StaticText}
      */
     SwfTag.prototype.buildText = function(tag, character)
     {
         var _this = this;
         var stage = _this.stage;
-        var text = new DefineText();
-        text.setCharacterId(tag.CharacterId);
-        text.setRatio(tag.Ratio || 0);
-        text.setTagType(character.tagType);
-        text.setBounds(character.bounds);
-        text.setLevel(tag.Depth);
+        var staticText = new StaticText();
+        staticText.setTagType(character.tagType);
+        staticText.setBounds(character.bounds);
 
         var records = character.textRecords;
         var length = records.length;
@@ -2232,12 +2597,12 @@ if (!("swf2js" in window)){(function(window)
                 textRecode.setData(data);
                 textRecode.setColor(color);
                 textRecode.setMatrix(matrix);
-                text.addRecord(textRecode);
+                staticText.addRecord(textRecode);
                 offsetX += entry.GlyphAdvance;
             }
         }
 
-        return text;
+        return staticText;
     };
 
     /**
@@ -2248,12 +2613,9 @@ if (!("swf2js" in window)){(function(window)
     SwfTag.prototype.buildShape = function(tag, character)
     {
         var shape = new Shape();
-        shape.setCharacterId(tag.CharacterId);
-        shape.setRatio(tag.Ratio || 0);
         shape.setTagType(character.tagType);
         shape.setBounds(character.bounds);
         shape.setData(character.data);
-        shape.setLevel(tag.Depth);
         return shape;
     };
 
@@ -2261,45 +2623,51 @@ if (!("swf2js" in window)){(function(window)
      * @param character
      * @param tag
      * @param parent
-     * @returns {Button}
+     * @returns {SimpleButton}
      */
     SwfTag.prototype.buildButton = function(character, tag, parent)
     {
         var _this = this;
+        var stage = _this.stage;
         var characters = character.characters;
-        var button = new Button();
+        var button = new SimpleButton();
+        button.setStage(stage);
         button.setParent(parent);
-        button.setStage(_this.stage);
         button.setLevel(tag.Depth);
 
         if ("actions" in character) {
             button.setActions(character.actions);
         }
+
+        var target = "instance" + button.instanceId;
         if (tag.PlaceFlagHasName) {
             button.setName(tag.Name);
+            target = tag.Name;
         }
-        var down = button.down;
+        button.setTarget(parent.getTarget()+"/"+target);
+
+        var downState = button.getSprite("down");
         if (character.ButtonStateDownSoundId) {
-            down.soundId = character.ButtonStateDownSoundId;
-            down.soundInfo = character.ButtonStateDownSoundInfo;
+            downState.soundId = character.ButtonStateDownSoundId;
+            downState.soundInfo = character.ButtonStateDownSoundInfo;
         }
 
-        var hitTest = button.hit;
+        var hitState = button.getSprite("hit");
         if (character.ButtonStateHitTestSoundId) {
-            hitTest.soundId = character.ButtonStateHitTestSoundId;
-            hitTest.soundInfo = character.ButtonStateHitTestSoundInfo;
+            hitState.soundId = character.ButtonStateHitTestSoundId;
+            hitState.soundInfo = character.ButtonStateHitTestSoundInfo;
         }
 
-        var over = button.over;
+        var overState = button.getSprite("over");
         if (character.ButtonStateOverSoundId) {
-            over.soundId = character.ButtonStateOverSoundId;
-            over.soundInfo = character.ButtonStateOverSoundInfo;
+            overState.soundId = character.ButtonStateOverSoundId;
+            overState.soundInfo = character.ButtonStateOverSoundInfo;
         }
 
-        var up = button.up;
+        var upState = button.getSprite("up");
         if (character.ButtonStateUpSoundId) {
-            up.soundId = character.ButtonStateUpSoundId;
-            up.soundInfo = character.ButtonStateUpSoundInfo;
+            upState.soundId = character.ButtonStateUpSoundId;
+            upState.soundInfo = character.ButtonStateUpSoundInfo;
         }
 
         for (var depth in characters) {
@@ -2314,27 +2682,33 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 var bTag = tags[idx];
-                var obj = _this.buildObject(bTag, parent, false, 1, true);
+                var obj = _this.buildObject(bTag, button, false, 1);
+                var placeObject = _this.buildPlaceObject(bTag);
                 var Depth = bTag.Depth;
                 if (bTag.ButtonStateDown) {
-                    down.addTag(Depth, obj, bTag);
+                    downState.addTag(Depth, obj);
+                    stage.setPlaceObject(placeObject, downState.instanceId, Depth, 0);
                 }
                 if (bTag.ButtonStateHitTest) {
-                    hitTest.addTag(Depth, obj, bTag);
+                    hitState.addTag(Depth, obj);
+                    stage.setPlaceObject(placeObject, hitState.instanceId, Depth, 0);
                 }
                 if (bTag.ButtonStateOver) {
-                    over.addTag(Depth, obj, bTag);
+                    overState.addTag(Depth, obj);
+                    stage.setPlaceObject(placeObject, overState.instanceId, Depth, 0);
                 }
                 if (bTag.ButtonStateUp) {
-                    up.addTag(Depth, obj, bTag);
+                    upState.addTag(Depth, obj);
+                    stage.setPlaceObject(placeObject, upState.instanceId, Depth, 0);
                 }
             }
         }
 
-        button.setCharacterId(tag.CharacterId);
-        button.setRatio(tag.Ratio || 0);
+        button.setSprite("down", downState);
+        button.setSprite("hit", hitState);
+        button.setSprite("over", overState);
+        button.setSprite("up", upState);
         button.setTagType(character.tagType);
-
         return button;
     };
 
@@ -2675,7 +3049,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var bitio = _this.bitio;
         var characterId = bitio.getUI16();
-        var shapeBounds = _this.rect();
+        var bounds = _this.rect();
 
         if (tagType === 83) {
             var obj = {};
@@ -2687,7 +3061,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var shapes = _this.shapeWithStyle(tagType);
-        _this.appendShapeTag(characterId, shapeBounds, shapes, tagType);
+        _this.appendShapeTag(characterId, bounds, shapes, tagType);
     };
 
     /**
@@ -2855,10 +3229,6 @@ if (!("swf2js" in window)){(function(window)
         bitio.byteAlign();
 
         var result = [1,0,0,1,0,0];
-        if (isArrayBuffer) {
-            result = new Float32Array(result);
-        }
-
         if (bitio.getUIBit()) {
             var nScaleBits = bitio.getUIBits(5);
             result[0] = bitio.getSIBits(nScaleBits) / 0x10000;
@@ -3239,16 +3609,17 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param characterId
-     * @param shapeBounds
+     * @param bounds
      * @param shapes
      * @param tagType
      */
-    SwfTag.prototype.appendShapeTag = function(characterId, shapeBounds, shapes, tagType)
+    SwfTag.prototype.appendShapeTag = function(characterId, bounds, shapes, tagType)
     {
-        this.stage.setCharacter(characterId, {
+        var stage = this.stage;
+        stage.setCharacter(characterId, {
             tagType: tagType,
             data: vtc.convert(shapes, false),
-            bounds: shapeBounds
+            bounds: bounds
         });
     };
 
@@ -4483,9 +4854,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var bitio = _this.bitio;
         var obj = {};
-        obj.ButtonReserved = bitio.getUIBits(2);
-        obj.ButtonHasBlendMode = bitio.getUIBits(1);
-        obj.ButtonHasFilterList = bitio.getUIBits(1);
+
+        bitio.getUIBits(2); // Reserved
+        obj.PlaceFlagHasBlendMode = bitio.getUIBits(1);
+        obj.PlaceFlagHasFilterList = bitio.getUIBits(1);
         obj.ButtonStateHitTest = bitio.getUIBits(1);
         obj.ButtonStateDown = bitio.getUIBits(1);
         obj.ButtonStateOver = bitio.getUIBits(1);
@@ -4496,11 +4868,11 @@ if (!("swf2js" in window)){(function(window)
         obj.Matrix = _this.matrix();
         obj.ColorTransform = _this.colorTransform();
         obj.PlaceFlagHasColorTransform = (obj.ColorTransform === undefined) ? 0 : 1;
-        if (obj.ButtonHasBlendMode) {
+        if (obj.PlaceFlagHasBlendMode) {
             obj.BlendMode = bitio.getUI8();
         }
-        if (obj.ButtonHasFilterList) {
-            obj.FilterList = _this.getFilterList();
+        if (obj.PlaceFlagHasFilterList) {
+            obj.SurfaceFilterList = _this.getFilterList();
         }
         obj.PlaceFlagHasRatio = 0;
         obj.PlaceFlagHasClipDepth = 0;
@@ -4645,13 +5017,13 @@ if (!("swf2js" in window)){(function(window)
 
                 var endLength = startOffset + length;
                 var actionRecords = [];
-                var endFlag = 0;
                 for (; bitio.byte_offset < endLength;) {
-                    actionRecords[actionRecords.length] = _this.parseClipActionRecord(endLength);
+                    var clipActionRecord = _this.parseClipActionRecord(endLength);
+                    actionRecords[actionRecords.length] = clipActionRecord;
                     if (endLength <= bitio.byte_offset) {
                         break;
                     }
-                    endFlag = (stage.getVersion() <= 5) ? bitio.getUI16() : bitio.getUI32();
+                    var endFlag = (stage.getVersion() <= 5) ? bitio.getUI16() : bitio.getUI32();
                     if (!endFlag) {
                         break;
                     }
@@ -4659,6 +5031,10 @@ if (!("swf2js" in window)){(function(window)
                         bitio.byte_offset -= 2;
                     } else {
                         bitio.byte_offset -= 4;
+                    }
+
+                    if (clipActionRecord.KeyCode) {
+                        bitio.byte_offset -= 1;
                     }
                 }
                 obj.ClipActionRecords = actionRecords;
@@ -4746,9 +5122,12 @@ if (!("swf2js" in window)){(function(window)
         var _getFilter = _this.getFilter;
         var NumberOfFilters = bitio.getUI8();
         for (var i = 0; i < NumberOfFilters; i++) {
-            result[i] = _getFilter.call(_this);
+            var filter = _getFilter.call(_this);
+            if (filter) {
+                result[result.length] = filter;
+            }
         }
-        return result;
+        return (result.length) ? result : null;
     };
 
     /**
@@ -4758,10 +5137,9 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var bitio = _this.bitio;
-        var obj = {};
-        obj.FilterID = bitio.getUI8();
+        var filterId = bitio.getUI8();
         var filter;
-        switch (obj.FilterID) {
+        switch (filterId) {
             case 0:
                 filter = _this.dropShadowFilter();
                 break;
@@ -4787,121 +5165,183 @@ if (!("swf2js" in window)){(function(window)
                 filter = _this.gradientBevelFilter();
                 break;
         }
-        obj.Filter = filter;
-        return obj;
+        return filter;
     };
 
     /**
-     * @returns {{}}
+     * @returns {DropShadowFilter}
      */
     SwfTag.prototype.dropShadowFilter = function()
     {
         var _this = this;
         var bitio = _this.bitio;
-        var obj = {};
-        obj.color = _this.rgba();
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Angle = bitio.getFloat32();
-        obj.Distance = bitio.getFloat16() | bitio.getFloat16();
-        obj.Strength = bitio.getFloat16() / 256;
-        obj.InnerShadow = bitio.getUIBits(1);
-        obj.Knockout = bitio.getUIBits(1);
-        obj.CompositeSource = bitio.getUIBits(1);
-        obj.Passes = bitio.getUIBits(5);
-        return obj;
+        var rgba = _this.rgba();
+        var alpha = rgba.A;
+        var color = rgba.R << 16 | rgba.G << 8 | rgba.B;
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var angle = bitio.getUI32() / 0x10000 * 180 / _PI;
+        var distance = bitio.getUI32() / 0x10000;
+        var strength = bitio.getFloat16() / 256;
+        var inner = (bitio.getUIBits(1)) ? true : false;
+        var knockout = (bitio.getUIBits(1)) ? true : false;
+        var hideObject = (bitio.getUIBits(1)) ? false : true;
+        var quality = bitio.getUIBits(5);
+
+        if (!strength) {
+            return null;
+        }
+
+        return new DropShadowFilter(
+            distance, angle, color, alpha, blurX, blurY,
+            strength, quality, inner, knockout, hideObject
+        );
     };
 
     /**
-     * @returns {{}}
+     * @returns {BlurFilter}
      */
     SwfTag.prototype.blurFilter = function()
     {
-        var obj = {};
         var bitio = this.bitio;
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Passes = bitio.getUIBits(5);
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var quality = bitio.getUIBits(5);
         bitio.getUIBits(3); // Reserved
-        return obj;
+
+        return new BlurFilter(blurX, blurY, quality);
     };
 
     /**
-     * @returns {{}}
+     * @returns {GlowFilter}
      */
     SwfTag.prototype.glowFilter = function()
     {
         var _this = this;
         var bitio = _this.bitio;
-        var obj = {};
-        obj.color = _this.rgba();
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Strength = bitio.getFloat16() / 256;
-        obj.InnerGlow = bitio.getUIBits(1);
-        obj.Knockout = bitio.getUIBits(1);
-        obj.CompositeSource = bitio.getUIBits(1);
-        obj.Passes = bitio.getUIBits(5);
-        return obj;
+        var rgba = _this.rgba();
+        var alpha = rgba.A;
+        var color = rgba.R << 16 | rgba.G << 8 | rgba.B;
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var strength = bitio.getFloat16() / 256;
+        var inner = (bitio.getUIBits(1)) ? true : false;
+        var knockout = (bitio.getUIBits(1)) ? true : false;
+        bitio.getUIBits(1); // CompositeSource
+        var quality = bitio.getUIBits(5);
+
+        if (!strength) {
+            return null;
+        }
+
+        return new GlowFilter(
+            color, alpha, blurX, blurY,
+            strength, quality, inner, knockout
+        );
     };
 
     /**
-     * @returns {{}}
+     * @returns {BevelFilter}
      */
     SwfTag.prototype.bevelFilter = function()
     {
         var _this = this;
         var bitio = _this.bitio;
-        var obj = {};
-        obj.ShadowColor = _this.rgba();
-        obj.HighlightColor = _this.rgba();
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Angle = bitio.getFloat16() | bitio.getFloat16();
-        obj.Distance = bitio.getFloat16() | bitio.getFloat16();
-        obj.Strength = bitio.getFloat16() / 256;
-        obj.InnerShadow = bitio.getUIBits(1);
-        obj.Knockout = bitio.getUIBits(1);
-        obj.CompositeSource = bitio.getUIBits(1);
-        obj.OnTop = bitio.getUIBits(1);
-        obj.Passes = bitio.getUIBits(4);
-        return obj;
+        var rgba;
+        rgba = _this.rgba();
+        var highlightAlpha = rgba.A;
+        var highlightColor = rgba.R << 16 | rgba.G << 8 | rgba.B;
+
+        rgba = _this.rgba();
+        var shadowAlpha = rgba.A;
+        var shadowColor = rgba.R << 16 | rgba.G << 8 | rgba.B;
+
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var angle = bitio.getUI32() / 0x10000 * 180 / _PI;
+        var distance = bitio.getUI32() / 0x10000;
+        var strength = bitio.getFloat16() / 256;
+        var inner = (bitio.getUIBits(1)) ? true : false;
+        var knockout = (bitio.getUIBits(1)) ? true : false;
+        bitio.getUIBits(1); // CompositeSource
+        var OnTop = bitio.getUIBits(1);
+        var quality = bitio.getUIBits(4);
+
+        var type = "inner";
+        if (!inner) {
+            if (OnTop) {
+                type = "full";
+            } else {
+                type = "outer";
+            }
+        }
+
+        if (!strength) {
+            return null;
+        }
+
+        return new BevelFilter(
+            distance, angle, highlightColor, highlightAlpha,
+            shadowColor, shadowAlpha, blurX, blurY,
+            strength, quality, type, knockout
+        );
     };
 
     /**
-     * @returns {{}}
+     * @returns {GradientGlowFilter}
      */
     SwfTag.prototype.gradientGlowFilter = function()
     {
         var _this = this;
         var bitio = _this.bitio;
-        var obj = {};
+        var i;
         var NumColors = bitio.getUI8();
 
         var colors = [];
-        for (; NumColors--;) {
-            colors[colors.length] = {
-                GradientColors: _this.rgba(),
-                GradientRatio: bitio.getUI8()
-            };
+        var alphas = [];
+        for (i = 0; i < NumColors; i++) {
+            var rgba = _this.rgba();
+            alphas[alphas.length] = rgba.A;
+            colors[colors.length] = rgba.R << 16 | rgba.G << 8 | rgba.B;
         }
 
-        obj.Colors = colors;
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Angle = bitio.getFloat16() | bitio.getFloat16();
-        obj.Distance = bitio.getFloat16() | bitio.getFloat16();
-        obj.Strength = bitio.getFloat16() / 256;
-        obj.InnerShadow = bitio.getUIBits(1);
-        obj.Knockout = bitio.getUIBits(1);
-        obj.CompositeSource = bitio.getUIBits(1);
-        obj.OnTop = bitio.getUIBits(1);
-        obj.Passes = bitio.getUIBits(4);
-        return obj;
+        var ratios = [];
+        for (i = 0; i < NumColors; i++) {
+            ratios[ratios.length] = bitio.getUI8();
+        }
+
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var angle = bitio.getUI32() / 0x10000 * 180 / _PI;
+        var distance = bitio.getUI32() / 0x10000;
+        var strength = bitio.getFloat16() / 256;
+        var inner = (bitio.getUIBits(1)) ? true : false;
+        var knockout = (bitio.getUIBits(1)) ? true : false;
+        bitio.getUIBits(1); // CompositeSource
+        var OnTop = bitio.getUIBits(1);
+        var quality = bitio.getUIBits(4);
+
+        var type = "inner";
+        if (!inner) {
+            if (OnTop) {
+                type = "full";
+            } else {
+                type = "outer";
+            }
+        }
+
+        if (!strength) {
+            return null;
+        }
+
+        return new GradientGlowFilter(
+            distance, angle, colors, alphas, ratios,
+            blurX, blurY, strength, quality, type, knockout
+        );
     };
 
     /**
-     * @returns {{}}
+     * @returns {ConvolutionFilter}
      */
     SwfTag.prototype.convolutionFilter = function()
     {
@@ -4924,53 +5364,77 @@ if (!("swf2js" in window)){(function(window)
         obj.Clamp = bitio.getUIBits(1);
         obj.PreserveAlpha = bitio.getUIBits(1);
 
-        return obj;
+        return new ConvolutionFilter(
+        );
     };
 
     /**
-     * @returns {{}}
-     */
-    SwfTag.prototype.colorMatrixFilter = function()
-    {
-        var obj = {};
-        var bitio = this.bitio;
-        var MatrixArr = [];
-        for (var i = 0; i < 20; i++) {
-            MatrixArr[MatrixArr.length] = bitio.getUI32();
-        }
-        return obj;
-    };
-
-    /**
-     * @returns {{}}
+     * @returns {GradientBevelFilter}
      */
     SwfTag.prototype.gradientBevelFilter = function()
     {
         var _this = this;
         var bitio = _this.bitio;
         var NumColors = bitio.getUI8();
+
+        var i;
         var colors = [];
-        for (; NumColors--;) {
-            colors[colors.length] = {
-                GradientColors: _this.rgba(),
-                GradientRatio: bitio.getUI8()
-            };
+        var alphas = [];
+        for (i = 0; i < NumColors; i++) {
+            var rgba = _this.rgba();
+            alphas[alphas.length] = rgba.A;
+            colors[colors.length] = rgba.R << 16 | rgba.G << 8 | rgba.B;
         }
 
-        var obj = {};
-        obj.Colors = colors;
-        obj.BlurX = bitio.getFloat16() | bitio.getFloat16();
-        obj.BlurY = bitio.getFloat16() | bitio.getFloat16();
-        obj.Angle = bitio.getFloat16() | bitio.getFloat16();
-        obj.Distance = bitio.getFloat16() | bitio.getFloat16();
-        obj.Strength = bitio.getFloat16() / 256;
-        obj.InnerShadow = bitio.getUIBits(1);
-        obj.Knockout = bitio.getUIBits(1);
-        obj.CompositeSource = bitio.getUIBits(1);
-        obj.OnTop = bitio.getUIBits(1);
-        obj.Passes = bitio.getUIBits(4);
+        var ratios = [];
+        for (i = 0; i < NumColors; i++) {
+            ratios[ratios.length] = bitio.getUI8();
+        }
 
-        return obj;
+        var blurX = bitio.getUI32() / 0x10000;
+        var blurY = bitio.getUI32() / 0x10000;
+        var angle = bitio.getUI32() / 0x10000 * 180 / _PI;
+        var distance = bitio.getUI32() / 0x10000;
+        var strength = bitio.getFloat16() / 256;
+
+        var inner = (bitio.getUIBits(1)) ? true : false;
+        var knockout = (bitio.getUIBits(1)) ? true : false;
+        bitio.getUIBits(1); // CompositeSource
+        var OnTop = bitio.getUIBits(1);
+        var quality = bitio.getUIBits(4);
+
+        var type = "inner";
+        if (!inner) {
+            if (OnTop) {
+                type = "full";
+            } else {
+                type = "outer";
+            }
+        }
+
+        if (!strength) {
+            return null;
+        }
+
+        return new GradientBevelFilter(
+            distance, angle, colors, alphas, ratios,
+            blurX, blurY, strength, quality, type, knockout
+        );
+    };
+
+    /**
+     * @returns {ColorMatrixFilter}
+     */
+    SwfTag.prototype.colorMatrixFilter = function()
+    {
+        var bitio = this.bitio;
+        var MatrixArr = [];
+        for (var i = 0; i < 20; i++) {
+            MatrixArr[MatrixArr.length] = bitio.getUI32();
+        }
+
+        return new ColorMatrixFilter(
+        );
     };
 
     /**
@@ -4982,10 +5446,6 @@ if (!("swf2js" in window)){(function(window)
         bitio.byteAlign();
 
         var result = [1,1,1,1,0,0,0,0];
-        if (isArrayBuffer) {
-            result = new Float32Array(result);
-        }
-
         var first6bits = bitio.getUIBits(6);
         var HasAddTerms = first6bits >> 5;
         var HasMultiTerms = (first6bits >> 4) & 1;
@@ -5045,12 +5505,13 @@ if (!("swf2js" in window)){(function(window)
 
         var mc = new MovieClip();
         mc.active = true;
-        mc.stage = stage;
+        mc.setStage(stage);
+        stage.initMovieClip[spriteId] = mc;
 
         var as = new ActionScript(bitio.getData(length - 2), undefined, undefined, true);
-        as.execute(mc);
-
-        stage.initActions[spriteId] = as;
+        var action = createActionScript(mc, as);
+        var initActions = stage.initActions;
+        initActions[initActions.length] = {as:action, mc:mc};
     };
 
     /**
@@ -5061,20 +5522,20 @@ if (!("swf2js" in window)){(function(window)
         var i;
         var bitio = this.bitio;
         var obj = {};
-        obj.SceneCount = bitio.getEncodedU32();
+        obj.SceneCount = bitio.getU30();
         obj.sceneInfo = [];
         for (i = 0; i < obj.SceneCount; i++) {
             obj.sceneInfo[i] = {
-                offset: bitio.getEncodedU32(),
+                offset: bitio.getU30(),
                 name: decodeURIComponent(bitio.getDataUntil("\0"))
             };
         }
 
-        obj.FrameLabelCount = bitio.getEncodedU32();
+        obj.FrameLabelCount = bitio.getU30();
         obj.frameInfo = [];
         for (i = 0; i < obj.FrameLabelCount; i++) {
             obj.frameInfo[i] = {
-                num: bitio.getEncodedU32(),
+                num: bitio.getU30(),
                 label: decodeURIComponent(bitio.getDataUntil("\0"))
             };
         }
@@ -5147,9 +5608,333 @@ if (!("swf2js" in window)){(function(window)
         obj.Flags = bitio.getUI32();
         obj.Name = bitio.getDataUntil("\0");
         var moveOffset = bitio.byte_offset - startOffset;
-        obj.ABCData = _this.parseDoAction(length - moveOffset);
+        var ABCData = bitio.getData(length - moveOffset);
 
-        return obj;
+        return ABCData;
+
+        // TODO
+        //var ABCBitIO = new BitIO();
+        //ABCBitIO.setData(ABCData);
+        //
+        //var minorVersion = ABCBitIO.getUI16();
+        //var majorVersion = ABCBitIO.getUI16();
+        //
+        //var intCount = ABCBitIO.getU30();
+        //var i;
+        //for (i = 1; i < intCount; i++) {
+        //    ABCBitIO.getUI32();
+        //}
+        //
+        //var UintCount = ABCBitIO.getU30();
+        //for (i = 1; i < UintCount; i++) {
+        //    ABCBitIO.getUI32();
+        //}
+        //
+        //var DoubleCount = ABCBitIO.getU30();
+        //for (i = 1; i < DoubleCount; i++) {
+        //    ABCBitIO.getFloat64();
+        //}
+        //
+        //var StringCount = ABCBitIO.getU30();
+        //var stringPool = [];
+        //for (i = 1; i < StringCount; i++) {
+        //    stringPool[stringPool.length] = ABCBitIO.AbcReadString();
+        //}
+        //
+        //var namespaceCount = ABCBitIO.getU30();
+        //for (i = 1; i < namespaceCount; i++) {
+        //    var kind = ABCBitIO.getUI8();
+        //    var nameIdx = ABCBitIO.getU30();
+        //}
+        //
+        //var nssetsCount = ABCBitIO.getU30();
+        //for (i = 1; i < nssetsCount; i++) {
+        //    var count = ABCBitIO.getUI8();
+        //    for (var idx = 0; idx < count; idx++) {
+        //        ABCBitIO.getUI8();
+        //    }
+        //}
+        //
+        //var multinameCount = ABCBitIO.getU30();
+        //for (i = 1; i < multinameCount; i++) {
+        //    var kind = ABCBitIO.getUI8();
+        //    switch (kind) {
+        //        case 7:
+        //        case 13:
+        //            var namespaceIdx = ABCBitIO.getU30();
+        //            var nameIdx = ABCBitIO.getU30();
+        //            break;
+        //        case 9:
+        //        case 14:
+        //            var nameIdx = ABCBitIO.getU30();
+        //            var nssetIdx = ABCBitIO.getU30();
+        //            break;
+        //        case 15:
+        //        case 16:
+        //            var nameIdx = ABCBitIO.getU30();
+        //            break;
+        //        case 27:
+        //            var nssetIdx = ABCBitIO.getU30();
+        //            break;
+        //        case 17:
+        //        case 18:
+        //            break;
+        //    }
+        //}
+        //
+        //var methodsCount = ABCBitIO.getU30();
+        //for (i = 0; i < methodsCount; i++) {
+        //    var obj = {};
+        //    var paramCount = ABCBitIO.getU30();
+        //    obj.retType = ABCBitIO.getU30();
+        //    obj.paramTypes = [];
+        //
+        //    for (var idx = 0; idx < paramCount; idx++) {
+        //        obj.paramTypes[idx] = ABCBitIO.getU30();
+        //    }
+        //
+        //    obj.nameIndex = ABCBitIO.getU30();
+        //    obj.flags = ABCBitIO.getUI8();
+        //    if (obj.flags & 8) {
+        //        var optionalCount = ABCBitIO.getU30();
+        //        obj.ValueKind = [];
+        //        for (var idx = 0; idx < optionalCount; idx++) {
+        //            obj.ValueKind[idx] = 0;
+        //        }
+        //
+        //        obj.paramNames = [];
+        //        for (var idx = 0; idx < paramCount; idx++) {
+        //            obj.paramNames[idx] = ABCBitIO.getU30();
+        //        }
+        //    }
+        //}
+        //
+        //
+        //var metadataCount = ABCBitIO.getU30();
+        //for (i = 0; i < metadataCount; i++) {
+        //    var name = ABCBitIO.getU30();
+        //    var item_count = ABCBitIO.getU30();
+        //    for (var idx = 0; idx < item_count; idx++) {
+        //        var key = ABCBitIO.getU30();
+        //        var value = ABCBitIO.getU30();
+        //    }
+        //}
+        //
+        //var classCount = ABCBitIO.getU30();
+        //for (i = 0; i < classCount; i++) {
+        //    var obj = {};
+        //    obj.nameIdx = ABCBitIO.getU30();
+        //    obj.superIdx = ABCBitIO.getU30();
+        //    obj.flags = ABCBitIO.getUI8();
+        //
+        //    if (obj.flags & 8) {
+        //        obj.protectedNS = ABCBitIO.getU30();
+        //    }
+        //
+        //    var interfacesCount = ABCBitIO.getU30();
+        //    obj.interfaces = [];
+        //    for (var idx = 0; idx < interfacesCount; idx++) {
+        //        obj.interfaces[idx] = ABCBitIO.getU30();
+        //    }
+        //
+        //    obj.iinitIdx = ABCBitIO.getU30();
+        //
+        //    var count = ABCBitIO.getU30();
+        //    for (var idx = 0; idx < count; idx++) {
+        //        var namaIdx = ABCBitIO.getU30();
+        //        var kind = ABCBitIO.getUI8();
+        //
+        //        switch (kind) {
+        //            case 0:
+        //            case 6:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var type_index = ABCBitIO.getU30();
+        //                var value_index = ABCBitIO.getU30();
+        //                if (value_index) {
+        //                    var value_kind = ABCBitIO.getUI8();
+        //                }
+        //                break;
+        //            case 1:
+        //            case 2:
+        //            case 3:
+        //                var disp_id = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //            case 4:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var class_info = ABCBitIO.getU30();
+        //                break;
+        //            case 5:
+        //                var slot_index = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //        }
+        //
+        //        if ((kind >> 4) & 0x04) {
+        //            var metadata_count = ABCBitIO.getU30();
+        //            var metadata = [];
+        //            for (var j = 0; j < metadata_count; j++) {
+        //                metadata[metadata.length] = ABCBitIO.getU30();
+        //            }
+        //        }
+        //    }
+        //
+        //}
+        //
+        //for (i = 0; i < classCount; i++) {
+        //    var obj = {};
+        //    obj.cinitIdx = ABCBitIO.getU30();
+        //
+        //    var count = ABCBitIO.getU30();
+        //    for (var idx = 0; idx < count; idx++) {
+        //        var namaIdx = ABCBitIO.getU30();
+        //        var kind = ABCBitIO.getUI8();
+        //
+        //        switch (kind) {
+        //            case 0:
+        //            case 6:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var type_index = ABCBitIO.getU30();
+        //                var value_index = ABCBitIO.getU30();
+        //                if (value_index) {
+        //                    var value_kind = ABCBitIO.getUI8();
+        //                }
+        //                break;
+        //            case 1:
+        //            case 2:
+        //            case 3:
+        //                var disp_id = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //            case 4:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var class_info = ABCBitIO.getU30();
+        //                break;
+        //            case 5:
+        //                var slot_index = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //        }
+        //
+        //        if ((kind >> 4) & 0x04) {
+        //            var metadata_count = ABCBitIO.getU30();
+        //            var metadata = [];
+        //            for (var j = 0; j < metadata_count; j++) {
+        //                metadata[metadata.length] = ABCBitIO.getU30();
+        //            }
+        //        }
+        //    }
+        //}
+        //
+        //var scriptCount = ABCBitIO.getU30();
+        //for (i = 0; i < scriptCount; i++) {
+        //    var init = ABCBitIO.getU30();
+        //    var count = ABCBitIO.getU30();
+        //    for (var idx = 0; idx < count; idx++) {
+        //        var namaIdx = ABCBitIO.getU30();
+        //        var kind = ABCBitIO.getUI8();
+        //
+        //        switch (kind) {
+        //            case 0:
+        //            case 6:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var type_index = ABCBitIO.getU30();
+        //                var value_index = ABCBitIO.getU30();
+        //                if (value_index) {
+        //                    var value_kind = ABCBitIO.getUI8();
+        //                }
+        //                break;
+        //            case 1:
+        //            case 2:
+        //            case 3:
+        //                var disp_id = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //            case 4:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var class_info = ABCBitIO.getU30();
+        //                break;
+        //            case 5:
+        //                var slot_index = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //        }
+        //
+        //        if ((kind >> 4) & 0x04) {
+        //            var metadata_count = ABCBitIO.getU30();
+        //            var metadata = [];
+        //            for (var j = 0; j < metadata_count; j++) {
+        //                metadata[metadata.length] = ABCBitIO.getU30();
+        //            }
+        //        }
+        //    }
+        //}
+        //
+        //var bodiesCount = ABCBitIO.getU30();
+        //for (i = 0; i < bodiesCount; i++) {
+        //    var method_info = ABCBitIO.getU30();
+        //    var max_stack = ABCBitIO.getU30();
+        //    var max_regs = ABCBitIO.getU30();
+        //    var scope_depth = ABCBitIO.getU30();
+        //    var max_scope = ABCBitIO.getU30();
+        //    var code_length = ABCBitIO.getU30();
+        //    var code = [];
+        //    for (var j = 0; j < code_length; j++) {
+        //        code[j] = ABCBitIO.getUI8();
+        //    }
+        //    var ex_count = ABCBitIO.getU30();
+        //    var Exception = [];
+        //    for (var j = 0; j < ex_count; j++) {
+        //        Exception[j] = {
+        //            start: ABCBitIO.getU30(),
+        //            end: ABCBitIO.getU30(),
+        //            target: ABCBitIO.getU30(),
+        //            type_index: ABCBitIO.getU30(),
+        //            name_index: ABCBitIO.getU30()
+        //        }
+        //    }
+        //    var count = ABCBitIO.getU30();
+        //    for (var idx = 0; idx < count; idx++) {
+        //        var namaIdx = ABCBitIO.getU30();
+        //        var kind = ABCBitIO.getUI8();
+        //
+        //        switch (kind) {
+        //            case 0:
+        //            case 6:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var type_index = ABCBitIO.getU30();
+        //                var value_index = ABCBitIO.getU30();
+        //                if (value_index) {
+        //                    var value_kind = ABCBitIO.getUI8();
+        //                }
+        //                break;
+        //            case 1:
+        //            case 2:
+        //            case 3:
+        //                var disp_id = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //            case 4:
+        //                var slot_id = ABCBitIO.getU30();
+        //                var class_info = ABCBitIO.getU30();
+        //                break;
+        //            case 5:
+        //                var slot_index = ABCBitIO.getU30();
+        //                var method_info = ABCBitIO.getU30();
+        //                break;
+        //        }
+        //
+        //        if ( (kind >> 4) & 0x04) {
+        //            var metadata_count = ABCBitIO.getU30();
+        //            var metadata = [];
+        //            for (var j = 0; j < metadata_count; j++) {
+        //                metadata[metadata.length] = ABCBitIO.getU30();
+        //            }
+        //        }
+        //    }
+        //}
+        //
+        //return obj;
     };
 
     /**
@@ -5530,10 +6315,9 @@ if (!("swf2js" in window)){(function(window)
      * @param initAction
      * @constructor
      */
-    var ActionScript = function (data, constantPool, register, initAction)
+    var ActionScript = function(data, constantPool, register, initAction)
     {
         var _this = this;
-        _this.id = asId++;
         _this.cache = [];
         _this.params = [];
         _this.constantPool = (constantPool === undefined) ? [] : constantPool;
@@ -5541,8 +6325,9 @@ if (!("swf2js" in window)){(function(window)
         _this.variables = {};
         _this.initAction = (initAction) ? true : false;
         _this.scope = null;
+        _this.parent = null;
         _this.arg = null;
-        _this.version = 0;
+        _this.version = 7;
         if (data.length) {
             _this.__init__(data);
         }
@@ -5592,23 +6377,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @type {{*}}
-     */
-    ActionScript.prototype.ignoreProperty =
-    {
-        "id": 1,
-        "cache": 1,
-        "params": 1,
-        "constantPool": 1,
-        "register": 1,
-        "variables": 1,
-        "initAction": 1,
-        "scope": 1,
-        "arg": 1,
-        "version": 1
-    };
-
-    /**
      * @param name
      * @param value
      */
@@ -5629,8 +6397,11 @@ if (!("swf2js" in window)){(function(window)
             return _this.arg;
         } else {
             value = _this.variables[name];
-            if (value === undefined && !(name in _this.ignoreProperty)) {
-                value = _this[name];
+            if (value === undefined) {
+                var parent = _this.parent;
+                if (parent) {
+                    value = parent.getVariable(name);
+                }
             }
         }
         return value;
@@ -5638,7 +6409,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param value
-     * @returns {*}
+     * @returns {string}
      */
     ActionScript.prototype.valueToString = function(value)
     {
@@ -5725,7 +6496,6 @@ if (!("swf2js" in window)){(function(window)
                             urls[idx] = [];
                             continue;
                         }
-
                         urls[idx] += str;
                     }
 
@@ -6096,10 +6866,12 @@ if (!("swf2js" in window)){(function(window)
         var scope = _this.scope;
         var movieClip = (scope instanceof MovieClip) ? scope : mc;
         if (!movieClip.active) {
-            return 0;
+            return undefined;
         }
-        var stage = mc.getStage();
-        _this.version = stage.getVersion();
+        var stage = movieClip.getStage();
+        if (stage) {
+            _this.version = stage.getVersion();
+        }
 
         var stack = [];
         var cache = _this.cache;
@@ -6108,6 +6880,7 @@ if (!("swf2js" in window)){(function(window)
             if (!(cIdx in cache)) {
                 continue;
             }
+
             var aScript = cache[cIdx];
             var actionCode = aScript.actionCode;
             if (!actionCode) {
@@ -6239,7 +7012,7 @@ if (!("swf2js" in window)){(function(window)
                 case 0x20:
                     movieClip = _this.ActionSetTarget2(stack, movieClip, mc);
                     break;
-                case  0x23:
+                case 0x23:
                     _this.ActionSetProperty(stack, movieClip);
                     break;
                 case 0x27:
@@ -6444,7 +7217,6 @@ if (!("swf2js" in window)){(function(window)
         stop: "stop",
         duplicatemovieclip: "duplicateMovieClip",
         getproperty: "getProperty",
-        onclipevent: "onClipEvent",
         removemovieclip: "removeMovieClip",
         setproperty: "setProperty",
         startdrag: "startDrag",
@@ -6467,6 +7239,8 @@ if (!("swf2js" in window)){(function(window)
         swapdepths: "swapDepths",
         getinstanceatdepth: "getInstanceAtDepth",
         attachmovie: "attachMovie",
+        attachaudio: "attachAudio",
+        attachbitmap: "attachBitmap",
         getnexthighestdepth: "getNextHighestDepth",
         getbytesloaded: "getBytesLoaded",
         getbytestotal: "getBytesTotal",
@@ -6476,11 +7250,23 @@ if (!("swf2js" in window)){(function(window)
         beginfill: "beginFill",
         begingradientfill: "beginGradientFill",
         beginbitmapfill: "beginBitmapFill",
+        clear: "clear",
         moveto: "moveTo",
         lineto: "lineTo",
         curveto: "curveTo",
         endfill: "endFill",
-        unloadclip: "unloadClip"
+        unloadclip: "unloadClip",
+        hittest: "hitTest",
+        getdepth: "getDepth",
+        createemptymovieclip: "createEmptyMovieClip",
+        createtextfield: "createTextField",
+        getbounds: "getBounds",
+        getrect: "getRect",
+        getswfversion: "getSWFVersion",
+        gettextsnapshot: "getTextSnapshot",
+        globaltolocal: "globalToLocal",
+        localtoglobal: "localToGlobal",
+        addproperty: "addProperty"
     };
 
     /**
@@ -6494,7 +7280,7 @@ if (!("swf2js" in window)){(function(window)
         }
         var _methods = this.methods;
         var lowerMethod = method.toLowerCase();
-        return (lowerMethod in _methods) ? _methods[lowerMethod] : method;
+        return (lowerMethod in _methods) ? _methods[lowerMethod] : null;
     };
 
     /**
@@ -6696,7 +7482,6 @@ if (!("swf2js" in window)){(function(window)
         if (_this.version > 4) {
             a = _this.logicValue(a);
             b = _this.logicValue(b);
-
             stack[stack.length] = (a !== 0 || b !== 0);
         } else {
             a = _this.calc(a);
@@ -6791,12 +7576,10 @@ if (!("swf2js" in window)){(function(window)
         var count = stack.pop();
         var index = stack.pop();
         var string = stack.pop();
+        string = this.valueToString(string);
         index--;
         if (index < 0) {
             index = 0;
-        }
-        if (typeof string !== "string") {
-            string += "";
         }
         stack[stack.length] = (count < 0) ? string.substr(index) : string.substr(index, count);
     };
@@ -6872,7 +7655,7 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.ActionToInteger = function(stack)
     {
         var value = stack.pop();
-        stack[stack.length] = _floor(value);
+        stack[stack.length] = _parseInt(value);
     };
 
     /**
@@ -7012,6 +7795,13 @@ if (!("swf2js" in window)){(function(window)
                         if (val === null) {
                             val = "";
                         }
+                        if (typeof val !== "string") {
+                            var typeText = typeof val;
+                            typeText = typeText.replace(/^[a-z]/g, function (str) {
+                                return str.toUpperCase();
+                            });
+                            val = "%5Btype+"+typeText+"%5D";
+                        }
                         queryString += "&" + key + "=" + val;
                     }
 
@@ -7139,6 +7929,7 @@ if (!("swf2js" in window)){(function(window)
         if (!_isNaN(index)) {
             index = _floor(index);
         }
+
         if (mc) {
             var targetMc = mc;
             if (target !== undefined) {
@@ -7176,7 +7967,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (typeof target === "string" && target) {
-            console.log('StartDrag:String', target);
+            targetMc = mc.getMovieClip(target);
         }
 
         if (targetMc instanceof MovieClip) {
@@ -7354,35 +8145,36 @@ if (!("swf2js" in window)){(function(window)
 
         var value;
         if (object) {
-            method = this.checkMethod(method);
-            var func = object[method];
-            var caller = mc;
-            if (!func && object instanceof MovieClip) {
-                func = object.getVariable(method);
-                if (func) {
-                    caller = object;
-                    object = func;
+            var func;
+            if (object instanceof MovieClip) {
+                var originMethod = this.checkMethod(method);
+                if (originMethod) {
+                    func = object[originMethod];
+                } else {
+                    func = object.getVariable(method);
+                }
+            } else {
+                if (method === "call" || method === "apply") {
+                    func = object;
+                    object = params.shift();
+                } else {
+                    func = object[method];
                 }
             }
 
             if (func) {
-                if (method === "call" || method === "apply") {
-                    caller = params.shift();
-                    if (!(caller instanceof MovieClip)) {
-                        caller = mc;
-                    }
-                    func = object;
-                }
-
-                if ("cache" in func) {
-                    var paramCache = params;
-                    params = [];
-                    params[params.length] = func.cache;
-                    params[params.length] = caller;
-                    params[params.length] = paramCache;
-                }
-
                 value = func.apply(object, params);
+            } else {
+                if (object instanceof Object && method === "registerClass") {
+                    value = false;
+                    var _root = mc.getMovieClip("_root");
+                    var stage = _root.getStage();
+                    var characterId = stage.exportAssets[params[0]];
+                    if (characterId) {
+                        stage.registerClass[characterId] = params[1];
+                        value = true;
+                    }
+                }
             }
         }
 
@@ -7402,42 +8194,49 @@ if (!("swf2js" in window)){(function(window)
         for (; numArgs--;) {
             params[params.length] = stack.pop();
         }
-        var ret;
+
         if (mc) {
-            name = _this.checkMethod(name);
-            var _name = name.toLowerCase();
-            if (_name in _this.methods && mc[name]) {
-                ret = mc[name].apply(mc, params);
+            var caller = mc;
+            var func;
+            var method = _this.checkMethod(name);
+            if (method) {
+                func = mc[method];
             } else if (window[name]) {
+                caller = window;
+
                 var targetMc = mc;
                 if (params[0] instanceof MovieClip) {
+                    // setInterval, setTimeout
                     targetMc = params.shift();
-                }
-                if (params.length > 0) {
-                    var obj = params.shift();
-                    var as = {};
-                    if (typeof obj === "string") {
-                        as = targetMc.getVariable(obj);
-                    }
-                    if (as instanceof Function) {
-                        var AS = as.cache;
-                        params.unshift(function(){
-                            AS.initVariable(arguments);
-                            AS.execute(targetMc);
-                        });
-                    } else {
-                        params.unshift(obj);
+                    if (params.length > 0) {
+                        var obj = params.shift();
+                        var as;
+                        if (typeof obj === "string") {
+                            as = targetMc.getVariable(obj);
+                        }
+                        if (typeof as === "function") {
+                            var time = params.shift();
+                            var clone = cloneArray(params);
+                            var action = (function(script, mc, args)
+                            {
+                                return function(){ script.apply(mc, args); };
+                            })(as, targetMc, clone);
+
+                            params = [];
+                            params[params.length] = action;
+                            params[params.length] = time;
+                        } else {
+                            params.unshift(obj);
+                        }
                     }
                 }
 
-                ret = window[name].apply(window, params);
+                func = window[name];
             } else {
-                var func = mc.getVariable(name);
-                if (func) {
-                    ret = func(func.cache, mc, params);
-                }
+                func = mc.getVariable(name);
             }
-            stack[stack.length] = ret;
+
+            stack[stack.length] = (func) ? func.apply(caller, params) : undefined;
         }
     };
 
@@ -7448,39 +8247,12 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionDefineFunction = function(stack, aScript, mc)
     {
-        var _this = this;
-        var AS = aScript.ActionScript;
+        var action = createActionScript(mc, aScript.ActionScript, this);
         var name = aScript.FunctionName;
-
-        var newAction = new ActionScript([], AS.constantPool, AS.register, AS.initAction);
-        newAction.cache = AS.cache;
-        newAction.scope = mc;
-        var variables = _this.variables;
-        var copy = {};
-        for (var prop in variables) {
-            if (!variables.hasOwnProperty(prop)) {
-                continue;
-            }
-            copy[prop] = variables[prop];
-        }
-        newAction.variables = copy;
-
-        var func = function (as, mc, args)
-        {
-            as.initVariable(args);
-            if (as.initAction) {
-                as.variables["this"] = this;
-            } else {
-                as.variables["this"] = mc;
-            }
-            return as.execute(mc);
-        };
-        func.cache = newAction;
-
         if (name !== "") {
-            mc.setVariable(name, func);
+            mc.setVariable(name, action);
         } else {
-            stack[stack.length] = func;
+            stack[stack.length] = action;
         }
     };
 
@@ -7493,9 +8265,9 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var value = stack.pop();
         var name = stack.pop();
-        if (_this.scope !== null) {
+        if (_this.parent) {
             _this.setVariable(name, value);
-        } else if (mc) {
+        } else {
             mc.setVariable(name, value);
         }
     };
@@ -7508,9 +8280,9 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var name = stack.pop();
-        if (_this.scope !== null) {
+        if (_this.parent) {
             _this.setVariable(name, undefined);
-        } else if (mc) {
+        } else {
             mc.setVariable(name, undefined);
         }
     };
@@ -7520,6 +8292,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionDelete = function(stack)
     {
+
         var name = stack.pop();
         var object = stack.pop();
         if (object instanceof MovieClip) {
@@ -7604,48 +8377,45 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.ActionGetMember = function(stack, mc)
     {
         var property;
-        var _this = this;
         var name = stack.pop();
         var object = stack.pop();
 
         if (typeof object === "string") {
-            var targetMc = mc.getMovieClip(object);
-            if (targetMc instanceof MovieClip) {
-                object = targetMc;
+            var target = mc.getProperty(object);
+            if (target) {
+                object = target;
             }
         }
 
-        if (object instanceof Object) {
-            if ("getProperty" in object) {
-                property = object.getProperty(name, false);
-            } else {
-                if (object instanceof _NamedNodeMap) {
-                    object = object.getNamedItem(name);
-                    name = "value";
-                }
-
-                if (name === "childNodes") {
+        if (object) {
+            switch (true) {
+                case object instanceof DisplayObject:
+                case object instanceof Global:
+                    property = object.getProperty(name, false);
+                    break;
+                case object instanceof Element && name === "childNodes":
                     var childNodes = object[name];
                     var length = childNodes.length;
                     property = [];
-                    for (var i = 0; i < length; i++) {
-                        var node = childNodes[i];
-                        if (node.nodeType !== 1) {
-                            continue;
+                    if (length) {
+                        for (var i = 0; i < length; i++) {
+                            var node = childNodes[i];
+                            if (node.nodeType !== 1) {
+                                continue;
+                            }
+                            property[property.length] = node;
                         }
-                        property[property.length] = node;
                     }
-                } else {
+                    break;
+                case object instanceof window.NamedNodeMap:
+                    var item = object.getNamedItem(name);
+                    property = item.value;
+                    break;
+                default:
                     property = object[name];
-                    if (property === undefined) {
-                        property = _this.getVariable(name);
-                    }
-                }
+                    break;
             }
-        } else if (object !== undefined) {
-            property = object[name];
         }
-
 
         stack[stack.length] = property;
     };
@@ -7701,7 +8471,6 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 constructor = this.CreateNewActionScript(window[method], mc, params);
             }
-
         } else if (method in object) {
             var func = object[method];
             constructor = this.CreateNewActionScript(func, mc, params);
@@ -7730,23 +8499,37 @@ if (!("swf2js" in window)){(function(window)
             switch (object) {
                 case "MovieClip":
                     obj = new MovieClip();
-                    obj.stage = mc.stage;
-                    obj.setParent(mc.getParent());
+                    var stage = mc.getStage();
+                    obj.setStage(stage);
+                    obj.setParent(mc);
                     break;
                 case "Sound":
-                    obj = new Sound();
+                    obj = new Sound(mc);
                     obj.movieClip = mc;
                     break;
                 case "XML":
-                    obj = new Xml(mc);
+                    obj = new Xml();
                     break;
                 case "LoadVars":
-                    obj = new LoadVars(mc);
+                    obj = new LoadVars();
+                    break;
+                case "Color":
+                    obj = new Color(params[0]);
+                    break;
+                case "TextFormat":
+                    obj = new TextFormat();
+                    break;
+                case "MovieClipLoader":
+                    obj = new MovieClipLoader();
                     break;
                 default:
                     if (mc) {
-                        var func = mc.getVariable(object);
-                        obj = this.CreateNewActionScript(func, mc, params);
+                        var _this = this;
+                        var func = _this.getVariable(object);
+                        if (!func) {
+                            func = mc.getVariable(object);
+                        }
+                        obj = _this.CreateNewActionScript(func, mc, params);
                     }
                     break;
             }
@@ -7762,33 +8545,11 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.CreateNewActionScript = function(Constr, mc, params)
     {
-        if (Constr instanceof Function && "cache" in Constr) {
-            var AS = function ActionScript(as, mc, args) {
-                as.initVariable(args);
-                if (as.initAction) {
-                    as.variables["this"] = this;
-                } else {
-                    as.variables["this"] = mc;
-                }
-                return as.execute(mc);
-            };
-
-            var proto = Constr.prototype;
-            for (var prop in proto) {
-                if (!proto.hasOwnProperty(prop)) {
-                    continue;
-                }
-                AS.prototype[prop] = proto[prop];
-            }
-
-            Constr.cache.scope = mc;
-            return new AS(Constr.cache, mc, params);
-        } else if (Constr) {
+        if (Constr) {
             params.unshift(Constr);
             return new (Function.prototype.bind.apply(Constr, params))();
-        } else {
-            return undefined;
         }
+        return undefined;
     };
 
     /**
@@ -7802,16 +8563,23 @@ if (!("swf2js" in window)){(function(window)
         var object = stack.pop();
         if (object) {
             if (typeof object === "string") {
-                var targetMc = mc.getMovieClip(object);
-                if (targetMc) {
-                    object = targetMc;
+                var target = mc.getProperty(object);
+                if (target) {
+                    object = target;
                 }
             }
 
-            if ("setProperty" in object && object !== MovieClip.prototype) {
-                object.setProperty(name, value, false);
-            } else if (typeof object === "object" || typeof object === "function") {
-                object[name] = value;
+            if (object) {
+                switch (true) {
+                    default:
+                    case object === MovieClip.prototype:
+                        object[name] = value;
+                        break;
+                    case object instanceof DisplayObject:
+                    case object instanceof Global:
+                        object.setProperty(name, value, false);
+                        break;
+                }
             }
         }
     };
@@ -8089,14 +8857,13 @@ if (!("swf2js" in window)){(function(window)
             var su;
             if (SuperClass === MovieClip) {
                 su = new MovieClip();
-                su.stage = mc.stage;
+                var stage = mc.getStage();
+                su.setStage(stage);
+                su.setParent(mc);
             } else {
                 su = new SuperClass();
             }
-
             SubClass.prototype = su;
-            var proto = Object.getPrototypeOf(SubClass.prototype);
-            proto = SuperClass.prototype;
             SubClass.prototype.constructor = SuperClass;
         }
     };
@@ -8152,73 +8919,3044 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     *
      * @constructor
      */
-    var Property = function(caller)
+    var BitmapFilter = function(){};
+
+    /**
+     * clone
+     */
+    BitmapFilter.prototype.clone = function()
     {
         var _this = this;
-        var proto = Object.getPrototypeOf(caller);
-        proto.getProperty = _this.getProperty;
-        proto.setProperty = _this.setProperty;
-        proto.getX = _this.getX;
-        proto.setX = _this.setX;
-        proto.getY = _this.getY;
-        proto.setY = _this.setY;
-        proto.getXScale = _this.getXScale;
-        proto.setXScale = _this.setXScale;
-        proto.getYScale = _this.getYScale;
-        proto.setYScale = _this.setYScale;
-        proto.getAlpha = _this.getAlpha;
-        proto.setAlpha = _this.setAlpha;
-        proto.getVisible = _this.getVisible;
-        proto.setVisible = _this.setVisible;
-        proto.getWidth = _this.getWidth;
-        proto.setWidth = _this.setWidth;
-        proto.getHeight = _this.getHeight;
-        proto.setHeight = _this.setHeight;
-        proto.getRotation = _this.getRotation;
-        proto.setRotation = _this.setRotation;
-        proto.getTarget = _this.getTarget;
-        proto.setTarget = _this.setTarget;
-        proto.getName = _this.getName;
-        proto.setName = _this.setName;
-        proto.getXMouse = _this.getXMouse;
-        proto.getYMouse = _this.getYMouse;
-        proto.getVariable = _this.getVariable;
-        proto.setVariable = _this.setVariable;
-        proto.getBlendMode = _this.getBlendMode;
-        proto.setBlendMode = _this.setBlendMode;
-        proto.getMovieClip = _this.getMovieClip;
-        proto.getEnabled = _this.getEnabled;
-        proto.setEnabled = _this.setEnabled;
-        proto.getLevel = _this.getLevel;
-        proto.setLevel = _this.setLevel;
-        proto.splitPath = _this.splitPath;
+        var args = [];
+        for (var prop in _this) {
+            if (!_this.hasOwnProperty(prop)) {
+                continue;
+            }
+            args[args.length] = _this[prop];
+        }
 
-        caller.variables = {};
-        caller._currentframe = 1;
-        caller._visible = true;
-        caller._droptarget = null;
-        caller._url = null;
-        caller._highquality = 1;
-        caller._focusrect = 1;
-        caller._soundbuftime = null;
-        caller._totalframes = 1;
-        caller._level = 0;
-        caller._depth = null;
-        caller._name = null;
-        caller._framesloaded = 0;
-        caller._target = "";
-        caller._lockroot = true;
-        caller.blendMode = 0;
-        caller.enabled = true;
+        var type = _this.filterId;
+        var filter = _this;
+        switch (type) {
+            case 0: // DropShadowFilter
+                filter = new (Function.prototype.bind.apply(DropShadowFilter, args))();
+                break;
+            case 1: // BlurFilter
+                filter = new (Function.prototype.bind.apply(BlurFilter, args))();
+                break;
+            case 2: // GlowFilter
+                filter = new (Function.prototype.bind.apply(GlowFilter, args))();
+                break;
+            case 3: // BevelFilter
+                filter = new (Function.prototype.bind.apply(BevelFilter, args))();
+                break;
+            case 4: // GradientGlowFilter
+                filter = new (Function.prototype.bind.apply(GradientGlowFilter, args))();
+                break;
+            case 5: // ConvolutionFilter
+                filter = new (Function.prototype.bind.apply(ConvolutionFilter, args))();
+                break;
+            case 6: // ColorMatrixFilter
+                filter = new (Function.prototype.bind.apply(ColorMatrixFilter, args))();
+                break;
+            case 7: // GradientBevelFilter
+                filter = new (Function.prototype.bind.apply(GradientBevelFilter, args))();
+                break;
+        }
+        return filter;
     };
 
     /**
-     * @param path
-     * @returns {{scope: Property, target: *}}
+     * @param rgb
+     * @returns {Number}
      */
-    Property.prototype.splitPath = function(path)
+    BitmapFilter.prototype.toColorInt = function(rgb)
+    {
+        if (typeof rgb === "string") {
+            var canvas = cacheStore.getCanvas();
+            canvas.width = 1;
+            canvas.height = 1;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = rgb;
+            rgb = "0x" + ctx.fillStyle.substr(1);
+            cacheStore.destroy(ctx);
+        }
+        return _parseInt(rgb);
+    };
+
+    /**
+     * @constructor
+     */
+    var BlurFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 1;
+        _this.blurX = 4;
+        _this.blurY = 4;
+        _this.quality = 1;
+
+        var arg = arguments;
+        var blurX = _parseInt(arg[0]);
+        if (!_isNaN(blurX) && 0 <= blurX && 255 >= blurX) {
+            _this.blurX = blurX;
+        }
+
+        var blurY = _parseInt(arg[1]);
+        if (!_isNaN(blurY) && 0 <= blurY && 255 >= blurY) {
+            _this.blurY = blurY;
+        }
+
+        var quality = _parseInt(arg[2]);
+        if (!_isNaN(quality) && 1 <= quality && 15 >= quality) {
+            _this.quality = quality;
+        }
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    BlurFilter.prototype = Object.create(BitmapFilter.prototype);
+    BlurFilter.prototype.constructor = BlurFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    BlurFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        var cacheCanvas = cache.canvas;
+        var canvas = cacheStore.getCanvas();
+        canvas.width = cacheCanvas.width;
+        canvas.height = cacheCanvas.height;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(cacheCanvas, 0, 0);
+        ctx._offsetX = cache._offsetX;
+        ctx._offsetY = cache._offsetY;
+        return this.executeFilter(ctx, stage);
+    };
+
+    /**
+     * @param ctx
+     * @param stage
+     * @returns {*}
+     */
+    BlurFilter.prototype.executeFilter = function(ctx, stage)
+    {
+        var _this = this;
+
+        var _blurX = _this.blurX;
+        var _blurY = _this.blurY;
+        if (_blurX === 0 && _blurY === 0) {
+            return ctx;
+        }
+
+        if (_blurX === 0) {
+            _blurX = 4;
+        }
+
+        if (_blurY === 0) {
+            _blurY = 4;
+        }
+
+        var _quality = _this.quality;
+        var scale = stage.getScale();
+
+        var STEP = [0.5, 1.05, 1.35, 1.55, 1.75, 1.9, 2, 2.1, 2.2, 2.3, 2.5, 3, 3, 3.5, 3.5];
+        var stepNo = STEP[_quality - 1];
+        var blurX = _ceil(_blurX * stepNo * scale * devicePixelRatio);
+        var blurY = _ceil(_blurY * stepNo * scale * devicePixelRatio);
+
+        var canvas = ctx.canvas;
+        var width = _ceil(canvas.width + (blurX * 2) + 1);
+        var height = _ceil(canvas.height + (blurY * 2) + 1);
+
+        var blurCanvas = cacheStore.getCanvas();
+        blurCanvas.width = width;
+        blurCanvas.height = height;
+        var blurCtx = blurCanvas.getContext("2d");
+        var offsetX = blurX;
+        var offsetY = blurY;
+
+        blurCtx._offsetX = blurX + ctx._offsetX;
+        blurCtx._offsetY = blurY + ctx._offsetY;
+        blurCtx.drawImage(canvas, offsetX, offsetY);
+
+        var imgData = blurCtx.getImageData(0, 0, width, height);
+        var px = imgData.data;
+
+        var radiusX = (offsetX) >> 1;
+        var radiusY = (offsetY) >> 1;
+
+        var MUL = [1, 171, 205, 293, 57, 373, 79, 137, 241, 27, 391, 357, 41, 19, 283, 265, 497, 469, 443, 421, 25, 191, 365, 349, 335, 161, 155, 149, 9, 278, 269, 261, 505, 245, 475, 231, 449, 437, 213, 415, 405, 395, 193, 377, 369, 361, 353, 345, 169, 331, 325, 319, 313, 307, 301, 37, 145, 285, 281, 69, 271, 267, 263, 259, 509, 501, 493, 243, 479, 118, 465, 459, 113, 446, 55, 435, 429, 423, 209, 413, 51, 403, 199, 393, 97, 3, 379, 375, 371, 367, 363, 359, 355, 351, 347, 43, 85, 337, 333, 165, 327, 323, 5, 317, 157, 311, 77, 305, 303, 75, 297, 294, 73, 289, 287, 71, 141, 279, 277, 275, 68, 135, 67, 133, 33, 262, 260, 129, 511, 507, 503, 499, 495, 491, 61, 121, 481, 477, 237, 235, 467, 232, 115, 457, 227, 451, 7, 445, 221, 439, 218, 433, 215, 427, 425, 211, 419, 417, 207, 411, 409, 203, 202, 401, 399, 396, 197, 49, 389, 387, 385, 383, 95, 189, 47, 187, 93, 185, 23, 183, 91, 181, 45, 179, 89, 177, 11, 175, 87, 173, 345, 343, 341, 339, 337, 21, 167, 83, 331, 329, 327, 163, 81, 323, 321, 319, 159, 79, 315, 313, 39, 155, 309, 307, 153, 305, 303, 151, 75, 299, 149, 37, 295, 147, 73, 291, 145, 289, 287, 143, 285, 71, 141, 281, 35, 279, 139, 69, 275, 137, 273, 17, 271, 135, 269, 267, 133, 265, 33, 263, 131, 261, 130, 259, 129, 257, 1];
+
+        var SHG = [0, 9, 10, 11, 9, 12, 10, 11, 12, 9, 13, 13, 10, 9, 13, 13, 14, 14, 14, 14, 10, 13, 14, 14, 14, 13, 13, 13, 9, 14, 14, 14, 15, 14, 15, 14, 15, 15, 14, 15, 15, 15, 14, 15, 15, 15, 15, 15, 14, 15, 15, 15, 15, 15, 15, 12, 14, 15, 15, 13, 15, 15, 15, 15, 16, 16, 16, 15, 16, 14, 16, 16, 14, 16, 13, 16, 16, 16, 15, 16, 13, 16, 15, 16, 14, 9, 16, 16, 16, 16, 16, 16, 16, 16, 16, 13, 14, 16, 16, 15, 16, 16, 10, 16, 15, 16, 14, 16, 16, 14, 16, 16, 14, 16, 16, 14, 15, 16, 16, 16, 14, 15, 14, 15, 13, 16, 16, 15, 17, 17, 17, 17, 17, 17, 14, 15, 17, 17, 16, 16, 17, 16, 15, 17, 16, 17, 11, 17, 16, 17, 16, 17, 16, 17, 17, 16, 17, 17, 16, 17, 17, 16, 16, 17, 17, 17, 16, 14, 17, 17, 17, 17, 15, 16, 14, 16, 15, 16, 13, 16, 15, 16, 14, 16, 15, 16, 12, 16, 15, 16, 17, 17, 17, 17, 17, 13, 16, 15, 17, 17, 17, 16, 15, 17, 17, 17, 16, 15, 17, 17, 14, 16, 17, 17, 16, 17, 17, 16, 15, 17, 16, 14, 17, 16, 15, 17, 16, 17, 17, 16, 17, 15, 16, 17, 14, 17, 16, 15, 17, 16, 17, 13, 17, 16, 17, 17, 16, 17, 14, 17, 16, 17, 16, 17, 16, 17, 9];
+
+        var mtx = MUL[radiusX];
+        var stx = SHG[radiusX];
+        var mty = MUL[radiusY];
+        var sty = SHG[radiusY];
+
+        var x = 0;
+        var y = 0;
+        var p = 0;
+        var yp = 0;
+        var yi = 0;
+        var yw = 0;
+        var r = 0;
+        var g = 0;
+        var b = 0;
+        var a = 0;
+        var pr = 0;
+        var pg = 0;
+        var pb = 0;
+        var pa = 0;
+
+        var divx = radiusX + radiusX + 1;
+        var divy = radiusY + radiusY + 1;
+        var w = imgData.width;
+        var h = imgData.height;
+
+        var w1 = w - 1;
+        var h1 = h - 1;
+        var rxp1 = radiusX + 1;
+        var ryp1 = radiusY + 1;
+
+        var ssx = {r:0, b:0, g:0, a:0};
+        var sx = ssx;
+        for (var i = 1; i < divx; i++) {
+            sx = sx.n = {r:0, b:0, g:0, a:0};
+        }
+        sx.n = ssx;
+
+        var ssy = {r:0, b:0, g:0, a:0};
+        var sy = ssy;
+        for (i = 1; i < divy; i++){
+            sy = sy.n = {r:0, b:0, g:0, a:0};
+        }
+        sy.n = ssy;
+
+        var si = null;
+        while (_quality-- > 0) {
+
+            yw = yi = 0;
+            var ms = mtx;
+            var ss = stx;
+            for (y = h; --y > -1;) {
+                pr = px[yi];
+                pg = px[yi + 1];
+                pb = px[yi + 2];
+                pa = px[yi + 3];
+                r = rxp1 * pr;
+                g = rxp1 * pg;
+                b = rxp1 * pb;
+                a = rxp1 * pa;
+
+                sx = ssx;
+
+                for (i = rxp1; --i > -1;) {
+                    sx.r = pr;
+                    sx.g = pg;
+                    sx.b = pb;
+                    sx.a = pa;
+                    sx = sx.n;
+                }
+
+                for (i = 1; i < rxp1; i++) {
+                    p = (yi + ((w1 < i ? w1 : i) << 2)) | 0;
+                    r += (sx.r = px[p]);
+                    g += (sx.g = px[p + 1]);
+                    b += (sx.b = px[p + 2]);
+                    a += (sx.a = px[p + 3]);
+                    sx = sx.n;
+                }
+
+                si = ssx;
+                for (x = 0; x < w; x++) {
+                    px[yi++] = (r * ms) >>> ss;
+                    px[yi++] = (g * ms) >>> ss;
+                    px[yi++] = (b * ms) >>> ss;
+                    px[yi++] = (a * ms) >>> ss;
+
+                    p = ((yw + ((p = x + radiusX + 1) < w1 ? p : w1)) << 2);
+
+                    r -= si.r - (si.r = px[p]);
+                    g -= si.g - (si.g = px[p + 1]);
+                    b -= si.b - (si.b = px[p + 2]);
+                    a -= si.a - (si.a = px[p + 3]);
+
+                    si = si.n;
+
+                }
+                yw += w;
+            }
+
+            ms = mty;
+            ss = sty;
+            for (x = 0; x < w; x++) {
+                yi = (x << 2) | 0;
+
+                r = (ryp1 * (pr = px[yi])) | 0;
+                g = (ryp1 * (pg = px[(yi + 1) | 0])) | 0;
+                b = (ryp1 * (pb = px[(yi + 2) | 0])) | 0;
+                a = (ryp1 * (pa = px[(yi + 3) | 0])) | 0;
+
+                sy = ssy;
+                for (i = 0; i < ryp1; i++) {
+                    sy.r = pr;
+                    sy.g = pg;
+                    sy.b = pb;
+                    sy.a = pa;
+                    sy = sy.n;
+                }
+
+                yp = w;
+
+                for (i = 1; i <= radiusY; i++) {
+                    yi = (yp + x) << 2;
+
+                    r += (sy.r = px[yi]);
+                    g += (sy.g = px[yi + 1]);
+                    b += (sy.b = px[yi + 2]);
+                    a += (sy.a = px[yi + 3]);
+
+                    sy = sy.n;
+                    if (i < h1) {
+                        yp += w;
+                    }
+                }
+
+                yi = x;
+                si = ssy;
+                if (_quality > 0) {
+                    for (y = 0; y < h; y++) {
+                        p = yi << 2;
+                        px[p + 3] = pa = (a * ms) >>> ss;
+                        if (pa > 0) {
+                            px[p] = ((r * ms) >>> ss );
+                            px[p + 1] = ((g * ms) >>> ss);
+                            px[p + 2] = ((b * ms) >>> ss);
+                        } else {
+                            px[p] = px[p + 1] = px[p + 2] = 0;
+                        }
+
+                        p = (x + (((p = y + ryp1) < h1 ? p : h1) * w)) << 2;
+
+                        r -= si.r - (si.r = px[p]);
+                        g -= si.g - (si.g = px[p + 1]);
+                        b -= si.b - (si.b = px[p + 2]);
+                        a -= si.a - (si.a = px[p + 3]);
+
+                        si = si.n;
+
+                        yi += w;
+                    }
+                } else {
+                    for (y = 0; y < h; y++) {
+                        p = yi << 2;
+                        px[p + 3] = pa = (a * ms) >>> ss;
+                        if (pa > 0) {
+                            pa = 255 / pa;
+                            px[p] = ((r * ms) >>> ss) * pa;
+                            px[p + 1] = ((g * ms) >>> ss) * pa;
+                            px[p + 2] = ((b * ms) >>> ss) * pa;
+                        } else {
+                            px[p] = px[p + 1] = px[p + 2] = 0;
+                        }
+
+                        p = (x + (((p = y + ryp1) < h1 ? p : h1) * w)) << 2;
+
+                        r -= si.r - (si.r = px[p]);
+                        g -= si.g - (si.g = px[p + 1]);
+                        b -= si.b - (si.b = px[p + 2]);
+                        a -= si.a - (si.a = px[p + 3]);
+
+                        si = si.n;
+
+                        yi += w;
+                    }
+                }
+            }
+        }
+
+        blurCtx.putImageData(imgData, 0, 0);
+        cacheStore.destroy(ctx);
+
+        return blurCtx;
+    };
+
+    /**
+     * @constructor
+     */
+    var DropShadowFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 0;
+        _this.distance = 4;
+        _this.angle = 45;
+        _this.color = 0;
+        _this.alpha = 1;
+        _this.blurX = 4;
+        _this.blurY = 4;
+        _this.strength = 1;
+        _this.quality = 1;
+        _this.inner = false;
+        _this.knockout = false;
+        _this.hideObject = false;
+
+        var arg = arguments;
+        var distance = _parseInt(arg[0]);
+        if (!_isNaN(distance)) {
+            _this.distance = distance;
+        }
+
+        var angle = _parseFloat(arg[1]);
+        if (!_isNaN(angle) && 0 <= angle && 360 >= angle) {
+            _this.angle = angle;
+        }
+
+        var color = _this.toColorInt(arg[2]);
+        if (!_isNaN(color)) {
+            _this.color = color;
+        }
+
+        var alpha = _parseFloat(arg[3]);
+        if (!_isNaN(alpha) && 0 <= alpha && 1 >= alpha) {
+            _this.alpha = alpha;
+        }
+
+        var blurX = _parseInt(arg[4]);
+        if (!_isNaN(blurX) && 0 <= blurX && 255 >= blurX) {
+            _this.blurX = blurX;
+        }
+
+        var blurY = _parseInt(arg[5]);
+        if (!_isNaN(blurY) && 0 <= blurY && 255 >= blurY) {
+            _this.blurY = blurY;
+        }
+
+        var strength = _parseFloat(arg[6]);
+        if (!_isNaN(strength) && 0 <= strength && 255 >= strength) {
+            _this.strength = strength;
+        }
+
+        var quality = _parseInt(arg[7]);
+        if (!_isNaN(quality) && 1 <= quality && 15 >= quality) {
+            _this.quality = quality;
+        }
+
+        var inner = arg[8];
+        if (typeof inner === "boolean") {
+            _this.inner = inner;
+        }
+
+        var knockout = arg[9];
+        if (typeof knockout === "boolean") {
+            _this.knockout = knockout;
+        }
+
+        var hideObject = arg[10];
+        if (typeof hideObject === "boolean") {
+            _this.hideObject = hideObject;
+        }
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    DropShadowFilter.prototype = Object.create(BitmapFilter.prototype);
+    DropShadowFilter.prototype.constructor = DropShadowFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     */
+    DropShadowFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        var _this = this;
+        var strength = _this.strength;
+        if (strength === 0) {
+            return cache;
+        }
+
+        var quality = _this.quality;
+        var inner = _this.inner;
+        var r = _this.angle * _PI / 180;
+        var blurX = _this.blurX;
+        var blurY = _this.blurY;
+
+        // blur
+        var blurFilter = new BlurFilter(blurX, blurY, quality);
+        var ctx = blurFilter.render(cache, matrix, colorTransform, stage);
+
+        // dropShadow
+        var intColor = _this.toColorInt(_this.color);
+        var filterColor = intToRGBA(intColor);
+        var color = generateColorTransform(filterColor, colorTransform);
+        ctx = coatOfColor(ctx, color, inner, strength);
+
+        // synthesis
+        var cacheOffsetX = cache._offsetX;
+        var cacheOffsetY = cache._offsetY;
+        var _offsetX = ctx._offsetX;
+        var _offsetY = ctx._offsetY;
+
+        var canvas = ctx.canvas;
+        var synCanvas = cacheStore.getCanvas();
+        var width = canvas.width + cacheOffsetX;
+        var height = canvas.height + cacheOffsetY;
+        var ox = 0;
+        var oy = 0;
+        var dx = 0;
+        var dy = 0;
+
+        var distance = _this.distance;
+        var scale = stage.getScale();
+        var x = _ceil(_cos(r) * distance * scale);
+        var y = _ceil(_sin(r) * distance * scale);
+
+        if (x !== 0) {
+            width += _abs(x);
+            if (x < 0) {
+                ox -= x;
+            } else {
+                dx = x;
+            }
+        }
+
+        if (y !== 0) {
+            height += _abs(x);
+            if (y < 0) {
+                oy -= y;
+            } else {
+                dy = y;
+            }
+        }
+
+        synCanvas.width = width;
+        synCanvas.height = height;
+        var synCtx = synCanvas.getContext("2d");
+        synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+        synCtx.globalAlpha = _this.alpha;
+        if (strength < 1) {
+            synCtx.globalAlpha *= strength;
+        }
+
+        var knockout = _this.knockout;
+        var hideObject = _this.hideObject;
+        synCtx.globalCompositeOperation = filterOperation(inner, knockout, hideObject);
+        synCtx.drawImage(canvas, cacheOffsetX + dx, cacheOffsetY + dy);
+
+        synCtx._offsetX = cacheOffsetX + _offsetX;
+        synCtx._offsetY = cacheOffsetY + _offsetY;
+
+        cacheStore.destroy(ctx);
+
+        return synCtx;
+    };
+
+    /**
+     * @constructor
+     */
+    var GlowFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 2;
+        _this.color = 0xFF0000;
+        _this.alpha = 1;
+        _this.blurX = 6;
+        _this.blurY = 6;
+        _this.strength = 2;
+        _this.quality = 1;
+        _this.inner = false;
+        _this.knockout = false;
+
+        var arg = arguments;
+        var color = _this.toColorInt(arg[0]);
+        if (!_isNaN(color)) {
+            _this.color = color;
+        }
+
+        var alpha = _parseFloat(arg[1]);
+        if (!_isNaN(alpha) && 0 <= alpha && 1 >= alpha) {
+            _this.alpha = alpha;
+        }
+
+        var blurX = _parseInt(arg[2]);
+        if (!_isNaN(blurX) && 0 <= blurX && 255 >= blurX) {
+            _this.blurX = blurX;
+        }
+
+        var blurY = _parseInt(arg[3]);
+        if (!_isNaN(blurY) && 0 <= blurY && 255 >= blurY) {
+            _this.blurY = blurY;
+        }
+
+        var strength = _parseFloat(arg[4]);
+        if (!_isNaN(strength) && 0 <= strength && 255 >= strength) {
+            _this.strength = strength;
+        }
+
+        var quality = _parseInt(arg[5]);
+        if (!_isNaN(quality) && 1 <= quality && 15 >= quality) {
+            _this.quality = quality;
+        }
+
+        var inner = arg[6];
+        if (typeof inner === "boolean") {
+            _this.inner = inner;
+        }
+
+        var knockout = arg[7];
+        if (typeof knockout === "boolean") {
+            _this.knockout = knockout;
+        }
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    GlowFilter.prototype = Object.create(BitmapFilter.prototype);
+    GlowFilter.prototype.constructor = GlowFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    GlowFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+
+        var _this = this;
+        var strength = _this.strength;
+        if (strength === 0) {
+            return cache;
+        }
+
+        var inner = _this.inner;
+        var blurX = _this.blurX;
+        var blurY = _this.blurY;
+
+        var blurFilter = new BlurFilter(blurX, blurY, _this.quality);
+        var ctx = blurFilter.render(cache, matrix, colorTransform, stage);
+
+        var width = ctx.canvas.width + cache._offsetX;
+        var height = ctx.canvas.height + cache._offsetY;
+
+        var intColor = _this.toColorInt(_this.color);
+        var filterColor = intToRGBA(intColor);
+        var color = generateColorTransform(filterColor, colorTransform);
+        ctx = coatOfColor(ctx, color, inner, strength);
+
+        var synCanvas = cacheStore.getCanvas();
+        synCanvas.width = width;
+        synCanvas.height = height;
+        var synCtx = synCanvas.getContext("2d");
+
+        synCtx.drawImage(cache.canvas, ctx._offsetX, ctx._offsetY);
+        synCtx.globalAlpha = _this.alpha;
+        if (strength < 1) {
+            synCtx.globalAlpha *= strength;
+        }
+
+        var operation = "source-over";
+        if (_this.knockout) {
+            if (inner) {
+                operation = "source-in";
+            } else {
+                operation = "source-out";
+            }
+        } else {
+            if (inner) {
+                operation = "source-atop";
+            } else {
+                operation = "destination-over";
+            }
+        }
+
+        synCtx.globalCompositeOperation = operation;
+        synCtx.drawImage(ctx.canvas, cache._offsetX, cache._offsetY);
+        synCtx._offsetX = cache._offsetX + ctx._offsetX;
+        synCtx._offsetY = cache._offsetY + ctx._offsetY;
+
+        cacheStore.destroy(ctx);
+
+        return synCtx;
+    };
+
+    /**
+     * @constructor
+     */
+    var BevelFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 3;
+        _this.distance = 4;
+        _this.angle = 45;
+        _this.highlightColor = 0xffffff;
+        _this.highlightAlpha = 1;
+        _this.shadowColor = 0x000000;
+        _this.shadowAlpha = 1;
+        _this.blurX = 4;
+        _this.blurY = 4;
+        _this.strength = 1;
+        _this.quality = 1;
+        _this.type = "inner";
+        _this.knockout = false;
+
+        var arg = arguments;
+
+        var distance = _parseInt(arg[0]);
+        if (!_isNaN(distance)) {
+            _this.distance = distance;
+        }
+
+        var angle = _parseFloat(arg[1]);
+        if (!_isNaN(angle) && 0 <= angle && 360 >= angle) {
+            _this.angle = angle;
+        }
+
+        var highlightColor = _this.toColorInt(arg[2]);
+        if (!_isNaN(highlightColor)) {
+            _this.highlightColor = highlightColor;
+        }
+
+        var highlightAlpha = _parseFloat(arg[3]);
+        if (!_isNaN(highlightAlpha) && 0 <= highlightAlpha && 1 >= highlightAlpha) {
+            _this.highlightAlpha = highlightAlpha;
+        }
+
+        var shadowColor = _this.toColorInt(arg[4]);
+        if (!_isNaN(shadowColor)) {
+            _this.shadowColor = shadowColor;
+        }
+
+        var shadowAlpha = _parseFloat(arg[5]);
+        if (!_isNaN(shadowAlpha) && 0 <= shadowAlpha && 1 >= shadowAlpha) {
+            _this.shadowAlpha = shadowAlpha;
+        }
+
+        var blurX = _parseInt(arg[6]);
+        if (!_isNaN(blurX) && 0 <= blurX && 255 >= blurX) {
+            _this.blurX = blurX;
+        }
+
+        var blurY = _parseInt(arg[7]);
+        if (!_isNaN(blurY) && 0 <= blurY && 255 >= blurY) {
+            _this.blurY = blurY;
+        }
+
+        var strength = _parseFloat(arg[8]);
+        if (!_isNaN(strength) && 0 <= strength && 255 >= strength) {
+            _this.strength = strength;
+        }
+
+        var quality = _parseInt(arg[9]);
+        if (!_isNaN(quality) && 1 <= quality && 15 >= quality) {
+            _this.quality = quality;
+        }
+
+        var type = arg[10];
+        if (typeof type === "string") {
+            _this.type = type;
+        }
+
+        var knockout = arg[11];
+        if (typeof knockout === "boolean") {
+            _this.knockout = knockout;
+        }
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    BevelFilter.prototype = Object.create(BitmapFilter.prototype);
+    BevelFilter.prototype.constructor = BevelFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    BevelFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        var _this = this;
+        var distance = _this.distance;
+        var angle = _this.angle;
+        var shadowColor = _this.shadowColor;
+        var shadowAlpha = _this.shadowAlpha;
+        var highlightColor = _this.highlightColor;
+        var highlightAlpha = _this.highlightAlpha;
+        var blurX = _this.blurX;
+        var blurY = _this.blurY;
+        var strength = _this.strength;
+        var quality = _this.quality;
+        var knockout = _this.knockout;
+        var r = angle * _PI / 180;
+        var filterColor, color;
+        var type = _this.type;
+
+        // blur
+        var blurFilter = new BlurFilter(blurX, blurY, quality);
+        var ctx = blurFilter.render(cache, matrix, colorTransform, stage);
+        var canvas = ctx.canvas;
+        var _offsetX = ctx._offsetX;
+        var _offsetY = ctx._offsetY;
+
+        // shadow
+        var shadowCanvas = cacheStore.getCanvas();
+        shadowCanvas.width = canvas.width;
+        shadowCanvas.height = canvas.height;
+        var shadowCtx = shadowCanvas.getContext("2d");
+        shadowCtx.drawImage(canvas, 0, 0);
+        var intShadowColor = _this.toColorInt(shadowColor);
+        filterColor = intToRGBA(intShadowColor);
+        color = generateColorTransform(filterColor, colorTransform);
+        shadowCtx = coatOfColor(shadowCtx, color, false, strength);
+
+        // shadow
+        var highlightCanvas = cacheStore.getCanvas();
+        highlightCanvas.width = canvas.width;
+        highlightCanvas.height = canvas.height;
+        var highlightCtx = highlightCanvas.getContext("2d");
+        highlightCtx.drawImage(canvas, 0, 0);
+        var intHighlightColor = _this.toColorInt(highlightColor);
+        filterColor = intToRGBA(intHighlightColor);
+        color = generateColorTransform(filterColor, colorTransform);
+        highlightCtx = coatOfColor(highlightCtx, color, false, strength);
+
+        var isInner = (type === "inner" || type === "full");
+        var isOuter = (type === "outer" || type === "full");
+
+        var cacheOffsetX = cache._offsetX;
+        var cacheOffsetY = cache._offsetY;
+        var synCanvas = cacheStore.getCanvas();
+        var width = canvas.width + cacheOffsetX;
+        var height = canvas.height + cacheOffsetY;
+        var ox = 0;
+        var oy = 0;
+
+        var scale = stage.getScale();
+        var x = _ceil(_cos(r) * distance * scale);
+        var y = _ceil(_sin(r) * distance * scale);
+
+        if (x !== 0) {
+            width += _abs(x);
+            if (x < 0) {
+                ox -= x;
+            }
+        }
+
+        if (y !== 0) {
+            height += _abs(x);
+            if (y < 0) {
+                oy -= y;
+            }
+        }
+
+        synCanvas.width = width;
+        synCanvas.height = height;
+        var synCtx = synCanvas.getContext("2d");
+        if (!knockout) {
+            synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+        }
+        if (strength < 1) {
+            synCtx.globalAlpha *= strength;
+        }
+        synCtx._offsetX = cacheOffsetX + _offsetX;
+        synCtx._offsetY = cacheOffsetY + _offsetY;
+
+        var xorCanvas = cacheStore.getCanvas();
+        xorCanvas.width = width + _offsetX;
+        xorCanvas.height = height + _offsetY;
+        var xorCtx = xorCanvas.getContext("2d");
+
+        xorCtx.globalCompositeOperation = "xor";
+        xorCtx.globalAlpha = highlightAlpha;
+        xorCtx.drawImage(highlightCtx.canvas, -x + ox, -y + oy);
+        xorCtx.globalAlpha = shadowAlpha;
+        xorCtx.drawImage(shadowCtx.canvas, x, y);
+
+        var operation;
+        if (isInner && isOuter) {
+            operation = "source-over";
+        } else if (isInner) {
+            synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+            operation = filterOperation(true, knockout);
+        } else if (isOuter) {
+            operation = "destination-over";
+        }
+
+        synCtx.globalCompositeOperation = operation;
+        synCtx.drawImage(xorCtx.canvas, 0, 0);
+        if (!isInner && isOuter && knockout) {
+            synCtx.globalCompositeOperation = "destination-out";
+            synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+        }
+
+        cacheStore.destroy(ctx);
+        cacheStore.destroy(highlightCtx);
+        cacheStore.destroy(shadowCtx);
+        cacheStore.destroy(xorCtx);
+
+        return synCtx;
+    };
+
+    /**
+     * @constructor
+     */
+    var GradientGlowFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 4;
+        _this.distance = 4;
+        _this.angle = 45;
+        _this.colors = null;
+        _this.alphas = null;
+        _this.ratios = null;
+        _this.blurX = 4;
+        _this.blurY = 4;
+        _this.strength = 1;
+        _this.quality = 1;
+        _this.type = "inner";
+        _this.knockout = false;
+
+        var arg = arguments;
+
+        var distance = _parseInt(arg[0]);
+        if (!_isNaN(distance)) {
+            _this.distance = distance;
+        }
+
+        var angle = _parseFloat(arg[1]);
+        if (!_isNaN(angle) && 0 <= angle && 360 >= angle) {
+            _this.angle = angle;
+        }
+
+        _this.colors = arg[2];
+        _this.alphas = arg[3];
+        _this.ratios = arg[4];
+
+        var blurX = _parseInt(arg[5]);
+        if (!_isNaN(blurX) && 0 <= blurX && 255 >= blurX) {
+            _this.blurX = blurX;
+        }
+
+        var blurY = _parseInt(arg[6]);
+        if (!_isNaN(blurY) && 0 <= blurY && 255 >= blurY) {
+            _this.blurY = blurY;
+        }
+
+        var strength = _parseFloat(arg[7]);
+        if (!_isNaN(strength) && 0 <= strength && 255 >= strength) {
+            _this.strength = strength;
+        }
+
+        var quality = _parseInt(arg[8]);
+        if (!_isNaN(quality) && 1 <= quality && 15 >= quality) {
+            _this.quality = quality;
+        }
+
+        var type = arg[9];
+        if (typeof type === "string") {
+            _this.type = type;
+        }
+
+        var knockout = arg[10];
+        if (typeof knockout === "boolean") {
+            _this.knockout = knockout;
+        }
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    GradientGlowFilter.prototype = Object.create(BitmapFilter.prototype);
+    GradientGlowFilter.prototype.constructor = GradientGlowFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    GradientGlowFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        var _this = this;
+        var strength = _this.strength;
+        if (strength === 0) {
+            return cache;
+        }
+
+        var type = _this.type;
+        var blurX = _this.blurX;
+        var blurY = _this.blurY;
+        var isInner = (type === "inner" || type === "full");
+        var isOuter = (type === "outer" || type === "full");
+        var knockout = _this.knockout;
+        var angle = _this.angle;
+        var r = angle * _PI / 180;
+
+        var blurFilter = new BlurFilter(blurX, blurY, _this.quality);
+        var ctx = blurFilter.render(cache, matrix, colorTransform, stage);
+
+        // synthesis
+        var cacheOffsetX = cache._offsetX;
+        var cacheOffsetY = cache._offsetY;
+        var _offsetX = ctx._offsetX;
+        var _offsetY = ctx._offsetY;
+
+        var canvas = ctx.canvas;
+        var synCanvas = cacheStore.getCanvas();
+        var width = canvas.width + cacheOffsetX;
+        var height = canvas.height + cacheOffsetY;
+        var ox = 0;
+        var oy = 0;
+        var dx = 0;
+        var dy = 0;
+
+        var distance = _this.distance;
+        var scale = stage.getScale();
+        var x = _ceil(_cos(r) * distance * scale);
+        var y = _ceil(_sin(r) * distance * scale);
+
+        if (x !== 0) {
+            width += _abs(x);
+            if (x < 0) {
+                ox -= x;
+            } else {
+                dx = x;
+            }
+        }
+
+        if (y !== 0) {
+            height += _abs(x);
+            if (y < 0) {
+                oy -= y;
+            } else {
+                dy = y;
+            }
+        }
+
+        synCanvas.width = width;
+        synCanvas.height = height;
+        var synCtx = synCanvas.getContext("2d");
+        if (!knockout) {
+            synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+        }
+
+        if (strength < 1) {
+            synCtx.globalAlpha *= strength;
+        }
+
+        var operation;
+        if (isInner && isOuter) {
+            operation = "source-over";
+        } else {
+            if (knockout) {
+                synCtx.drawImage(cache.canvas, _offsetX + ox, _offsetY + oy);
+            }
+            operation = filterOperation(isInner, knockout);
+        }
+
+        synCtx.globalCompositeOperation = operation;
+        synCtx.drawImage(canvas, cacheOffsetX + dx, cacheOffsetY + dy);
+
+        synCtx._offsetX = cacheOffsetX + _offsetX;
+        synCtx._offsetY = cacheOffsetY + _offsetY;
+
+        cacheStore.destroy(ctx);
+
+        return synCtx;
+    };
+
+    /**
+     * @constructor
+     */
+    var ConvolutionFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 5;
+
+
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    ConvolutionFilter.prototype = Object.create(BitmapFilter.prototype);
+    ConvolutionFilter.prototype.constructor = ConvolutionFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    ConvolutionFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        return cache;
+    };
+
+    /**
+     * @constructor
+     */
+    var ColorMatrixFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 6;
+
+
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    ColorMatrixFilter.prototype = Object.create(BitmapFilter.prototype);
+    ColorMatrixFilter.prototype.constructor = ColorMatrixFilter;
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    ColorMatrixFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        return cache;
+    };
+
+    /**
+     * @constructor
+     */
+    var GradientBevelFilter = function()
+    {
+        var _this = this;
+        BitmapFilter.call(_this);
+
+        _this.filterId = 7;
+
+
+    };
+
+    /**
+     * extends
+     * @type {BitmapFilter}
+     */
+    GradientBevelFilter.prototype = Object.create(BitmapFilter.prototype);
+    GradientBevelFilter.prototype.constructor = GradientBevelFilter;
+
+
+    /**
+     * @param cache
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    GradientBevelFilter.prototype.render = function(cache, matrix, colorTransform, stage)
+    {
+        return cache;
+    };
+
+    /**
+     * @constructor
+     */
+    var Graphics = function()
+    {
+        var _this = this;
+        _this.instanceId = instanceId++;
+        _this.clear();
+    };
+
+    /**
+     * @returns {Graphics}
+     */
+    Graphics.prototype.clear = function()
+    {
+        var _this = this;
+        var no = _Number.MAX_VALUE;
+        _this.bounds = {xMin: no, xMax: -no, yMin: no, yMax: -no};
+        _this.maxWidth = 0;
+        _this.isDraw = false;
+        _this.isFillDraw = false;
+        _this.isLineDraw = false;
+        _this.cacheKey = "";
+        _this.fillRecodes = [];
+        _this.lineRecodes = [];
+        return _this;
+    };
+
+    /**
+     * @returns {string}
+     */
+    Graphics.prototype.getCacheKey = function()
+    {
+        return this.cacheKey;
+    };
+
+    /**
+     * @returns {string}
+     */
+    Graphics.prototype.addCacheKey = function()
+    {
+        var args = arguments;
+        var cacheKey = "";
+        var length = args.length;
+        if (length) {
+            for (var i = 0; i < length; i++) {
+                var value = args[i];
+                cacheKey += "_"+ value;
+            }
+        }
+        this.cacheKey += cacheKey;
+    };
+
+    /**
+     * @returns {*}
+     */
+    Graphics.prototype.getBounds = function()
+    {
+        return this.bounds;
+    };
+
+    /**
+     * @param x
+     * @param y
+     */
+    Graphics.prototype.setBounds = function(x, y)
+    {
+        var bounds = this.bounds;
+        bounds.xMin = _min(bounds.xMin, x);
+        bounds.xMax = _max(bounds.xMax, x);
+        bounds.yMin = _min(bounds.yMin, y);
+        bounds.yMax = _max(bounds.yMax, y);
+    };
+
+    /**
+     * @param color
+     */
+    Graphics.prototype.pushFillRecode = function(color)
+    {
+        var recodes = this.fillRecodes;
+        recodes[recodes.length] = {
+            recodes: [],
+            style: color,
+            cmd: null
+        };
+    };
+
+    /**
+     * @returns {Array}
+     */
+    Graphics.prototype.getFillRecode = function()
+    {
+        var recodes = this.fillRecodes;
+        var obj = recodes[recodes.length - 1];
+        obj.cmd = null;
+        return obj.recodes;
+    };
+
+    /**
+     * @param color
+     * @param width
+     * @param capsStyle
+     * @param jointStyle
+     */
+    Graphics.prototype.pushLineRecode = function(color, width, capsStyle, jointStyle)
+    {
+        var recodes = this.lineRecodes;
+        recodes[recodes.length] = {
+            recodes: [],
+            Width: width,
+            capsStyle: capsStyle,
+            jointStyle: jointStyle,
+            style: color,
+            cmd: null
+        };
+    };
+
+    /**
+     * @returns {Array}
+     */
+    Graphics.prototype.getLineRecode = function()
+    {
+        var recodes = this.lineRecodes;
+        var obj = recodes[recodes.length - 1];
+        obj.cmd = null;
+        return obj.recodes;
+    };
+
+    /**
+     * @param rgb
+     * @param alpha
+     * @returns {Graphics}
+     */
+    Graphics.prototype.beginFill = function(rgb, alpha)
+    {
+        if (typeof rgb === "string") {
+            var canvas = cacheStore.getCanvas();
+            canvas.width = 1;
+            canvas.height = 1;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = rgb;
+            rgb = "0x" + ctx.fillStyle.substr(1);
+            cacheStore.destroy(ctx);
+        }
+
+        var _this = this;
+        var rgbInt = _parseInt(rgb);
+        if (!_isNaN(rgbInt)) {
+            alpha = _parseFloat(alpha);
+            if (_isNaN(alpha)) {
+                alpha = 100;
+            }
+            var color = intToRGBA(rgb, alpha);
+            _this.pushFillRecode(color);
+            _this.addCacheKey(rgb, alpha);
+            _this.isDraw = true;
+            _this.isFillDraw = true;
+        }
+        return _this;
+    };
+
+    /**
+     * @param width
+     * @param rgb
+     * @param alpha
+     * @param pixelHinting
+     * @param noScale
+     * @param capsStyle
+     * @param jointStyle
+     * @param miterLimit
+     * @returns {Graphics}
+     */
+    Graphics.prototype.lineStyle = function(width, rgb, alpha, pixelHinting, noScale, capsStyle, jointStyle, miterLimit)
+    {
+        var _this = this;
+        width = _parseFloat(width);
+        if (!_isNaN(width)) {
+            if (typeof rgb === "string") {
+                var canvas = cacheStore.getCanvas();
+                canvas.width = 1;
+                canvas.height = 1;
+                var ctx = canvas.getContext("2d");
+                ctx.fillStyle = rgb;
+                rgb = "0x" + ctx.fillStyle.substr(1);
+                cacheStore.destroy(ctx);
+            }
+            var rgbInt = _parseInt(rgb);
+            if (_isNaN(rgbInt)) {
+                rgb = 0x000000;
+            }
+            alpha = _parseFloat(alpha);
+            if (_isNaN(alpha)) {
+                alpha = 100;
+            }
+            if (!capsStyle) {
+                capsStyle = "round";
+            }
+            if (!jointStyle) {
+                jointStyle = "round";
+            }
+            var color = intToRGBA(rgb, alpha);
+            width *= 20;
+            _this.maxWidth = _max(_this.maxWidth, width);
+            _this.pushLineRecode(color, width, capsStyle, jointStyle);
+            _this.addCacheKey(rgb, alpha);
+            _this.isDraw = true;
+            _this.isLineDraw = true;
+        }
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @returns {Graphics}
+     */
+    Graphics.prototype.moveTo = function(x, y)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        x *= 20;
+        y *= 20;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [0, x, y];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [0, x, y];
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x, y);
+            _this.addCacheKey(x, y);
+        }
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @returns {Graphics}
+     */
+    Graphics.prototype.lineTo = function(x, y)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        x *= 20;
+        y *= 20;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [2, x, y];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [2, x, y];
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x, y);
+            _this.addCacheKey(x, y);
+        }
+        return _this;
+    };
+
+    /**
+     * @param cx
+     * @param cy
+     * @param dx
+     * @param dy
+     * @returns {Graphics}
+     */
+    Graphics.prototype.curveTo = function(cx, cy, dx, dy)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        cx *= 20;
+        cy *= 20;
+        dx *= 20;
+        dy *= 20;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [1, cx, cy, dx, dy];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [1, cx, cy, dx, dy];
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(cx, cy);
+            _this.setBounds(dx, dy);
+            _this.addCacheKey(cx, cy, dx, dy);
+        }
+        return _this;
+    };
+
+    /**
+     * @param cp1x
+     * @param cp1y
+     * @param cp2x
+     * @param cp2y
+     * @param x
+     * @param y
+     * @returns {Graphics}
+     */
+    Graphics.prototype.cubicCurveTo = function(cp1x, cp1y, cp2x, cp2y, x, y)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        cp1x *= 20;
+        cp1y *= 20;
+        cp2x *= 20;
+        cp2y *= 20;
+        x *= 20;
+        y *= 20;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [3, cp1x, cp1y, cp2x, cp2y, x, y];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [3, cp1x, cp1y, cp2x, cp2y, x, y];
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x, y);
+            _this.addCacheKey(cp1x, cp1y, cp2x, cp2y, x, y);
+        }
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @param radius
+     * @returns {Graphics}
+     */
+    Graphics.prototype.drawCircle = function(x, y, radius)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        x *= 20;
+        y *= 20;
+        radius *= 20;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [4, x, y, radius, 0, _PI*2];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [4, x, y, radius, 0, _PI*2];
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x - radius, y - radius);
+            _this.setBounds(x + radius, y + radius);
+            _this.addCacheKey(x, y, radius);
+        }
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @returns {Graphics}
+     */
+    Graphics.prototype.drawEllipse = function(x, y, width, height)
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        x *= 20;
+        y *= 20;
+        width *= 20;
+        height *= 20;
+        var radius = _min(width, height);
+        var _comparison = comparison(width, height);
+        var xScale = width / _comparison;
+        var yScale = height / _comparison;
+        var scale = _min(xScale, yScale) / _max(xScale, yScale);
+        var data = [5];
+        if (width === height) {
+            data[data.length] = 1;
+            data[data.length] = 1;
+        } else if (width > height) {
+            data[data.length] = 1;
+            data[data.length] = scale;
+        } else {
+            data[data.length] = scale;
+            data[data.length] = 1;
+        }
+        data[data.length] = x;
+        data[data.length] = y;
+        data[data.length] = radius;
+
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = data;
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = data;
+        }
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x - width, y - height);
+            _this.setBounds(x + width, y + height);
+            _this.addCacheKey(x, y, width, height);
+        }
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @returns {Graphics}
+     */
+    Graphics.prototype.drawRect = function(x, y, width, height)
+    {
+        var _this = this;
+        _this.moveTo(x, y);
+        _this.lineTo(x + width, y);
+        _this.lineTo(x + width, y + height);
+        _this.lineTo(x, y + height);
+        _this.lineTo(x, y);
+        return _this;
+    };
+
+    /**
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @param ellipseWidth
+     * @param ellipseHeight
+     * @returns {Graphics}
+     */
+    Graphics.prototype.drawRoundRect = function(x, y, width, height, ellipseWidth, ellipseHeight)
+    {
+        return this;
+    };
+
+    /**
+     * @param vertices
+     * @param indices
+     * @param uvtData
+     * @param culling
+     * @returns {Graphics}
+     */
+    Graphics.prototype.drawTriangles = function(vertices, indices, uvtData, culling)
+    {
+        var _this = this;
+        var length = vertices.length;
+        if (length && length % 3 === 0) {
+            var i = 0;
+            var count = 0;
+            if (indices) {
+                length = indices.length;
+                if (length && length % 3 === 0) {
+                    for (i = 0; i < length; i++) {
+                        var idx = indices[i];
+                        if (count === 0) {
+                            _this.moveTo(vertices[idx], vertices[idx + 1]);
+                        } else {
+                            _this.lineTo(vertices[idx], vertices[idx + 1]);
+                        }
+                        count++;
+                        if (count % 3 === 0) {
+                            count = 0;
+                        }
+                    }
+                }
+            } else {
+                for (i = 0; i < length; i++) {
+                    if (count === 0) {
+                        _this.moveTo(vertices[i++], vertices[i]);
+                    } else {
+                        _this.lineTo(vertices[i++], vertices[i]);
+                    }
+                    count++;
+                    if (count % 3 === 0) {
+                        count = 0;
+                    }
+                }
+            }
+        }
+        return _this;
+    };
+
+    /**
+     * @returns {Graphics}
+     */
+    Graphics.prototype.endFill = function()
+    {
+        var _this = this;
+        _this.isFillDraw = false;
+        return _this;
+    };
+
+    /**
+     * @returns {Graphics}
+     */
+    Graphics.prototype.closePath = function()
+    {
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            fillRecodes[fillRecodes.length] = [6];
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            lineRecodes[lineRecodes.length] = [6];
+        }
+        return _this;
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {*}
+     */
+    Graphics.prototype.render = function(ctx, matrix, colorTransform, stage)
+    {
+        var _this = this;
+        var cacheKey = "";
+        var alpha = colorTransform[3] + (colorTransform[7] / 255);
+        if (!alpha) {
+            return cacheKey;
+        }
+
+        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
+        var cacheScale = cacheScaleXY(rMatrix);
+        var xScale = cacheScale[0];
+        var yScale = cacheScale[1];
+
+        var maxWidth = _this.maxWidth;
+        var halfWidth = maxWidth / 2;
+        var bounds = _this.getBounds();
+        var xMax = bounds.xMax;
+        var xMin = bounds.xMin;
+        var yMax = bounds.yMax;
+        var yMin = bounds.yMin;
+
+        var W = _abs(_ceil((xMax - xMin + maxWidth) * xScale));
+        var H = _abs(_ceil((yMax - yMin + maxWidth) * yScale));
+
+        if (W <= 0 || H <= 0) {
+            return cacheKey;
+        }
+
+        var cache;
+        var canvas;
+        cacheKey = cacheStore.generateKey("Graphics", _this.instanceId, cacheScale, colorTransform);
+        cacheKey += _this.getCacheKey();
+        cache = cacheStore.getCache(cacheKey);
+
+        if (!cache &&
+            stage.getWidth() > W &&
+            stage.getHeight() > H &&
+            cacheStore.size > (W * H)
+        ) {
+            canvas = cacheStore.getCanvas();
+            canvas.width = W;
+            canvas.height = H;
+            cache = canvas.getContext("2d");
+            var cMatrix = [xScale, 0, 0, yScale, (-xMin + halfWidth) * xScale, (-yMin + halfWidth) * yScale];
+            setTransform(cache, cMatrix);
+            cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, stage.clipMc);
+            cacheStore.setCache(cacheKey, cache);
+        }
+
+        if (cache) {
+            canvas = cache.canvas;
+            var sMatrix = [1 / xScale, 0, 0, 1 / yScale, xMin - halfWidth, yMin - halfWidth];
+            var m2 = multiplicationMatrix(rMatrix, sMatrix);
+            setTransform(ctx, m2);
+            if (isAndroid4x && !isChrome) {
+                ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
+                ctx.fillRect(0, 0, W, H);
+            } else {
+                ctx.drawImage(canvas, 0, 0, W, H);
+            }
+        } else {
+            setTransform(ctx, rMatrix);
+            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, stage.clipMc);
+        }
+
+        return cacheKey +"_"+ rMatrix[4] +"_"+ rMatrix[5];
+    };
+
+    /**
+     * @param ctx
+     * @param minScale
+     * @param colorTransform
+     * @param isClip
+     */
+    Graphics.prototype.executeRender = function(ctx, minScale, colorTransform, isClip)
+    {
+        var _this = this;
+        var fillRecodes = _this.fillRecodes;
+        var lineRecodes = _this.lineRecodes;
+        var length;
+        var i;
+        var obj;
+        var recodes;
+        var color;
+        var _generateColorTransform = generateColorTransform;
+        var _rgba = rgba;
+        var cmd;
+
+        length = fillRecodes.length;
+        if (length) {
+            for (i = 0; i < length; i++) {
+                obj = fillRecodes[i];
+                recodes = obj.recodes;
+                if (!recodes.length) {
+                    continue;
+                }
+
+                color = _generateColorTransform(obj.style, colorTransform);
+                cmd = obj.cmd;
+                if (cmd === null) {
+                    cmd = vtc.buildCommand(recodes);
+                    obj.cmd = cmd;
+                }
+
+                ctx.beginPath();
+                ctx.fillStyle = _rgba(color);
+                cmd(ctx);
+                if (isClip) {
+                    ctx.clip();
+                } else {
+                    ctx.fill();
+                }
+            }
+        }
+
+        if (!isClip) {
+            length = lineRecodes.length;
+            if (length) {
+                for (i = 0; i < length; i++) {
+                    obj = lineRecodes[i];
+                    recodes = obj.recodes;
+                    if (!recodes.length) {
+                        continue;
+                    }
+
+                    color = _generateColorTransform(obj.style, colorTransform);
+                    cmd = obj.cmd;
+                    if (cmd === null) {
+                        cmd = vtc.buildCommand(recodes);
+                        obj.cmd = cmd;
+                    }
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = _rgba(color);
+                    ctx.lineWidth = _max(obj.Width, 1 / minScale);
+                    ctx.lineCap = obj.capsStyle;
+                    ctx.lineJoin = obj.jointStyle;
+                    cmd(ctx);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        var resetCss = "rgba(0,0,0,1)";
+        ctx.strokeStyle = resetCss;
+        ctx.fillStyle = resetCss;
+        ctx.globalAlpha = 1;
+
+        return ctx;
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param stage
+     * @param x
+     * @param y
+     * @returns {boolean}
+     */
+    Graphics.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
+    {
+        var _this = this;
+        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
+        var fillRecodes = _this.fillRecodes;
+        var lineRecodes = _this.lineRecodes;
+        var recodes;
+        var cmd;
+        var i;
+        var length;
+        var obj;
+        var hit = false;
+
+        setTransform(ctx, rMatrix);
+        length = fillRecodes.length;
+        if (length) {
+            for (i = 0; i < length; i++) {
+                obj = fillRecodes[i];
+                cmd = obj.cmd;
+                if (cmd === null) {
+                    recodes = obj.recodes;
+                    cmd = vtc.buildCommand(recodes);
+                    obj.cmd = cmd;
+                }
+
+                ctx.beginPath();
+                cmd(ctx);
+                hit = ctx.isPointInPath(x, y);
+                if (hit) {
+                    return hit;
+                }
+            }
+        }
+
+        length = lineRecodes.length;
+        if (length) {
+            var minScale = _min(rMatrix[0], rMatrix[3]);
+            for (i = 0; i < length; i++) {
+                obj = lineRecodes[i];
+                cmd = obj.cmd;
+                if (cmd === null) {
+                    recodes = obj.recodes;
+                    cmd = vtc.buildCommand(recodes);
+                    obj.cmd = cmd;
+                }
+
+                ctx.beginPath();
+                ctx.lineWidth = _max(obj.Width, 1 / minScale);
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                cmd(ctx);
+                hit = ctx.isPointInStroke(x, y);
+                if (hit) {
+                    return hit;
+                }
+            }
+        }
+
+        return hit;
+    };
+
+    /**
+     * @constructor
+     */
+    var SoundTransform = function()
+    {
+        var _this = this;
+        _this._leftToLeft = 0;
+        _this._leftToRight = 1;
+        _this._pan = 0;
+        _this._rightToLeft = 0;
+        _this._rightToRight = 1;
+        _this._volume = 1;
+    };
+
+    /**
+     * properties
+     */
+    Object.defineProperties(SoundTransform.prototype,
+    {
+        leftToLeft: {
+            get: function()
+            {
+                return this.getLeftToLeft();
+            },
+            set: function(leftToLeft)
+            {
+                this.setLeftToLeft(leftToLeft);
+            }
+        },
+        leftToRight: {
+            get: function()
+            {
+                return this.getLeftToRight();
+            },
+            set: function(leftToRight)
+            {
+                this.setLeftToRight(leftToRight);
+            }
+        },
+        pan: {
+            get: function()
+            {
+                return this.getPan();
+            },
+            set: function(pan)
+            {
+                this.setPan(pan);
+            }
+        },
+        rightToLeft:{
+            get: function()
+            {
+                return this.getRightToLeft();
+            },
+            set: function(rightToLeft)
+            {
+                this.setRightToLeft(rightToLeft);
+            }
+        },
+        rightToRight: {
+            get: function()
+            {
+                return this.getRightToRight();
+            },
+            set: function(rightToRight)
+            {
+                this.setRightToRight(rightToRight);
+            }
+        },
+        volume: {
+            get: function()
+            {
+                return this.getVolume();
+            },
+            set: function(volume)
+            {
+                this.setVolume(volume);
+            }
+        }
+    });
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getLeftToLeft = function()
+    {
+        return this._leftToLeft;
+    };
+
+    /**
+     * @param leftToLeft
+     */
+    SoundTransform.prototype.setLeftToLeft = function(leftToLeft)
+    {
+        leftToLeft = _parseInt(leftToLeft);
+        if (!_isNaN(leftToLeft)) {
+            this._leftToLeft = leftToLeft;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getLeftToRight = function()
+    {
+        return this._leftToRight;
+    };
+
+    /**
+     * @param leftToRight
+     */
+    SoundTransform.prototype.setLeftToRight = function(leftToRight)
+    {
+        leftToRight = _parseInt(leftToRight);
+        if (!_isNaN(leftToRight)) {
+            this._leftToRight = leftToRight;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getPan = function()
+    {
+        return this._pan;
+    };
+
+    /**
+     * @param pan
+     */
+    SoundTransform.prototype.setPan = function(pan)
+    {
+        pan = _parseInt(pan);
+        if (!_isNaN(pan)) {
+            this._pan = pan;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getRightToLeft = function()
+    {
+        return this._rightToLeft;
+    };
+
+    /**
+     * @param rightToLeft
+     */
+    SoundTransform.prototype.setRightToLeft = function(rightToLeft)
+    {
+        rightToLeft = _parseInt(rightToLeft);
+        if (!_isNaN(rightToLeft)) {
+            this._rightToLeft = rightToLeft;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getRightToRight = function()
+    {
+        return this._rightToRight;
+    };
+
+    /**
+     * @param rightToRight
+     */
+    SoundTransform.prototype.setRightToRight = function(rightToRight)
+    {
+        rightToRight = _parseInt(rightToRight);
+        if (!_isNaN(rightToRight)) {
+            this._rightToRight = rightToRight;
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
+    SoundTransform.prototype.getVolume = function()
+    {
+        return this._volume;
+    };
+
+    /**
+     * @param volume
+     */
+    SoundTransform.prototype.setVolume = function(volume)
+    {
+        volume = _parseInt(volume);
+        if (!_isNaN(volume)) {
+            this._volume = volume;
+        }
+    };
+
+    /**
+     * @param vol
+     * @param panning
+     */
+    SoundTransform.prototype.SoundTransform = function(vol, panning)
+    {
+        var _this = this;
+        vol = _parseInt(vol);
+        if (!_isNaN(vol)) {
+            _this.volume = vol;
+        }
+        panning = _parseInt(panning);
+        if (!_isNaN(panning)) {
+            _this.pan = panning;
+        }
+    };
+
+    /**
+     * @constructor
+     */
+    var Swf2jsEvent = function()
+    {
+        var _this = this;
+        _this.target = {};
+        _this.bubbles = true;
+        _this.cancelable = true;
+        _this.currentTarget = {};
+        _this.eventPhase = 0;
+    };
+
+    /**
+     * @type {string}
+     */
+    Swf2jsEvent.prototype.ACTIVATE = "activate";
+
+    /**
+     * @param type
+     * @constructor
+     */
+    var ClipEvent = function(type)
+    {
+        var _this = this;
+        _this.type = type;
+        Swf2jsEvent.call(this);
+    };
+
+    /**
+     * extends
+     * @type {EventDispatcher}
+     */
+    ClipEvent.prototype = Object.create(Swf2jsEvent.prototype);
+    ClipEvent.prototype.constructor = ClipEvent;
+
+    var clipEvent = new ClipEvent();
+
+    /**
+     * @constructor
+     */
+    var EventDispatcher = function()
+    {
+        var _this = this;
+        _this.events = {};
+        _this.isLoad = false;
+        _this.active = false;
+    };
+
+    /**
+     * properties
+     */
+    Object.defineProperties(EventDispatcher.prototype,
+    {
+        onEnterFrame: {
+            get: function () {
+                return this.getOnEvent("onEnterFrame");
+            },
+            set: function (as) {
+                this.setVariable("onEnterFrame", as);
+            }
+        },
+        onPress: {
+            get: function () {
+                return this.getOnEvent("onPress");
+            },
+            set: function (as) {
+                this.setVariable("onPress", as);
+            }
+        },
+        onRelease: {
+            get: function () {
+                return this.getOnEvent("onRelease");
+            },
+            set: function (as) {
+                this.setVariable("onRelease", as);
+            }
+        },
+        onRollOver: {
+            get: function () {
+                return this.getOnEvent("onRollOver");
+            },
+            set: function (as) {
+                this.setVariable("onRollOver", as);
+            }
+        },
+        onRollOut: {
+            get: function () {
+                return this.getOnEvent("onRollOut");
+            },
+            set: function (as) {
+                this.setVariable("onRollOut", as);
+            }
+        },
+        onData: {
+            get: function () {
+                return this.getOnEvent("onData");
+            },
+            set: function (as) {
+                this.setVariable("onData", as);
+            }
+        },
+        onMouseDown: {
+            get: function () {
+                return this.getOnEvent("onMouseDown");
+            },
+            set: function (as) {
+                this.setVariable("onMouseDown", as);
+            }
+        },
+        onMouseUp: {
+            get: function () {
+                return this.getVariable("onMouseUp");
+            },
+            set: function (as) {
+                this.setVariable("onMouseUp", as);
+            }
+        },
+        onMouseMove: {
+            get: function () {
+                return this.getOnEvent("onMouseMove");
+            },
+            set: function (as) {
+                this.setVariable("onMouseMove", as);
+            }
+        },
+        onDragOut: {
+            get: function () {
+                return this.getOnEvent("onDragOut");
+            },
+            set: function (as) {
+                this.setVariable("onDragOut", as);
+            }
+        },
+        onDragOver: {
+            get: function () {
+                return this.getOnEvent("onDragOver");
+            },
+            set: function (as) {
+                this.setVariable("onDragOver", as);
+            }
+        },
+        onKeyDown: {
+            get: function () {
+                return this.getOnEvent("onKeyDown");
+            },
+            set: function (as) {
+                this.setVariable("onKeyDown", as);
+            }
+        },
+        onKeyUp: {
+            get: function () {
+                return this.getOnEvent("onKeyUp");
+            },
+            set: function (as) {
+                this.setVariable("onKeyUp", as);
+            }
+        },
+        onLoad: {
+            get: function () {
+                return this.getOnEvent("onLoad");
+            },
+            set: function (as) {
+                this.setVariable("onLoad", as);
+            }
+        },
+        onUnLoad: {
+            get: function () {
+                return this.getVariable("onUnLoad");
+            },
+            set: function (as) {
+                this.setVariable("onUnLoad", as);
+            }
+        }
+    });
+
+    /**
+     * @param type
+     * @returns {*}
+     */
+    EventDispatcher.prototype.getOnEvent = function(type)
+    {
+        return this.getVariable(type);
+    };
+
+    /**
+     * @param type
+     * @param listener
+     * @param useCapture
+     * @param priority
+     * @param useWeakReference
+     */
+    EventDispatcher.prototype.addEventListener = function(type, listener, useCapture, priority, useWeakReference)
+    {
+        var events = this.events;
+        if (!(type in events)) {
+            events[type] = [];
+        }
+
+        var event = events[type];
+        event[event.length] = listener;
+    };
+
+    /**
+     * @param event
+     */
+    EventDispatcher.prototype.dispatchEvent = function(event)
+    {
+        var _this = this;
+        var type = event.type;
+        if (_this.hasEventListener(type)) {
+            var events = _this.events[type];
+            _this.setActionQueue(events);
+        }
+    };
+
+    /**
+     * @param type
+     * @returns {boolean}
+     */
+    EventDispatcher.prototype.hasEventListener = function(type)
+    {
+        return (type in this.events);
+    };
+
+    /**
+     * @param type
+     * @param listener
+     * @param useCapture
+     */
+    EventDispatcher.prototype.removeEventListener = function(type, listener, useCapture)
+    {
+        var _this = this;
+        if (_this.hasEventListener(type)) {
+            var events = _this.events;
+            var event = events[type];
+            var length = event.length;
+            for (var i = 0; i < length; i++) {
+                if (event[i] !== listener) {
+                    continue;
+                }
+                delete event[i];
+                break;
+            }
+        }
+    };
+
+    /**
+     * @param type
+     */
+    EventDispatcher.prototype.willTrigger = function(type)
+    {
+        return this.hasEventListener(type);
+    };
+
+    /**
+     * @param as
+     */
+    EventDispatcher.prototype.setActionQueue = function(as)
+    {
+        var _this = this;
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
+        var actions = stage.actions;
+        actions[actions.length] = {as: as, mc:_this};
+    };
+
+    /**
+     * @constructor
+     */
+    var AccessibilityProperties = function()
+    {};
+
+    /**
+     * @constructor
+     */
+    var DisplayObject = function()
+    {
+        var _this = this;
+        EventDispatcher.call(_this);
+        _this.initialize();
+    };
+
+    /**
+     * extends
+     * @type {EventDispatcher}
+     */
+    DisplayObject.prototype = Object.create(EventDispatcher.prototype);
+    DisplayObject.prototype.constructor = DisplayObject;
+
+    /**
+     * properties
+     */
+    Object.defineProperties(DisplayObject.prototype,
+    {
+        accessibilityProperties: {
+            value: new AccessibilityProperties()
+        },
+        alpha: {
+            get: function()
+            {
+                return this.getAlpha() / 100;
+            },
+            set: function(alpha)
+            {
+                this.setAlpha(alpha * 100);
+            }
+        },
+        _alpha: {
+            get: function()
+            {
+                return this.getAlpha();
+            },
+            set: function(alpha)
+            {
+                this.setAlpha(alpha);
+            }
+        },
+        name: {
+            get: function()
+            {
+                return this.getName();
+            },
+            set: function(name)
+            {
+                this.setName(name);
+            }
+        },
+        _name: {
+            get: function()
+            {
+                return this.getName();
+            },
+            set: function(name)
+            {
+                this.setName(name);
+            }
+        },
+        blendMode: {
+            get: function()
+            {
+                return this.getBlendMode();
+            },
+            set: function(blendMode)
+            {
+                this.setBlendMode(blendMode);
+            }
+        },
+        filters: {
+            get: function()
+            {
+                return this.getFilters();
+            },
+            set: function(filters)
+            {
+                this.setFilters(filters);
+            }
+        },
+        _visible: {
+            get: function()
+            {
+                return this.getVisible();
+            },
+            set: function(visible)
+            {
+                this.setVisible(visible);
+            }
+        },
+        visible: {
+            get: function()
+            {
+                return this.getVisible();
+            },
+            set: function(visible)
+            {
+                this.setVisible(visible);
+            }
+        },
+        _rotation: {
+            get: function()
+            {
+                return this.getRotation();
+            },
+            set: function(rotation)
+            {
+                this.setRotation(rotation);
+            }
+        },
+        rotation: {
+            get: function()
+            {
+                return this.getRotation();
+            },
+            set: function(rotation)
+            {
+                this.setRotation(rotation);
+            }
+        },
+        _height: {
+            get: function()
+            {
+                return this.getHeight();
+            },
+            set: function(height)
+            {
+                this.setHeight(height);
+            }
+        },
+        height: {
+            get: function()
+            {
+                return this.getHeight();
+            },
+            set: function(height)
+            {
+                this.setHeight(height);
+            }
+        },
+        _width: {
+            get: function()
+            {
+                return this.getWidth();
+            },
+            set: function(width)
+            {
+                this.setWidth(width);
+            }
+        },
+        width: {
+            get: function()
+            {
+                return this.getWidth();
+            },
+            set: function(width)
+            {
+                this.setWidth(width);
+            }
+        },
+        _x: {
+            get: function()
+            {
+                return this.getX();
+            },
+            set: function(x)
+            {
+                this.setX(x);
+            }
+        },
+        x: {
+            get: function()
+            {
+                return this.getX();
+            },
+            set: function(x)
+            {
+                this.setX(x);
+            }
+        },
+        _y: {
+            get: function()
+            {
+                return this.getY();
+            },
+            set: function(y)
+            {
+                this.setY(y);
+            }
+        },
+        y: {
+            get: function()
+            {
+                return this.getY();
+            },
+            set: function(y)
+            {
+                this.setY(y);
+            }
+        },
+        _xscale: {
+            get: function()
+            {
+                return this.getXScale();
+            },
+            set: function(xscale)
+            {
+                this.setXScale(xscale);
+            }
+        },
+        scaleX: {
+            get: function()
+            {
+                return this.getXScale();
+            },
+            set: function(xscale)
+            {
+                this.setXScale(xscale);
+            }
+        },
+        _yscale: {
+            get: function()
+            {
+                return this.getYScale();
+            },
+            set: function(yscale)
+            {
+                this.setYScale(yscale);
+            }
+        },
+        scaleY: {
+            get: function()
+            {
+                return this.getYScale();
+            },
+            set: function(yscale)
+            {
+                this.setYScale(yscale);
+            }
+        },
+        _xmouse: {
+            get: function()
+            {
+                return this.getXMouse();
+            },
+            set: function(){}
+        },
+        mouseX: {
+            get: function()
+            {
+                return this.getXMouse();
+            },
+            set: function(){}
+        },
+        _ymouse: {
+            get: function()
+            {
+                return this.getYMouse();
+            },
+            set: function(){}
+        },
+        mouseY: {
+            get: function()
+            {
+                return this.getYMouse();
+            },
+            set: function(){}
+        },
+        mask: {
+            get: function()
+            {
+                return this.getMask();
+            },
+            set: function(obj)
+            {
+                this.setMask(obj);
+            }
+        },
+        enabled: {
+            get: function()
+            {
+                return this.getEnabled();
+            },
+            set: function(enabled)
+            {
+                this.setEnabled(enabled);
+            }
+        }
+    });
+
+    /**
+     * initialize
+     */
+    DisplayObject.prototype.initialize = function()
+    {
+        var _this = this;
+
+        // common
+        _this.instanceId = instanceId++;
+        _this.characterId = 0;
+        _this.tagType = 0;
+        _this.ratio = 0;
+        _this.clipDepth = 0;
+        _this.isClipDepth = false;
+        _this.stageId = null;
+        _this.loadStageId = null;
+        _this.variables = {};
+        _this.buttonStatus = "up";
+
+        // properties
+        _this.__visible = true;
+        _this.__name = null;
+        _this._url = null;
+        _this._highquality = 1;
+        _this._focusrect = 1;
+        _this._soundbuftime = null;
+        _this._totalframes = 1;
+        _this._level = 0;
+        _this._depth = null;
+        _this._framesloaded = 0;
+        _this._target = "";
+        _this._lockroot = true;
+        _this._enabled = true;
+        _this._blendMode = null;
+        _this._filters = null;
+        _this._filterCacheKey = null;
+        _this._parent = null;
+        _this._parentPlace = null;
+        _this._mask = null;
+        _this._matrix = null;
+        _this._colorTransform = null;
+    };
+
+    // filters
+    DisplayObject.prototype.flash = {
+        filters: {
+            DropShadowFilter: DropShadowFilter,
+            BlurFilter: BlurFilter,
+            GlowFilter: GlowFilter,
+            BevelFilter: BevelFilter,
+            GradientGlowFilter: GradientGlowFilter,
+            ConvolutionFilter: ConvolutionFilter,
+            ColorMatrixFilter: ColorMatrixFilter,
+            GradientBevelFilter: GradientBevelFilter,
+            BitmapFilter: BitmapFilter
+        }
+    };
+
+    /**
+     * @param stage
+     */
+    DisplayObject.prototype.setStage = function(stage)
+    {
+        var _this = this;
+        _this.stageId = stage.getId();
+        stage.setInstance(_this);
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getStage = function()
+    {
+        var _this = this;
+        var stage = _this.getLoadStage();
+        if (!stage)  {
+            stage = _this.getParentStage();
+        }
+        return stage;
+    };
+
+    /**
+     *
+     * @returns {*}
+     */
+    DisplayObject.prototype.getParentStage = function()
+    {
+        var stageId = this.stageId;
+        if (stageId !== null) {
+            if (stageId in stages) {
+                return stages[stageId];
+            } else {
+                return loadStages[stageId];
+            }
+        }
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getLoadStage = function()
+    {
+        var loadStageId = this.loadStageId;
+        if (loadStageId !== null) {
+            if (loadStageId in stages) {
+                return stages[loadStageId];
+            } else {
+                return loadStages[loadStageId];
+            }
+        }
+    };
+
+    /**
+     * @param stage
+     */
+    DisplayObject.prototype.setLoadStage = function(stage)
+    {
+        this.loadStageId = (stage !== null) ? stage.getId() : null;
+    };
+
+    /**
+     * @returns {number}
+     */
+    DisplayObject.prototype.getCharacterId = function()
+    {
+        return this.characterId;
+    };
+
+    /**
+     * @param characterId
+     */
+    DisplayObject.prototype.setCharacterId = function(characterId)
+    {
+        this.characterId = characterId;
+    };
+
+    /**
+     * @returns {number}
+     */
+    DisplayObject.prototype.getTagType = function()
+    {
+        return this.tagType;
+    };
+
+    /**
+     * @param tagType
+     */
+    DisplayObject.prototype.setTagType = function(tagType)
+    {
+        this.tagType = tagType;
+    };
+
+    /**
+     * @returns {number}
+     */
+    DisplayObject.prototype.getRatio = function()
+    {
+        return this.ratio;
+    };
+
+    /**
+     * @param ratio
+     */
+    DisplayObject.prototype.setRatio = function(ratio)
+    {
+        this.ratio = ratio;
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getParent = function()
+    {
+        var _this = this;
+        var stage = _this.getLoadStage();
+        var parent;
+        if (stage) {
+            parent = stage.getInstance(_this._parent);
+        }
+        if (!parent) {
+            stage = _this.getParentStage();
+            parent = stage.getInstance(_this._parent);
+        }
+        return parent;
+    };
+
+    /**
+     * @param parent
+     */
+    DisplayObject.prototype.setParent = function(parent)
+    {
+        var _this = this;
+        if (parent instanceof DisplayObjectContainer) {
+            parent.setInstance(_this);
+        }
+        _this._parent = parent.instanceId;
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getParentSprite = function()
+    {
+        var _this = this;
+        var stage = _this.getStage();
+        return stage.getInstance(_this._sprite);
+    };
+
+    /**
+     * @param sprite
+     */
+    DisplayObject.prototype.setParentSprite = function(sprite)
+    {
+        this._sprite = sprite.instanceId;
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getButtonStatus = function()
+    {
+        return this.buttonStatus;
+    };
+
+    /**
+     * @param status
+     */
+    DisplayObject.prototype.setButtonStatus = function(status)
+    {
+        this.buttonStatus = status;
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getMask = function()
+    {
+        return this._mask;
+    };
+
+    /**
+     * @param obj
+     */
+    DisplayObject.prototype.setMask = function(obj)
+    {
+        this._mask = obj;
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getEnabled = function()
+    {
+        return this._enabled;
+    };
+
+    /**
+     * @param enabled
+     */
+    DisplayObject.prototype.setEnabled = function(enabled)
+    {
+        this._enabled = enabled;
+    };
+
+    /**
+     * @returns {boolean}
+     */
+    DisplayObject.prototype.getButtonMode = function()
+    {
+        return this._buttonMode;
+    };
+
+    /**
+     * @param buttonMode
+     */
+    DisplayObject.prototype.setButtonMode = function(buttonMode)
+    {
+        this._buttonMode = buttonMode;
+    };
+
+    /**
+     * @returns {string}
+     */
+    DisplayObject.prototype.getTarget = function()
+    {
+        return this._target;
+    };
+
+    /**
+     * @param target
+     */
+    DisplayObject.prototype.setTarget = function(target)
+    {
+        this._target = target;
+    };
+
+    /**
+     * @param property
+     * @param getter
+     * @param setter
+     * @returns {boolean}
+     */
+    DisplayObject.prototype.addProperty = function(property, getter, setter)
+    {
+        if (typeof property !== "string" || property === "") {
+            return false;
+        }
+
+        if (!getter) {
+            getter = function(){};
+        }
+        if (setter) {
+            setter = function(){};
+        }
+
+        if (typeof getter !== "function" || typeof setter !== "function") {
+            return false;
+        }
+
+        Object.defineProperty(this, property,
+        {
+            get : getter,
+            set : setter
+        });
+        return true;
+    };
+
+
+    /**
+     * @param path
+     * @returns {{scope: DisplayObject, target: *}}
+     */
+    DisplayObject.prototype.splitPath = function(path)
     {
         var _this = this;
         var scope = _this;
@@ -8255,7 +11993,7 @@ if (!("swf2js" in window)){(function(window)
      * @param parse
      * @returns {undefined}
      */
-    Property.prototype.getProperty = function(name, parse)
+    DisplayObject.prototype.getProperty = function(name, parse)
     {
         var _this = this;
         var target = name;
@@ -8394,6 +12132,9 @@ if (!("swf2js" in window)){(function(window)
                 break;
             default:
                 value = _this.getVariable(target, parse);
+                if (value === undefined && target !== name) {
+                    value = _this.getGlobalVariable(name);
+                }
                 break;
         }
 
@@ -8405,7 +12146,7 @@ if (!("swf2js" in window)){(function(window)
      * @param value
      * @param parse
      */
-    Property.prototype.setProperty = function(name, value, parse)
+    DisplayObject.prototype.setProperty = function(name, value, parse)
     {
         var _this = this;
         var target = name;
@@ -8418,17 +12159,11 @@ if (!("swf2js" in window)){(function(window)
         switch (target) {
             case 0:
             case "_x":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setX(value);
-                }
+                _this.setX(value);
                 break;
             case 1:
             case "_y":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setY(value);
-                }
+                _this.setY(value);
                 break;
             case 2:
             case "_xscale":
@@ -8464,10 +12199,7 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case 6:
             case "_alpha":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setAlpha(value);
-                }
+                _this.setAlpha(value);
                 break;
             case 7:
             case "_visible":
@@ -8475,24 +12207,15 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case 8:
             case "_width":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setWidth(value);
-                }
+                _this.setWidth(value);
                 break;
             case 9:
             case "_height":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setHeight(value);
-                }
+                _this.setHeight(value);
                 break;
             case 10:
             case "_rotation":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setRotation(value);
-                }
+                _this.setRotation(value);
                 break;
             case 13:
             case "_name":
@@ -8532,13 +12255,13 @@ if (!("swf2js" in window)){(function(window)
                 }
                 break;
             case "blendMode":
-                value = _parseFloat(value);
-                if (!_isNaN(value)) {
-                    _this.setBlendMode(value);
-                }
+                _this.setBlendMode(value);
                 break;
             case "enabled":
                 _this.setEnabled(value);
+                break;
+            case "filters":
+                _this.setFilters(value);
                 break;
             default:
                 _this.setVariable(target, value);
@@ -8549,42 +12272,55 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    Property.prototype.getX = function()
+    DisplayObject.prototype.getX = function()
     {
         var matrix = this.getMatrix();
-        return (matrix) ? matrix[4]/20 : undefined;
+        return (matrix) ? matrix[4] / 20 : undefined;
     };
 
     /**
      * @param x
      */
-    Property.prototype.setX = function(x)
+    DisplayObject.prototype.setX = function(x)
     {
-        var matrix = this.getMatrix();
-        matrix[4] = x*20;
+        x = _parseFloat(x);
+        if (!_isNaN(x)) {
+            var _this = this;
+            var _matrix = _this.getMatrix();
+            var matrix = cloneArray(_matrix);
+            matrix[4] = x * 20;
+            _this.setMatrix(matrix);
+        }
     };
 
     /**
      * @returns {*}
      */
-    Property.prototype.getY = function()
+    DisplayObject.prototype.getY = function()
     {
         var matrix = this.getMatrix();
-        return (matrix) ? matrix[5]/20 : undefined;
+        return (matrix) ? matrix[5] / 20 : undefined;
     };
 
     /**
      * @param y
      */
-    Property.prototype.setY = function(y)
+    DisplayObject.prototype.setY = function(y)
     {
-        var matrix = this.getMatrix();
-        matrix[5] = y*20;
+        y = _parseFloat(y);
+        if (!_isNaN(y)) {
+            var _this = this;
+            var _matrix = _this.getMatrix();
+            var matrix = cloneArray(_matrix);
+            matrix[5] = y * 20;
+            _this.setMatrix(matrix);
+        }
     };
+
     /**
      * @returns {*}
      */
-    Property.prototype.getXScale = function()
+    DisplayObject.prototype.getXScale = function()
     {
         var matrix = this.getMatrix();
         return _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]) * 100;
@@ -8593,20 +12329,23 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param xscale
      */
-    Property.prototype.setXScale = function(xscale)
+    DisplayObject.prototype.setXScale = function(xscale)
     {
-        var originMatrix = this.getOriginMatrix();
-        var matrix = this.getMatrix();
-        var radianX = _atan2(originMatrix[1], originMatrix[0]);
+        var _this = this;
+        var _matrix = _this.getMatrix();
+        var _originMatrix = _this.getOriginMatrix();
+        var radianX = _atan2(_originMatrix[1], _originMatrix[0]);
         xscale /= 100;
+        var matrix = cloneArray(_matrix);
         matrix[0] = xscale * _cos(radianX);
         matrix[1] = xscale * _sin(radianX);
+        _this.setMatrix(matrix);
     };
 
     /**
      * @returns {*}
      */
-    Property.prototype.getYScale = function()
+    DisplayObject.prototype.getYScale = function()
     {
         var matrix = this.getMatrix();
         return _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]) * 100;
@@ -8615,20 +12354,23 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param yscale
      */
-    Property.prototype.setYScale = function(yscale)
+    DisplayObject.prototype.setYScale = function(yscale)
     {
-        var originMatrix = this.getOriginMatrix();
-        var matrix = this.getMatrix();
-        var radianY = _atan2(-originMatrix[2], originMatrix[3]);
+        var _this = this;
+        var _matrix = _this.getMatrix();
+        var _originMatrix = _this.getOriginMatrix();
+        var radianY = _atan2(-_originMatrix[2], _originMatrix[3]);
         yscale /= 100;
+        var matrix = cloneArray(_matrix);
         matrix[2] = -yscale * _sin(radianY);
         matrix[3] = yscale * _cos(radianY);
+        _this.setMatrix(matrix);
     };
 
     /**
      * @returns {number}
      */
-    Property.prototype.getAlpha = function()
+    DisplayObject.prototype.getAlpha = function()
     {
         var colorTransform = this.getColorTransform();
         var alpha = colorTransform[3] + (colorTransform[7] / 255);
@@ -8638,39 +12380,45 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param alpha
      */
-    Property.prototype.setAlpha = function(alpha)
+    DisplayObject.prototype.setAlpha = function(alpha)
     {
-        var colorTransform = this.getColorTransform();
-        colorTransform[3] = alpha / 100;
-        colorTransform[7] = 0;
+        alpha = _parseFloat(alpha);
+        if (!_isNaN(alpha)) {
+            var _this = this;
+            var _colorTransform = _this.getColorTransform();
+            var colorTransform = cloneArray(_colorTransform);
+            colorTransform[3] = alpha / 100;
+            colorTransform[7] = 0;
+            _this.setColorTransform(colorTransform);
+        }
     };
 
     /**
      * @returns {number}
      */
-    Property.prototype.getVisible = function()
+    DisplayObject.prototype.getVisible = function()
     {
         var _this = this;
         var stage = _this.getStage();
         var version = stage.getVersion();
         if (version > 4) {
-            return _this._visible;
+            return _this.__visible;
         }
-        return (_this._visible) ? 1 : 0;
+        return (_this.__visible) ? 1 : 0;
     };
 
     /**
      * @param visible
      */
-    Property.prototype.setVisible = function(visible)
+    DisplayObject.prototype.setVisible = function(visible)
     {
         var _this = this;
         if (typeof visible === "boolean") {
-            _this._visible = visible;
+            _this.__visible = visible;
         } else {
             visible = _parseFloat(visible);
             if (!_isNaN(visible)) {
-                _this._visible = (visible) ? true : false;
+                _this.__visible = (visible) ? true : false;
             }
         }
     };
@@ -8678,77 +12426,39 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    Property.prototype.getWidth = function()
+    DisplayObject.prototype.getLevel = function()
     {
-        var _this = this;
-        var matrix = _this.getMatrix();
-        var bounds = _this.getBounds(matrix);
-        var width = bounds.xMax - bounds.xMin;
-        if (width < 0) {
-            width *= -1;
-        }
-        return width;
+        return this._level;
     };
 
     /**
-     * @param width
+     * @param level
      */
-    Property.prototype.setWidth = function(width)
+    DisplayObject.prototype.setLevel = function(level)
     {
-        var _this = this;
-        var _matrix = _this.getOriginMatrix();
-        var bounds = _this.getBounds(_matrix);
-        var _width = bounds.xMax - bounds.xMin;
-        if (_width < 0) {
-            _width *= -1;
-        }
-        var xScale = width * _matrix[0] / _width;
-        if (_isNaN(xScale)) {
-            xScale = 0;
-        }
-        var matrix = _this.getMatrix();
-        matrix[0] = xScale;
+        this._level = level;
     };
 
     /**
-     * @returns {number}
+     * @returns {null}
      */
-    Property.prototype.getHeight = function()
+    DisplayObject.prototype.getName = function()
     {
-        var _this = this;
-        var matrix = _this.getMatrix();
-        var bounds = _this.getBounds(matrix);
-        var height = bounds.yMax - bounds.yMin;
-        if (height < 0) {
-            height *= -1;
-        }
-        return height;
+        return this.__name;
     };
 
     /**
-     * @param height
+     * @param name
      */
-    Property.prototype.setHeight = function(height)
+    DisplayObject.prototype.setName = function(name)
     {
-        var _this = this;
-        var _matrix = _this.getOriginMatrix();
-        var bounds = _this.getBounds(_matrix);
-        var _height = bounds.yMax - bounds.yMin;
-        if (_height < 0) {
-            _height *= -1;
-        }
-        var yScale = height * _matrix[3] / _height;
-        if (_isNaN(yScale)) {
-            yScale = 0;
-        }
-        var matrix = _this.getMatrix();
-        matrix[3] = yScale;
+        this.__name = name;
     };
 
     /**
      * @returns {number}
      */
-    Property.prototype.getRotation = function()
+    DisplayObject.prototype.getRotation = function()
     {
         var matrix = this.getMatrix();
         var rotation = _atan2(matrix[1], matrix[0]) * 180 / _PI;
@@ -8766,58 +12476,100 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param rotation
      */
-    Property.prototype.setRotation = function(rotation)
+    DisplayObject.prototype.setRotation = function(rotation)
     {
-        var matrix = this.getMatrix();
-        var radianX = _atan2(matrix[1], matrix[0]);
-        var radianY = _atan2(-matrix[2], matrix[3]);
-        var ScaleX = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
-        var ScaleY = _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]);
-        rotation *= _PI / 180;
-        radianY += rotation - radianX;
-        radianX = rotation;
-        matrix[0] = ScaleX  * _cos(radianX);
-        matrix[1] = ScaleX  * _sin(radianX);
-        matrix[2] = -ScaleY * _sin(radianY);
-        matrix[3] = ScaleY  * _cos(radianY);
+        rotation = _parseFloat(rotation);
+        if (!_isNaN(rotation)) {
+            var _this = this;
+            var _matrix = _this.getMatrix();
+            var matrix = cloneArray(_matrix);
+            var radianX = _atan2(matrix[1], matrix[0]);
+            var radianY = _atan2(-matrix[2], matrix[3]);
+            var ScaleX = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]);
+            var ScaleY = _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]);
+            rotation *= _PI / 180;
+            radianY += rotation - radianX;
+            radianX = rotation;
+            matrix[0] = ScaleX * _cos(radianX);
+            matrix[1] = ScaleX * _sin(radianX);
+            matrix[2] = -ScaleY * _sin(radianY);
+            matrix[3] = ScaleY * _cos(radianY);
+            _this.setMatrix(matrix);
+        }
     };
 
     /**
-     * @returns {string}
+     * @returns {number}
      */
-    Property.prototype.getTarget = function()
+    DisplayObject.prototype.getWidth = function()
     {
-        return this._target;
+        var _this = this;
+        var matrix = _this.getMatrix();
+        var bounds = _this.getBounds(matrix);
+        var width = bounds.xMax - bounds.xMin;
+        return _abs(width);
     };
 
     /**
-     * @param target
+     * @param width
      */
-    Property.prototype.setTarget = function(target)
+    DisplayObject.prototype.setWidth = function(width)
     {
-        this._target = target;
+        width = _parseFloat(width);
+        if (!_isNaN(width)) {
+            var _this = this;
+            var _matrix = _this.getOriginMatrix();
+            var bounds = _this.getBounds(_matrix);
+            var _width = _abs(bounds.xMax - bounds.xMin);
+            var xScale = width * _matrix[0] / _width;
+            if (_isNaN(xScale)) {
+                xScale = 0;
+            }
+            _matrix = _this.getMatrix();
+            var matrix = cloneArray(_matrix);
+            matrix[0] = xScale;
+            _this.setMatrix(matrix);
+        }
     };
 
     /**
-     * @returns {null}
+     * @returns {number}
      */
-    Property.prototype.getName = function()
+    DisplayObject.prototype.getHeight = function()
     {
-        return this._name;
+        var _this = this;
+        var matrix = _this.getMatrix();
+        var bounds = _this.getBounds(matrix);
+        var height = bounds.yMax - bounds.yMin;
+        return _abs(height);
     };
 
     /**
-     * @param name
+     * @param height
      */
-    Property.prototype.setName = function(name)
+    DisplayObject.prototype.setHeight = function(height)
     {
-        this._name = name;
+        height = _parseFloat(height);
+        if (!_isNaN(height)) {
+            var _this = this;
+            var _matrix = _this.getOriginMatrix();
+            var bounds = _this.getBounds(_matrix);
+            var _height = _abs(bounds.yMax - bounds.yMin);
+            var yScale = height * _matrix[3] / _height;
+            if (_isNaN(yScale)) {
+                yScale = 0;
+            }
+            _matrix = _this.getMatrix();
+            var matrix = cloneArray(_matrix);
+            matrix[3] = yScale;
+            _this.setMatrix(matrix);
+        }
     };
 
     /**
      * @returns {*}
      */
-    Property.prototype.getXMouse = function()
+    DisplayObject.prototype.getXMouse = function()
     {
         if (!_event) {
             return null;
@@ -8842,7 +12594,7 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = multiplicationMatrix;
         for (;;) {
             var parent = mc.getParent();
-            if (!parent || parent.characterId === 0) {
+            if (!parent) {
                 break;
             }
             matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
@@ -8859,7 +12611,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {*}
      */
-    Property.prototype.getYMouse = function()
+    DisplayObject.prototype.getYMouse = function()
     {
         if (!_event) {
             return null;
@@ -8884,7 +12636,7 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = multiplicationMatrix;
         for (;;) {
             var parent = mc.getParent();
-            if (!parent || parent.characterId === 0) {
+            if (!parent) {
                 break;
             }
             matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
@@ -8903,9 +12655,13 @@ if (!("swf2js" in window)){(function(window)
      * @param parse
      * @returns {*}
      */
-    Property.prototype.getVariable = function(name, parse)
+    DisplayObject.prototype.getVariable = function(name, parse)
     {
         var _this = this;
+        if (name === undefined) {
+            return name;
+        }
+
         var variables = _this.variables;
         if (!variables) {
             return undefined;
@@ -8928,18 +12684,22 @@ if (!("swf2js" in window)){(function(window)
             }
         }
         if (version > 4) {
+            if (_this instanceof MovieClip) {
+                value = _this.getMovieClip(name, parse);
+                if (value) {
+                    return value;
+                }
+            }
             var _global = stage.getGlobal();
             var value = _global.getVariable(name);
             if (value) {
                 return value;
             }
+            if (_this instanceof MovieClip && name === "flash") {
+                return _this.flash;
+            }
             if (name in window) {
                 return window[name];
-            }
-
-            if (_this instanceof MovieClip) {
-                value = _this.getMovieClip(name, parse);
-                return value;
             }
         }
         return undefined;
@@ -8949,7 +12709,7 @@ if (!("swf2js" in window)){(function(window)
      * @param name
      * @param value
      */
-    Property.prototype.setVariable = function(name, value)
+    DisplayObject.prototype.setVariable = function(name, value)
     {
         var _this = this;
         var variables = _this.variables;
@@ -8974,51 +12734,52 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {number}
-     */
-    Property.prototype.getBlendMode = function()
-    {
-        return this.blendMode;
-    };
-
-    /**
-     * @param value
-     */
-    Property.prototype.setBlendMode = function(value)
-    {
-        this.blendMode = value;
-    };
-
-    /**
+     * @param path
      * @returns {*}
      */
-    Property.prototype.getEnabled = function()
+    DisplayObject.prototype.getGlobalVariable = function(path)
     {
-        return this.enabled;
-    };
+        var _this = this;
+        var stage = _this.getStage();
+        var version = stage.getVersion();
+        if (version < 5) {
+            return undefined;
+        }
 
-    /**
-     * @param bool
-     */
-    Property.prototype.setEnabled = function(bool)
-    {
-        this.enabled = bool;
-    };
+        var splitData = null;
+        if (path.indexOf(".") !== -1) {
+            splitData = path.split(".");
+        }
 
-    /**
-     * @returns {number}
-     */
-    Property.prototype.getLevel = function()
-    {
-        return this._level;
-    };
+        var value;
+        if (splitData) {
+            var _global = stage.getGlobal();
+            var variables = _global.variables;
+            var length = splitData.length;
+            for (var i = 0; i < length; i++) {
+                var name = splitData[i];
+                if (version < 7) {
+                    for (var key in variables) {
+                        if (!variables.hasOwnProperty(key)) {
+                            continue;
+                        }
+                        if (key.toLowerCase() === name.toLowerCase()) {
+                            value = variables[key];
+                            break;
+                        }
+                    }
+                } else {
+                    value = variables[name];
+                }
 
-    /**
-     * @param level
-     */
-    Property.prototype.setLevel = function(level)
-    {
-        this._level = level;
+                if (!value) {
+                    break;
+                }
+                variables = value;
+            }
+        }
+
+        return value;
     };
 
     /**
@@ -9026,7 +12787,7 @@ if (!("swf2js" in window)){(function(window)
      * @param parse
      * @returns {*}
      */
-    Property.prototype.getMovieClip = function(path, parse)
+    DisplayObject.prototype.getMovieClip = function(path, parse)
     {
         var _this = this;
         var mc = _this;
@@ -9053,7 +12814,6 @@ if (!("swf2js" in window)){(function(window)
             return this;
         }
         var stage = _root.getStage();
-        var version = stage.getVersion();
         if (path === "_global") {
             return stage.getGlobal();
         }
@@ -9102,6 +12862,8 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
+        var version = stage.getVersion();
+        var loadStage = _this.getStage();
         for (var i = 0; i < len; i++) {
             var name = splitData[i];
             if (name === "") {
@@ -9125,6 +12887,7 @@ if (!("swf2js" in window)){(function(window)
             }
             if (name === "..") {
                 mc = mc.getParent();
+
                 if (!mc) {
                     return undefined;
                 }
@@ -9144,7 +12907,8 @@ if (!("swf2js" in window)){(function(window)
                         continue;
                     }
 
-                    tag = tags[idx];
+                    var instanceId = tags[idx];
+                    tag = loadStage.getInstance(instanceId);
                     if (!tag) {
                         continue;
                     }
@@ -9178,195 +12942,1545 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param caller
-     * @constructor
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @param visible
      */
-    var Common = function(caller)
+    DisplayObject.prototype.preRender = function(ctx, matrix, colorTransform, stage, visible)
     {
         var _this = this;
-        caller.instanceId = instanceId++;
-        caller.characterId = 0;
-        caller.tagType = 0;
-        caller.ratio = 0;
-        caller.clipDepth = 0;
-        caller.isClipDepth = false;
+        _this.isLoad = true;
 
-        var proto = Object.getPrototypeOf(caller);
-        proto.getCharacterId = _this.getCharacterId;
-        proto.setCharacterId = _this.setCharacterId;
-        proto.getTagType = _this.getTagType;
-        proto.setTagType = _this.setTagType;
-        proto.getRatio = _this.getRatio;
-        proto.setRatio = _this.setRatio;
-    };
+        var cacheKey = "";
+        var preCtx = ctx;
+        var preMatrix = matrix;
 
-    /**
-     * @returns {number}
-     */
-    Common.prototype.getCharacterId = function()
-    {
-        return this.characterId;
-    };
+        switch (true) {
+            case _this instanceof DisplayObjectContainer:
+            case _this instanceof SimpleButton:
+                _this.setHitRange(matrix, stage, visible);
+                break;
+            default:
+                break;
+        }
 
-    /**
-     * @param characterId
-     */
-    Common.prototype.setCharacterId = function(characterId)
-    {
-        this.characterId = characterId;
-    };
+        // mask
+        var maskObj = _this.getMask();
+        if (maskObj) {
+            _this.renderMask(preCtx, preMatrix, colorTransform, stage);
+        }
 
-    /**
-     * @returns {number}
-     */
-    Common.prototype.getTagType = function()
-    {
-        return this.tagType;
-    };
+        // filter
+        var filters = _this.getFilters();
+        var isFilter = false;
+        if (!stage.clipMc && filters !== null && filters.length) {
+            isFilter = true;
+        }
 
-    /**
-     * @param tagType
-     */
-    Common.prototype.setTagType = function(tagType)
-    {
-        this.tagType = tagType;
-    };
+        // blend
+        var blendMode = _this.getBlendMode();
+        var isBlend = false;
+        if (blendMode !== null && blendMode !== "normal") {
+            isBlend = true;
+        }
 
-    /**
-     * @returns {number}
-     */
-    Common.prototype.getRatio = function()
-    {
-        return this.ratio;
-    };
+        // filter or blend
+        var cache,rMatrix,xScale,yScale,xMin,yMin,xMax,yMax;
+        if (isFilter || isBlend) {
+            rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
 
-    /**
-     * @param ratio
-     */
-    Common.prototype.setRatio = function(ratio)
-    {
-        this.ratio = ratio;
-    };
-
-    /**
-     * @param caller
-     * @constructor
-     */
-    var ShapeAndText = function(caller)
-    {
-        var _this = this;
-        caller.bounds = null;
-        caller.matrix = null;
-        caller.colorTransform = null;
-        caller._level = 0;
-        var proto = Object.getPrototypeOf(caller);
-        proto.getBounds = _this.getBounds;
-        proto.setBounds = _this.setBounds;
-        proto.getMatrix = _this.getMatrix;
-        proto.setMatrix = _this.setMatrix;
-        proto.getColorTransform = _this.getColorTransform;
-        proto.setColorTransform = _this.setColorTransform;
-        proto.getLevel = _this.getLevel;
-        proto.setLevel = _this.setLevel;
-    };
-
-    /**
-     * @returns {{}}
-     */
-    ShapeAndText.prototype.getBounds = function(matrix)
-    {
-        if (matrix) {
-            var bounds = boundsMatrix(this.bounds, matrix);
-            for (var name in bounds) {
-                if (!bounds.hasOwnProperty(name)) {
-                    continue;
-                }
-                bounds[name] /= 20;
+            var bounds;
+            var twips = 1;
+            if (_this instanceof Shape || _this instanceof StaticText) {
+                bounds = _this.getBounds();
+                xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
+                yScale = _sqrt(rMatrix[2] * rMatrix[2] + rMatrix[3] * rMatrix[3]);
+            } else {
+                twips = 20;
+                bounds = _this.getBounds(matrix);
+                xScale = stage.getScale() * _devicePixelRatio;
+                yScale = stage.getScale() * _devicePixelRatio;
             }
-            return bounds;
-        } else {
-            return this.bounds;
+
+            xMin = bounds.xMin;
+            yMin = bounds.yMin;
+            xMax = bounds.xMax;
+            yMax = bounds.yMax;
+
+            var width = _abs(_ceil((xMax - xMin) * xScale));
+            var height = _abs(_ceil((yMax - yMin) * yScale));
+
+            var canvas = cacheStore.getCanvas();
+            canvas.width = width;
+            canvas.height = height;
+            cache = canvas.getContext("2d");
+            cache._offsetX = 0;
+            cache._offsetY = 0;
+
+            var m2 = [1, 0, 0, 1, -xMin * twips, -yMin * twips];
+            var m3 = [matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]];
+            if (_this instanceof Shape || _this instanceof StaticText) {
+                m3[4] = 0;
+                m3[5] = 0;
+            }
+
+            preCtx = cache;
+            preMatrix = multiplicationMatrix(m2, m3);
+        }
+
+        // graphics
+        cacheKey += _this.renderGraphics(preCtx, preMatrix, colorTransform, stage);
+
+        // main
+        cacheKey += _this.render(preCtx, preMatrix, colorTransform, stage, visible);
+
+        // post render
+        if (maskObj) {
+            ctx.restore();
+        }
+
+        if (cache) {
+            if (isFilter && cacheKey !== "") {
+                cache = _this.renderFilter(cache, matrix, colorTransform, stage, cacheKey);
+            }
+
+            xMin *= xScale;
+            yMin *= yScale;
+            if (_this instanceof Shape || _this instanceof StaticText) {
+                xMin += rMatrix[4];
+                yMin += rMatrix[5];
+            }
+            xMin -= cache._offsetX;
+            yMin -= cache._offsetY;
+            _this.renderBlend(ctx, cache, xMin, yMin, isFilter);
+        }
+
+        return cacheKey;
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @returns {string}
+     */
+    DisplayObject.prototype.renderGraphics = function(ctx, matrix, colorTransform, stage)
+    {
+        var graphics = this.graphics;
+        var cacheKey = "";
+        if (graphics && graphics.isDraw) {
+            cacheKey = graphics.render(ctx, matrix, colorTransform, stage);
+        }
+        return cacheKey;
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     */
+    DisplayObject.prototype.renderMask = function(ctx, matrix, colorTransform, stage)
+    {
+        var maskObj = this.getMask();
+        if (maskObj) {
+            ctx.save();
+            ctx.beginPath();
+            stage.clipMc = true;
+            var maskMatrix = multiplicationMatrix(matrix, maskObj.getMatrix());
+            var maskColorTransform = multiplicationColor(colorTransform, maskObj.getColorTransform());
+            maskObj.render(ctx, maskMatrix, maskColorTransform, stage, true);
+            stage.clipMc = false;
         }
     };
 
     /**
-     * @param bounds
+     * @param filters
+     * @returns {string}
      */
-    ShapeAndText.prototype.setBounds = function(bounds)
+    DisplayObject.prototype.getFilterKey = function(filters)
     {
-        this.bounds = bounds;
+        var keys = [];
+        var length = filters.length;
+        for (var i = 0; i < length; i++) {
+            var filter = filters[i];
+            for (var prop in filter) {
+                if (!filter.hasOwnProperty(prop)) {
+                    continue;
+                }
+                keys[keys.length] = filter[prop];
+            }
+        }
+        return keys.join("_");
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @param cacheKey
+     * @returns {*}
+     */
+    DisplayObject.prototype.renderFilter = function(ctx, matrix, colorTransform, stage, cacheKey)
+    {
+        var _this = this;
+        var filters = _this.getFilters();
+        if (stage.clipMc || !filters || !filters.length) {
+            return ctx;
+        }
+
+        cacheKey += "_"+ _this.getFilterKey(filters);
+        var cacheStoreKey = "Filter_"+ _this.instanceId;
+
+        var cache;
+        if (_this._filterCacheKey === cacheKey) {
+            cache = cacheStore.getCache(cacheStoreKey);
+        }
+
+        if (!cache) {
+            var fLength = filters.length;
+            for (var i = 0; i < fLength; i++) {
+                var filter = filters[i];
+                cache = filter.render(ctx, matrix, colorTransform, stage);
+            }
+            _this._filterCacheKey = cacheKey;
+            cacheStore.setCache(cacheStoreKey, cache);
+        }
+
+        cacheStore.destroy(ctx);
+
+        return cache;
+    };
+
+    /**
+     * @param ctx
+     * @param cache
+     * @param xMin
+     * @param yMin
+     * @param isFilter
+     */
+    DisplayObject.prototype.renderBlend = function(ctx, cache, xMin, yMin, isFilter)
+    {
+        var _this = this;
+        var mode = _this.getBlendMode();
+        var operation = "source-over";
+        var canvas = cache.canvas;
+        var width = canvas.width;
+        var height = canvas.height;
+        cache.setTransform(1, 0, 0, 1, 0, 0);
+
+        switch (mode) {
+            case "multiply":
+                operation = "multiply";
+                break;
+            case "screen":
+                operation = "screen";
+                break;
+            case "lighten":
+                operation = "lighten";
+                break;
+            case "darken":
+                operation = "darken";
+                break;
+            case "difference":
+                operation = "difference";
+                break;
+            case "add":
+                operation = "lighter";
+                break;
+            case "subtract":
+                cache.globalCompositeOperation = "difference";
+                cache.fillStyle = "rgb(255,255,255)";
+                cache.fillRect(0, 0, width, height);
+                cache.globalCompositeOperation = "darken";
+                cache.fillStyle = "rgb(255,255,255)";
+                cache.fillRect(0, 0, width, height);
+                operation = "color-burn";
+                break;
+            case "invert":
+                cache.globalCompositeOperation = "difference";
+                cache.fillStyle = "rgb(255,255,255)";
+                cache.fillRect(0, 0, width, height);
+                cache.globalCompositeOperation = "lighter";
+                cache.fillStyle = "rgb(255,255,255)";
+                cache.fillRect(0, 0, width, height);
+                operation = "difference";
+                break;
+            case "alpha":
+                operation = "source-over";
+                break;
+            case "erase":
+                operation = "destination-out";
+                break;
+            case "overlay":
+                operation = "overlay";
+                break;
+            case "hardlight":
+                operation = "hard-light";
+                break;
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = operation;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(canvas, xMin, yMin, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = "source-over";
+        if (!isFilter) {
+            cacheStore.destroy(cache);
+        }
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getOriginMatrix = function()
+    {
+        var _this = this;
+        var controller = _this.getController();
+        return controller.getMatrix();
     };
 
     /**
      * @returns []
      */
-    ShapeAndText.prototype.getMatrix = function()
+    DisplayObject.prototype.getMatrix = function()
     {
-        return this.matrix;
+        var _this = this;
+        var _matrix = _this._matrix;
+        if (_matrix) {
+            return _matrix;
+        }
+        return _this.getOriginMatrix();
     };
 
     /**
      * @param matrix
      */
-    ShapeAndText.prototype.setMatrix = function(matrix)
+    DisplayObject.prototype.setMatrix = function(matrix)
     {
-        this.matrix = matrix;
+        var _this = this;
+        _this._matrix = matrix;
+        _this.setController(true, false, false, false);
+    };
+
+    /**
+     * @returns {*}
+     */
+    DisplayObject.prototype.getOriginColorTransform = function()
+    {
+        var _this = this;
+        var controller = _this.getController();
+        return controller.getColorTransform();
     };
 
     /**
      * @returns []
      */
-    ShapeAndText.prototype.getColorTransform = function()
+    DisplayObject.prototype.getColorTransform = function()
     {
-        return this.colorTransform;
+        var _this = this;
+        var _colorTransform = _this._colorTransform;
+        if (_colorTransform) {
+            return _colorTransform;
+        }
+        return _this.getOriginColorTransform();
     };
 
     /**
      * @param colorTransform
      */
-    ShapeAndText.prototype.setColorTransform = function(colorTransform)
+    DisplayObject.prototype.setColorTransform = function(colorTransform)
     {
-        this.colorTransform = colorTransform;
+        var _this = this;
+        _this._colorTransform = colorTransform;
+        _this.setController(false, true, false, false);
+    };
+
+    /**
+     * @returns {string}
+     */
+    DisplayObject.prototype.getOriginBlendMode = function()
+    {
+        var _this = this;
+        var controller = _this.getController();
+        return controller.getBlendMode();
+    };
+
+    /**
+     * @returns {string}
+     */
+    DisplayObject.prototype.getBlendMode = function()
+    {
+        var _this = this;
+        var _blendMode = _this._blendMode;
+        if (_blendMode) {
+            return _blendMode;
+        }
+        return _this.getOriginBlendMode();
+    };
+
+    /**
+     * @param blendMode
+     */
+    DisplayObject.prototype.setBlendMode = function(blendMode)
+    {
+        var mode = getBlendName(blendMode);
+        if (mode !== null) {
+            var _this = this;
+            _this._blendMode = mode;
+            _this.setController(false, false, false, true);
+        }
+    };
+
+    /**
+     * @returns {Array}
+     */
+    DisplayObject.prototype.getOriginFilters = function()
+    {
+        var _this = this;
+        var controller = _this.getController();
+        return controller.getFilters();
+    };
+
+    /**
+     * @returns {Array}
+     */
+    DisplayObject.prototype.getFilters = function()
+    {
+        var _this = this;
+        var _filters = _this._filters;
+        if (_filters) {
+            return _filters;
+        }
+        return _this.getOriginFilters();
+    };
+
+    /**
+     * @param filters
+     */
+    DisplayObject.prototype.setFilters = function(filters)
+    {
+        var _this = this;
+        _this._filterCacheKey = null;
+        _this._filters = filters;
+        _this.setController(false, false, true, false);
+    };
+
+    /**
+     * @param isMatrix
+     * @param isColorTransform
+     * @param isFilters
+     * @param isBlend
+     */
+    DisplayObject.prototype.setController = function(isMatrix, isColorTransform, isFilters, isBlend)
+    {
+        var _this = this;
+        var _cloneArray = cloneArray;
+
+        if (!isMatrix) {
+            var _matrix = _this._matrix;
+            if (_matrix === null) {
+                _matrix = _this.getMatrix();
+                _this._matrix = _cloneArray(_matrix);
+            }
+        }
+
+        if (!isColorTransform) {
+            var _colorTransform = _this._colorTransform;
+            if (_colorTransform === null) {
+                _colorTransform = _this.getColorTransform();
+                _this._colorTransform = _cloneArray(_colorTransform);
+            }
+        }
+
+        if (!isFilters) {
+            var _filters = _this._filters;
+            if (_filters === null) {
+                _filters = _this.getFilters();
+                if (_filters === null) {
+                    _filters = [];
+                }
+                _this._filters = _filters;
+            }
+        }
+
+        if (!isBlend) {
+            var _blendMode = _this._blendMode;
+            if (_blendMode === null) {
+                _blendMode = _this.getBlendMode();
+                _this._blendMode = _blendMode;
+            }
+        }
+    };
+
+    /**
+     * @returns {PlaceObject}
+     */
+    DisplayObject.prototype.getController = function()
+    {
+        var _this = this;
+        var frame = 0;
+        var depth = _this.getLevel();
+        var stage = _this.getParentStage();
+        if (!stage) {
+            return new PlaceObject();
+        }
+
+        var parent = _this.getParentSprite();
+        if (!parent) {
+            parent = _this.getParent();
+        }
+        if (!parent) {
+            return new PlaceObject();
+        }
+
+        if (parent instanceof MovieClip) {
+            frame = parent.getCurrentFrame();
+        }
+        var placeObject = stage.getPlaceObject(parent.instanceId, depth, frame);
+        if (!placeObject) {
+            stage = _this.getLoadStage();
+            if (stage) {
+                placeObject = stage.getPlaceObject(parent.instanceId, depth, frame);
+            }
+        }
+
+        return (placeObject) ? placeObject : new PlaceObject();
+    };
+
+    /**
+     * reset
+     */
+    DisplayObject.prototype.reset = function()
+    {
+        var _this = this;
+        _this.active = false;
+        _this._matrix = null;
+        _this._colorTransform = null;
+        _this._filters = null;
+        _this._blendMode = null;
+        _this._depth = null;
+        _this.setVisible(true);
+        _this.setEnabled(true);
+        _this.setButtonStatus("up");
+
+        if (_this instanceof TextField) {
+            var input = _this.input;
+            if (_this.inputActive) {
+                input.onchange = null;
+                var stage = _this.getStage();
+                var div = _document.getElementById(stage.getName());
+                if (div) {
+                    _this.setProperty("text", input.value);
+                    _this.inputActive = false;
+                    var el = _document.getElementById(_this.getTagName());
+                    if (el) {
+                        try {
+                            div.removeChild(el);
+                        } catch (e) {
+
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     * @constructor
+     */
+    var InteractiveObject = function()
+    {
+        var _this = this;
+        DisplayObject.call(_this);
+    };
+
+    /**
+     * extends
+     * @type {DisplayObject}
+     */
+    InteractiveObject.prototype = Object.create(DisplayObject.prototype);
+    InteractiveObject.prototype.constructor = InteractiveObject;
+
+
+    /**
+     * @constructor
+     */
+    var TextSnapshot = function()
+    {
+        this.charCount = 0;
+    };
+
+    /**
+     * @param beginIndex
+     * @param textToFind
+     * @param caseSensitive
+     */
+    TextSnapshot.prototype.findText = function(beginIndex, textToFind, caseSensitive)
+    {};
+
+    /**
+     * @param beginIndex
+     * @param endIndex
+     */
+    TextSnapshot.prototype.getSelected = function(beginIndex, endIndex)
+    {};
+
+    /**
+     * @param includeLineEndings
+     */
+    TextSnapshot.prototype.getSelectedText = function(includeLineEndings)
+    {};
+
+    TextSnapshot.prototype.getText = function(beginIndex, endIndex, includeLineEndings)
+    {};
+
+    /**
+     * @param beginIndex
+     * @param endIndex
+     */
+    TextSnapshot.prototype.getTextRunInfo = function(beginIndex, endIndex)
+    {};
+
+    /**
+     * @param x
+     * @param y
+     * @param maxDistance
+     */
+    TextSnapshot.prototype.hitTestTextNearPos = function(x, y, maxDistance)
+    {};
+
+    /**
+     * @param hexColor
+     */
+    TextSnapshot.prototype.setSelectColor = function(hexColor)
+    {};
+
+    /**
+     * @param beginIndex
+     * @param endIndex
+     * @param select
+     */
+    TextSnapshot.prototype.setSelected = function(beginIndex, endIndex, select)
+    {};
+
+    /**
+     * @constructor
+     */
+    var DisplayObjectContainer = function()
+    {
+        var _this = this;
+        InteractiveObject.call(_this);
+
+        _this._mouseChildren = true;
+        _this._tabChildren = true;
+        _this._textSnapshot = new TextSnapshot();
+        _this._numChildren = 0;
+        _this.soundId = null;
+        _this.soundInfo = null;
+        _this.container = [];
+        _this.instances = [];
+        _this.isSwap = false;
+    };
+
+    /**
+     * extends
+     * @type {InteractiveObject}
+     */
+    DisplayObjectContainer.prototype = Object.create(InteractiveObject.prototype);
+    DisplayObjectContainer.prototype.constructor = DisplayObjectContainer;
+
+    /**
+     * properties
+     */
+    Object.defineProperties(DisplayObjectContainer.prototype,
+    {
+        mouseChildren: {
+            get: function()
+            {
+                return this.getMouseChildren();
+            },
+            set: function(mouseChildren)
+            {
+                this.setMouseChildren(mouseChildren);
+            }
+        },
+        textSnapshot: {
+            get: function()
+            {
+                return this.getTextSnapshot();
+            },
+            set: function() {}
+        },
+        numChildren: {
+            get: function()
+            {
+                return this.getNumChildren();
+            },
+            set: function(){}
+        },
+        tabChildren: {
+            get: function()
+            {
+                return this.getTabChildren();
+            },
+            set: function(tabChildren)
+            {
+                this.setTabChildren(tabChildren);
+            }
+        }
+    });
+
+    /**
+     * @returns {boolean}
+     */
+    DisplayObjectContainer.prototype.getMouseChildren = function()
+    {
+        return this._mouseChildren;
+    };
+
+    /**
+     * @param mouseChildren
+     */
+    DisplayObjectContainer.prototype.setMouseChildren = function(mouseChildren)
+    {
+        this._mouseChildren = mouseChildren;
+    };
+
+    /**
+     * @returns {TextSnapshot}
+     */
+    DisplayObjectContainer.prototype.getTextSnapshot = function()
+    {
+        return this._textSnapshot;
     };
 
     /**
      * @returns {number}
      */
-    ShapeAndText.prototype.getLevel = function()
+    DisplayObjectContainer.prototype.getNumChildren = function()
     {
-        return this._level;
+        return 0;
     };
 
     /**
-     * @param level
+     * @returns {boolean}
      */
-    ShapeAndText.prototype.setLevel = function(level)
+    DisplayObjectContainer.prototype.getTabChildren = function()
     {
-        this._level = level;
+        return this._tabChildren;
     };
 
     /**
-     * @param caller
-     * @constructor
+     * @param tabChildren
      */
-    var Dummy = function(caller)
+    DisplayObjectContainer.prototype.setTabChildren = function(tabChildren)
+    {
+        this._tabChildren = tabChildren;
+    };
+
+    /**
+     * @returns {Array}
+     */
+    DisplayObjectContainer.prototype.getContainer = function()
+    {
+        return this.container;
+    };
+
+    /**
+     * @returns {Array}
+     */
+    DisplayObjectContainer.prototype.getInstances = function()
+    {
+        return this.instances;
+    };
+
+    /**
+     * @param instance
+     */
+    DisplayObjectContainer.prototype.setInstance = function(instance)
+    {
+        var instances = this.instances;
+        var instanceId = instance.instanceId;
+        if (!(instanceId in instances)) {
+            instances[instanceId] = 1;
+        }
+    };
+
+    /**
+     * @param instance
+     */
+    DisplayObjectContainer.prototype.deleteInstance = function(instance)
+    {
+        delete this.instances[instance.instanceId];
+    };
+
+    /**
+     * @param child
+     * @param depth
+     * @returns {DisplayObject}
+     */
+    DisplayObjectContainer.prototype.addChild = function(child, depth)
+    {
+        if (child instanceof DisplayObject) {
+            var _this = this;
+
+            if (depth === undefined) {
+                depth = _this.getNextHighestDepth();
+            }
+
+            var stage = _this.getStage();
+            child.setParent(_this);
+            child.setStage(stage);
+            child.setLevel(depth);
+
+            var container = _this.getContainer();
+            var frame = 1;
+            if (!(frame in container)) {
+                container[frame] = [];
+            }
+
+            var placeObject = new PlaceObject();
+            var instanceId = _this.instanceId;
+            if (_this instanceof MovieClip) {
+                var totalFrames = _this.getTotalFrames() + 1;
+                for ( ; frame < totalFrames; frame++) {
+                    stage.setPlaceObject(placeObject, instanceId, depth, frame);
+                    container[frame][depth] = child.instanceId;
+                }
+            } else {
+                stage.setPlaceObject(placeObject, instanceId, depth, frame);
+                container[depth] = child.instanceId;
+            }
+
+            _this._numChildren++;
+        }
+        return child;
+    };
+
+    /**
+     * @param child
+     * @param depth
+     * @returns {DisplayObject}
+     */
+    DisplayObjectContainer.prototype.addChildAt = function(child, depth)
+    {
+        return this.addChild(child, depth);
+    };
+
+    /**
+     *
+     * @param depth
+     * @returns {DisplayObject}
+     */
+    DisplayObjectContainer.prototype.getChildAt = function(depth)
     {
         var _this = this;
-        var proto = Object.getPrototypeOf(caller);
-        proto.getName = _this.getName;
-        proto.getVisible = _this.getVisible;
-        proto.reset = _this.reset;
-        proto.addActions = _this.addActions;
-        proto.putFrame = _this.putFrame;
-        proto.getBlendMode = _this.getBlendMode;
+        var container = _this.getContainer();
+        var children = container;
+
+        if (16384 > depth) {
+            depth += 16384;
+        }
+
+        if (_this instanceof MovieClip) {
+            var frame = _this.getCurrentFrame();
+            children = container[frame];
+        }
+        return children[depth];
     };
 
-    Dummy.prototype.getName = function(){return null;};
-    Dummy.prototype.getVisible = function(){return true;};
-    Dummy.prototype.reset = function(){};
-    Dummy.prototype.putFrame = function(){};
-    Dummy.prototype.addActions = function(){};
-    Dummy.prototype.getBlendMode = function(){ return 0; };
+    /**
+     * @param name
+     * @return {DisplayObject}
+     */
+    DisplayObjectContainer.prototype.getChildByName = function(name)
+    {
+        var _this = this;
+        var container = _this.getContainer();
+        var children = container;
+        if (_this instanceof MovieClip) {
+            var frame = _this.getCurrentFrame();
+            children = container[frame];
+        }
+
+        var obj;
+        for (var depth in children) {
+            if (!children.hasOwnProperty(depth)) {
+                continue;
+            }
+
+            var child = children[depth];
+            if (child.getName() !== name) {
+                continue;
+            }
+            obj = child;
+            break;
+        }
+        return obj;
+    };
+
+    /**
+     * @param child
+     * @returns {number}
+     */
+    DisplayObjectContainer.prototype.getChildIndex = function(child)
+    {
+        var index;
+        if (child instanceof DisplayObject) {
+            index = child.getLevel() - 16384;
+        }
+        return index;
+    };
+
+    /**
+     * @param child
+     * @return {DisplayObject}
+     */
+    DisplayObjectContainer.prototype.removeChild = function(child)
+    {
+        var _this = this;
+        var container = _this.getContainer();
+        var depth, obj;
+        if (_this instanceof MovieClip) {
+            var totalFrames = _this.getTotalFrames();
+            for (var frame = 1; frame < totalFrames; frame++) {
+                if (!(frame in container)) {
+                    continue;
+                }
+
+                var children = container[frame];
+                for (depth in children) {
+                    if (!children.hasOwnProperty(depth)) {
+                        continue;
+                    }
+                    obj = children[depth];
+                    if (obj.instanceId !== child.instanceId) {
+                        continue;
+                    }
+                    delete container[frame][depth];
+                    break;
+                }
+            }
+        } else {
+            for (depth in container) {
+                if (!container.hasOwnProperty(depth)) {
+                    continue;
+                }
+                obj = container[depth];
+                if (obj.instanceId !== child.instanceId) {
+                    continue;
+                }
+                delete container[depth];
+                break;
+            }
+        }
+
+        if (child) {
+            _this.deleteInstance(child);
+            _this._numChildren--;
+        }
+
+        return child;
+    };
+
+    /**
+     * @param depth
+     * @returns {*}
+     */
+    DisplayObjectContainer.prototype.removeChildAt = function(depth)
+    {
+        var _this = this;
+        var container = _this.getContainer();
+        var children = container;
+
+        if (16384 > depth) {
+            depth += 16384;
+        }
+
+        var child;
+        if (_this instanceof MovieClip) {
+            var totalFrames = _this.getTotalFrames();
+            for (var frame = 1; frame < totalFrames; frame++) {
+                if (!(frame in container)) {
+                    continue;
+                }
+
+                children = container[frame];
+                if (!(depth in children)) {
+                    continue;
+                }
+
+                child = children[depth];
+                delete container[frame][depth];
+            }
+        } else {
+            child = children[depth];
+            delete children[depth];
+        }
+
+        if (child) {
+            _this._numChildren--;
+        }
+
+        return child;
+    };
+
+    /**
+     * @param depth
+     * @param obj
+     */
+    DisplayObjectContainer.prototype.addTag = function(depth, obj)
+    {
+        var _this = this;
+        _this.container[depth] = obj.instanceId;
+        _this._numChildren++;
+    };
+
+    /**
+     * startSound
+     */
+    DisplayObjectContainer.prototype.startSound = function()
+    {
+        var _this = this;
+        var soundId = _this.soundId;
+        if (soundId) {
+            var stage = _this.getStage();
+            var sound = stage.sounds[soundId];
+            if (sound) {
+                var audio = _document.createElement("audio");
+                audio.onload = function () {
+                    this.load();
+                    this.preload = "auto";
+                    this.autoplay = false;
+                    this.loop = false;
+                };
+                audio.src = sound.base64;
+                startSound(audio, _this.soundInfo);
+            }
+        }
+    };
+
+    /**
+     * reset
+     */
+    DisplayObjectContainer.prototype.reset = function()
+    {
+        var _this = this;
+        var container = _this.container;
+        var length = container.length;
+        if (length) {
+            var stage = _this.getStage();
+            for (var depth in container) {
+                if (!container.hasOwnProperty(depth)) {
+                    continue;
+                }
+
+                var instanceId = container[depth];
+                var obj = stage.getInstance(instanceId);
+                obj.reset();
+            }
+        }
+
+        _this._depth = null;
+        _this._matrix = null;
+        _this._colorTransform = null;
+        _this._filters = null;
+        _this._blendMode = null;
+    };
+
+    /**
+     * @param matrix
+     * @param stage
+     * @param visible
+     */
+    DisplayObjectContainer.prototype.setHitRange = function(matrix, stage, visible)
+    {
+        var _this = this;
+        var maskObj = _this.getMask();
+        var myStage = _this.getStage();
+        var _cloneArray = cloneArray;
+        var _multiplicationMatrix = multiplicationMatrix;
+
+        var bounds;
+        var clips = [];
+        var container = _this.getTags();
+        var length = container.length;
+        var lastDepth = 0;
+        if (length) {
+            for (var depth in container) {
+                if (!container.hasOwnProperty(depth)) {
+                    continue;
+                }
+
+                lastDepth = _max(depth, lastDepth);
+                var instanceId = container[depth];
+                var obj = myStage.getInstance(instanceId);
+                if (!obj || obj === maskObj) {
+                    continue;
+                }
+
+                // mask end
+                var cLen = clips.length;
+                for (var cIdx = 0; cIdx < cLen; cIdx++) {
+                    var cDepth = clips[cIdx];
+                    if (depth > cDepth) {
+                        clips.splice(cIdx, 1);
+                        break;
+                    }
+                }
+
+                // mask start
+                if (obj.isClipDepth) {
+                    clips[clips.length] = obj.clipDepth;
+                }
+
+                var isVisible = _min(obj.getVisible(), visible);
+                var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
+                var buttonHits = stage.buttonHits;
+                if (isVisible && obj.getEnabled()) {
+                    if (obj.hasEventListener("press") ||
+                        obj.hasEventListener("release") ||
+                        obj.hasEventListener("rollOver") ||
+                        obj.hasEventListener("rollOut") ||
+                        obj.onPress !== undefined ||
+                        obj.onRelease !== undefined ||
+                        obj.onRollOver !== undefined ||
+                        obj.onRollOut !== undefined
+                    ) {
+                        bounds = obj.getBounds(renderMatrix);
+                        buttonHits[buttonHits.length] = {
+                            xMax: bounds.xMax,
+                            xMin: bounds.xMin,
+                            yMax: bounds.yMax,
+                            yMin: bounds.yMin,
+                            parent: obj,
+                            matrix: _cloneArray(renderMatrix),
+                            active: (clips.length) ? false : true
+                        };
+                    }
+                }
+
+                if (obj instanceof TextField) {
+                    var type = obj.getVariable("type");
+                    if (type === "input") {
+                        bounds = obj.getBounds(renderMatrix);
+                        buttonHits[buttonHits.length] = {
+                            xMax: bounds.xMax,
+                            xMin: bounds.xMin,
+                            yMax: bounds.yMax,
+                            yMin: bounds.yMin,
+                            parent: obj,
+                            active: (clips.length) ? false : true
+                        };
+                    }
+                }
+            }
+
+            lastDepth++;
+            if (length && length !== lastDepth) {
+                container.length = lastDepth;
+            }
+        }
+    };
+
+    /**
+     * @param container
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @param visible
+     * @returns {string}
+     */
+    DisplayObjectContainer.prototype.rendering = function(container, ctx, matrix, colorTransform, stage, visible)
+    {
+        var _this = this;
+        var _multiplicationMatrix = multiplicationMatrix;
+        var _multiplicationColor = multiplicationColor;
+        var maskObj = _this.getMask();
+        var myStage = _this.getStage();
+
+        // render
+        var cacheKey = "";
+        var clips = [];
+        var length = container.length;
+        if (length) {
+            for (var depth in container) {
+                if (!container.hasOwnProperty(depth)) {
+                    continue;
+                }
+
+                var instanceId = container[depth];
+                var obj = myStage.getInstance(instanceId);
+                if (!obj || obj === maskObj) {
+                    continue;
+                }
+
+                // mask end
+                var cLen = clips.length;
+                for (var cIdx = 0; cIdx < cLen; cIdx++) {
+                    var cDepth = clips[cIdx];
+                    if (depth > cDepth) {
+                        clips.splice(cIdx, 1);
+                        ctx.restore();
+                        break;
+                    }
+                }
+
+                // mask start
+                if (obj.isClipDepth) {
+                    ctx.save();
+                    ctx.beginPath();
+                    clips[clips.length] = obj.clipDepth;
+                    if (obj instanceof MovieClip) {
+                        stage.isClipDepth = true;
+                    }
+                }
+
+                var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
+                var renderColorTransform = _multiplicationColor(colorTransform, obj.getColorTransform());
+                var isVisible = _min(obj.getVisible(), visible);
+                if (obj.isClipDepth) {
+                    if (renderMatrix[0] === 0) {
+                        renderMatrix[0] = 0.00000000000001;
+                    }
+                    if (renderMatrix[3] === 0) {
+                        renderMatrix[3] = 0.00000000000001;
+                    }
+                }
+
+                cacheKey += obj.preRender(ctx, renderMatrix, renderColorTransform, stage, isVisible);
+                if (stage.isClipDepth) {
+                    stage.isClipDepth = false;
+                }
+            }
+        }
+
+        if (clips.length) {
+            ctx.restore();
+        }
+
+        return cacheKey;
+    };
+
+
+    /**
+     * @constructor
+     */
+    var Sprite = function()
+    {
+        var _this = this;
+        DisplayObjectContainer.call(_this);
+
+        _this.touchPointID = 0;
+        _this._buttonMode = false;
+        _this._useHandCursor = false;
+        _this._dropTarget = null;
+        _this._hitArea = null;
+        _this._graphics = new Graphics();
+        _this._soundTransform = new SoundTransform();
+    };
+
+    /**
+     * extends
+     * @type {DisplayObjectContainer}
+     */
+    Sprite.prototype = Object.create(DisplayObjectContainer.prototype);
+    Sprite.prototype.constructor = Sprite;
+
+    /**
+     * properties
+     */
+    Object.defineProperties(Sprite.prototype,
+    {
+        graphics: {
+            get: function()
+            {
+                return this.getGraphics();
+            },
+            set: function(buttonMode) {}
+        },
+        hitArea: {
+            get: function()
+            {
+                return this.getHitArea();
+            },
+            set: function(sprite)
+            {
+                this.setHitArea(sprite);
+            }
+        },
+        soundTransform: {
+            get: function()
+            {
+                return this._soundTransform;
+            },
+            set: function() {}
+        },
+        useHandCursor: {
+            get: function()
+            {
+                return this.getUseHandCursor();
+            },
+            set: function(useHandCursor)
+            {
+                this.setUseHandCursor(useHandCursor);
+            }
+        },
+        dropTarget: {
+            get: function()
+            {
+                return this.getDropTarget();
+            },
+            set: function()
+            {
+                this.setDropTarget();
+            }
+        }
+    });
+
+    /**
+     * @returns {Graphics}
+     */
+    Sprite.prototype.getGraphics = function()
+    {
+        return this._graphics;
+    };
+
+    /**
+     * @returns {DisplayObject}
+     */
+    Sprite.prototype.getHitArea = function()
+    {
+        return this._hitArea;
+    };
+
+    /**
+     * @param displayObject
+     */
+    Sprite.prototype.setHitArea = function(displayObject)
+    {
+        this._buttonMode = displayObject;
+    };
+
+    /**
+     * @returns {boolean}
+     */
+    Sprite.prototype.getUseHandCursor = function()
+    {
+        return this._useHandCursor;
+    };
+
+    /**
+     * @param useHandCursor
+     */
+    Sprite.prototype.setUseHandCursor = function(useHandCursor)
+    {
+        this._useHandCursor = useHandCursor;
+    };
+
+    /**
+     * startTouchDrag
+     */
+    Sprite.prototype.startTouchDrag = function(touchPointID, lock, bounds)
+    {
+        this.startDrag(lock);
+    };
+
+    /**
+     * @param touchPointID
+     */
+    Sprite.prototype.stopTouchDrag = function(touchPointID)
+    {
+        this.stopDrag();
+    };
+
+    /**
+     * startDrag
+     */
+    Sprite.prototype.startDrag = function()
+    {
+        var args = arguments;
+        var lock = args[0];
+        var left = _parseFloat(args[1]);
+        var top = _parseFloat(args[2]);
+        var right = _parseFloat(args[3]);
+        var bottom = _parseFloat(args[4]);
+
+        var _this = this;
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
+        var startX = 0;
+        var startY = 0;
+        if (!lock) {
+            startX = _this.getXMouse();
+            startY = _this.getYMouse();
+        }
+
+        stage.dragMc = _this;
+        stage.dragRules = {
+            startX: startX,
+            startY: startY,
+            left: left,
+            top: top,
+            right: right,
+            bottom: bottom
+        };
+
+        _this.setDropTarget();
+    };
+
+    /**
+     * stopDrag
+     */
+    Sprite.prototype.stopDrag = function()
+    {
+        var _this = this;
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
+        stage.dragMc = null;
+        stage.dragRules = null;
+        _this.setDropTarget();
+    };
+
+    /**
+     * executeDrag
+     */
+    Sprite.prototype.executeDrag = function()
+    {
+        var _this = this;
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
+        var dragRules = stage.dragRules;
+        var startX = dragRules.startX;
+        var startY = dragRules.startY;
+        var left = dragRules.left;
+        var top = dragRules.top;
+        var right = dragRules.right;
+        var bottom = dragRules.bottom;
+        var x = _this.getX();
+        var y = _this.getY();
+        var xmouse = _this.getXMouse();
+        var ymouse = _this.getYMouse();
+
+        xmouse -= startX;
+        ymouse -= startY;
+
+        var moveX = x+xmouse;
+        var moveY = y+ymouse;
+
+        if (!_isNaN(left)) {
+            if (_isNaN(top)) {
+                top = 0;
+            }
+            if (_isNaN(right)) {
+                right = 0;
+            }
+            if (_isNaN(bottom)) {
+                bottom = 0;
+            }
+
+            // x
+            if (right < moveX) {
+                _this.setX(right);
+            } else if (moveX < left) {
+                _this.setX(left);
+            } else {
+                _this.setX(moveX);
+            }
+
+            // y
+            if (bottom < moveY) {
+                _this.setY(bottom);
+            } else if (moveY < top) {
+                _this.setY(top);
+            } else {
+                _this.setY(moveY);
+            }
+        } else {
+            _this.setX(moveX);
+            _this.setY(moveY);
+        }
+    };
+
+    /**
+     *
+     * @returns {null|*}
+     */
+    Sprite.prototype.getDropTarget = function()
+    {
+        return this._droptarget;
+    };
+
+    /**
+     * setDropTarget
+     */
+    Sprite.prototype.setDropTarget = function()
+    {
+        var _this = this;
+        _this._droptarget = null;
+        var _root = _this.getMovieClip("_root");
+        var stage = _root.getStage();
+        var parent = _this.getParent();
+        if (!parent) {
+            parent = stage.getParent();
+        }
+
+        var x = _root.getXMouse();
+        var y = _root.getYMouse();
+
+        var tags = parent.getTags();
+        for (var depth in tags) {
+            if (!tags.hasOwnProperty(depth)) {
+                continue;
+            }
+
+            var id = tags[depth];
+            if (id === _this.instanceId) {
+                continue;
+            }
+
+            var instance = stage.getInstance(id);
+            if (!(instance instanceof MovieClip)) {
+                continue;
+            }
+
+            var hit = instance.hitTest(x, y);
+            if (hit) {
+                _this._droptarget = instance;
+                break;
+            }
+        }
+    };
+
+    /**
+     * @returns {Array}
+     */
+    Sprite.prototype.getTags = function()
+    {
+        return this.getContainer();
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @param visible
+     * @returns {string}
+     */
+    Sprite.prototype.render = function(ctx, matrix, colorTransform, stage, visible)
+    {
+        var _this = this;
+        var container = _this.getContainer();
+        return _this.rendering(container, ctx, matrix, colorTransform, stage, visible);
+    };
+
 
     /**
      * @constructor
@@ -9374,13 +14488,57 @@ if (!("swf2js" in window)){(function(window)
     var Shape = function()
     {
         var _this = this;
-        var obj;
-        obj = new Common(_this);
-        obj = new ShapeAndText(_this);
-        obj = new Dummy(_this);
-        obj = null;
-        _this.instanceId = instanceId++;
+        DisplayObject.call(_this);
+
         _this.data = null;
+        _this._graphics = new Graphics();
+
+        var no = _Number.MAX_VALUE;
+        _this.setBounds({xMin: no, xMax: -no, yMin: no, yMax: -no});
+    };
+
+    /**
+     * extends
+     * @type {DisplayObject}
+     */
+    Shape.prototype = Object.create(DisplayObject.prototype);
+    Shape.prototype.constructor = Shape;
+
+    /**
+     * properties
+     */
+    Object.defineProperties(Shape.prototype,
+    {
+        graphics: {
+            get: function () {
+                return this.getGraphics();
+            },
+            set: function () {}
+        }
+    });
+
+    /**
+     * dummy
+     */
+    Shape.prototype.addActions = function(){};
+
+    /**
+     * putFrame
+     */
+    Shape.prototype.putFrame = function()
+    {
+        var _this = this;
+        _this.active = true;
+        clipEvent.type = "enterFrame";
+        _this.dispatchEvent(clipEvent);
+    };
+
+    /**
+     * @returns {Graphics}
+     */
+    Shape.prototype.getGraphics = function()
+    {
+        return this._graphics;
     };
 
     /**
@@ -9400,6 +14558,54 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @returns {{}}
+     */
+    Shape.prototype.getBounds = function(matrix)
+    {
+        var _this = this;
+        var bounds, gBounds;
+        var graphics = _this.graphics;
+        var isDraw = graphics.isDraw;
+
+        if (matrix) {
+            bounds = boundsMatrix(_this.bounds, matrix);
+            if (isDraw) {
+                gBounds = boundsMatrix(graphics.getBounds(), matrix);
+                bounds.xMin = _min(gBounds.xMin, bounds.xMin);
+                bounds.xMax = _max(gBounds.xMax, bounds.xMax);
+                bounds.yMin = _min(gBounds.yMin, bounds.yMin);
+                bounds.yMax = _max(gBounds.yMax, bounds.yMax);
+            }
+
+            for (var name in bounds) {
+                if (!bounds.hasOwnProperty(name)) {
+                    continue;
+                }
+                bounds[name] /= 20;
+            }
+            return bounds;
+        } else {
+            bounds = _this.bounds;
+            if (isDraw) {
+                gBounds = graphics.getBounds();
+                bounds.xMin = _min(gBounds.xMin, bounds.xMin);
+                bounds.xMax = _max(gBounds.xMax, bounds.xMax);
+                bounds.yMin = _min(gBounds.yMin, bounds.yMin);
+                bounds.yMax = _max(gBounds.yMax, bounds.yMax);
+            }
+            return this.bounds;
+        }
+    };
+
+    /**
+     * @param bounds
+     */
+    Shape.prototype.setBounds = function(bounds)
+    {
+        this.bounds = bounds;
+    };
+
+    /**
      * @returns {boolean}
      */
     Shape.prototype.isMorphing = function()
@@ -9414,73 +14620,86 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @param stage
      * @param visible
-     * @param localStage
-     * @returns {number}
+     * @returns {*}
      */
-    Shape.prototype.render = function(ctx, matrix, colorTransform, stage, visible, localStage)
+    Shape.prototype.render = function(ctx, matrix, colorTransform, stage, visible)
     {
         var _this = this;
         var cache = null;
+        var cacheKey = "";
         var alpha = colorTransform[3] + (colorTransform[7] / 255);
         if (!alpha || !visible) {
-            return 0;
+            return cacheKey;
         }
 
         var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
-        var isClipDepth = _this.isClipDepth || stage.isClipDepth;
+        var isClipDepth = _this.isClipDepth || stage.isClipDepth || stage.clipMc;
+        var xScale, yScale, xMax, xMin, yMax, yMin;
+
         if (isClipDepth) {
             setTransform(ctx, rMatrix);
-            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
+            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage);
         } else {
-            var xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
-            var yScale = _sqrt(rMatrix[2] * rMatrix[2] + rMatrix[3] * rMatrix[3]);
-            xScale = _pow(_SQRT2, _ceil(_log(xScale) / (_LN2 / 2)));
-            yScale = _pow(_SQRT2, _ceil(_log(yScale) / (_LN2 / 2)));
+            var cacheScale = cacheScaleXY(rMatrix);
+            xScale = cacheScale[0];
+            yScale = cacheScale[1];
             var bounds = _this.getBounds();
-            var xMax = bounds.xMax;
-            var xMin = bounds.xMin;
-            var yMax = bounds.yMax;
-            var yMin = bounds.yMin;
-            var W = _ceil((xMax - xMin) * xScale);
-            var H = _ceil((yMax - yMin) * yScale);
+            xMax = bounds.xMax;
+            xMin = bounds.xMin;
+            yMax = bounds.yMax;
+            yMin = bounds.yMin;
+            var W = _abs(_ceil((xMax - xMin) * xScale));
+            var H = _abs(_ceil((yMax - yMin) * yScale));
 
-            if (W > 0 && H > 0) {
-                var cacheId = _this.getCharacterId() + "_" + localStage.getId();
-                if (_this.isMorphing()) {
-                    cacheId += "_" + _this.getRatio();
-                }
-                var cacheKey = cacheStore.generateKey("Shape", cacheId, [xScale, yScale], colorTransform);
-                cache = cacheStore.get(cacheKey);
-                var canvas;
-                if (!cache) {
-                    if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W * H) {
-                        canvas = cacheStore.getCanvas();
-                        canvas.width = W;
-                        canvas.height = H;
-                        cache = canvas.getContext("2d");
-                        var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
-                        setTransform(cache, cMatrix);
-                        cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, isClipDepth, stage, localStage);
-                        cacheStore.set(cacheKey, cache);
-                    }
-                }
+            if (W <= 0 || H <= 0) {
+                return cacheKey;
+            }
 
-                if (cache) {
-                    canvas = cache.canvas;
-                    var m2 = multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
-                    setTransform(ctx, m2);
-                    if (isAndroid4x && !isChrome) {
-                        ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
-                        ctx.fillRect(0, 0, W, H);
-                    } else {
-                        ctx.drawImage(canvas, 0, 0, W, H);
-                    }
+            var canvas;
+            var loadStage = _this.getStage();
+            var cacheId = _this.getCharacterId() + "_" + loadStage.getId();
+            if (_this.isMorphing()) {
+                cacheId += "_" + _this.getRatio();
+            }
+
+            cacheKey = cacheStore.generateKey("Shape", cacheId, cacheScale, colorTransform);
+            cache = cacheStore.getCache(cacheKey);
+            if (!cache &&
+                stage.getWidth() > W &&
+                stage.getHeight() > H &&
+                cacheStore.size > (W * H)
+            ) {
+                canvas = cacheStore.getCanvas();
+                canvas.width = W;
+                canvas.height = H;
+                cache = canvas.getContext("2d");
+                var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
+                setTransform(cache, cMatrix);
+                cache = _this.executeRender(
+                    cache, _min(xScale, yScale), colorTransform, isClipDepth, stage
+                );
+                cacheStore.setCache(cacheKey, cache);
+            }
+
+            if (cache) {
+                canvas = cache.canvas;
+                var sMatrix = [1 / xScale, 0, 0, 1 / yScale, xMin, yMin];
+                var m2 = multiplicationMatrix(rMatrix, sMatrix);
+                setTransform(ctx, m2);
+                if (isAndroid4x && !isChrome) {
+                    ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
+                    ctx.fillRect(0, 0, W, H);
                 } else {
-                    setTransform(ctx, rMatrix);
-                    _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage, localStage);
+                    ctx.drawImage(canvas, 0, 0, W, H);
                 }
+            } else {
+                setTransform(ctx, rMatrix);
+                _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage);
             }
         }
+
+        cacheKey += "_" + rMatrix[4] + "_" + rMatrix[5];
+        return cacheKey;
     };
 
     /**
@@ -9494,6 +14713,14 @@ if (!("swf2js" in window)){(function(window)
     Shape.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
     {
         var _this = this;
+        var graphics = _this.graphics;
+        if (graphics.isDraw) {
+            return graphics.renderHitTest(ctx, matrix, stage, x, y);
+        }
+
+        if (!_this.getData()) {
+            return false;
+        }
         var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
         setTransform(ctx, rMatrix);
 
@@ -9536,16 +14763,19 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @param isClipDepth
      * @param stage
-     * @param localStage
      * @returns {*}
      */
-    Shape.prototype.executeRender = function(ctx, minScale, colorTransform, isClipDepth, stage, localStage)
+    Shape.prototype.executeRender = function(ctx, minScale, colorTransform, isClipDepth, stage)
     {
         var _this = this;
         var shapes = _this.getData();
+        if (!shapes) {
+            return ctx;
+        }
         var length = shapes.length;
         var _generateColorTransform = generateColorTransform;
         var _generateImageTransform = _this.generateImageTransform;
+        var _linearGradientXY = linearGradientXY;
 
         var color;
         var css;
@@ -9598,7 +14828,7 @@ if (!("swf2js" in window)){(function(window)
                         ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
                         css = ctx.createRadialGradient(0, 0, 0, 0, 0, 16384);
                     } else {
-                        var xy = linearGradientXY(m);
+                        var xy = _linearGradientXY(m);
                         css = ctx.createLinearGradient(xy[0], xy[1], xy[2], xy[3]);
                     }
 
@@ -9635,19 +14865,20 @@ if (!("swf2js" in window)){(function(window)
                 case 0x43:
                     var width;
                     var height;
+                    var loadStage = _this.getStage();
                     var bitmapId = styleObj.bitmapId;
                     var bMatrix = styleObj.bitmapMatrix;
                     var repeat = (styleType === 0x40 || styleType === 0x42) ? "repeat" : "no-repeat";
                     var bitmapCacheKey = cacheStore.generateKey(
                         "Bitmap",
-                        bitmapId +"_"+ localStage.getId() +"_"+ repeat,
+                        bitmapId +"_"+ loadStage.getId() +"_"+ repeat,
                         undefined,
                         colorTransform
                     );
 
-                    var image = cacheStore.get(bitmapCacheKey);
+                    var image = cacheStore.getCache(bitmapCacheKey);
                     if (image === undefined) {
-                        image = localStage.getCharacter(bitmapId);
+                        image = loadStage.getCharacter(bitmapId);
                         if (!image) {
                             break;
                         }
@@ -9669,7 +14900,7 @@ if (!("swf2js" in window)){(function(window)
                                 var imageContext = canvas.getContext("2d");
                                 imageContext.drawImage(image.canvas, 0, 0, width, height);
                                 image = _generateImageTransform.call(_this, imageContext, colorTransform);
-                                cacheStore.set(bitmapCacheKey, image);
+                                cacheStore.setCache(bitmapCacheKey, image);
                             }
                         } else {
                             ctx.globalAlpha = _max(0, _min((255 * colorTransform[3]) + colorTransform[7], 255)) / 255;
@@ -9826,22 +15057,59 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @constructor
      */
-    var DefineText = function()
+    var StaticText = function()
     {
         var _this = this;
-        var obj;
-        obj = new Common(_this);
-        obj = new ShapeAndText(_this);
-        obj = new Dummy(_this);
-        obj = null;
+        DisplayObject.call(_this);
+
         _this.data = null;
         _this.records = [];
     };
 
     /**
+     * extends
+     * @type {DisplayObject}
+     */
+    StaticText.prototype = Object.create(DisplayObject.prototype);
+    StaticText.prototype.constructor = StaticText;
+
+    /**
+     * dummy
+     */
+    StaticText.prototype.putFrame = function(){};
+    StaticText.prototype.addActions = function(){};
+
+    /**
+     * @returns {{}}
+     */
+    StaticText.prototype.getBounds = function(matrix)
+    {
+        if (matrix) {
+            var bounds = boundsMatrix(this.bounds, matrix);
+            for (var name in bounds) {
+                if (!bounds.hasOwnProperty(name)) {
+                    continue;
+                }
+                bounds[name] /= 20;
+            }
+            return bounds;
+        } else {
+            return this.bounds;
+        }
+    };
+
+    /**
+     * @param bounds
+     */
+    StaticText.prototype.setBounds = function(bounds)
+    {
+        this.bounds = bounds;
+    };
+
+    /**
      * @returns {Array|*}
      */
-    DefineText.prototype.getRecords = function()
+    StaticText.prototype.getRecords = function()
     {
         return this.records;
     };
@@ -9849,7 +15117,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param record
      */
-    DefineText.prototype.addRecord = function(record)
+    StaticText.prototype.addRecord = function(record)
     {
         var records = this.getRecords();
         records[records.length] = record;
@@ -9861,9 +15129,9 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @param stage
      * @param visible
-     * @param localStage
+     * @return {*}
      */
-    DefineText.prototype.render = function(ctx, matrix, colorTransform, stage, visible, localStage)
+    StaticText.prototype.render = function(ctx, matrix, colorTransform, stage, visible)
     {
         var _this = this;
         var alpha = colorTransform[3] + (colorTransform[7] / 255);
@@ -9873,10 +15141,9 @@ if (!("swf2js" in window)){(function(window)
 
         var _multiplicationMatrix = multiplicationMatrix;
         var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
-        var xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
-        var yScale = _sqrt(rMatrix[2] * rMatrix[2] + rMatrix[3] * rMatrix[3]);
-        xScale = _pow(_SQRT2, _ceil(_log(xScale) / (_LN2 / 2)));
-        yScale = _pow(_SQRT2, _ceil(_log(yScale) / (_LN2 / 2)));
+        var cacheScale = cacheScaleXY(rMatrix);
+        var xScale = cacheScale[0];
+        var yScale = cacheScale[1];
         var bounds = _this.getBounds();
         var xMax = bounds.xMax;
         var xMin = bounds.xMin;
@@ -9885,9 +15152,9 @@ if (!("swf2js" in window)){(function(window)
         var W = _ceil((xMax - xMin) * xScale);
         var H = _ceil((yMax - yMin) * yScale);
         if (W > 0 && H > 0) {
-            var cacheId = _this.getCharacterId() + "_" + localStage.getId();
-            var cacheKey = cacheStore.generateKey("Text", cacheId, [xScale, yScale], colorTransform);
-            var cache = cacheStore.get(cacheKey);
+            var cacheId = _this.getCharacterId() + "_" + _this.getStage().getId();
+            var cacheKey = cacheStore.generateKey("Text", cacheId, cacheScale, colorTransform);
+            var cache = cacheStore.getCache(cacheKey);
             var canvas;
             if (!cache) {
                 if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W * H) {
@@ -9898,7 +15165,7 @@ if (!("swf2js" in window)){(function(window)
                     var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
                     setTransform(cache, cMatrix);
                     cache = _this.executeRender(cache, cMatrix, colorTransform);
-                    cacheStore.set(cacheKey, cache);
+                    cacheStore.setCache(cacheKey, cache);
                 }
             }
 
@@ -9916,7 +15183,11 @@ if (!("swf2js" in window)){(function(window)
                 setTransform(ctx, rMatrix);
                 _this.executeRender(ctx, rMatrix, colorTransform);
             }
+
+            return cacheKey +"_"+ rMatrix[4] +"_"+ rMatrix[5];
         }
+
+        return null;
     };
 
     /**
@@ -9925,7 +15196,7 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @returns {*}
      */
-    DefineText.prototype.executeRender = function(ctx, matrix, colorTransform)
+    StaticText.prototype.executeRender = function(ctx, matrix, colorTransform)
     {
         var _this = this;
         var records = _this.getRecords();
@@ -9961,9 +15232,36 @@ if (!("swf2js" in window)){(function(window)
         return ctx;
     };
 
-    // Dummy
-    DefineText.prototype.renderHitTest = function(){return true;};
+    /**
+     * @param ctx
+     * @param matrix
+     * @param stage
+     * @param x
+     * @param y
+     * @returns {boolean}
+     */
+    StaticText.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
+    {
+        var _this = this;
+        var records = _this.getRecords();
+        var length = records.length;
+        if (!length) {
+            return false;
+        }
 
+        var bounds = _this.getBounds();
+        var xMax = bounds.xMax;
+        var xMin = bounds.xMin;
+        var yMax = bounds.yMax;
+        var yMin = bounds.yMin;
+        var width = _ceil(xMax - xMin);
+        var height = _ceil(yMax - yMin);
+        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
+        setTransform(ctx, rMatrix);
+        ctx.beginPath();
+        ctx.rect(xMin, yMin, width, height);
+        return ctx.isPointInPath(x, y);
+    };
 
     /**
      * @constructor
@@ -9992,7 +15290,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param mc
      * @param name
      * @param depth
      * @param x
@@ -10001,13 +15298,10 @@ if (!("swf2js" in window)){(function(window)
      * @param height
      * @constructor
      */
-    var TextField = function(mc, name, depth, x, y, width, height)
+    var TextField = function(name, depth, x, y, width, height)
     {
         var _this = this;
-        var _cloneArray = cloneArray;
-        var obj;
-        obj = new Common(_this);
-        obj = new Property(_this);
+        InteractiveObject.call(_this);
 
         if (name) {
             _this.setName(name);
@@ -10018,18 +15312,41 @@ if (!("swf2js" in window)){(function(window)
         }
 
         _this.fontId = 0;
-        _this.parent = mc;
-        _this.matrix = _cloneArray([1,0,0,1,x,y]);
-        _this._matrix = _cloneArray([1,0,0,1,x,y]);
-        _this.colorTransform = _cloneArray([1,1,1,1,0,0,0,0]);
-        _this._colorTransform = _cloneArray([1,1,1,1,0,0,0,0]);
         _this.bounds = {xMin: 0, xMax: width, yMin: 0, yMax: height};
-        _this.buttonStatus = "up";
         _this.input = null;
         _this.inputActive = false;
-        _this.active = false;
+        _this.span = null;
+    };
 
-        obj = {};
+    /**
+     * extends
+     * @type {InteractiveObject}
+     */
+    TextField.prototype = Object.create(InteractiveObject.prototype);
+    TextField.prototype.constructor = TextField;
+
+    /**
+     * properties
+     */
+    Object.defineProperties(Sprite.prototype,
+    {
+        text: {
+            get: function () {
+                return this.getProperty("text");
+            },
+            set: function (text) {
+                this.setProperty("text", text);
+            }
+        }
+    });
+
+    /**
+     * setInitParams
+     */
+    TextField.prototype.setInitParams = function()
+    {
+        var _this = this;
+        var obj = {};
         obj.antiAliasType = null;
         obj.autoSize = "none";
         obj.background = 0;
@@ -10057,7 +15374,7 @@ if (!("swf2js" in window)){(function(window)
             }
             _this.setProperty(key, obj[key]);
         }
-        _this.setNewTextFormat(new TextFormat());
+        _this.setTextFormat(new TextFormat());
     };
 
     /**
@@ -10071,7 +15388,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param format
      */
-    TextField.prototype.setNewTextFormat = function(format)
+    TextField.prototype.setTextFormat = function(format)
     {
         var _this = this;
         for (var name in format) {
@@ -10080,32 +15397,6 @@ if (!("swf2js" in window)){(function(window)
             }
             _this.setProperty(name, format[name]);
         }
-    };
-
-    /**
-     * @returns {*}
-     */
-    TextField.prototype.getParent = function()
-    {
-        return this.parent;
-    };
-
-    /**
-     *
-     * @param parent
-     */
-    TextField.prototype.setParent = function(parent)
-    {
-        this.parent = parent;
-    };
-
-    /**
-     * @returns {*}
-     */
-    TextField.prototype.getStage = function()
-    {
-        var parent = this.getParent();
-        return parent.getStage();
     };
 
     /**
@@ -10136,88 +15427,20 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns []
-     */
-    TextField.prototype.getMatrix = function()
-    {
-        return this.matrix;
-    };
-
-    /**
-     * @param matrix
-     */
-    TextField.prototype.setMatrix = function(matrix)
-    {
-        var _this = this;
-        _this.matrix = matrix;
-        _this._matrix = cloneArray(matrix);
-    };
-
-    /**
-     * @returns []
-     */
-    TextField.prototype.getColorTransform = function()
-    {
-        return this.colorTransform;
-    };
-
-    /**
-     * @param colorTransform
-     */
-    TextField.prototype.setColorTransform = function(colorTransform)
-    {
-        var _this = this;
-        _this.colorTransform = colorTransform;
-        _this._colorTransform = cloneArray(colorTransform);
-    };
-
-    /**
-     * reset
-     */
-    TextField.prototype.reset = function()
-    {
-        var _this = this;
-        _this.active = false;
-        var input = _this.input;
-        if (_this.inputActive) {
-            input.onchange = null;
-            var stage = _this.getStage();
-            var div = _document.getElementById(stage.getName());
-            if (div) {
-                _this.setProperty("text", input.value);
-                _this.inputActive = false;
-                var el = _document.getElementById(_this.getTagName());
-                if (el) {
-                    try {
-                        div.removeChild(el);
-                    } catch (e) {
-
-                    }
-                }
-            }
-        }
-        _this.setMatrix(_this._matrix);
-        _this.setColorTransform(_this._colorTransform);
-        _this.setVisible(true);
-        _this.setEnabled(true);
-        _this.setButtonStatus("up");
-    };
-
-    /**
      * @param ctx
      * @param matrix
      * @param colorTransform
      * @param stage
      * @param visible
-     * @param localStage
      */
-    TextField.prototype.render = function(ctx, matrix, colorTransform, stage, visible, localStage)
+    TextField.prototype.render = function(ctx, matrix, colorTransform, stage, visible)
     {
         var alpha = colorTransform[3] + (colorTransform[7] / 255);
         if (!alpha || !visible) {
             return 0;
         }
 
+        var textCacheKey = ["TextField"];
         var _this = this;
         var _multiplicationMatrix = multiplicationMatrix;
         var _generateColorTransform = generateColorTransform;
@@ -10236,6 +15459,20 @@ if (!("swf2js" in window)){(function(window)
             text += "";
         }
 
+        if (!text) {
+            var html = variables.html;
+            if (html) {
+                text = variables.htmlText;
+                var span = _this.span;
+                if (!span) {
+                    span = _document.createElement("span");
+                    _this.span = span;
+                }
+                span.innerHTML = text;
+                text = span.innerText;
+            }
+        }
+
         ctx.textBaseline = "top";
 
         var bounds = _this.getBounds();
@@ -10252,9 +15489,8 @@ if (!("swf2js" in window)){(function(window)
             var color;
             var rx = xMin;
             var ry = yMin;
-            var m = _this.matrix;
-            var _m = _this._matrix;
-            if (m[4] !== _m[4] || m[5] !== _m[5]) {
+            var m = _this._matrix;
+            if (m) {
                 rx = -xMin;
                 ry = -yMin;
                 var m2 = _multiplicationMatrix(matrix, [1, 0, 0, 1, xMin, yMin]);
@@ -10268,8 +15504,10 @@ if (!("swf2js" in window)){(function(window)
                 ctx.beginPath();
                 ctx.rect(rx, ry, W, H);
                 color = _generateColorTransform(variables.backgroundColor, colorTransform);
+                textCacheKey[textCacheKey.length] = color;
                 ctx.fillStyle = rgba(color);
                 color = _generateColorTransform(variables.borderColor, colorTransform);
+                textCacheKey[textCacheKey.length] = color;
                 ctx.strokeStyle = rgba(color);
                 ctx.lineWidth = _min(20, 1 / _min(rMatrix[0], rMatrix[3]));
                 ctx.globalAlpha = 1;
@@ -10284,7 +15522,9 @@ if (!("swf2js" in window)){(function(window)
             }
 
             color = _generateColorTransform(objRGBA, colorTransform);
-            ctx.fillStyle = rgba(color);
+            var fillStyle = rgba(color);
+            textCacheKey[textCacheKey.length] = fillStyle;
+            ctx.fillStyle = fillStyle;
 
             // font type
             var fontType = "";
@@ -10295,29 +15535,30 @@ if (!("swf2js" in window)){(function(window)
                 fontType += "bold ";
             }
 
-            ctx.font = fontType + variables.size + "px " + variables.font;
+            var fontStyle = fontType + variables.size + "px " + variables.font;
+            textCacheKey[textCacheKey.length] = fontStyle;
+            ctx.font = fontStyle;
+
             if (_this.input !== null) {
                 var input = _this.input;
                 var scale = stage.getScale();
                 var fontSize = _ceil(variables.size * scale * _min(matrix[0], matrix[3]));
                 input.style.font = fontType + fontSize + "px " + variables.font;
                 input.style.color = rgba(color);
-
                 var as = variables.onChanged;
                 if (as && !input.onchange) {
-                    var onChanged = function(stage, as, textField, el)
+                    var onChanged = function(stage, origin, clip, el)
                     {
                         return function()
                         {
-                            if (textField.active) {
-                                textField.setProperty("text", el.value);
-                                as.setVariable("this", textField);
-                                as.execute(textField.getParent());
+                            if (clip.active) {
+                                clip.setProperty("text", el.value);
+                                origin.apply(clip, arguments);
                                 stage.executeAction();
                             }
                         };
                     };
-                    input.onchange = onChanged(stage, as.cache, _this, input);
+                    input.onchange = onChanged(stage, as, _this, input);
                 }
             }
 
@@ -10330,7 +15571,7 @@ if (!("swf2js" in window)){(function(window)
                 if (_this.inputActive === false) {
                     var splitData = text.split("\n");
                     if (variables.embedFonts) {
-                        var fontData = localStage.getCharacter(_this.fontId);
+                        var fontData = _this.getStage().getCharacter(_this.fontId);
                         _this.renderOutLine(ctx, fontData, splitData, rMatrix, rx, W, variables);
                     } else {
                         _this.renderText(ctx, splitData, rMatrix, variables);
@@ -10340,7 +15581,12 @@ if (!("swf2js" in window)){(function(window)
                 ctx.restore();
                 ctx.globalAlpha = 1;
             }
+
+            textCacheKey[textCacheKey.length] = text;
+            return cacheStore.generateKey(textCacheKey.join("_"), _this.getCharacterId(), rMatrix, colorTransform);
         }
+
+        return null;
     };
 
     /**
@@ -10366,6 +15612,11 @@ if (!("swf2js" in window)){(function(window)
         var GlyphShapeTable = fontData.GlyphShapeTable;
         var FontAdvanceTable = fontData.FontAdvanceTable;
         var YOffset = (fontData.FontAscent * fontScale);
+        var cacheYOffset = YOffset;
+        var wordWrap = variables.wordWrap;
+        var multiline = variables.multiline;
+        var bounds = _this.getBounds();
+        var areaWidth = (_ceil((bounds.xMax) - (bounds.xMin)) - leftMargin - rightMargin);
         var idx;
         var index;
         var _multiplicationMatrix = multiplicationMatrix;
@@ -10375,6 +15626,7 @@ if (!("swf2js" in window)){(function(window)
             var XOffset = offset;
             var txtLength = txt.length;
             var textWidth = 0;
+
             for (idx = 0; idx < txtLength; idx++) {
                 index = CodeTable.indexOf(txt[idx].charCodeAt(0));
                 if (index === -1) {
@@ -10382,6 +15634,8 @@ if (!("swf2js" in window)){(function(window)
                 }
                 textWidth += (FontAdvanceTable[index] * fontScale);
             }
+
+
             if (align === "right") {
                 XOffset += width - rightMargin - textWidth - 40;
             } else if (align === "center") {
@@ -10390,15 +15644,28 @@ if (!("swf2js" in window)){(function(window)
                 XOffset += indent + leftMargin + 40;
             }
 
+            var cacheXOffset = XOffset;
+            var wordWidth = 0;
             for (idx = 0; idx < txtLength; idx++) {
                 index = CodeTable.indexOf(txt[idx].charCodeAt(0));
                 if (index < 0) {
                     continue;
                 }
+
+                var addXOffset = FontAdvanceTable[index] * fontScale;
+                if (wordWrap && multiline) {
+                    if (wordWidth + addXOffset > areaWidth) {
+                        XOffset = cacheXOffset;
+                        YOffset += cacheYOffset;
+                        wordWidth = 0;
+                    }
+                }
+
                 var m2 = _multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
                 setTransform(ctx, m2);
                 _this.renderGlyph(GlyphShapeTable[index], ctx);
-                XOffset += FontAdvanceTable[index] * fontScale;
+                XOffset += addXOffset;
+                wordWidth += addXOffset;
             }
             YOffset += leading;
         }
@@ -10499,22 +15766,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {string}
-     */
-    TextField.prototype.getButtonStatus = function()
-    {
-        return this.buttonStatus;
-    };
-
-    /**
-     * @param status
-     */
-    TextField.prototype.setButtonStatus = function(status)
-    {
-        this.buttonStatus = status;
-    };
-
-    /**
      * putFrame
      */
     TextField.prototype.putFrame = function()
@@ -10522,176 +15773,113 @@ if (!("swf2js" in window)){(function(window)
         this.active = true;
     };
 
+    /**
+     * @param ctx
+     * @param matrix
+     * @param stage
+     * @param x
+     * @param y
+     * @returns {boolean}
+     */
+    TextField.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
+    {
+        var _this = this;
+        var bounds = _this.getBounds();
+        var xMax = bounds.xMax;
+        var xMin = bounds.xMin;
+        var yMax = bounds.yMax;
+        var yMin = bounds.yMin;
+        var width = _ceil(xMax - xMin);
+        var height = _ceil(yMax - yMin);
+
+        var _multiplicationMatrix = multiplicationMatrix;
+        var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
+        setTransform(ctx, rMatrix);
+
+        var m = _this.getMatrix();
+        if (m) {
+            xMin = -xMin;
+            yMin = -yMin;
+            var m2 = _multiplicationMatrix(matrix, [1, 0, 0, 1, xMin, yMin]);
+            rMatrix = _multiplicationMatrix(stage.getMatrix(), m2);
+            setTransform(ctx, rMatrix);
+        }
+
+        ctx.beginPath();
+        ctx.rect(xMin, yMin, width, height);
+        return ctx.isPointInPath(x, y);
+    };
+
     // dummy
     TextField.prototype.addActions = function(){};
     TextField.prototype.getTags = function(){return undefined;};
-    TextField.prototype.renderHitTest = function(){return true;};
-
-    /**
-     * @param parent
-     * @constructor
-     */
-    var ButtonCharacter = function(parent)
-    {
-        var _this = this;
-        _this.soundId = 0;
-        _this.soundInfo = null;
-        _this.parent = parent;
-        _this.matrix = [];
-        _this.colorTransform = [];
-        _this.tags = [];
-    };
-
-    /**
-     * @returns Button
-     */
-    ButtonCharacter.prototype.getParent = function()
-    {
-        return this.parent;
-    };
-
-    /**
-     * @param depth
-     * @param obj
-     * @param tag
-     */
-    ButtonCharacter.prototype.addTag = function(depth, obj, tag)
-    {
-        var _this = this;
-        _this.tags[depth] = obj;
-        _this.setMatrix(depth, cloneArray(tag.Matrix));
-        _this.setColorTransform(depth, cloneArray(tag.ColorTransform));
-    };
-
-    /**
-     *
-     * @returns {Array}
-     */
-    ButtonCharacter.prototype.getTags = function()
-    {
-        return this.tags;
-    };
-
-    /**
-     * @param depth
-     * @returns {*}
-     */
-    ButtonCharacter.prototype.getMatrix = function(depth)
-    {
-        return this.matrix[depth];
-    };
-
-    /**
-     * @param depth
-     * @param matrix
-     * @returns {*}
-     */
-    ButtonCharacter.prototype.setMatrix = function(depth, matrix)
-    {
-        this.matrix[depth] = matrix;
-    };
-
-    /**
-     * @param depth
-     * @returns {*}
-     */
-    ButtonCharacter.prototype.getColorTransform = function(depth)
-    {
-        return this.colorTransform[depth];
-    };
-
-    /**
-     * @param depth
-     * @param matrix
-     * @returns {*}
-     */
-    ButtonCharacter.prototype.setColorTransform = function(depth, matrix)
-    {
-        this.colorTransform[depth] = matrix;
-    };
-
-    /**
-     * startSound
-     */
-    ButtonCharacter.prototype.startSound = function()
-    {
-        var _this = this;
-        var soundId = _this.soundId;
-        if (soundId) {
-            var parent = _this.getParent();
-            var stage = parent.getStage();
-            var sound = stage.sounds[soundId];
-            var audio = _document.createElement("audio");
-            audio.onload = function () {
-                this.load();
-                this.preload = "auto";
-                this.autoplay = false;
-                this.loop = false;
-            };
-            audio.src = sound.base64;
-            startSound(audio, _this.soundInfo);
-        }
-    };
 
     /**
      * @constructor
      */
-    var Button = function()
+    var SimpleButton = function()
     {
         var _this = this;
-        var obj;
-        obj = new Common(_this);
-        obj = new Property(_this);
-        obj = null;
-        _this.parent = null;
-        _this.stage = null;
-        _this.down = new ButtonCharacter(_this);
-        _this.hit = new ButtonCharacter(_this);
-        _this.over = new ButtonCharacter(_this);
-        _this.up = new ButtonCharacter(_this);
+        InteractiveObject.call(_this);
+
         _this.actions = [];
-        _this.buttonStatus = "up";
-        _this.renderMatrix = null;
-        _this.enabled = true;
+        _this._downState = new Sprite();
+        _this._hitState = new Sprite();
+        _this._overState = new Sprite();
+        _this._upState = new Sprite();
     };
 
     /**
-     * @returns MovieClip
+     * extends
+     * @type {InteractiveObject}
      */
-    Button.prototype.getParent = function()
-    {
-        return this.parent;
-    };
+    SimpleButton.prototype = Object.create(InteractiveObject.prototype);
+    SimpleButton.prototype.constructor = SimpleButton;
 
     /**
-     * @param parent
+     * properties
      */
-    Button.prototype.setParent = function(parent)
+    Object.defineProperties(SimpleButton.prototype,
     {
-        this.parent = parent;
-    };
-
-    /**
-     * @returns Stage
-     */
-    Button.prototype.getStage = function()
-    {
-        return this.stage;
-    };
-
-    /**
-     * @param stage
-     */
-    Button.prototype.setStage = function(stage)
-    {
-        this.stage = stage;
-    };
+        downState: {
+            get: function () {
+                return this.getSprite("down");
+            },
+            set: function (sprite) {
+                this.setSprite(sprite, "down");
+            }
+        },
+        hitState: {
+            get: function () {
+                return this.getSprite("hit");
+            },
+            set: function (sprite) {
+                this.setSprite(sprite, "hit");
+            }
+        },
+        overState: {
+            get: function () {
+                return this.getSprite("over");
+            },
+            set: function (sprite) {
+                this.setSprite(sprite, "over");
+            }
+        },
+        upState: {
+            get: function () {
+                return this.getSprite("up");
+            },
+            set: function (sprite) {
+                this.setSprite(sprite, "up");
+            }
+        }
+    });
 
     /**
      *
      * @returns {Array|ActionScript|*|actions}
      */
-    Button.prototype.getActions = function()
+    SimpleButton.prototype.getActions = function()
     {
         return this.actions;
     };
@@ -10699,27 +15887,19 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param actions
      */
-    Button.prototype.setActions = function(actions)
+    SimpleButton.prototype.setActions = function(actions)
     {
         this.actions = actions;
     };
 
     /**
-     * @returns {string}
-     */
-    Button.prototype.getButtonStatus = function()
-    {
-        return this.buttonStatus;
-    };
-
-    /**
      * @param status
      */
-    Button.prototype.setButtonStatus = function(status)
+    SimpleButton.prototype.setButtonStatus = function(status)
     {
         var _this = this;
         if (_this.getButtonStatus() !== status) {
-            _this.characterReset();
+            _this.buttonReset(status);
         }
         _this.buttonStatus = status;
     };
@@ -10728,13 +15908,58 @@ if (!("swf2js" in window)){(function(window)
      * @param status
      * @returns {*}
      */
-    Button.prototype.getButtonCharacter = function(status)
+    SimpleButton.prototype.getSprite = function(status)
     {
         var _this = this;
         if (!status) {
             status = _this.buttonStatus;
         }
-        return _this[status];
+        status += "State";
+        return _this["_"+ status];
+    };
+
+    /**
+     * @param status
+     * @param sprite
+     */
+    SimpleButton.prototype.setSprite = function(status, sprite)
+    {
+        var _this = this;
+        var stage = _this.getStage();
+
+        var level = 0;
+        switch (status) {
+            case "down":
+                level = 1;
+                break;
+            case "hit":
+                level = 2;
+                break;
+            case "over":
+                level = 3;
+                break;
+            case "up":
+                level = 4;
+                break;
+        }
+
+        stage.setPlaceObject(new PlaceObject(), _this.instanceId, level, 0);
+        sprite.setParent(_this);
+        sprite.setLevel(level);
+        sprite.setStage(stage);
+        var container = sprite.getContainer();
+        for (var depth in container) {
+            if (!container.hasOwnProperty(depth)) {
+                continue;
+            }
+
+            var instanceId = container[depth];
+            var obj = stage.getInstance(instanceId);
+            obj.setParentSprite(sprite);
+        }
+
+        status += "State";
+        _this["_"+ status] = sprite;
     };
 
     /**
@@ -10742,7 +15967,7 @@ if (!("swf2js" in window)){(function(window)
      * @param status
      * @returns {{xMin: number, xMax: number, yMin: number, yMax: number}}
      */
-    Button.prototype.getBounds = function(matrix, status)
+    SimpleButton.prototype.getBounds = function(matrix, status)
     {
         var _this = this;
         var xMax = 0;
@@ -10751,10 +15976,11 @@ if (!("swf2js" in window)){(function(window)
         var yMin = 0;
 
         var _multiplicationMatrix = multiplicationMatrix;
-        var buttonCharacter = _this.getButtonCharacter(status);
-        var tags = buttonCharacter.getTags();
+        var sprite = _this.getSprite(status);
+        var tags = sprite.getContainer();
         var length = tags.length;
         if (length) {
+            var stage = _this.getStage();
             var no = _Number.MAX_VALUE;
             xMax = -no;
             yMax = -no;
@@ -10765,12 +15991,14 @@ if (!("swf2js" in window)){(function(window)
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
+
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
                 if (tag.isClipDepth) {
                     continue;
                 }
-                var bMatrix = buttonCharacter.getMatrix(depth);
-                var matrix2 = (matrix) ? _multiplicationMatrix(matrix, bMatrix) : bMatrix;
+
+                var matrix2 = (matrix) ? _multiplicationMatrix(matrix, tag.getMatrix()) : tag.getMatrix();
                 var bounds = tag.getBounds(matrix2, status);
                 if (!bounds) {
                     continue;
@@ -10785,90 +16013,38 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns []
+     * @param status
      */
-    Button.prototype.getMatrix = function()
-    {
-        return this.matrix;
-    };
-
-    /**
-     * @param matrix
-     */
-    Button.prototype.setMatrix = function(matrix)
+    SimpleButton.prototype.buttonReset = function(status)
     {
         var _this = this;
-        _this.matrix = matrix;
-        _this._matrix = cloneArray(matrix);
-    };
-
-    /**
-     * @returns []
-     */
-    Button.prototype.getColorTransform = function()
-    {
-        return this.colorTransform;
-    };
-
-    /**
-     * @param colorTransform
-     */
-    Button.prototype.setColorTransform = function(colorTransform)
-    {
-        var _this = this;
-        _this.colorTransform = colorTransform;
-        _this._colorTransform = cloneArray(colorTransform);
-    };
-
-    /**
-     * reset
-     */
-    Button.prototype.reset = function()
-    {
-        var _this = this;
-        var _cloneArray = cloneArray;
-        _this.setMatrix(_cloneArray(_this._matrix));
-        _this.setColorTransform(_cloneArray(_this._colorTransform));
-        _this.setVisible(true);
-        _this.setEnabled(true);
-        _this.setButtonStatus("up");
-    };
-
-    /**
-     * characterReset
-     */
-    Button.prototype.characterReset = function()
-    {
-        var _this = this;
-        var buttonCharacter = _this.getButtonCharacter();
-        var tags = buttonCharacter.getTags();
-        var length = tags.length;
-        if (length) {
-            for (var depth in tags) {
-                if (!tags.hasOwnProperty(depth)) {
-                    continue;
-                }
-                var tag = tags[depth];
-                tag.reset();
+        var sprite = _this.getSprite();
+        var container = sprite.getContainer();
+        var nextSprite = _this.getSprite(status);
+        var nextContainer = nextSprite.getContainer();
+        var stage = _this.getStage();
+        for (var depth in container) {
+            if (!container.hasOwnProperty(depth)) {
+                continue;
             }
+            var instanceId = container[depth];
+            if (depth in nextContainer && instanceId === nextContainer[depth]) {
+                continue;
+            }
+            var instance = stage.getInstance(instanceId);
+            instance.reset();
         }
     };
 
     /**
-     * @param ctx
      * @param matrix
-     * @param colorTransform
      * @param stage
      * @param visible
-     * @param localStage
      */
-    Button.prototype.render = function(ctx, matrix, colorTransform, stage, visible, localStage)
+    SimpleButton.prototype.setHitRange = function(matrix, stage, visible)
     {
         var _this = this;
         var buttonHits = stage.buttonHits;
-        var _multiplicationMatrix = multiplicationMatrix;
-        var _multiplicationColor = multiplicationColor;
-
         if (visible && _this.getEnabled()) {
             // enter
             if (isTouch) {
@@ -10894,12 +16070,12 @@ if (!("swf2js" in window)){(function(window)
             }
 
             var status = "hit";
-            var hitTest = _this.getButtonCharacter(status);
-            var hitTags = hitTest.getTags();
+            var hitTest = _this.getSprite(status);
+            var hitTags = hitTest.getContainer();
             if (!hitTags.length) {
                 status = "up";
-                hitTest = _this.getButtonCharacter(status);
-                hitTags = hitTest.getTags();
+                hitTest = _this.getSprite(status);
+                hitTags = hitTest.getContainer();
             }
 
             if (hitTags.length) {
@@ -10919,22 +16095,23 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
+    };
 
-        var buttonCharacter = _this.getButtonCharacter();
-        var tags = buttonCharacter.getTags();
-        var length = tags.length;
-        if (length) {
-            for (var depth in tags) {
-                if (!tags.hasOwnProperty(depth)) {
-                    continue;
-                }
-                var tag = tags[depth];
-                var renderMatrix = _multiplicationMatrix(matrix, buttonCharacter.getMatrix(depth));
-                var renderColorTransform = _multiplicationColor(colorTransform, buttonCharacter.getColorTransform(depth));
-                var isVisible = _min(tag.getVisible(), visible);
-                tag.render(ctx, renderMatrix, renderColorTransform, stage, isVisible, localStage);
-            }
-        }
+    /**
+     * @param ctx
+     * @param matrix
+     * @param colorTransform
+     * @param stage
+     * @param visible
+     */
+    SimpleButton.prototype.render = function(ctx, matrix, colorTransform, stage, visible)
+    {
+        var _this = this;
+        var sprite = _this.getSprite();
+        var renderMatrix = multiplicationMatrix(matrix, sprite.getMatrix());
+        var renderColorTransform = multiplicationColor(colorTransform, sprite.getColorTransform());
+        var isVisible = _min(sprite.getVisible(), visible);
+        return sprite.preRender(ctx, renderMatrix, renderColorTransform, stage, isVisible);
     };
 
     /**
@@ -10945,29 +16122,32 @@ if (!("swf2js" in window)){(function(window)
      * @param y
      * @returns {boolean}
      */
-    Button.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
+    SimpleButton.prototype.renderHitTest = function(ctx, matrix, stage, x, y)
     {
         var _this = this;
         var _multiplicationMatrix = multiplicationMatrix;
 
-        var buttonCharacter = _this.getButtonCharacter("hit");
-        var tags = buttonCharacter.getTags();
+        var sprite = _this.getSprite("hit");
+        var tags = sprite.getContainer();
         var length = tags.length;
-
         if (!length) {
-            buttonCharacter = _this.getButtonCharacter();
-            tags = buttonCharacter.getTags();
+            sprite = _this.getSprite();
+            tags = sprite.getContainer();
             length = tags.length;
         }
 
         if (length) {
+            var renderMatrix = _multiplicationMatrix(matrix, sprite.getMatrix());
+            var loadStage = _this.getStage();
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
-                var renderMatrix = _multiplicationMatrix(matrix, buttonCharacter.getMatrix(depth));
-                var hit = tag.renderHitTest(ctx, renderMatrix, stage, x, y);
+
+                var instanceId = tags[depth];
+                var tag = loadStage.getInstance(instanceId);
+                var rMatrix = _multiplicationMatrix(renderMatrix, tag.getMatrix());
+                var hit = tag.renderHitTest(ctx, rMatrix, stage, x, y);
                 if (hit) {
                     return hit;
                 }
@@ -10980,17 +16160,19 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @see MovieClip.addActions
      */
-    Button.prototype.addActions = function()
+    SimpleButton.prototype.addActions = function()
     {
-        var buttonCharacter = this.getButtonCharacter();
-        var tags = buttonCharacter.getTags();
+        var sprite = this.getSprite();
+        var tags = sprite.getContainer();
         var length = tags.length;
         if (length) {
+            var stage = this.getStage();
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
                 tag.addActions();
             }
         }
@@ -10999,18 +16181,21 @@ if (!("swf2js" in window)){(function(window)
     /**
      * putFrame
      */
-    Button.prototype.putFrame = function()
+    SimpleButton.prototype.putFrame = function()
     {
-        var buttonCharacter = this.getButtonCharacter();
-        var tags = buttonCharacter.getTags();
+        var _this = this;
+        var sprite = _this.getSprite();
+        var tags = sprite.getContainer();
         var length = tags.length;
         if (length) {
             tags.reverse();
+            var stage = _this.getStage();
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
                 tag.putFrame();
             }
             tags.reverse();
@@ -11021,7 +16206,7 @@ if (!("swf2js" in window)){(function(window)
      * Dummy
      * @returns {undefined}
      */
-    Button.prototype.getTags = function(){ return undefined; };
+    SimpleButton.prototype.getTags = function(){ return undefined; };
 
     /**
      * @constructor
@@ -11029,132 +16214,45 @@ if (!("swf2js" in window)){(function(window)
     var MovieClip = function()
     {
         var _this = this;
-        var obj;
-        obj = new Common(_this);
-        obj = new Property(_this);
-        obj = null;
+        Sprite.call(_this);
 
-        // param
-        _this.stage = null;
-        _this.loadStage = null;
-        _this.parent = null;
-        _this.matrix = cloneArray([1,0,0,1,0,0]);
-        _this.colorTransform = cloneArray([1,1,1,1,0,0,0,0]);
-        _this.controller = [];
-        _this._controller = [];
-        _this.addTags = [];
+        _this._currentframe = 1;
         _this.removeTags = [];
         _this.actions = [];
         _this.labels = [];
-        _this.sounds = [];
-        _this.filters = [];
-        _this.buttonStatus = "up";
 
+        // flag
         _this.stopFlag = false;
         _this.isAction = true;
-        _this.isLoad = false;
-        _this.isEnterFrame = false;
-        _this.active = false;
-        _this.isStatic = true;
 
         // clip
         _this.isClipDepth = false;
         _this.clipDepth = 0;
 
         // sound
+        _this.sounds = [];
         _this.soundStopFlag = false;
-
-        // event
-        _this.clipEvent = {};
-
-        // shape
-        var no = _Number.MAX_VALUE;
-        _this.draw = false;
-        _this.bounds = {xMin: no, xMax: -no, yMin: no, yMax: -no};
-        _this.fillRecodes = [];
-        _this.lineRecodes = [];
-        _this.isFillDraw = false;
-        _this.isLineDraw = false;
     };
 
     /**
-     * @returns {*}
+     * extends
+     * @type {Sprite}
      */
-    MovieClip.prototype.getStage = function()
-    {
-        var _this = this;
-        return (!_this.loadStage) ? _this.stage : _this.loadStage;
-    };
-
-    /**
-     * @param name
-     * @param as
-     */
-    MovieClip.prototype.addEvent = function(name, as)
-    {
-        this.variables[name] = as;
-    };
+    MovieClip.prototype = Object.create(Sprite.prototype);
+    MovieClip.prototype.constructor = MovieClip;
 
     /**
      * @param name
      */
-    MovieClip.prototype.delEvent = function(name)
-    {
-        var variables = this.variables;
-        if (name in variables) {
-            delete variables[name];
-        }
-    };
-
-    /**
-     * @param name
-     * @returns {*}
-     */
-    MovieClip.prototype.getEvent = function(name)
+    MovieClip.prototype.dispatchOnEvent = function(name)
     {
         var _this = this;
         var variables = _this.variables;
         if (name in variables) {
             var as = variables[name];
             if (as) {
-                if ("cache" in as) {
-                    var func = as.cache;
-                    func.setVariable("this", _this);
-                }
-                return [as];
+                _this.setActionQueue(as);
             }
-        }
-        return [];
-    };
-
-    /**
-     * @param name
-     */
-    MovieClip.prototype.dispatchEvent = function(name)
-    {
-        var _this = this;
-        var variables = _this.variables;
-        if (name in variables) {
-            var as = variables[name];
-            if (as) {
-                if ("cache" in as) {
-                    var func = as.cache;
-                    func.setVariable("this", _this);
-                }
-                _this.setActionQueue([as]);
-            }
-        }
-    };
-
-    /**
-     * @param name
-     */
-    MovieClip.prototype.dispatchClipEvent = function(name)
-    {
-        var _this = this;
-        var clipEvent = _this.clipEvent;
-        if (name in clipEvent) {
-            _this.setActionQueue(clipEvent[name]);
         }
     };
 
@@ -11166,7 +16264,6 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.createEmptyMovieClip = function(name, depth)
     {
         var _this = this;
-        var _cloneArray = cloneArray;
         var stage = _this.getStage();
 
         var mc = _this.getMovieClip(name);
@@ -11179,37 +16276,19 @@ if (!("swf2js" in window)){(function(window)
         mc.setName(name);
         mc.setLevel(depth);
         mc.setParent(_this);
-        mc.stage = stage;
+        mc.setStage(stage);
 
-        var frame = _this.getCurrentFrame();
-        var tags = _this.addTags;
-        if (!(frame in tags)) {
-            tags[frame] = [];
+        var container = _this.getContainer();
+        var totalFrames = _this.getTotalFrames() + 1;
+        var placeObject = new PlaceObject();
+        var instanceId = _this.instanceId;
+        for (var frame = 1; frame < totalFrames; frame++) {
+            if (!(frame in container)) {
+                container[frame] = [];
+            }
+            container[frame][depth] = mc.instanceId;
+            stage.setPlaceObject(placeObject, instanceId, depth, frame);
         }
-        tags[frame][depth] = mc;
-
-        var controller = _this.controller;
-        if (!(frame in controller)) {
-            controller[frame] = [];
-        }
-
-        controller[frame][depth] = {
-            matrix: _cloneArray([1,0,0,1,0,0]),
-            _matrix: _cloneArray([1,0,0,1,0,0]),
-            colorTransform: _cloneArray([1,1,1,1,0,0,0,0]),
-            _colorTransform: _cloneArray([1,1,1,1,0,0,0,0])
-        };
-
-        var _controller = _this._controller;
-        if (!(frame in _controller)) {
-            _controller[frame] = [];
-        }
-
-        _controller[frame][depth] = {
-            instanceId: mc.instanceId,
-            isReset: 1
-        };
-
         return mc;
     };
 
@@ -11224,8 +16303,22 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.createTextField = function(name, depth, x, y, width, height)
     {
-        console.log("createTextField", name, depth, x, y, width, height);
-        return new TextField(this, name, depth, x, y, width, height);
+        if (16384 > depth) {
+            depth += 16384;
+        }
+        var _this = this;
+        var textField = new TextField(name, depth, x, y, width*20, height*20);
+        textField.setParent(_this);
+        textField.setStage(_this.getStage());
+        textField.setInitParams();
+        var container = _this.getContainer();
+        for (var frame in container){
+            if (!container.hasOwnProperty(frame)) {
+                continue;
+            }
+            container[frame][depth] = textField;
+        }
+        return textField;
     };
 
     /**
@@ -11238,28 +16331,6 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var stage = _this.getStage();
         stage.setBackgroundColor(r, g, b);
-    };
-
-    /**
-     * @returns {Array}
-     */
-    MovieClip.prototype.getFilters = function()
-    {
-        return this.filters;
-    };
-
-    /**
-     *
-     * @param filters
-     */
-    MovieClip.prototype.setFilters = function(filters)
-    {
-        var _this = this;
-        var length = filters.length;
-        for (var i = 0; i < length; i++) {
-            var filter = filters[i];
-            _this.filters[filter.FilterID] = filter.Filter;
-        }
     };
 
     /**
@@ -11344,18 +16415,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param event
-     * @param actionScript
-     */
-    MovieClip.prototype.onClipEvent = function(event, actionScript)
-    {
-        var _this = this;
-        var clipEvent = _this.clipEvent;
-        clipEvent[event] = [];
-        clipEvent[event][0] = actionScript;
-    };
-
-    /**
      * @param url
      * @param target
      * @param SendVarsMethod
@@ -11422,47 +16481,41 @@ if (!("swf2js" in window)){(function(window)
                     switch (status) {
                         case 200:
                         case 304:
-                            var loadStage = new Stage();
-                            targetMc.loadStage = loadStage;
-                            loadStage.parent = targetMc;
-
                             var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
+                            var loadStage = new Stage();
+                            loadStages[loadStage.getId()] = loadStage;
                             loadStage.parse(data);
 
                             if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
+                                stage.stop();
                                 loadStage.setId(stage.getId());
                                 loadStage.setName(stage.getName());
                                 loadStage.backgroundColor = stage.backgroundColor;
                                 loadStage.initCanvas();
                                 loadStage.loadStatus = 2;
                                 loadStage.loadEvent();
+                                delete loadStages[loadStage.getId()];
                                 stages[stage.getId()] = loadStage;
-                                stage.stop();
                                 stage = null;
                             } else {
                                 loadStage.stop();
+                                var loadParentMc = loadStage.getParent();
+                                loadParentMc.setLoadStage(loadStage);
+                                targetMc.addChild(loadParentMc);
                             }
                             targetMc._url = url;
 
-                            var as;
-                            var onData = targetMc.getVariable("onData");
-                            if (onData !== undefined) {
-                                as = onData.cache;
-                                as.setVariable("this", targetMc);
-                                loadStage.executeEventAction({
-                                    as: [onData],
-                                    mc: targetMc
-                                });
+                            var onData = targetMc.onData;
+                            if (onData) {
+                                loadStage.executeEventAction(onData, targetMc);
                             }
 
-                            var clipEvent = targetMc.clipEvent;
-                            if ("data" in clipEvent) {
-                                as = clipEvent.data[0];
-                                as.execute(targetMc);
+                            if (targetMc.hasEventListener("data")) {
+                                clipEvent.type = "data";
+                                targetMc.dispatchEvent(clipEvent);
                             }
 
                             targetMc.addActions();
-
                             break;
                     }
                 }
@@ -11489,25 +16542,21 @@ if (!("swf2js" in window)){(function(window)
         }
 
         // delete
-        targetMc.loadStage = null;
-        targetMc.stage = _this.getStage();
-        targetMc.addTags = [];
+        targetMc.setLoadStage(null);
+        targetMc.setStage(_this.getStage());
+        targetMc.container = [];
         targetMc.actions = [];
+        targetMc.instances = [];
         targetMc.labels = [];
         targetMc.sounds = [];
-        targetMc.clipEvent = {};
-        targetMc.filters = [];
-        targetMc.controller = [];
-        targetMc._controller = [];
         targetMc.removeTags = [];
-        targetMc.variables = {};
-        targetMc.colorTransform = cloneArray([1,1,1,1,0,0,0,0]);
-        targetMc.matrix = cloneArray([1,0,0,1,0,0]);
-        targetMc._currentframe = 1;
         targetMc._totalframes = 1;
         targetMc._url = null;
         targetMc._lockroot = true;
         targetMc.reset();
+
+        var loadStage = targetMc.getStage();
+        delete loadStages[loadStage.getId()];
     };
 
     /**
@@ -11644,18 +16693,14 @@ if (!("swf2js" in window)){(function(window)
                             }
 
                             var stage = _this.getStage();
-                            var as;
-                            var onData = targetMc.getVariable("onData");
-                            if (onData !== undefined) {
-                                as = onData.cache;
-                                as.setVariable("this", targetMc);
-                                stage.executeEventAction({as: [onData], mc: targetMc});
+                            var onData = targetMc.onData;
+                            if (onData) {
+                                stage.executeEventAction(onData, targetMc);
                             }
 
-                            var clipEvent = targetMc.clipEvent;
-                            if ("data" in clipEvent) {
-                                as = clipEvent.data[0];
-                                as.execute(targetMc);
+                            if (targetMc.hasEventListener("data")) {
+                                clipEvent.type = "data";
+                                targetMc.dispatchEvent(clipEvent);
                             }
 
                             break;
@@ -11753,113 +16798,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * startDrag
-     */
-    MovieClip.prototype.startDrag = function()
-    {
-        var lock = arguments[0];
-        var left = _parseFloat(arguments[1]);
-        var top = _parseFloat(arguments[2]);
-        var right = _parseFloat(arguments[3]);
-        var bottom = _parseFloat(arguments[4]);
-
-        var _this = this;
-        var _root = _this.getMovieClip("_root");
-        var stage = _root.getStage();
-        var startX = 0;
-        var startY = 0;
-        if (!lock) {
-            startX = _this.getXMouse();
-            startY = _this.getYMouse();
-        }
-
-        stage.dragMc = _this;
-        stage.dragRules = {
-            startX: startX,
-            startY: startY,
-            left: left,
-            top: top,
-            right: right,
-            bottom: bottom
-        };
-
-        _this.setDropTarget();
-    };
-
-    /**
-     * stopDrag
-     */
-    MovieClip.prototype.stopDrag = function()
-    {
-        var _this = this;
-        var _root = _this.getMovieClip("_root");
-        var stage = _root.getStage();
-        stage.dragMc = null;
-        stage.dragRules = null;
-        _this.setDropTarget();
-    };
-
-    /**
-     * executeDrag
-     */
-    MovieClip.prototype.executeDrag = function()
-    {
-        var _this = this;
-        var _root = _this.getMovieClip("_root");
-        var stage = _root.getStage();
-        var dragRules = stage.dragRules;
-        var startX = dragRules.startX;
-        var startY = dragRules.startY;
-        var left = dragRules.left;
-        var top = dragRules.top;
-        var right = dragRules.right;
-        var bottom = dragRules.bottom;
-        var x = _this.getX();
-        var y = _this.getY();
-        var xmouse = _this.getXMouse();
-        var ymouse = _this.getYMouse();
-
-        xmouse -= startX;
-        ymouse -= startY;
-
-        var moveX = x+xmouse;
-        var moveY = y+ymouse;
-
-        if (!_isNaN(left)) {
-            if (_isNaN(top)) {
-                top = 0;
-            }
-            if (_isNaN(right)) {
-                right = 0;
-            }
-            if (_isNaN(bottom)) {
-                bottom = 0;
-            }
-
-            // x
-            if (right < moveX) {
-                _this.setX(right);
-            } else if (moveX < left) {
-                _this.setX(left);
-            } else {
-                _this.setX(moveX);
-            }
-
-            // y
-            if (bottom < moveY) {
-                _this.setY(bottom);
-            } else if (moveY < top) {
-                _this.setY(top);
-            } else {
-                _this.setY(moveY);
-            }
-        } else {
-            _this.setX(moveX);
-            _this.setY(moveY);
-        }
-    };
-
-    /**
      * @param depth
      * @returns {*}
      */
@@ -11893,39 +16831,25 @@ if (!("swf2js" in window)){(function(window)
                     _this.setDepth(depth, swapDepth, mc);
                 }
             } else {
-                depth = arguments[0];
-                if (_Number.isNaN(depth)) {
+                depth = _parseInt(arguments[0]);
+                if (_isNaN(depth)) {
                     depth = parent.getNextHighestDepth();
                 }
-                depth = _parseInt(depth);
-                if (!_isNaN(depth)) {
+                if (16384 > depth) {
                     depth += 16384;
-                    if (depth in tags) {
-                        var tag = tags[depth];
-                        if (tag.instanceId !== _this.instanceId) {
-                            _this.swapDepths(tag);
-                        }
-                    } else {
-                        _this.setDepth(depth, null, null);
+                }
+
+                if (depth in tags) {
+                    var id = tags[depth];
+                    if (id !== _this.instanceId) {
+                        var stage = _this.getStage();
+                        var instance = stage.getInstance(id);
+                        _this.swapDepths(instance);
                     }
+                } else {
+                    _this.setDepth(depth, null, null);
                 }
             }
-        }
-    };
-
-    /**
-     * @param movieClip
-     */
-    MovieClip.prototype.setMask = function(movieClip)
-    {
-        var _this = this;
-        var tags = _this.getTags();
-        if (movieClip instanceof MovieClip) {
-            movieClip.isClipDepth = true;
-            movieClip.clipDepth = tags.length - 1;
-        } else {
-            _this.isClipDepth = false;
-            _this.clipDepth = 0;
         }
     };
 
@@ -11943,12 +16867,14 @@ if (!("swf2js" in window)){(function(window)
         if (_isNaN(depth)) {
             depth = _this.getNextHighestDepth();
         }
+        if (depth < 16384) {
+            depth += 16384;
+        }
 
         var mc = _this.getMovieClip(name);
         if (mc) {
             mc.removeMovieClip();
         }
-        depth += 16384;
 
         var stage = _this.getStage();
         var exportAssets = stage.exportAssets;
@@ -11957,37 +16883,31 @@ if (!("swf2js" in window)){(function(window)
             var tag = stage.getCharacter(characterId);
             if (tag) {
                 var swfTag = new SwfTag(stage, null);
-                movieClip = new MovieClip();
-                movieClip.stage = stage;
+                var RegClass = stage.registerClass[characterId];
+                movieClip = (RegClass) ? new RegClass() : new MovieClip();
+                movieClip.setStage(stage);
                 movieClip.setCharacterId(characterId);
                 movieClip.setParent(_this);
                 movieClip.setLevel(depth);
                 movieClip.setName(name);
                 movieClip.setTarget(_this.getTarget()+"/"+name);
                 swfTag.build(tag, movieClip);
-                swfTag = null;
 
-                var _cloneArray = cloneArray;
-                var obj = {
-                    matrix: _cloneArray([1,0,0,1,0,0]),
-                    _matrix: _cloneArray([1,0,0,1,0,0]),
-                    colorTransform: _cloneArray([1,1,1,1,0,0,0,0]),
-                    _colorTransform: _cloneArray([1,1,1,1,0,0,0,0])
-                };
-
+                var placeObject = new PlaceObject();
+                var instanceId = _this.instanceId;
                 var totalFrame = _this.getTotalFrames() + 1;
-                var addTags = _this.addTags;
-                var controller = _this.controller;
-                var currentFrame = 1;
-                for (var frame = currentFrame; frame < totalFrame; frame++) {
-                    if (!(frame in addTags)) {
-                        addTags[frame] = [];
+                var container = _this.getContainer();
+                for (var frame = 1; frame < totalFrame; frame++) {
+                    if (!(frame in container)) {
+                        container[frame] = [];
                     }
-                    if (!(frame in controller)) {
-                        controller[frame] = [];
-                    }
-                    addTags[frame][depth] = movieClip;
-                    controller[frame][depth] = obj;
+                    container[frame][depth] = movieClip.instanceId;
+                    stage.setPlaceObject(placeObject, instanceId, depth, frame);
+                }
+
+                var initMovieClip = stage.initMovieClip[characterId];
+                if (initMovieClip) {
+                    movieClip.variables = initMovieClip.variables;
                 }
 
                 if (object) {
@@ -11998,15 +16918,6 @@ if (!("swf2js" in window)){(function(window)
                         movieClip.setProperty(prop, object[prop]);
                     }
                 }
-
-                var _controller = _this._controller;
-                if (!(currentFrame in _controller)) {
-                    _controller[currentFrame] = [];
-                }
-                _controller[currentFrame][depth] = {
-                    instanceId: movieClip.instanceId,
-                    isReset: 1
-                };
 
                 movieClip.addActions();
             }
@@ -12021,20 +16932,15 @@ if (!("swf2js" in window)){(function(window)
     {
         var depth = 0;
         var _this = this;
-        var tags = _this.addTags;
-        for (var idx in tags) {
-            if (!tags.hasOwnProperty(idx)) {
+        var container = _this.getContainer();
+        for (var idx in container) {
+            if (!container.hasOwnProperty(idx)) {
                 continue;
             }
-            var tag = tags[idx];
-            depth = _max(depth, tag.length);
+            var children = container[idx];
+            depth = _max(depth, children.length);
         }
-
-        if (16384 > depth) {
-            depth = 16384;
-        }
-
-        return depth - 16384;
+        return depth;
     };
 
     /**
@@ -12102,7 +17008,7 @@ if (!("swf2js" in window)){(function(window)
         if (targetMc !== undefined && targetMc.getCharacterId() !== 0) {
             stage = targetMc.getStage();
             cloneMc = new MovieClip();
-            cloneMc.stage = stage;
+            cloneMc.setStage(stage);
 
             var char = stage.getCharacter(targetMc.characterId);
             var swftag = new SwfTag(stage);
@@ -12119,48 +17025,31 @@ if (!("swf2js" in window)){(function(window)
             cloneMc.setLevel(depth);
             cloneMc.setTotalFrames(targetMc.getTotalFrames());
             cloneMc.setCharacterId(targetMc.characterId);
-            cloneMc.isStatic = targetMc.isStatic;
-            cloneMc.clipEvent = targetMc.clipEvent;
-            cloneMc.filters = targetMc.filters;
+            cloneMc.events = targetMc.events;
+            cloneMc._matrix = targetMc._matrix;
+            cloneMc._colorTransform = targetMc._colorTransform;
+            cloneMc._filters = targetMc._filters;
+            cloneMc._blendMode = targetMc._blendMode;
 
-            var _cloneArray = cloneArray;
             var totalFrame = parent.getTotalFrames() + 1;
-            var addTags = parent.addTags;
-            var _controller = parent._controller;
-            var controller = parent.controller;
-            var matrix = targetMc.getMatrix();
-            var colorTransform = targetMc.getColorTransform();
-            var frame = 1;
-            if (!(frame in controller)) {
-                controller[frame] = [];
-            }
-
-            controller[frame][depth] = {
-                matrix: _cloneArray(matrix),
-                _matrix: _cloneArray(matrix),
-                colorTransform: _cloneArray(colorTransform),
-                _colorTransform: _cloneArray(colorTransform)
-            };
-
-            if (!(frame in _controller)) {
-                _controller[frame] = [];
-            }
-            _controller[frame][depth] = {
-                instanceId: cloneMc.instanceId,
-                isReset: 1
-            };
-
-            for (frame = 1; frame < totalFrame; frame++) {
-                if (!(frame in addTags)) {
-                    addTags[frame] = [];
+            var container = parent.getContainer();
+            var instanceId = parent.instanceId;
+            var placeObjects = stage.placeObjects[instanceId];
+            var level = targetMc.getLevel();
+            for (var frame = 1; frame < totalFrame; frame++) {
+                if (!(frame in container)) {
+                    container[frame] = [];
                 }
+                container[frame][depth] = cloneMc.instanceId;
 
-                addTags[frame][depth] = cloneMc;
-                if (frame > 1) {
-                    if (!(frame in controller)) {
-                        controller[frame] = [];
+                if (frame in placeObjects) {
+                    var placeObject = placeObjects[frame][level];
+                    if (placeObject) {
+                        if (!(frame in placeObjects)) {
+                            placeObjects[frame] = [];
+                        }
+                        placeObjects[frame][depth] = placeObject.clone();
                     }
-                    controller[frame][depth] = controller[frame-1][depth];
                 }
             }
 
@@ -12172,8 +17061,6 @@ if (!("swf2js" in window)){(function(window)
                     cloneMc.setProperty(prop, object[prop]);
                 }
             }
-
-            cloneMc.initParams();
             cloneMc.addActions();
         }
 
@@ -12191,39 +17078,32 @@ if (!("swf2js" in window)){(function(window)
             targetMc = _this.getMovieClip(name);
         }
 
-        if (targetMc instanceof MovieClip && targetMc.getDepth() >= 0) {
+        var level = targetMc.getLevel();
+        if (targetMc instanceof MovieClip && level > 16384) {
             var depth = targetMc.getDepth() + 16384;
-            var level = targetMc.getLevel();
             var parent = targetMc.getParent();
-            var addTags = parent.addTags;
-            var controller = parent.controller;
-            var _controller = parent._controller;
-            var tag;
+            var container = parent.getContainer();
+            var stage = _this.getStage();
+            var instanceId = targetMc.instanceId;
+            stage.removePlaceObject(instanceId);
+            var tagId;
             for (var frame = parent.getTotalFrames() + 1; --frame;) {
-                if (frame in _controller && depth in _controller[frame]) {
-                    delete _controller[frame][level];
-                }
-
-                if (frame in controller && depth in controller[frame]) {
-                    delete controller[frame][level];
-                }
-
-                if (!(frame in addTags)) {
+                if (!(frame in container)) {
                     continue;
                 }
 
-                var tags = addTags[frame];
+                var tags = container[frame];
                 if (depth in tags) {
-                    tag = tags[depth];
-                    if (tag.instanceId === targetMc.instanceId) {
-                        delete addTags[frame][depth];
+                    tagId = tags[depth];
+                    if (tagId === instanceId) {
+                        delete container[frame][depth];
                     }
                 }
 
                 if (level in tags) {
-                    tag = tags[level];
-                    if (tag.instanceId === targetMc.instanceId) {
-                        delete addTags[frame][level];
+                    tagId = tags[level];
+                    if (tagId === instanceId) {
+                        delete container[frame][level];
                     }
                 }
             }
@@ -12236,6 +17116,8 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.putFrame = function()
     {
         var _this = this;
+        var stage = _this.getStage();
+
         _this.active = true;
         var stopFlag = _this.stopFlag;
         var frame = _this.getCurrentFrame();
@@ -12265,7 +17147,8 @@ if (!("swf2js" in window)){(function(window)
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
                 if (!tag) {
                     continue;
                 }
@@ -12275,8 +17158,9 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (_this.isLoad) {
-            _this.dispatchClipEvent("enterFrame");
-            _this.dispatchEvent("onEnterFrame");
+            clipEvent.type = "enterFrame";
+            _this.dispatchEvent(clipEvent);
+            _this.dispatchOnEvent("onEnterFrame");
             _this.addTouchEvent();
             if (_this.isAction) {
                 _this.isAction = false;
@@ -12345,11 +17229,11 @@ if (!("swf2js" in window)){(function(window)
             var maxFrame = _max(frame, _this.getCurrentFrame()) + 1;
             var minFrame = _min(frame, _this.getCurrentFrame());
 
+            var stage = _this.getStage();
             var tags = _this.getTags();
             var checked = [];
             var nextTags = _this.getTags(frame);
-            var depth;
-            var tag;
+            var tag, tagId, depth, nextTag, nextTagId;
             var length = _max(tags.length, nextTags.length);
             if (length) {
                 for (depth = 0; depth < length; depth++) {
@@ -12357,50 +17241,52 @@ if (!("swf2js" in window)){(function(window)
                         continue;
                     }
 
-                    tag = tags[depth];
-                    var nextTag = nextTags[depth];
-                    if (!tag && !nextTag) {
+                    tagId = tags[depth];
+                    nextTagId = nextTags[depth];
+                    if (!tagId && !nextTagId) {
                         continue;
                     }
 
-                    if (tag && nextTag) {
-                        if (tag.instanceId === nextTag.instanceId) {
-                            checked[tag.instanceId] = true;
+                    tag = stage.getInstance(tagId);
+                    nextTag = stage.getInstance(nextTagId);
+                    if (tagId && nextTagId) {
+                        if (tagId === nextTagId) {
+                            checked[tagId] = true;
                             continue;
                         }
 
                         tag.reset();
                         nextTag.reset();
-                        checked[tag.instanceId] = true;
-                        checked[nextTag.instanceId] = true;
+                        checked[tagId] = true;
+                        checked[nextTagId] = true;
                     } else if (tag) {
                         tag.reset();
-                        checked[tag.instanceId] = true;
+                        checked[tagId] = true;
                     } else if (nextTag) {
                         nextTag.reset();
-                        checked[nextTag.instanceId] = true;
+                        checked[nextTagId] = true;
                     }
                 }
             }
 
             if (checked.length) {
                 for (var chkFrame = minFrame; chkFrame < maxFrame; chkFrame++) {
-                    var addTags = _this.getTags(chkFrame);
-                    if (!addTags.length) {
+                    var container = _this.getTags(chkFrame);
+                    if (!container.length) {
                         continue;
                     }
 
-                    for (depth in addTags) {
-                        if (!addTags.hasOwnProperty(depth)) {
+                    for (depth in container) {
+                        if (!container.hasOwnProperty(depth)) {
                             continue;
                         }
-                        tag = addTags[depth];
-                        var instanceId = tag.instanceId;
-                        if (instanceId in checked) {
+                        tagId = container[depth];
+                        if (tagId in checked) {
                             continue;
                         }
 
-                        checked[tag.instanceId] = tag;
+                        checked[tagId] = true;
+                        tag = stage.getInstance(tagId);
                         tag.reset();
                     }
                 }
@@ -12449,6 +17335,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var parent = _this.getParent();
+        parent.isSwap = true;
         var _depth = _this._depth;
         var level  = (_depth !== null) ? _depth : _this.getLevel();
         var totalFrame = parent.getTotalFrames() + 1;
@@ -12460,33 +17347,38 @@ if (!("swf2js" in window)){(function(window)
             swapMc._depth = depth;
         }
 
-        var addTags = parent.addTags;
+        var container = parent.container;
+        var instanceId = _this.instanceId;
         for (var frame = 1; frame < totalFrame; frame++) {
-            if (!(frame in addTags)) {
+            if (!(frame in container)) {
                 continue;
             }
 
-            var tags = addTags[frame];
+            var tags = container[frame];
             if (!tags.length) {
                 continue;
             }
 
             if (swapMc) {
-                if (level in tags && tags[level] === _this) {
-                    tags[depth] = swapMc;
+                if (level in tags && tags[level] === instanceId) {
+                    tags[depth] = swapMc.instanceId;
                 }
 
-                if (swapDepth in tags && tags[swapDepth] === swapMc) {
-                    tags[swapDepth] = _this;
+                if (swapDepth in tags && tags[swapDepth] === swapMc.instanceId) {
+                    tags[swapDepth] = instanceId;
                 }
             } else {
-                if (level in tags && tags[level] === _this) {
+                if (level in tags && tags[level] === instanceId) {
                     delete tags[level];
-                    tags[depth] = _this;
+                    tags[depth] = instanceId;
                 }
             }
 
-            addTags[frame] = tags;
+            container[frame] = tags;
+        }
+        _this.setController(false,false,false,false);
+        if (swapMc) {
+            swapMc.setController(false,false,false,false);
         }
     };
 
@@ -12552,21 +17444,7 @@ if (!("swf2js" in window)){(function(window)
 
         var soundInfo = tag.SoundInfo;
         startSound(sound.Audio, soundInfo);
-
         _this.soundStopFlag = true;
-    };
-
-    /**
-     * @param frame
-     * @param tag
-     */
-    MovieClip.prototype.addTag = function(frame, tag)
-    {
-        var tags = this.addTags;
-        if (!(frame in tags)) {
-            tags[frame] = [];
-        }
-        tags[frame][tag.Depth] = tag;
     };
 
     /**
@@ -12576,7 +17454,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var key = (!frame) ? _this.getCurrentFrame() : frame;
-        return (key in _this.addTags) ? _this.addTags[key] : [];
+        return (key in _this.container) ? _this.container[key] : [];
     };
 
     /**
@@ -12611,13 +17489,15 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var removeTags = _this.getRemoveTags(_this.getCurrentFrame());
         if (removeTags) {
+            var stage = _this.getStage();
             var tags = _this.getTags(_this.getCurrentFrame() - 1);
             for (var idx in tags) {
                 if (!tags.hasOwnProperty(idx)) {
                     continue;
                 }
 
-                var tag = tags[idx];
+                var instanceId = tags[idx];
+                var tag = stage.getInstance(instanceId);
                 if (!tag) {
                     continue;
                 }
@@ -12629,7 +17509,8 @@ if (!("swf2js" in window)){(function(window)
                     }
 
                     if (depth === tag.getLevel()) {
-                        _this.dispatchClipEvent("unload");
+                        clipEvent.type = "unload";
+                        _this.dispatchEvent(clipEvent);
                         tag.reset();
                     }
                 } else {
@@ -12648,180 +17529,90 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.resetCheck = function()
     {
         var _this = this;
-        var isReset = false;
-        var _controller = _this._controller;
-        var totalFrames = _controller.length;
-        if (totalFrames) {
-            for (var frame = 1; frame < totalFrames; frame++) {
-                if (!(frame in _controller)) {
-                    continue;
-                }
-
-                var _cTags = _controller[frame];
-                var length = _cTags.length;
-                if (!length) {
-                    continue;
-                }
-
-                for (var depth in _cTags) {
-                    if (!_cTags.hasOwnProperty(depth)) {
-                        continue;
-                    }
-                    var addTags = _this.getTags(frame);
-                    var obj = addTags[depth];
-                    if (!obj || !obj.getRatio()) {
-                        continue;
-                    }
-
-                    isReset = true;
-                    obj.reset();
-                }
+        var instances = _this.getInstances();
+        var stage = _this.getStage();
+        for (var id in instances) {
+            if (!instances.hasOwnProperty(id)) {
+                continue;
             }
+            var instance = stage.getInstance(id);
+            if (!instance || !instance.getRatio()) {
+                continue;
+            }
+            instance.reset();
         }
-        return isReset;
     };
 
     /**
-     * @param clearParent
+     * reset
      */
-    MovieClip.prototype.reset = function(clearParent)
+    MovieClip.prototype.reset = function()
     {
         var _this = this;
-        var _cloneArray = cloneArray;
-        var _controller = _this._controller;
-        var controller = _this.controller;
-        var totalFrames = _controller.length;
-        var depth;
-        var length;
-        var level;
-        var _cTags;
-        var _cTag;
-        var cTag;
-        var tag = null;
-        var tags = [];
-        var resetTags = [];
-
-        for (var frame = 1; frame < totalFrames; frame++) {
-            tags = _this.getTags(frame);
-            length = tags.length;
-            if (length) {
-                resetTags = [];
-                for (depth in tags) {
-                    if (!tags.hasOwnProperty(depth)) {
-                        continue;
-                    }
-                    tag = tags[depth];
-                    if (!tag) {
-                        delete tags[depth];
-                    }
-
-                    if (tag.getLevel() !== depth) {
-                        tag._depth = null;
-                        resetTags[tag.getLevel()] = tag;
-                        delete tags[depth];
-                    }
-                }
-
-                length = resetTags.length;
+        var stage = _this.getStage();
+        var parent = _this.getParent();
+        if (parent && parent.isSwap) {
+            parent.isSwap = false;
+            var totalFrames = parent.getTotalFrames() + 1;
+            for (var frame = 1; frame < totalFrames; frame++) {
+                var tags = parent.getTags(frame);
+                var length = tags.length;
                 if (length) {
-                    for (level in resetTags) {
-                        if (!resetTags.hasOwnProperty(level)) {
+                    var resetTags = [];
+                    for (var depth in tags) {
+                        if (!tags.hasOwnProperty(depth)) {
                             continue;
                         }
-                        tags[level] = resetTags[level];
+
+                        var tagId = tags[depth];
+                        var tag = stage.getInstance(tagId);
+                        if (!tag) {
+                            delete tags[depth];
+                        }
+
+                        if (tag.getLevel() !== _parseInt(depth)) {
+                            tag._depth = null;
+                            resetTags[tag.getLevel()] = tagId;
+                            delete tags[depth];
+                        }
                     }
-                }
-            }
 
-            if (!(frame in _controller)) {
-                continue;
-            }
-
-            _cTags = _controller[frame];
-            length = _cTags.length;
-            if (!length) {
-                continue;
-            }
-
-            for (depth in _cTags) {
-                if (!_cTags.hasOwnProperty(depth)) {
-                    continue;
-                }
-                _cTag = _cTags[depth];
-                if (_cTag.isReset) {
-                    cTag = controller[frame][depth];
-                    cTag.matrix = _cloneArray(cTag._matrix);
-                    cTag.colorTransform = _cloneArray(cTag._colorTransform);
-                }
-
-                if (depth in tags) {
-                    var obj = tags[depth];
-                    if (obj instanceof MovieClip && obj.getDepth() >= 0) {
-                        obj.removeMovieClip();
-                    } else {
-                        obj.reset(false);
-                    }
-                }
-            }
-        }
-
-        if (clearParent !== false) {
-            var parent = _this.getParent();
-            if (parent) {
-                _controller = parent._controller;
-                controller = parent.controller;
-                totalFrames = _controller.length;
-                level = _this.getLevel();
-                for (frame = 1; frame < totalFrames; frame++) {
-                    tags = parent.getTags(frame);
-                    length = tags.length;
+                    length = resetTags.length;
                     if (length) {
-                        resetTags = [];
-                        for (depth in tags) {
-                            if (!tags.hasOwnProperty(depth)) {
+                        for (var level in resetTags) {
+                            if (!resetTags.hasOwnProperty(level)) {
                                 continue;
                             }
-                            tag = tags[depth];
-                            if (tag.getLevel() !== depth) {
-                                tag._depth = null;
-                                resetTags[tag.getLevel()] = tag;
-                            }
-                        }
-
-                        length = resetTags.length;
-                        if (length) {
-                            for (depth in resetTags) {
-                                if (!resetTags.hasOwnProperty(depth)) {
-                                    continue;
-                                }
-                                tags[depth] = resetTags[depth];
-                            }
+                            tags[level] = resetTags[level];
                         }
                     }
-
-                    if (!(frame in _controller)) {
-                        continue;
-                    }
-
-                    _cTags = _controller[frame];
-                    if (!(level in _cTags)) {
-                        continue;
-                    }
-
-                    _cTag = _cTags[level];
-                    if (_this.instanceId !== _cTag.instanceId) {
-                        continue;
-                    }
-
-                    cTag = controller[frame][level];
-                    cTag.matrix = _cloneArray(cTag._matrix);
-                    cTag.colorTransform = _cloneArray(cTag._colorTransform);
                 }
             }
         }
 
+        var instances = _this.getInstances();
+        for (var id in instances) {
+            if (!instances.hasOwnProperty(id)) {
+                continue;
+            }
+            var instance = stage.getInstance(id);
+            if (instance instanceof MovieClip && instance.getDepth() >= 0) {
+                instance.removeMovieClip();
+            } else {
+                instance.reset();
+            }
+        }
+
+        _this.play();
+        _this.setCurrentFrame(1);
+        _this.clear();
         _this.initParams();
         _this.variables = {};
+
+        var initMovieClip = stage.initMovieClip[_this.getCharacterId()];
+        if (initMovieClip) {
+            _this.variables = initMovieClip.variables;
+        }
     };
 
     /**
@@ -12830,19 +17621,20 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.initParams = function()
     {
         var _this = this;
-        _this.play();
-        _this.setVisible(true);
-        _this.setEnabled(true);
-        _this.setCurrentFrame(1);
-        _this.clear();
         _this.active = false;
         _this.isLoad = false;
-        _this.isEnterFrame = false;
         _this.isAction = true;
         _this.soundStopFlag = false;
         _this._droptarget = null;
         _this._depth = null;
+        _this._mask = null;
+        _this._matrix = null;
+        _this._colorTransform = null;
+        _this._filters = null;
+        _this._blendMode = null;
         _this.buttonStatus = "up";
+        _this.setVisible(true);
+        _this.setEnabled(true);
     };
 
     /**
@@ -12851,7 +17643,7 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.addTouchEvent = function()
     {
         var _this = this;
-        var clipEvent = _this.clipEvent;
+        var events = _this.events;
         var _root = _this.getMovieClip("_root");
         var stage = _root.getStage();
         var moveEventHits = stage.moveEventHits;
@@ -12859,11 +17651,11 @@ if (!("swf2js" in window)){(function(window)
         var upEventHits = stage.upEventHits;
         var keyDownEventHits = stage.keyDownEventHits;
         var as;
-        for (var name in clipEvent) {
-            if (!clipEvent.hasOwnProperty(name)) {
+        for (var name in events) {
+            if (!events.hasOwnProperty(name)) {
                 continue;
             }
-            as = clipEvent[name];
+            as = events[name];
             switch (name) {
                 case "mouseDown":
                     downEventHits[downEventHits.length] = {as: as, mc: _this};
@@ -12887,19 +17679,17 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var variables =_this.variables;
-
-        as = variables.onMouseDown;
+        as = _this.onMouseDown;
         if (as) {
-            downEventHits[downEventHits.length] = {event: true, mc: _this};
+            downEventHits[downEventHits.length] = {mc: _this};
         }
-        as = variables.onMouseMove;
+        as = _this.onMouseMove;
         if (as) {
-            moveEventHits[moveEventHits.length] = {event: true, mc: _this};
+            moveEventHits[moveEventHits.length] = {mc: _this};
         }
-        as = variables.onMouseUp;
+        as = _this.onMouseUp;
         if (as) {
-            upEventHits[upEventHits.length] = {event: true, mc: _this};
+            upEventHits[upEventHits.length] = {mc: _this};
         }
     };
 
@@ -12910,25 +17700,22 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.active = true;
+
         var as;
         if (_this.isAction) {
             _this.isAction = false;
             if (!_this.isLoad) {
-                var clipEvent = _this.clipEvent;
-                if ("initialize" in clipEvent) {
-                    as = clipEvent.initialize[0];
-                    as.execute(_this);
-                }
-                if ("construct" in clipEvent) {
-                    as = clipEvent.construct[0];
-                    as.execute(_this);
-                }
-                _this.dispatchClipEvent("load");
+                clipEvent.type = "initialize";
+                _this.dispatchEvent(clipEvent);
+                clipEvent.type = "construct";
+                _this.dispatchEvent(clipEvent);
+                clipEvent.type = "load";
+                _this.dispatchEvent(clipEvent);
 
                 var variables = _this.variables;
                 as = variables.onLoad;
-                if (as) {
-                    _this.setActionQueue([as]);
+                if (as !== undefined) {
+                    _this.setActionQueue(as);
                 }
                 _this.addTouchEvent();
             }
@@ -12939,6 +17726,7 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
+        var stage = _this.getStage();
         var tags = _this.getTags();
         var length = tags.length;
         if (length) {
@@ -12946,85 +17734,36 @@ if (!("swf2js" in window)){(function(window)
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
-                if (!tag) {
+                var instanceId = tags[depth];
+                var instance = stage.getInstance(instanceId);
+                if (!instance) {
                     continue;
                 }
-                tag.addActions();
+                instance.addActions();
             }
         }
     };
 
     /**
-     * setActionQueue
+     * @param mc
+     * @returns {{xMin: *, xMax: number, yMin: *, yMax: number}}
      */
-    MovieClip.prototype.setActionQueue = function(as)
+    MovieClip.prototype.getRect = function(mc)
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
-        var stage = _root.getStage();
-        var actions = stage.actions;
-        actions[actions.length] = {mc:_this, as: as};
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getParent = function()
-    {
-        return this.parent;
-    };
-
-    /**
-     * @param parent
-     */
-    MovieClip.prototype.setParent = function(parent)
-    {
-        this.parent = parent;
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getController = function()
-    {
-        var _this = this;
-        var parent = _this.getParent();
-        if (!parent) {
-            return _this;
+        if (!mc) {
+            mc = _this;
         }
-        var controllers = parent.controller[parent.getCurrentFrame()];
-        return controllers[_this.getLevel()];
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getMatrix = function()
-    {
-        var _this = this;
-        var controller = _this.getController();
-        return (controller) ? controller.matrix : undefined;
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getOriginMatrix = function()
-    {
-        var _this = this;
-        var controller = _this.getController();
-        return controller._matrix;
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getColorTransform = function()
-    {
-        var _this = this;
-        var controller = _this.getController();
-        return controller.colorTransform;
+        var bounds = mc.getBounds(mc.getOriginMatrix());
+        var graphics = _this.graphics;
+        var twips = 20;
+        var maxWidth = graphics.maxWidth / twips;
+        var halfWidth = maxWidth / 2;
+        var xMin = bounds.xMin + halfWidth;
+        var xMax = bounds.xMax - halfWidth;
+        var yMin = bounds.yMin + halfWidth;
+        var yMax = bounds.yMax - halfWidth;
+        return {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
     };
 
     /**
@@ -13033,25 +17772,33 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.getBounds = function(matrix)
     {
+        if (matrix instanceof MovieClip) {
+            return matrix.getBounds(matrix.getOriginMatrix());
+        }
+
         var _this = this;
         var tags = _this.getTags();
         var xMax = 0;
         var yMax = 0;
         var xMin = 0;
         var yMin = 0;
-        var draw = _this.draw;
-        if (draw) {
-            var myBounds = boundsMatrix(_this.bounds, matrix);
+        var graphics = _this.graphics;
+        var isDraw = graphics.isDraw;
+        if (isDraw) {
+            var maxWidth = graphics.maxWidth;
+            var halfWidth = maxWidth / 2;
+            var gBounds = boundsMatrix(graphics.bounds, matrix);
             var twips = (matrix) ? 20 : 1;
-            xMin = myBounds.xMin / twips;
-            xMax = myBounds.xMax / twips;
-            yMin = myBounds.yMin / twips;
-            yMax = myBounds.yMax / twips;
+            xMin = (gBounds.xMin - halfWidth) / twips;
+            xMax = (gBounds.xMax + halfWidth) / twips;
+            yMin = (gBounds.yMin - halfWidth) / twips;
+            yMax = (gBounds.yMax + halfWidth) / twips;
         }
 
         var length = tags.length;
+        var stage = _this.getStage();
         if (length) {
-            if (!draw) {
+            if (!isDraw) {
                 var no = _Number.MAX_VALUE;
                 xMax = -no;
                 yMax = -no;
@@ -13064,7 +17811,8 @@ if (!("swf2js" in window)){(function(window)
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var tag = tags[depth];
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
                 if (!tag || tag.isClipDepth) {
                     continue;
                 }
@@ -13086,68 +17834,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param x
-     * @param y
-     */
-    MovieClip.prototype.setBounds = function(x, y)
-    {
-        var bounds = this.bounds;
-        bounds.xMin = _min(bounds.xMin, x);
-        bounds.xMax = _max(bounds.xMax, x);
-        bounds.yMin = _min(bounds.yMin, y);
-        bounds.yMax = _max(bounds.yMax, y);
-    };
-
-    /**
-     * @returns {null}
-     */
-    MovieClip.prototype.getDropTarget = function()
-    {
-        return this._droptarget;
-    };
-
-    /**
-     * setDropTarget
-     */
-    MovieClip.prototype.setDropTarget = function()
-    {
-        var _this = this;
-        _this._droptarget = null;
-        var _root = _this.getMovieClip("_root");
-        var stage = _root.getStage();
-        var parent = _this.getParent();
-        if (!parent) {
-            parent = stage.getParent();
-        }
-
-        var x = _root.getXMouse();
-        var y = _root.getYMouse();
-
-        var tags = parent.getTags();
-        for (var depth in tags) {
-            if (!tags.hasOwnProperty(depth)) {
-                continue;
-            }
-
-            var tag = tags[depth];
-            if (tag.instanceId === _this.instanceId) {
-                continue;
-            }
-
-            if (!(tag instanceof MovieClip)) {
-                continue;
-            }
-
-            var hit = tag.hitTest(x, y);
-            if (hit) {
-                _this._droptarget = tag;
-                break;
-            }
-
-        }
-    };
-
-    /**
      * @param frame
      * @returns {*}
      */
@@ -13163,15 +17849,12 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.setActions = function(frame, actionScript)
     {
         var _this = this;
-        _this.isStatic = false;
-
         var actions = _this.actions;
         if (!(frame in actions)) {
             actions[frame] = [];
         }
-
-        var len = actions[frame].length;
-        actions[frame][len] = actionScript;
+        var length = actions[frame].length;
+        actions[frame][length] = createActionScript(_this, actionScript);
     };
 
     /**
@@ -13183,9 +17866,8 @@ if (!("swf2js" in window)){(function(window)
         var actions = _this.getActions(frame);
         if (actions !== undefined) {
             var length = actions.length;
-            var _actionRun = actionRun;
             for (var i = 0; i < length; i++) {
-                _actionRun(actions[i], _this);
+                actions[i].apply(_this);
             }
         }
     };
@@ -13201,14 +17883,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.isLoad = true;
-        _this.isEnterFrame = true;
-        var tags = _this.getTags();
-        var length = tags.length;
-        var clips = [];
-        var bounds;
-        var _multiplicationMatrix = multiplicationMatrix;
-        var _multiplicationColor = multiplicationColor;
-        var _cloneArray = cloneArray;
 
         // sound
         if (!_this.soundStopFlag) {
@@ -13225,145 +17899,8 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var lastDepth = 0;
-        if (length) {
-            for (var depth in tags) {
-                if (!tags.hasOwnProperty(depth)) {
-                    continue;
-                }
-
-                lastDepth = _max(depth, lastDepth);
-                var obj = tags[depth];
-                if (!obj) {
-                    continue;
-                }
-
-                // mask end
-                var cLen = clips.length;
-                for (var cIdx = 0; cIdx < cLen; cIdx++) {
-                    var cDepth = clips[cIdx];
-                    if (depth > cDepth) {
-                        clips.splice(cIdx, 1);
-                        ctx.restore();
-                        break;
-                    }
-                }
-
-                // mask start
-                if (obj.isClipDepth) {
-                    ctx.save();
-                    ctx.beginPath();
-                    clips[clips.length] = obj.clipDepth;
-                    if (obj instanceof MovieClip) {
-                        stage.isClipDepth = true;
-                    }
-                }
-
-                var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
-                var renderColorTransform = _multiplicationColor(colorTransform, obj.getColorTransform());
-                var isVisible = _min(obj.getVisible(), visible);
-                if (obj.isClipDepth) {
-                    if (renderMatrix[0] === 0) {
-                        renderMatrix[0] = 0.00000000000001;
-                    }
-                    if (renderMatrix[3] === 0) {
-                        renderMatrix[3] = 0.00000000000001;
-                    }
-                }
-
-                var isFilter = false;
-                var buttonHits;
-                if (obj instanceof MovieClip) {
-                    if (isVisible && obj.getEnabled()) {
-                        var variables = obj.variables;
-                        var clipEvent = obj.clipEvent;
-                        if (clipEvent.press !== undefined ||
-                            clipEvent.release !== undefined ||
-                            variables.onPress !== undefined ||
-                            variables.onRelease !== undefined ||
-                            variables.onRollOver !== undefined ||
-                            variables.onRollOut !== undefined
-                        ) {
-                            buttonHits = stage.buttonHits;
-                            bounds = obj.getBounds(renderMatrix);
-                            buttonHits[buttonHits.length] = {
-                                xMax: bounds.xMax,
-                                xMin: bounds.xMin,
-                                yMax: bounds.yMax,
-                                yMin: bounds.yMin,
-                                parent: obj,
-                                matrix: _cloneArray(renderMatrix),
-                                active: (clips.length) ? false : true
-                            };
-                        }
-                    }
-
-                    var filters = obj.getFilters();
-                    if (filters.length) {
-                        isFilter = true;
-                        obj.preFilter(ctx, matrix, renderColorTransform, stage, isVisible);
-                    }
-
-                    if (isVisible && obj.draw) {
-                        obj.executeDraw(ctx, renderMatrix, renderColorTransform, stage);
-                    }
-                }
-
-                if (obj instanceof TextField) {
-                    var type = obj.getVariable("type");
-                    if (type === "input") {
-                        buttonHits = stage.buttonHits;
-                        bounds = obj.getBounds(renderMatrix);
-                        buttonHits[buttonHits.length] = {
-                            xMax: bounds.xMax,
-                            xMin: bounds.xMin,
-                            yMax: bounds.yMax,
-                            yMin: bounds.yMin,
-                            parent: obj,
-                            active: (clips.length) ? false : true
-                        };
-                    }
-                }
-
-                if (obj.getBlendMode() < 3) {
-                    obj.render(ctx, renderMatrix, renderColorTransform, stage, isVisible, _this.getStage());
-                } else {
-                    var scale = stage.getScale();
-                    bounds = obj.getBounds(renderMatrix);
-                    var xMin = bounds.xMin;
-                    var yMin = bounds.yMin;
-                    var width = _ceil((bounds.xMax - xMin) * scale);
-                    var height = _ceil((bounds.yMax - yMin) * scale);
-                    if (width > 0 && height > 0) {
-                        var canvas = cacheStore.getCanvas();
-                        canvas.width = width;
-                        canvas.height = height;
-                        var blendCtx = canvas.getContext("2d");
-                        var ratio = 1 / _devicePixelRatio;
-                        var m2 = [ratio, 0, 0, ratio, -xMin*20/_devicePixelRatio, -yMin*20/_devicePixelRatio];
-                        var bMatrix = _multiplicationMatrix(m2, renderMatrix);
-                        obj.render(blendCtx, bMatrix, renderColorTransform, stage, isVisible, _this.getStage());
-                        obj.blend(ctx, blendCtx, xMin*scale, yMin*scale);
-                    }
-                }
-
-                if (stage.isClipDepth) {
-                    stage.isClipDepth = false;
-                }
-
-                if (isFilter) {
-                    obj.postFilter(ctx, renderMatrix, renderColorTransform, stage, isVisible);
-                }
-            }
-        }
-
-        lastDepth++;
-        if (length && length !== lastDepth) {
-            tags.length = lastDepth;
-        }
-        if (clips.length) {
-            ctx.restore();
-        }
+        var container = _this.getTags();
+        return _this.rendering(container, ctx, matrix, colorTransform, stage, visible);
     };
 
     /**
@@ -13382,12 +17919,15 @@ if (!("swf2js" in window)){(function(window)
         var hit = false;
 
         if (length) {
+            var loadStage = _this.getStage();
             var _multiplicationMatrix = multiplicationMatrix;
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
                 }
-                var obj = tags[depth];
+
+                var instanceId = tags[depth];
+                var obj = loadStage.getInstance(instanceId);
                 var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
                 hit = obj.renderHitTest(ctx, renderMatrix, stage, x, y);
                 if (hit) {
@@ -13396,263 +17936,12 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        if (_this.draw) {
-            return _this.drawHitTest(ctx, matrix, stage, x, y);
+        var graphics = _this.graphics;
+        if (graphics.isDraw) {
+            return graphics.renderHitTest(ctx, matrix, stage, x, y);
         }
 
         return hit;
-    };
-
-    /**
-     * @param ctx
-     * @param matrix
-     * @param stage
-     * @param x
-     * @param y
-     * @returns {boolean}
-     */
-    MovieClip.prototype.drawHitTest = function(ctx, matrix, stage, x, y)
-    {
-        var _this = this;
-        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
-        var fillRecodes = _this.fillRecodes;
-        var lineRecodes = _this.lineRecodes;
-        var recodes;
-        var cmd;
-        var i;
-        var length;
-        var obj;
-        var hit = false;
-
-        setTransform(ctx, rMatrix);
-        length = fillRecodes.length;
-        if (length) {
-            for (i = 0; i < length; i++) {
-                obj = fillRecodes[i];
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    recodes = obj.recodes;
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
-
-                ctx.beginPath();
-                cmd(ctx);
-                hit = ctx.isPointInPath(x, y);
-                if (hit) {
-                    return hit;
-                }
-            }
-        }
-
-        length = lineRecodes.length;
-        if (length) {
-            var minScale = _min(rMatrix[0], rMatrix[3]);
-            for (i = 0; i < length; i++) {
-                obj = lineRecodes[i];
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    recodes = obj.recodes;
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
-
-                ctx.beginPath();
-                ctx.lineWidth = _max(obj.Width, 1 / minScale);
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                cmd(ctx);
-                hit = ctx.isPointInStroke(x, y);
-                if (hit) {
-                    return hit;
-                }
-            }
-        }
-
-        return hit;
-    };
-
-    /**
-     * @param ctx
-     * @param blendCtx
-     * @param xMin
-     * @param yMin
-     */
-    MovieClip.prototype.blend = function(ctx, blendCtx, xMin, yMin)
-    {
-        var _this = this;
-        var mode = _this.blendMode;
-        var operation = "source-over";
-        var canvas = blendCtx.canvas;
-        var width = canvas.width;
-        var height = canvas.height;
-        blendCtx.setTransform(1, 0, 0, 1, 0, 0);
-
-        switch (mode) {
-            case 3: // multiply
-                operation = "multiply";
-                break;
-            case 4: // screen
-                operation = "screen";
-                break;
-            case 5: // lighten
-                operation = "lighten";
-                break;
-            case 6: // darken
-                operation = "darken";
-                break;
-            case 7: // difference
-                operation = "difference";
-                break;
-            case 8: // add
-                operation = "lighter";
-                break;
-            case 9: // subtract
-                blendCtx.globalCompositeOperation = "difference";
-                blendCtx.fillStyle = "rgb(255,255,255)";
-                blendCtx.fillRect(0, 0, width, height);
-                blendCtx.globalCompositeOperation = "darken";
-                blendCtx.fillStyle = "rgb(255,255,255)";
-                blendCtx.fillRect(0, 0, width, height);
-                operation = "color-burn";
-                break;
-            case 10: // invert
-                blendCtx.globalCompositeOperation = "difference";
-                blendCtx.fillStyle = "rgb(255,255,255)";
-                blendCtx.fillRect(0, 0, width, height);
-                blendCtx.globalCompositeOperation = "lighter";
-                blendCtx.fillStyle = "rgb(255,255,255)";
-                blendCtx.fillRect(0, 0, width, height);
-                operation = "difference";
-                break;
-            case 11: // alpha
-            case 12: // erase
-                operation = "source-over";
-                break;
-            case 13: // overlay
-                operation = "overlay";
-                break;
-            case 14: // hardlight
-                operation = "hard-light";
-                break;
-        }
-
-        ctx.globalCompositeOperation = operation;
-        ctx.setTransform(_devicePixelRatio,0,0,_devicePixelRatio,0,0);
-        ctx.drawImage(canvas, xMin, yMin, width, height);
-        ctx.globalCompositeOperation = "source-over";
-        cacheStore.destroy(blendCtx);
-    };
-
-    /**
-     * @param ctx
-     * @param matrix
-     * @param colorTransform
-     */
-    MovieClip.prototype.preFilter = function(ctx, matrix, colorTransform)
-    {
-        // stage, visible
-        var _this = this;
-        var filters = _this.filters;
-        var length = filters.length;
-        if (length) {
-            var _generateColorTransform = generateColorTransform;
-            for (var id = 0; id < length; id++) {
-                if (!(id in filters)) {
-                    continue;
-                }
-
-                var filter = filters[id];
-                var color;
-                switch (id) {
-                    case 0:
-                        color = _generateColorTransform(filter.color, colorTransform);
-                        ctx.shadowColor = rgba(color);
-
-                        //var point = filter.Angle / 20 * _PI / 180;
-                        var r = 45 * _PI / 180;
-                        var bounds = _this.getBounds(matrix);
-                        var x = bounds.xMin/20 + _cos(r) * filter.Distance;
-                        var y = bounds.yMin/20 + _sin(r) * filter.Distance;
-
-                        ctx.shadowBlur = filter.Strength * 3.5 * filter.Passes;
-                        ctx.shadowOffsetX = x;
-                        ctx.shadowOffsetY = y;
-
-                        break;
-                    case 1:
-                        ctx.shadowBlur = 3.5 * filter.Passes;
-                        ctx.shadowOffsetX = filter.BlurX;
-                        ctx.shadowOffsetY = filter.BlurY;
-                        break;
-                    case 2:
-                        color = _generateColorTransform(filter.color, colorTransform);
-                        ctx.shadowColor = rgba(color);
-                        ctx.shadowBlur = filter.Strength * 3.5 * filter.Passes;
-                        //ctx.shadowOffsetX = filter.BlurX;
-                        //ctx.shadowOffsetY = filter.BlurY;
-                        break;
-                }
-            }
-        }
-    };
-
-    /**
-     * @param ctx
-     */
-    MovieClip.prototype.postFilter = function(ctx)
-    {
-        // matrix, colorTransform, stage, visible
-
-        var _this = this;
-        var filters = _this.filters;
-        var length = filters.length;
-        if (length) {
-            //var _generateColorTransform = generateColorTransform;
-            for (var id = 0; id < length; id++) {
-                if (!(id in filters)) {
-                    continue;
-                }
-
-                //var filter = filters[id];
-                switch (id) {
-                    case 0:
-                        ctx.globalCompositeOperation = "source-over";
-                        ctx.shadowBlur = 0;
-                        ctx.shadowColor = "rgba(0,0,0,0)";
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
-                        break;
-                    case 1:
-                        ctx.shadowBlur = 0;
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
-                        break;
-                    case 2:
-                        ctx.shadowBlur = 0;
-                        ctx.shadowColor = "rgba(0,0,0,0)";
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
-                        break;
-                }
-            }
-        }
-    };
-
-    /**
-     * @returns {*}
-     */
-    MovieClip.prototype.getButtonStatus = function()
-    {
-        return this.buttonStatus;
-    };
-
-    /**
-     * @param status
-     */
-    MovieClip.prototype.setButtonStatus = function(status)
-    {
-        this.buttonStatus = status;
     };
 
     /**
@@ -13664,80 +17953,29 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param color
-     */
-    MovieClip.prototype.pushFillRecode = function(color)
-    {
-        var recodes = this.fillRecodes;
-        recodes[recodes.length] = {
-            recodes: [],
-            style: color,
-            cmd: null
-        };
-    };
-
-    /**
-     * @returns {Array}
-     */
-    MovieClip.prototype.getFillRecode = function()
-    {
-        var recodes = this.fillRecodes;
-        var obj = recodes[recodes.length - 1];
-        obj.cmd = null;
-        return obj.recodes;
-    };
-
-    /**
-     * @param color
-     * @param width
-     */
-    MovieClip.prototype.pushLineRecode = function(color, width)
-    {
-        var recodes = this.lineRecodes;
-        recodes[recodes.length] = {
-            recodes: [],
-            Width: (width * 20),
-            style: color,
-            cmd: null
-        };
-    };
-
-    /**
-     * @returns {Array}
-     */
-    MovieClip.prototype.getLineRecode = function()
-    {
-        var recodes = this.lineRecodes;
-        var obj = recodes[recodes.length - 1];
-        obj.cmd = null;
-        return obj.recodes;
-    };
-
-    /**
      * @param rgb
      * @param alpha
      */
     MovieClip.prototype.beginFill = function(rgb, alpha)
     {
-        var _this = this;
-        var color = intToRGBA(rgb, alpha);
-        _this.pushFillRecode(color);
-        _this.isFillDraw = true;
-        _this.draw = true;
+        var graphics = this.getGraphics();
+        graphics.beginFill(rgb, alpha);
     };
 
     /**
      * @param width
      * @param rgb
      * @param alpha
+     * @param pixelHinting
+     * @param noScale
+     * @param capsStyle
+     * @param jointStyle
+     * @param miterLimit
      */
-    MovieClip.prototype.lineStyle = function(width, rgb, alpha)
+    MovieClip.prototype.lineStyle = function(width, rgb, alpha, pixelHinting, noScale, capsStyle, jointStyle, miterLimit)
     {
-        var _this = this;
-        var color = intToRGBA(rgb, alpha);
-        _this.pushLineRecode(color, width);
-        _this.isLineDraw = true;
-        _this.draw = true;
+        var graphics = this.getGraphics();
+        graphics.lineStyle(width, rgb, alpha, pixelHinting, noScale, capsStyle, jointStyle, miterLimit);
     };
 
     /**
@@ -13746,18 +17984,8 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.moveTo = function(dx, dy)
     {
-        var _this = this;
-        var x = dx * 20;
-        var y = dy * 20;
-        var data = [0, x, y];
-        if (_this.isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = data;
-        }
-        if (_this.isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = data;
-        }
+        var graphics = this.getGraphics();
+        graphics.moveTo(dx, dy);
     };
 
     /**
@@ -13766,23 +17994,8 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.lineTo = function(dx, dy)
     {
-        var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
-        var x = dx * 20;
-        var y = dy * 20;
-        var data = [2, x, y];
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = data;
-        }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = data;
-        }
-        if (isFillDraw || isLineDraw) {
-            _this.setBounds(x, y);
-        }
+        var graphics = this.getGraphics();
+        graphics.lineTo(dx, dy);
     };
 
     /**
@@ -13793,25 +18006,8 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.curveTo = function(cx, cy, dx, dy)
     {
-        var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
-        var x = dx * 20;
-        var y = dy * 20;
-        var x2 = cx * 20;
-        var y2 = cy * 20;
-        var data = [1, x2, y2, x, y];
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = data;
-        }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = data;
-        }
-        if (isFillDraw || isLineDraw) {
-            _this.setBounds(x, y);
-        }
+        var graphics = this.getGraphics();
+        graphics.curveTo(cx, cy, dx, dy);
     };
 
     /**
@@ -13819,12 +18015,8 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.clear = function()
     {
-        var _this = this;
-        _this.draw = false;
-        _this.isFillDraw = false;
-        _this.isLineDraw = false;
-        _this.fillRecodes = [];
-        _this.lineRecodes = [];
+        var graphics = this.getGraphics();
+        graphics.clear();
     };
 
     /**
@@ -13832,127 +18024,164 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.endFill = function()
     {
-        this.isFillDraw = false;
+        var graphics = this.getGraphics();
+        graphics.endFill();
     };
-
-    /**
-     * @param ctx
-     * @param matrix
-     * @param colorTransform
-     * @param stage
-     */
-    MovieClip.prototype.executeDraw = function(ctx, matrix, colorTransform, stage)
-    {
-        var _this = this;
-        var alpha = colorTransform[3] + (colorTransform[7] / 255);
-        if (!alpha) {
-            return 0;
-        }
-
-        var isClipDepth = _this.isClipDepth || stage.isClipDepth;
-        var rMatrix = multiplicationMatrix(stage.getMatrix(), matrix);
-        var fillRecodes = _this.fillRecodes;
-        var lineRecodes = _this.lineRecodes;
-        var length;
-        var i;
-        var obj;
-        var recodes;
-        var color;
-        var _generateColorTransform = generateColorTransform;
-        var _rgba = rgba;
-        var cmd;
-
-        setTransform(ctx, rMatrix);
-        length = fillRecodes.length;
-        if (length) {
-            for (i = 0; i < length; i++) {
-                obj = fillRecodes[i];
-                color = _generateColorTransform(obj.style, colorTransform);
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    recodes = obj.recodes;
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
-
-                ctx.beginPath();
-                ctx.fillStyle = _rgba(color);
-                cmd(ctx);
-                ctx.fill();
-            }
-        }
-
-        if (!isClipDepth) {
-            length = lineRecodes.length;
-            if (length) {
-                var minScale = _min(rMatrix[0], rMatrix[3]);
-                for (i = 0; i < length; i++) {
-                    obj = lineRecodes[i];
-                    color = _generateColorTransform(obj.style, colorTransform);
-                    cmd = obj.cmd;
-                    if (cmd === null) {
-                        recodes = obj.recodes;
-                        cmd = vtc.buildCommand(recodes);
-                        obj.cmd = cmd;
-                    }
-
-                    ctx.beginPath();
-                    ctx.strokeStyle = _rgba(color);
-                    ctx.lineWidth = _max(obj.Width, 1 / minScale);
-                    ctx.lineCap = "round";
-                    ctx.lineJoin = "round";
-                    cmd(ctx);
-                    ctx.stroke();
-                }
-            }
-        }
-
-        var resetCss = "rgba(0,0,0,1)";
-        ctx.strokeStyle = resetCss;
-        ctx.fillStyle = resetCss;
-        ctx.globalAlpha = 1;
-    };
-
 
     /**
      * @constructor
      */
-    var MovieClipLoader = function(){};
+    var MovieClipLoader = function()
+    {
+        var _this = this;
+        _this.variables = {};
+    };
 
+    /**
+     * properties
+     */
+    Object.defineProperties(MovieClipLoader.prototype,
+    {
+        onLoadComplete: {
+            get: function () {
+                return this.getProperty("onLoadComplete");
+            },
+            set: function (onLoadComplete) {
+                this.setProperty(onLoadComplete);
+            }
+        },
+        onLoadError: {
+            get: function () {
+                return this.getProperty("onLoadError");
+            },
+            set: function (onLoadError) {
+                this.setProperty(onLoadError);
+            }
+        },
+        onLoadInit: {
+            get: function () {
+                return this.getProperty("onLoadInit");
+            },
+            set: function (onLoadInit) {
+                this.setProperty(onLoadInit);
+            }
+        },
+        onLoadProgress: {
+            get: function () {
+                return this.getProperty("onLoadProgress");
+            },
+            set: function (onLoadProgress) {
+                this.setProperty(onLoadProgress);
+            }
+        },
+        onLoadStart: {
+            get: function () {
+                return this.getProperty("onLoadStart");
+            },
+            set: function (onLoadStart) {
+                this.setProperty(onLoadStart);
+            }
+        }
+    });
 
+    /**
+     * @param url
+     * @param target
+     */
     MovieClipLoader.prototype.loadClip = function(url, target)
     {
 
     };
 
+    /**
+     *
+     * @param listener
+     */
+    MovieClipLoader.prototype.addListener = function(listener)
+    {
+
+    };
 
     /**
-     * @param mc
+     *
+     * @param target
+     */
+    MovieClipLoader.prototype.getProgress = function(target)
+    {
+
+    };
+
+    /**
+     *
+     * @param listener
+     */
+    MovieClipLoader.prototype.removeListener = function(listener)
+    {
+
+    };
+
+    /**
+     *
+     * @param target
+     */
+    MovieClipLoader.prototype.unloadClip = function(target)
+    {
+
+    };
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    MovieClipLoader.prototype.getProperty = function(name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * @param name
+     * @param value
+     */
+    MovieClipLoader.prototype.setProperty = function(name, value)
+    {
+        this.variables[String(name)] = value;
+    };
+
+
+
+    /**
      * @constructor
      */
-    var LoadVars = function(mc)
+    var LoadVars = function()
     {
         var _this = this;
         _this.xmlHttpRequest = new XMLHttpRequest();
-        _this.movieClip = mc;
         _this.variables = {};
         _this.target = _this;
-
-        /**
-         * @param src
-         */
-        _this.onData = function(src)
-        {
-            _this.decode(src);
-            var as = _this.getProperty("onLoad");
-            if (as) {
-                var AS = as.cache;
-                AS.setVariable("success", true);
-                AS.setVariable("this", _this.target);
-                AS.execute(_this.movieClip);
-            }
-        };
     };
+
+    /**
+     * properties
+     */
+    Object.defineProperties(LoadVars.prototype,
+    {
+        onData: {
+            get: function () {
+                return this.getProperty("onData");
+            },
+            set: function (onData) {
+                this.setProperty("onData", onData);
+            }
+        },
+        onLoad: {
+            get: function () {
+                return this.getProperty("onLoad");
+            },
+            set: function (onLoad) {
+                this.setProperty("onLoad", onLoad);
+            }
+        }
+    });
 
     /**
      * @param name
@@ -13985,19 +18214,28 @@ if (!("swf2js" in window)){(function(window)
         {
             var readyState = xmlHttpRequest.readyState;
             if (readyState === 4) {
+                var src = decodeURIComponent(xmlHttpRequest.responseText);
+                _this.decode(src);
+                var onData = _this.onData;
+                if (onData) {
+                    onData.apply(src, [src]);
+                }
+
+                var onLoad;
                 var status = xmlHttpRequest.status;
                 switch (status) {
                     case 200:
                     case 304:
-                        var responseText = decodeURIComponent(xmlHttpRequest.responseText);
-                        var as = _this.getProperty("onData");
-                        if (as) {
-                            as(as.cache, _this.movieClip, [responseText]);
-                        } else {
-                            _this.onData(responseText);
+                        onLoad = _this.onLoad;
+                        if (onLoad) {
+                            onLoad.apply(src, [true]);
                         }
                         return true;
                     default:
+                        onLoad = _this.onLoad;
+                        if (onLoad) {
+                            onLoad.apply(src, [false]);
+                        }
                         return false;
                 }
             }
@@ -14108,17 +18346,58 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param mc
      * @constructor
      */
-    var Xml = function(mc)
+    var Xml = function()
     {
         var _this = this;
-        _this.movieClip = mc;
         _this.ignoreWhite = false;
         _this.loaded = false;
         _this.status = 0;
+        _this.variables = {};
     };
+
+    /**
+     * properties
+     */
+    Object.defineProperties(Xml.prototype,
+    {
+        onData: {
+            get: function () {
+                return this.getProperty("onData");
+            },
+            set: function (onData) {
+                this.setProperty("onData", onData);
+            }
+        },
+        onLoad: {
+            get: function () {
+                return this.getProperty("onLoad");
+            },
+            set: function (onLoad) {
+                this.setProperty("onLoad", onLoad);
+            }
+        }
+    });
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    Xml.prototype.getProperty = function(name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * @param name
+     * @param value
+     */
+    Xml.prototype.setProperty = function(name, value)
+    {
+        this.variables[String(name)] = value;
+    };
+
 
     /**
      * @param url
@@ -14126,25 +18405,34 @@ if (!("swf2js" in window)){(function(window)
     Xml.prototype.load = function(url)
     {
         var _this = this;
+        url = "" + url;
         var xmlHttpRequest = new XMLHttpRequest();
         xmlHttpRequest.open("GET", url);
         xmlHttpRequest.onreadystatechange = function()
         {
             var readyState = xmlHttpRequest.readyState;
             if (readyState === 4) {
+                var src = xmlHttpRequest.responseXML;
+                var onData = _this.onData;
+                if (onData) {
+                    onData.apply(src, [src]);
+                }
+
+                var onLoad;
                 var status = xmlHttpRequest.status;
                 switch (status) {
                     case 200:
                     case 304:
-                        var as = _this.onLoad;
-                        if (as) {
-                            var AS = as.cache;
-                            AS.setVariable("success", true);
-                            AS.setVariable("this", xmlHttpRequest.responseXML);
-                            AS.execute(_this.movieClip);
+                        onLoad = _this.onLoad;
+                        if (onLoad) {
+                            onLoad.apply(src, [true]);
                         }
                         return true;
                     default:
+                        onLoad = _this.onLoad;
+                        if (onLoad) {
+                            onLoad.apply(src, [false]);
+                        }
                         return false;
                 }
             }
@@ -14179,6 +18467,8 @@ if (!("swf2js" in window)){(function(window)
         _this.send(url);
         return _this.load(resultXML);
     };
+
+
 
     /**
      * @constructor
@@ -14471,6 +18761,66 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param mc
+     * @constructor
+     */
+    var Color = function(mc)
+    {
+        this.movieClip = mc;
+    };
+
+    /**
+     * @param offset
+     */
+    Color.prototype.setRGB = function(offset)
+    {
+        var _this = this;
+        var mc = _this.movieClip;
+        if (mc instanceof MovieClip) {
+            var obj = intToRGBA(_parseInt(offset));
+            var colorTransform = mc.getOriginColorTransform();
+            if (colorTransform) {
+                var transform = [obj.R,obj.G,obj.B,obj.A*255,0,0,0,0];
+                var multiColor = cloneArray(transform);
+                var color = multiplicationColor(colorTransform, multiColor);
+                mc.setColorTransform(color);
+            }
+        }
+    };
+
+    /**
+     * @returns {*[]|*}
+     */
+    Color.prototype.getTransform = function()
+    {
+        var _this = this;
+        var mc = _this.movieClip;
+        if (mc instanceof MovieClip) {
+            return mc.getColorTransform();
+        }
+        return undefined;
+    };
+
+    /**
+     * @param obj
+     */
+    Color.prototype.setTransform = function(obj)
+    {
+        var _this = this;
+        var mc = _this.movieClip;
+        if (mc instanceof MovieClip) {
+            var colorTransform = mc.getOriginColorTransform();
+            var transform = [
+                obj.rb, obj.gb, obj.bb, obj.ab,
+                obj.ra, obj.ga, obj.ba, obj.aa
+            ];
+            var multiColor = cloneArray(transform);
+            var color = multiplicationColor(colorTransform, multiColor);
+            mc.setColorTransform(color);
+        }
+    };
+
+    /**
      * @constructor
      */
     var Key = function()
@@ -14486,29 +18836,17 @@ if (!("swf2js" in window)){(function(window)
     Key.prototype.addListener = function(listener)
     {
         var _this = this;
-        var onKeyDown;
-        var onKeyUp;
-        if ("getProperty" in listener) {
-            onKeyDown = listener.getProperty("onKeyDown");
-            onKeyUp = listener.getProperty("onKeyUp");
-        } else {
-            onKeyDown = listener.onKeyDown;
-            onKeyUp = listener.onKeyUp;
-        }
+        var onKeyDown = listener.onKeyDown;
+        var onKeyUp = listener.onKeyUp;
 
-        var as;
         if (onKeyDown) {
-            as = onKeyDown.cache;
-            as.setVariable("this", listener);
             var keyDownEvent = _this.keyDownEvent;
-            keyDownEvent[keyDownEvent.length] = onKeyDown;
+            keyDownEvent[keyDownEvent.length] = {as: onKeyDown, mc: listener};
         }
 
         if (onKeyUp) {
-            as = onKeyUp.cache;
-            as.setVariable("this", listener);
             var keyUpEvent = _this.keyUpEvent;
-            keyUpEvent[keyUpEvent.length] = onKeyUp;
+            keyUpEvent[keyUpEvent.length] = {as: onKeyUp, mc: listener};
         }
     };
 
@@ -14526,9 +18864,6 @@ if (!("swf2js" in window)){(function(window)
      */
     Key.prototype.getCode = function()
     {
-        if (isTouch) {
-            return 13;
-        }
         var keyCode = (_keyEvent) ? _keyEvent.keyCode : null;
         if (96 <= keyCode && keyCode <= 105) {
             var n = keyCode - 96;
@@ -14572,17 +18907,15 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param event
      */
-    function keyDownAction(event)
+    function keyUpAction(event)
     {
         _keyEvent = event;
         var keyUpEvent = keyClass.keyUpEvent;
         var length = keyUpEvent.length;
         if (length) {
             for (var i = 0; i < length; i++) {
-                var func = keyUpEvent[i];
-                var as = func.cache;
-                var mc = as.getVariable("this");
-                func(as, mc, []);
+                var obj = keyUpEvent[i];
+                obj.as.apply(obj.mc);
             }
         }
     }
@@ -14590,26 +18923,21 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param event
      */
-    function keyUpAction(event)
+    function keyDownAction(event)
     {
         _keyEvent = event;
         var keyCode = keyClass.getCode();
         var i;
         var length;
-        var func;
-        var as;
-        var mc;
         var keyDownEvent = keyClass.keyDownEvent;
+        var obj;
         length = keyDownEvent.length;
         if (length) {
             for (i = 0; i < length; i++) {
-                func = keyDownEvent[i];
-                as = func.cache;
-                mc = as.getVariable("this");
-                func(as, mc, []);
+                obj = keyDownEvent[i];
+                obj.as.apply(obj.mc);
             }
         }
-
 
         var idx;
         length = stages.length;
@@ -14622,10 +18950,9 @@ if (!("swf2js" in window)){(function(window)
             var keyDownEventHits = stage.keyDownEventHits;
             var kLen = keyDownEventHits.length;
             if (kLen) {
-                var _executeEventAction = stage.executeEventAction;
                 for (idx = 0; idx < kLen; idx++) {
-                    var obj = keyDownEventHits[idx];
-                    _executeEventAction.call(stage, obj);
+                    obj = keyDownEventHits[idx];
+                    stage.executeEventAction(obj.as, obj.mc);
                 }
             }
 
@@ -14723,48 +19050,46 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.variables = {};
-
-        /**
-         *
-         * @param name
-         * @returns {*}
-         */
-        _this.getVariable = function(name)
-        {
-            return _this.variables[name];
-        };
-
-        /**
-         * @param name
-         * @param value
-         * @returns {*}
-         */
-        _this.setVariable = function(name, value)
-        {
-            _this.variables[name] = value;
-        };
-
-        /**
-         * @param name
-         * @returns {*}
-         */
-        _this.getProperty = function(name)
-        {
-            return _this.variables[name];
-        };
-
-        /**
-         * @param name
-         * @param value
-         */
-        _this.setProperty = function(name, value)
-        {
-            _this.variables[name] = value;
-        };
-
     };
 
-    Global.prototype = window.prototype;
+    /**
+     *
+     * @param name
+     * @returns {*}
+     */
+    Global.prototype.getVariable = function(name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * @param name
+     * @param value
+     * @returns {*}
+     */
+    Global.prototype.setVariable = function(name, value)
+    {
+        this.variables[name] = value;
+    };
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    Global.prototype.getProperty = function(name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * @param name
+     * @param value
+     */
+    Global.prototype.setProperty = function(name, value)
+    {
+        this.variables[name] = value;
+    };
+    //Global.prototype = window.prototype;
 
     /**
      * @constructor
@@ -14776,12 +19101,6 @@ if (!("swf2js" in window)){(function(window)
         _this.name = "swf2js_"+_this.id;
         _this.intervalId = 0;
 
-        var mc = new MovieClip();
-        var _cloneArray = cloneArray;
-        mc.matrix = _cloneArray([1,0,0,1,0,0]);
-        mc.colorTransform = _cloneArray([1,1,1,1,0,0,0,0]);
-        _this.parent = mc;
-        _this.parent.stage = this;
         _this.fps = 0;
         _this.fileSize = 0;
         _this.stopFlag = true;
@@ -14800,9 +19119,12 @@ if (!("swf2js" in window)){(function(window)
         _this.canvas = null;
         _this.preContext = null;
         _this.hitContext = null;
-        _this.matrix = [];
+        _this.matrix = [1,0,0,1,0,0];
         _this.characters = [];
+        _this.initActions = [];
+        _this.initMovieClip = [];
         _this.exportAssets = [];
+        _this.registerClass = [];
         _this.buttonHits = [];
         _this.downEventHits = [];
         _this.moveEventHits = [];
@@ -14813,14 +19135,15 @@ if (!("swf2js" in window)){(function(window)
         _this.loadSounds = [];
         _this.videos = [];
         _this.actions = [];
+        _this.instances = [];
+        _this.controllers = [];
+        _this.placeObjects = [];
         _this.isAction = true;
         _this.queue = null;
         _this._global = new Global();
-        _this.initActions = [];
         _this.touchObj = null;
         _this.touchStatus = "up";
         _this.overObj = null;
-        _this.dragStatus = "in";
         _this.touchEndAction = null;
         _this.imgUnLoadCount = 0;
         _this.scale = 1;
@@ -14837,11 +19160,16 @@ if (!("swf2js" in window)){(function(window)
         _this.loadStatus = 0;
         _this.isClipDepth = false;
         _this.clipDepth = 0;
-        _this.clipMc = null;
+        _this.clipMc = false;
         _this.dragMc = null;
         _this.dragRules = null;
         _this.scaleMode = "showAll";
         _this.align = "";
+
+        // init
+        var mc = new MovieClip();
+        mc.setStage(_this);
+        _this.setParent(mc);
     };
 
     /**
@@ -15099,6 +19427,85 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param id
+     * @returns {*}
+     */
+    Stage.prototype.getInstance = function(id)
+    {
+        return this.instances[id];
+    };
+
+    /**
+     * @param instance
+     */
+    Stage.prototype.setInstance = function(instance)
+    {
+        this.instances[instance.instanceId] = instance;
+    };
+
+    /**
+     * @param instanceId
+     * @param depth
+     * @param frame
+     * @returns {*}
+     */
+    Stage.prototype.getPlaceObject = function(instanceId, depth, frame)
+    {
+        var placeObjects = this.placeObjects;
+        if (!(instanceId in placeObjects)) {
+            return null;
+        }
+        var placeObject = placeObjects[instanceId];
+        if (!(frame in placeObject)) {
+            return null;
+        }
+        var tags = placeObject[frame];
+        if (!(depth in tags)) {
+            return null;
+        }
+        return tags[depth];
+    };
+
+    /**
+     * @param placeObject
+     * @param instanceId
+     * @param depth
+     * @param frame
+     */
+    Stage.prototype.setPlaceObject = function(placeObject, instanceId, depth, frame)
+    {
+        var _this = this;
+        var placeObjects = _this.placeObjects;
+        if (!(instanceId in placeObjects)) {
+            placeObjects[instanceId] = [];
+        }
+        if (!(frame in placeObjects[instanceId])) {
+            placeObjects[instanceId][frame] = [];
+        }
+        placeObjects[instanceId][frame][depth] = placeObject;
+    };
+
+    /**
+     * @param instanceId
+     * @param depth
+     * @param frame
+     */
+    Stage.prototype.copyPlaceObject = function(instanceId, depth, frame)
+    {
+        var _this = this;
+        var placeObject = _this.getPlaceObject(instanceId, depth, frame - 1);
+        _this.setPlaceObject(placeObject, instanceId, depth, frame);
+    };
+
+    /**
+     * @param instanceId
+     */
+    Stage.prototype.removePlaceObject = function(instanceId)
+    {
+        delete this.placeObjects[instanceId];
+    };
+
+    /**
      * @returns {*}
      */
     Stage.prototype.getFps = function()
@@ -15194,10 +19601,11 @@ if (!("swf2js" in window)){(function(window)
             case "FWS": // No ZIP
                 break;
             case "CWS": // ZLIB
-                bitio.deCompress(fileLength);
+                bitio.deCompress(fileLength, "ZLIB");
                 break;
-            case "ZWS": // LZMA
-                alert("not supported by LZMA");
+            case "ZWS": // TODO LZMA
+                alert("not support LZMA");
+                //bitio.deCompress(fileLength, "LZMA");
                 return false;
         }
 
@@ -15232,7 +19640,7 @@ if (!("swf2js" in window)){(function(window)
             canvas.height = height;
             var imageContext = canvas.getContext("2d");
             imageContext.drawImage(this, 0, 0, width, height);
-            _this.setCharacter(2, imageContext);
+            _this.setCharacter(1, imageContext);
 
             var shapeWidth = width * 20;
             var shapeHeight = height * 20;
@@ -15288,7 +19696,7 @@ if (!("swf2js" in window)){(function(window)
                 fillStyles: {
                     fillStyleCount: 1,
                     fillStyles: [{
-                        bitmapId: 2,
+                        bitmapId: 1,
                         bitmapMatrix: [20, 0, 0, 20, 0, 0],
                         fillStyleType: 65
                     }]
@@ -15300,30 +19708,35 @@ if (!("swf2js" in window)){(function(window)
             };
 
             var bounds = {xMin: 0, xMax: shapeWidth, yMin: 0, yMax: shapeHeight};
+            var data = vtc.convert(shape);
 
-            _this.setCharacter(1, {
+            _this.setCharacter(2, {
                 tagType: 22,
-                data: vtc.convert(shape),
+                data: data,
                 bounds: bounds
             });
 
+            var parent = _this.getParent();
             var obj = new Shape();
-            obj.setData(vtc.convert(shape));
+            obj.setParent(parent);
+            obj.setStage(_this);
+            obj.setData(data);
             obj.setTagType(22);
-            obj.setCharacterId(1);
+            obj.setCharacterId(2);
             obj.setBounds(bounds);
-            obj.setMatrix(cloneArray([1,0,0,1,0,0]));
-            obj.setColorTransform(cloneArray([1,1,1,1,0,0,0,0]));
             obj.setLevel(1);
 
-            var mc = _this.getParent();
-            mc.addTags[1] = [];
-            mc.addTags[1][1] = obj;
+            parent.container[1] = [];
+            parent.container[1][1] = obj.instanceId;
+
+            var placeObject = new PlaceObject();
+            _this.setPlaceObject(placeObject, obj.instanceId, 1, 1);
 
             _this.init();
         };
 
-        image.src = "data:image/jpeg;base64,"+ swftag.base64encode(swftag.parseJpegData(data));
+        var jpegData = swftag.parseJpegData(data);
+        image.src = "data:image/jpeg;base64,"+ swftag.base64encode(jpegData);
     };
 
     /**
@@ -15416,13 +19829,16 @@ if (!("swf2js" in window)){(function(window)
         var div = _document.getElementById(_this.getName());
         if (div) {
             // _root
+            _this.doInitActions();
+
             var mc = _this.getParent();
             mc.addActions();
             _this.executeAction();
 
             // callback
-            if (typeof _this.callback === "function") {
-                _this.callback.call(window, mc);
+            var callback = _this.callback;
+            if (typeof callback === "function") {
+                callback.call(window, mc);
             }
 
             // render
@@ -15533,10 +19949,29 @@ if (!("swf2js" in window)){(function(window)
         _this.buttonHits = [];
         var mc = _this.getParent();
         var ctx = _this.preContext;
+
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = _this.getBackgroundColor();
+        ctx.globalCompositeOperation = "source-over";
         ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
-        mc.render(ctx, mc.getMatrix(), mc.getColorTransform(), _this, mc.getVisible());
+        mc.preRender(ctx, mc.getMatrix(), mc.getColorTransform(), _this, mc.getVisible());
+    };
+
+    /**
+     * doInitActions
+     */
+    Stage.prototype.doInitActions = function()
+    {
+        var initActions = this.initActions;
+        var length = initActions.length;
+        if (length) {
+            for (var i = 0; i < length; i++) {
+                var obj = initActions[i];
+                var as = obj.as;
+                var mc = obj.mc;
+                as.apply(mc);
+            }
+        }
     };
 
     /**
@@ -15547,17 +19982,25 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         if (_this.isAction && _this.actions.length) {
             _this.isAction = false;
-            var _actionRun = actionRun;
             for (var i = 0; i < _this.actions.length; i++) {
                 var obj = _this.actions[i];
                 var mc = obj.mc;
                 if (!mc.active) {
                     continue;
                 }
-                var as = obj.as;
-                var length = as.length;
-                for (var idx = 0; idx < length; idx++) {
-                    _actionRun(as[idx], mc);
+                var actions = obj.as;
+                if (typeof actions === "function") {
+                    actions.apply(mc);
+                } else {
+                    var length = actions.length;
+                    if (length) {
+                        for (var idx in actions) {
+                            if (!actions.hasOwnProperty(idx)) {
+                                continue;
+                            }
+                            actions[idx].apply(mc);
+                        }
+                    }
                 }
             }
         }
@@ -15601,9 +20044,13 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.instanceId = 0;
-        _this.parent = new MovieClip();
-        _this.parent.stage = _this;
+        var mc = new MovieClip();
+        mc.reset();
+        mc.setStage(_this);
+        _this.parent = mc;
         _this.characters = [];
+        _this.instances = [];
+        _this.controllers = [];
         _this.buttonHits = [];
         _this.downEventHits = [];
         _this.moveEventHits = [];
@@ -15613,7 +20060,7 @@ if (!("swf2js" in window)){(function(window)
         _this.sounds = [];
         _this.loadSounds = [];
         _this.actions = [];
-        _this.initActions = [];
+        _this.initMovieClip = [];
     };
 
     /**
@@ -15627,11 +20074,12 @@ if (!("swf2js" in window)){(function(window)
         if (_this.getId() in stages) {
             if (tagId) {
                 if (_document.readyState === "loading") {
-                    var reStart = function () {
-                        window.removeEventListener("DOMContentLoaded", reStart, false);
+                    var reTry = function ()
+                    {
+                        window.removeEventListener("DOMContentLoaded", reTry);
                         _this.init();
                     };
-                    window.addEventListener("DOMContentLoaded", reStart, false);
+                    window.addEventListener("DOMContentLoaded", reTry);
                     return 0;
                 }
 
@@ -15650,9 +20098,7 @@ if (!("swf2js" in window)){(function(window)
                     container.appendChild(div);
                 }
             } else {
-                _document.open();
-                _document.write('<div id="' + _this.getName() + '"></div>');
-                _document.close();
+                _document.body.insertAdjacentHTML("beforeend", "<div id='" + _this.getName() + "'></div>");
             }
         }
 
@@ -15731,8 +20177,8 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (!isTouch) {
-            window.addEventListener("keydown", keyUpAction);
-            window.addEventListener("keyup", keyDownAction);
+            window.addEventListener("keydown", keyDownAction);
+            window.addEventListener("keyup", keyUpAction);
             window.addEventListener("keyup", function (event)
             {
                 _keyEvent = event;
@@ -15985,19 +20431,24 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param obj
+     * @param actions
+     * @param caller
      */
-    Stage.prototype.executeEventAction = function(obj)
+    Stage.prototype.executeEventAction = function(actions, caller)
     {
-        var _this = this;
-        var actions = obj.as;
-        var mc = obj.mc;
-        var length = actions.length;
-        var _actionRun = actionRun;
-        for (var i = 0; i < length; i++) {
-            _actionRun(actions[i], mc);
+        if (actions) {
+            if (typeof actions === "function") {
+                actions.apply(caller);
+            } else {
+                var length = actions.length;
+                if (length) {
+                    for (var i = 0; i < length; i++) {
+                        actions[i].apply(caller);
+                    }
+                }
+            }
+            this.executeAction();
         }
-        _this.executeAction();
     };
 
     /**
@@ -16013,19 +20464,19 @@ if (!("swf2js" in window)){(function(window)
             _this.touchEndAction = null;
             var downEventHits = _this.downEventHits;
             var length = downEventHits.length;
-            var mc;
+            var mc, as;
             if (length) {
                 event.preventDefault();
-                var _executeEventAction = _this.executeEventAction;
                 for (var i = 0; i < length; i++) {
                     var obj = downEventHits[i];
-                    var downEvent = obj.event;
-                    if (downEvent) {
-                        mc = obj.mc;
-                        obj.as = mc.getEvent("onMouseDown");
+                    mc = obj.mc;
+                    as = obj.as;
+                    if (!as) {
+                        as = mc.onMouseDown;
                     }
-                    _executeEventAction.call(_this, obj);
+                    _this.executeEventAction(as, obj.mc);
                 }
+                _this.downEventHits = [];
             }
 
             var hitObj = _this.hitCheck(event);
@@ -16053,53 +20504,48 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.executePress = function(mc, hitObj)
     {
         var _this = this;
-        var as;
         var isRender = false;
-        if (mc instanceof MovieClip) {
-            var variables = mc.variables;
-            var clipEvent = mc.clipEvent;
-            if (isTouch) {
-                var onRollOver = variables.onRollOver;
-                if (onRollOver !== undefined) {
-                    as = onRollOver.cache;
-                    as.setVariable("this", mc);
-                    _this.executeEventAction({as:[onRollOver], mc: mc});
-                    isRender = true;
-                }
-            }
-            var press = clipEvent.press;
-            if (press !== undefined) {
-                _this.executeEventAction({as:press, mc: mc});
-                isRender = true;
-            }
-            var onPress = variables.onPress;
-            if (onPress !== undefined) {
-                as = onPress.cache;
-                as.setVariable("this", mc);
-                _this.executeEventAction({as:[onPress], mc: mc});
+        var onPress;
+        var onRollOver;
+        if (isTouch) {
+            onRollOver = mc.onRollOver;
+            if (onRollOver) {
+                _this.executeEventAction(onRollOver, mc);
                 isRender = true;
             }
         }
 
-        var button = hitObj.button;
-        var func;
+        var events = mc.events;
+        var press = events.press;
+        if (press) {
+            _this.executeEventAction(press, mc);
+            isRender = true;
+        }
+        onPress = mc.onPress;
+        if (onPress) {
+            _this.executeEventAction(onPress, mc);
+            isRender = true;
+        }
 
+        var button = hitObj.button;
         if (button) {
             if (isTouch) {
-                func = button.getVariable("onRollOver");
-                if (typeof func === "function") {
-                    as = func.cache;
-                    as.setVariable("this", button);
-                    as.execute(mc);
-                    _this.executeAction();
+                onRollOver = button.onRollOver;
+                if (onRollOver) {
+                    _this.executeEventAction(onRollOver, button);
                 }
             }
 
             button.setButtonStatus("down");
+            if (isTouch) {
+                _this.executeButtonAction(button, mc, "CondIdleToOverUp");
+            }
+
             var actions = button.getActions();
             var length = actions.length;
             if (length) {
                 var touchObj = _this.touchObj;
+
                 for (var idx = 0; idx < length; idx++) {
                     if (!(idx in actions)) {
                         continue;
@@ -16120,8 +20566,7 @@ if (!("swf2js" in window)){(function(window)
                     if (isTouch) {
                         if (keyPress === 13 ||
                             (keyPress >= 48 && keyPress <= 57) ||
-                            cond.CondOverUpToOverDown ||
-                            (isTouch && cond.CondIdleToOverUp)
+                            cond.CondOverUpToOverDown
                         ) {
                             _this.buttonAction(mc, cond.ActionScript);
                         }
@@ -16133,16 +20578,13 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
 
-            func = button.getVariable("onPress");
-            if (typeof func === "function") {
-                as = func.cache;
-                as.setVariable("this", button);
-                as.execute(mc);
-                _this.executeAction();
+            onPress = button.onPress;
+            if (onPress) {
+                _this.executeEventAction(onPress, button);
             }
 
-            var buttonCharacter = button.getButtonCharacter();
-            buttonCharacter.startSound();
+            var sprite = button.getSprite();
+            sprite.startSound();
 
             isRender = true;
         }
@@ -16214,26 +20656,23 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchMove = function(event)
     {
         var _this = this;
-        var mc;
-        var as;
-        var button;
-        var func;
-        var variables;
         var overObj = _this.overObj;
         var moveEventHits = _this.moveEventHits;
         var length = moveEventHits.length;
+        var mc, as, button, events;
+        var dragOver, onDragOver, dragOut, onDragOut, rollOver, onRollOver, rollOut, onRollOut;
         if (length) {
             event.preventDefault();
-            var _executeEventAction = _this.executeEventAction;
             for (var i = 0; i < length; i++) {
                 var obj = moveEventHits[i];
-                var moveEvent = obj.event;
-                if (moveEvent) {
-                    mc = obj.mc;
-                    obj.as = mc.getEvent("onMouseMove");
+                mc = obj.mc;
+                as = obj.as;
+                if (!as) {
+                    as = mc.onMouseMove;
                 }
-                _executeEventAction.call(_this, obj);
+                _this.executeEventAction(as, mc);
             }
+            _this.moveEventHits = [];
         }
 
         if (!isTouch || (isTouch && _this.isTouchEvent)) {
@@ -16243,9 +20682,8 @@ if (!("swf2js" in window)){(function(window)
                 hitObj = _this.hitCheck(event);
             }
 
-            var buttonCharacter;
+            var sprite;
             var isRender = false;
-
             if (!isTouch) {
                 var canvas = _this.canvas;
                 if (_this.isHit || touchObj) {
@@ -16262,65 +20700,72 @@ if (!("swf2js" in window)){(function(window)
             if (touchObj) {
                 button = touchObj.button;
                 mc = touchObj.parent;
+
                 if (mc.active) {
                     _this.overObj = hitObj;
                     if (hitObj &&
                         hitObj.parent.instanceId === mc.instanceId &&
                         hitObj.button === button
                     ) {
-                        if (mc instanceof MovieClip && mc.getButtonStatus() === "up") {
+                        if (mc.getButtonStatus() === "up") {
                             mc.setButtonStatus("down");
-                            variables = mc.variables;
-                            var onDragOver = variables.onDragOver;
-                            if (onDragOver !== undefined) {
-                                as = onDragOver.cache;
-                                as.setVariable("this", button);
-                                _this.executeEventAction({as: [onDragOver], mc: mc});
+
+                            events = mc.events;
+                            dragOver = events.dragOver;
+                            if (dragOver) {
+                                isRender = true;
+                                _this.executeEventAction(dragOver, mc);
+                            }
+
+                            onDragOver = mc.onDragOver;
+                            if (onDragOver) {
+                                isRender = true;
+                                _this.executeEventAction(onDragOver, mc);
                             }
                         }
 
                         if (button && button.getButtonStatus() === "up") {
                             button.setButtonStatus("down");
-                            buttonCharacter = button.getButtonCharacter();
-                            buttonCharacter.startSound();
-
-                            func = button.getVariable("onDragOver");
-                            if (typeof func === "function") {
-                                as = func.cache;
-                                as.setVariable("this", button);
-                                as.execute(mc);
-                                _this.executeAction();
+                            sprite = button.getSprite();
+                            sprite.startSound();
+                            onDragOver = button.onDragOver;
+                            if (onDragOver) {
+                                isRender = true;
+                                _this.executeEventAction(onDragOver, button);
                             }
-                            isRender = true;
+
                         }
                     } else {
-                        mc.setButtonStatus("up");
-                        if (mc instanceof MovieClip && mc.getButtonStatus() === "down") {
-                            variables = mc.variables;
-                            var onDragOut = variables.onDragOut;
-                            if (onDragOut !== undefined) {
-                                as = onDragOut.cache;
-                                as.setVariable("this", button);
-                                _this.executeEventAction({as: [onDragOut], mc: mc});
+                        if (mc.getButtonStatus() === "down") {
+                            events = mc.events;
+                            dragOut = events.dragOut;
+                            if (dragOut) {
+                                isRender = true;
+                                _this.executeEventAction(dragOut, mc);
+                            }
+
+                            onDragOut = mc.onDragOut;
+                            if (onDragOut) {
+                                isRender = true;
+                                _this.executeEventAction(onDragOut, mc);
                             }
                         }
+                        mc.setButtonStatus("up");
 
                         if (button) {
                             if (button.getButtonStatus() === "down") {
                                 button.setButtonStatus("up");
-                                func = button.getVariable("onDragOut");
-                                if (typeof func === "function") {
-                                    as = func.cache;
-                                    as.setVariable("this", button);
-                                    as.execute(mc);
-                                    _this.executeAction();
+                                onDragOut = button.onDragOut;
+                                if (onDragOut) {
+                                    isRender = true;
+                                    _this.executeEventAction(onDragOut, button);
                                 }
-                                isRender = true;
                             }
                         }
                     }
                 }
             } else if (hitObj) {
+
                 if (overObj) {
                     button = overObj.button;
                     if (button && button !== hitObj.button) {
@@ -16335,35 +20780,37 @@ if (!("swf2js" in window)){(function(window)
                 _this.overObj = hitObj;
                 button = hitObj.button;
                 mc = hitObj.parent;
-                if (!isTouch && mc instanceof MovieClip && mc.active) {
+                if (!isTouch && mc.active) {
                     if (!overObj || overObj.parent !== mc) {
-                        variables = mc.variables;
-                        var onRollOver = variables.onRollOver;
-                        if (onRollOver !== undefined) {
-                            as = onRollOver.cache;
-                            as.setVariable("this", mc);
-                            _this.executeEventAction({as: [onRollOver], mc: mc});
+                        events = mc.events;
+                        rollOver = events.rollOver;
+                        if (rollOver) {
+                            isRender = true;
+                            _this.executeEventAction(rollOver, mc);
+                        }
+
+                        onRollOver = mc.onRollOver;
+                        if (onRollOver) {
+                            isRender = true;
+                            _this.executeEventAction(onRollOver, mc);
                         }
                     }
                 }
 
                 if (button) {
                     button.setButtonStatus("over");
-                    buttonCharacter = button.getButtonCharacter();
-                    buttonCharacter.startSound();
+                    sprite = button.getSprite();
+                    sprite.startSound();
                     if (!isTouch) {
-                        _this.executeButtonAction(button, mc, "CondIdleToOverUp");
                         if (!overObj || overObj.button !== button) {
-                            func = button.getVariable("onRollOver");
-                            if (typeof func === "function") {
-                                as = func.cache;
-                                as.setVariable("this", button);
-                                as.execute(mc);
-                                _this.executeAction();
+                            _this.executeButtonAction(button, mc, "CondIdleToOverUp");
+                            onRollOver = button.onRollOver;
+                            if (onRollOver) {
+                                isRender = true;
+                                _this.executeEventAction(onRollOver, button);
                             }
                         }
                     }
-                    isRender = true;
                 }
             } else if (_this.touchStatus === "up") {
                 _this.overObj = null;
@@ -16372,27 +20819,29 @@ if (!("swf2js" in window)){(function(window)
                     mc = overObj.parent;
                     if (mc.active) {
                         mc.setButtonStatus("up");
-                        variables = mc.variables;
-                        var onRollOut = variables.onRollOut;
-                        if (onRollOut !== undefined) {
-                            as = onRollOut.cache;
-                            as.setVariable("this", mc);
-                            _this.executeEventAction({as: [onRollOut], mc: mc});
+
+                        events = mc.events;
+                        rollOut = events.rollOut;
+                        if (rollOut) {
+                            isRender = true;
+                            _this.executeEventAction(rollOut, mc);
+                        }
+
+                        onRollOut = mc.onRollOut;
+                        if (onRollOut) {
+                            isRender = true;
+                            _this.executeEventAction(onRollOut, mc);
                         }
 
                         if (button) {
                             button.setButtonStatus("up");
                             _this.executeButtonAction(button, mc, "CondOverUpToIdle");
-                            func = button.getVariable("onRollOut");
-                            if (typeof func === "function") {
-                                as = func.cache;
-                                as.setVariable("this", button);
-                                as.execute(mc);
-                                _this.executeAction();
+                            onRollOut = button.onRollOut;
+                            if (onRollOut) {
+                                isRender = true;
+                                _this.executeEventAction(onRollOut, button);
                             }
                         }
-
-                        isRender = true;
                     }
                 }
             }
@@ -16416,23 +20865,22 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchEnd = function(event)
     {
         var _this = this;
-        var as;
-        var mc;
+        var mc, as, release, onRelease;
         var touchObj = _this.touchObj;
         var upEventHits = _this.upEventHits;
         var length = upEventHits.length;
         if (length) {
             event.preventDefault();
-            var _executeEventAction = _this.executeEventAction;
             for (var i = 0; i < length; i++) {
                 var obj = upEventHits[i];
-                var upEvent = obj.event;
-                if (upEvent) {
-                    mc = obj.mc;
-                    obj.as = mc.getEvent("onMouseUp");
+                mc = obj.mc;
+                as = obj.as;
+                if (!as) {
+                    as = mc.onMouseUp;
                 }
-                _executeEventAction.call(_this, obj);
+                _this.executeEventAction(as, obj.mc);
             }
+            _this.upEventHits = [];
         }
 
         var hitObj = _this.hitCheck(event);
@@ -16452,38 +20900,29 @@ if (!("swf2js" in window)){(function(window)
             if (mc.active) {
                 if (canAction) {
                     if (touchEndAction !== null) {
-                        event.preventDefault();
                         _this.buttonAction(mc, touchEndAction);
                         isRender = true;
                     }
 
-                    if (mc instanceof MovieClip) {
-                        var clipEvent = mc.clipEvent;
-                        var release = clipEvent.release;
-                        if (release !== undefined) {
-                            _this.executeEventAction({as: release, mc: mc});
-                            isRender = true;
-                        }
-                        var variables = mc.variables;
-                        var onRelease = variables.onRelease;
-                        if (onRelease !== undefined) {
-                            as = onRelease.cache;
-                            as.setVariable("this", mc);
-                            _this.executeEventAction({as: [onRelease], mc: mc});
-                            isRender = true;
-                        }
+                    var events = mc.events;
+                    release = events.release;
+                    if (release) {
+                        _this.executeEventAction(release, mc);
+                        isRender = true;
+                    }
+                    onRelease = mc.onRelease;
+                    if (onRelease) {
+                        _this.executeEventAction(onRelease, mc);
+                        isRender = true;
                     }
                 }
 
                 var button = touchObj.button;
                 if (button) {
                     if (canAction) {
-                        var func = button.getVariable("onRelease");
-                        if (typeof func === "function") {
-                            as = func.cache;
-                            as.setVariable("this", button);
-                            as.execute(mc);
-                            _this.executeAction();
+                        onRelease = button.onRelease;
+                        if (onRelease) {
+                            _this.executeEventAction(onRelease, button);
                         }
                     }
 
@@ -16495,12 +20934,13 @@ if (!("swf2js" in window)){(function(window)
                     }
                     button.setButtonStatus(status);
 
-                    var buttonCharacter = button.getButtonCharacter("hit");
-                    buttonCharacter.startSound();
+                    var sprite = button.getSprite("hit");
+                    sprite.startSound();
                     isRender = true;
                 }
 
                 if (isRender) {
+                    event.preventDefault();
                     _this.touchRender();
                 }
             }
@@ -16550,8 +20990,6 @@ if (!("swf2js" in window)){(function(window)
         }
     };
 
-
-
     /**
      * touchRender
      */
@@ -16566,6 +21004,71 @@ if (!("swf2js" in window)){(function(window)
      * @constructor
      */
     var Swf2js = function(){};
+
+    /**
+     * @type {Shape}
+     */
+    Swf2js.prototype.Shape = Shape;
+
+    /**
+     * @type {Sprite}
+     */
+    Swf2js.prototype.Sprite = Sprite;
+
+    /**
+     * @type {TextField}
+     */
+    Swf2js.prototype.TextField = TextField;
+
+    /**
+     * @type {SimpleButton}
+     */
+    Swf2js.prototype.SimpleButton = SimpleButton;
+
+    /**
+     * @type {DropShadowFilter}
+     */
+    Swf2js.prototype.DropShadowFilter = DropShadowFilter;
+
+    /**
+     * @type {BlurFilter}
+     */
+    Swf2js.prototype.BlurFilter = BlurFilter;
+
+    /**
+     * @type {GlowFilter}
+     */
+    Swf2js.prototype.GlowFilter = GlowFilter;
+
+    /**
+     * @type {BevelFilter}
+     */
+    Swf2js.prototype.BevelFilter = BevelFilter;
+
+    /**
+     * @type {GradientGlowFilter}
+     */
+    Swf2js.prototype.GradientGlowFilter = GradientGlowFilter;
+
+    /**
+     * @type {ConvolutionFilter}
+     */
+    Swf2js.prototype.ConvolutionFilter = ConvolutionFilter;
+
+    /**
+     * @type {ColorMatrixFilter}
+     */
+    Swf2js.prototype.ColorMatrixFilter = ColorMatrixFilter;
+
+    /**
+     * @type {GradientBevelFilter}
+     */
+    Swf2js.prototype.GradientBevelFilter = GradientBevelFilter;
+
+    /**
+     * @type {BitmapFilter}
+     */
+    Swf2js.prototype.BitmapFilter = BitmapFilter;
 
     /**
      * @param url
@@ -16626,19 +21129,21 @@ if (!("swf2js" in window)){(function(window)
             return this.load(url, options);
         }
         var stage = stages[0];
-        for (var i in stage) {
-            if (!stage.hasOwnProperty(i)) {
+        for (var i in stages) {
+            if (!stages.hasOwnProperty(i)) {
                 continue;
             }
             var p = stages[i];
+            p.stop();
             if (i) {
                 p.deleteNode(p.tagId);
+                p = null;
             }
-            _clearInterval(p.intervalId);
         }
 
         stageId = 1;
         stages = [];
+        loadStages = [];
         stages[0] = stage;
         stage.reload(url, options);
     };
@@ -16661,10 +21166,6 @@ if (!("swf2js" in window)){(function(window)
         stage.init();
         stage.isLoad = true;
 
-        var mc = new MovieClip();
-        mc.stage = stage;
-        stage.parent = mc;
-
         if (_document.readyState === "loading") {
             var reLoad = function()
             {
@@ -16674,7 +21175,7 @@ if (!("swf2js" in window)){(function(window)
             };
             window.addEventListener("DOMContentLoaded", reLoad, false);
         }
-        return mc;
+        return stage.getParent();
     };
 
     window.swf2js = new Swf2js();
