@@ -10801,7 +10801,7 @@ if (!("swf2js" in window)){(function(window)
 
         var cache;
         var canvas;
-        cacheKey = cacheStore.generateKey("Graphics", _this.instanceId, cacheScale, colorTransform);
+        cacheKey = cacheStore.generateKey("Graphics", 0, cacheScale, colorTransform);
         cacheKey += _this.getCacheKey();
         cache = cacheStore.getCache(cacheKey);
 
@@ -13821,7 +13821,7 @@ if (!("swf2js" in window)){(function(window)
      */
     DisplayObjectContainer.prototype.getNumChildren = function()
     {
-        return 0;
+        return this._numChildren;
     };
 
     /**
@@ -14323,7 +14323,6 @@ if (!("swf2js" in window)){(function(window)
 
         return cacheKey;
     };
-
 
     /**
      * @constructor
@@ -15448,13 +15447,11 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param name
      * @param depth
-     * @param x
-     * @param y
      * @param width
      * @param height
      * @constructor
      */
-    var TextField = function(name, depth, x, y, width, height)
+    var TextField = function(name, depth, width, height)
     {
         var _this = this;
         InteractiveObject.call(_this);
@@ -15465,6 +15462,14 @@ if (!("swf2js" in window)){(function(window)
 
         if (depth) {
             _this.setLevel(depth);
+        }
+
+        if (!width) {
+            width = 0;
+        }
+
+        if (!height) {
+            height = 0;
         }
 
         _this.fontId = 0;
@@ -16461,6 +16466,35 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param depth
+     * @returns {SimpleButton}
+     */
+    MovieClip.prototype.createButton = function(name, depth)
+    {
+        var button = new SimpleButton();
+        if (name) {
+            button.setName(name);
+        }
+        this.addChild(button, depth);
+        return button;
+    };
+
+    /**
+     * @param name
+     * @param depth
+     * @param width
+     * @param height
+     * @returns {TextField}
+     */
+    MovieClip.prototype.createText = function(name, depth, width, height)
+    {
+        var textField = new TextField(name, depth, width, height);
+        this.addChild(textField, depth);
+        textField.setInitParams();
+        return textField;
+    };
+
+    /**
      * @param name
      * @param depth
      * @param x
@@ -16475,7 +16509,7 @@ if (!("swf2js" in window)){(function(window)
             depth += 16384;
         }
         var _this = this;
-        var textField = new TextField(name, depth, x, y, width*20, height*20);
+        var textField = new TextField(name, depth, width*20, height*20);
         textField.setParent(_this);
         textField.setStage(_this.getStage());
         textField.setInitParams();
@@ -21182,21 +21216,6 @@ if (!("swf2js" in window)){(function(window)
      * @type {Shape}
      */
     Swf2js.prototype.Shape = Shape;
-
-    /**
-     * @type {Sprite}
-     */
-    Swf2js.prototype.Sprite = Sprite;
-
-    /**
-     * @type {TextField}
-     */
-    Swf2js.prototype.TextField = TextField;
-
-    /**
-     * @type {SimpleButton}
-     */
-    Swf2js.prototype.SimpleButton = SimpleButton;
 
     /**
      * @type {DropShadowFilter}
