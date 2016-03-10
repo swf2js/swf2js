@@ -17277,7 +17277,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var targetMc = _this;
         if (typeof name === "string") {
-            targetMc = _this.getMovieClip(name);
+            var target = _this.getMovieClip(name);
+            if (target) {
+                targetMc = target;
+            }
         }
 
         var level = targetMc.getLevel();
