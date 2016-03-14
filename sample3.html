@@ -8,10 +8,10 @@
 </head>
 <body style="margin: 0; padding:0; background-color: #000000;">
 <script type="text/javascript">
-    swf2js.load('swf/mogura.swf', {callback: function(_root)
+    swf2js.load("./swf/mogura.swf", {callback: function(_root)
     {
         var mc = _root.getMovieClip("hm");
-        mc.addEvent("onEnterFrame", function(){
+        mc.addEventListener("enterFrame", function(){
             this.x++;
         });
     }});

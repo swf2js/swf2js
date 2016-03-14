@@ -8,22 +8,102 @@
 </head>
 <body style="margin: 0; padding:0; background-color: #000000;">
 <script type="text/javascript">
-    var _root = swf2js.createRootMovieClip(240, 240, 30);
-    var mc1 = _root.createEmptyMovieClip('MC1', 1);
-    mc1.loadMovie("swf/model.swf");
-    mc1._xscale = 50;
-    mc1._yscale = 50;
 
-    mc1.addEventListener("press", function()
+    // root作成                           (width, height, fps)
+    var _root = swf2js.createRootMovieClip(240, 240, 30);
+
+    // ***********************
+    // Flashライクな書き方
+    // ***********************
+
+    // 空のMovieClipを作成                 (MovieClip名, depth)
+    var model = _root.createEmptyMovieClip("model", 10);
+
+    // 外部swfを読み込み
+    model.loadMovie("./swf/model.swf");
+
+    // 座標をセット
+    model.x = 50; // 2系 model._x = 50;
+    model.y = 10; // 2系 model._y = 50;
+
+    // 画面に合わせてサイズ調整
+    model.scaleX = 65; // 2系 model._xscale = 65;
+    model.scaleY = 65; // 2系 model._yscale = 65;
+
+    // タッチした時のイベントを登録
+    model.addEventListener("press", function()
     {
+        // 透明度を変更
+        this.alpha = 0.5; // 2系 model._alpha = 50;
+        // 指の位置に合わせて移動
         this.startDrag();
-        this._alpha = 50;
     });
 
-    mc1.addEventListener("release", function()
+    // タッチ終了した時のイベントを登録
+    model.addEventListener("release", function()
     {
+        // 透明度をもとに戻す
+        this.alpha = 1; // 2系 model._alpha = 100;
+        // 移動終了
         this.stopDrag();
-        this._alpha = 100;
+    });
+
+    // ***********************
+    // CreateJSライクな書き方
+    // ***********************
+
+    // 空のMovieClipを作成
+    var shapes = _root.createEmptyMovieClip("shapes", 1);
+
+    /**
+     * ランダム座標値
+     * @returns {number}
+     */
+    var random = function()
+    {
+        return Math.floor(Math.random() * 240);
+    };
+
+    // 親のMovieClipの毎フレーム処理を登録
+    shapes.addEventListener("enterFrame", function()
+    {
+        // Shapeを作成
+        var shape = new swf2js.Shape();
+
+        var hue = 360 * Math.random();
+        var color = "hsl(" + hue + ", 100%, 50%)";
+
+        // ランダムに円を描画
+        shape.graphics
+                .beginFill(color)
+                .drawCircle(0, 0, Math.floor(20 * Math.random()));
+
+        // 表示回数をセット
+        shape.life = 10;
+
+        // ランダムに座標をセット
+        shape.x = random();
+        shape.y = random();
+
+        // Shapeの毎フレーム処理を登録
+        shape.addEventListener("enterFrame", function ()
+        {
+            // 表示回数を減算
+            this.life--;
+            if (this.life <= 0) {
+                // 表示回数が切れたら削除
+                shapes.removeChild(this);
+            } else {
+                // マウスの動きに合わせる
+                var mouseX = shapes.mouseX;
+                var mouseY = shapes.mouseY;
+                this.x = (mouseX) ? mouseX + 100 * (Math.random() - 0.5) : random();
+                this.y = (mouseY) ? mouseY + 100 * (Math.random() - 0.5) : random();
+            }
+        });
+
+        // Shapeを追加
+        this.addChild(shape);
     });
 </script>
 </body>
