@@ -41,7 +41,7 @@ if (!("swf2js" in window)){(function(window)
     var console = window.console;
     var isBtoa = ("btoa" in window);
     var isWebGL = (window.WebGLRenderingContext &&
-    _document.createElement("canvas").getContext("webgl")) ? true : false;
+        _document.createElement("canvas").getContext("webgl")) ? true : false;
     var requestAnimationFrame =
         window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
@@ -265,10 +265,10 @@ if (!("swf2js" in window)){(function(window)
     function linearGradientXY(m)
     {
         var x0 = -16384 * m[0] - 16384 * m[2] + m[4];
-        var x1 = 16384 * m[0] - 16384 * m[2] + m[4];
+        var x1 =  16384 * m[0] - 16384 * m[2] + m[4];
         var x2 = -16384 * m[0] + 16384 * m[2] + m[4];
         var y0 = -16384 * m[1] - 16384 * m[3] + m[5];
-        var y1 = 16384 * m[1] - 16384 * m[3] + m[5];
+        var y1 =  16384 * m[1] - 16384 * m[3] + m[5];
         var y2 = -16384 * m[1] + 16384 * m[3] + m[5];
         var vx2 = x2 - x0;
         var vy2 = y2 - y0;
@@ -16634,7 +16634,7 @@ if (!("swf2js" in window)){(function(window)
      * @param height
      * @returns {TextField}
      */
-    MovieClip.prototype.createTextField = function (name, depth, x, y, width, height
+    MovieClip.prototype.createTextField = function (name, depth, x, y, width, height)
     {
         if (16384 > depth) {
             depth += 16384;
