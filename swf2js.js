@@ -1314,7 +1314,7 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 case 5:
                     str += "ctx.scale(" + a[1] + "," + a[2] + ");";
-                    str += "ctx.arc(" + a[3] + "," + a[4] + "," + a[5] + ",0,Math.PI*2,false);";
+                    str += "ctx.arc(" + a[3] + "," + a[4] + "," + a[5] + ", "+ a[6] + "," + a[7] + ",false);";
                     str += "ctx.scale(1,1);";
                     break;
                 case 6:
@@ -2406,6 +2406,7 @@ if (!("swf2js" in window)){(function(window)
 
         var textField = new TextField();
         textField.setStage(stage);
+        textField.setParent(parent);
         textField.setInitParams();
         textField.setTagType(character.tagType);
         textField.setBounds(character.bounds);
@@ -10249,9 +10250,7 @@ if (!("swf2js" in window)){(function(window)
      */
     var Graphics = function ()
     {
-        var _this = this;
-        _this.instanceId = instanceId++;
-        _this.clear();
+        this.clear();
     };
 
     /**
@@ -10630,6 +10629,8 @@ if (!("swf2js" in window)){(function(window)
         data[data.length] = x;
         data[data.length] = y;
         data[data.length] = radius;
+        data[data.length] = 0;
+        data[data.length] = _PI*2;
 
         if (isFillDraw) {
             var fillRecodes = _this.getFillRecode();
@@ -10676,7 +10677,135 @@ if (!("swf2js" in window)){(function(window)
      */
     Graphics.prototype.drawRoundRect = function (x, y, width, height, ellipseWidth, ellipseHeight)
     {
-        return this;
+        var _this = this;
+        var isFillDraw = _this.isFillDraw;
+        var isLineDraw = _this.isLineDraw;
+
+        x *= 20;
+        y *= 20;
+        width *= 20;
+        height *= 20;
+        ellipseWidth *= 20;
+        ellipseHeight *= 20;
+
+        var halfEllipseWidth = ellipseWidth / 2;
+        var halfEllipseHeight = ellipseHeight / 2;
+        var radius = _min(halfEllipseWidth, halfEllipseHeight);
+        var _comparison = comparison(ellipseWidth, ellipseHeight);
+        var xScale = ellipseWidth / _comparison;
+        var yScale = ellipseHeight / _comparison;
+        var scale = _min(xScale, yScale) / _max(xScale, yScale);
+        var data = [];
+        var vec;
+        var xs, ys;
+        if (ellipseWidth === ellipseHeight) {
+            xs = 1;
+            ys = 1;
+        } else if (ellipseWidth > ellipseHeight) {
+            xs = 1;
+            ys = scale;
+        } else {
+            xs = scale;
+            ys = 1;
+        }
+
+        // arc
+        vec = [];
+        vec[vec.length] = 5;
+        vec[vec.length] = xs;
+        vec[vec.length] = ys;
+        vec[vec.length] = x + halfEllipseWidth;
+        vec[vec.length] = y + halfEllipseHeight;
+        vec[vec.length] = radius;
+        vec[vec.length] = _PI;
+        vec[vec.length] = (270/180)*_PI;
+        data[data.length] = vec;
+
+        // lineTo
+        vec = [];
+        vec[vec.length] = 2;
+        vec[vec.length] = x + width - halfEllipseWidth;
+        vec[vec.length] = y;
+        data[data.length] = vec;
+
+        // arc
+        vec = [];
+        vec[vec.length] = 5;
+        vec[vec.length] = xs;
+        vec[vec.length] = ys;
+        vec[vec.length] = x + width - halfEllipseWidth;
+        vec[vec.length] = y + halfEllipseHeight;
+        vec[vec.length] = radius;
+        vec[vec.length] = (270/180)*_PI;
+        vec[vec.length] = 0;
+        data[data.length] = vec;
+
+        // lineTo
+        vec = [];
+        vec[vec.length] = 2;
+        vec[vec.length] = x + width;
+        vec[vec.length] = y + height - halfEllipseHeight;
+        data[data.length] = vec;
+
+        // arc
+        vec = [];
+        vec[vec.length] = 5;
+        vec[vec.length] = xs;
+        vec[vec.length] = ys;
+        vec[vec.length] = x + width - halfEllipseWidth;
+        vec[vec.length] = y + height - halfEllipseHeight;
+        vec[vec.length] = radius;
+        vec[vec.length] = 0;
+        vec[vec.length] = (90/180)*_PI;
+        data[data.length] = vec;
+
+        // lineTo
+        vec = [];
+        vec[vec.length] = 2;
+        vec[vec.length] = x + halfEllipseWidth;
+        vec[vec.length] = y + height;
+        data[data.length] = vec;
+
+        //// arc
+        vec = [];
+        vec[vec.length] = 5;
+        vec[vec.length] = xs;
+        vec[vec.length] = ys;
+        vec[vec.length] = x + halfEllipseWidth;
+        vec[vec.length] = y + height - halfEllipseHeight;
+        vec[vec.length] = radius;
+        vec[vec.length] = (45/180)*_PI;
+        vec[vec.length] = _PI;
+        data[data.length] = vec;
+
+        // lineTo
+        vec = [];
+        vec[vec.length] = 2;
+        vec[vec.length] = x;
+        vec[vec.length] = y - halfEllipseHeight;
+        data[data.length] = vec;
+
+        var dataLength = data.length;
+        var i = 0;
+        if (isFillDraw) {
+            var fillRecodes = _this.getFillRecode();
+            for (i = 0; i < dataLength; i++) {
+                fillRecodes[fillRecodes.length] = data[i];
+            }
+        }
+        if (isLineDraw) {
+            var lineRecodes = _this.getLineRecode();
+            for (i = 0; i < dataLength; i++) {
+                lineRecodes[lineRecodes.length] = data[i];
+            }
+        }
+
+        if (isFillDraw || isLineDraw) {
+            _this.setBounds(x - width, y - height);
+            _this.setBounds(x + width, y + height);
+            _this.addCacheKey(x, y, width, height, ellipseWidth, ellipseHeight);
+        }
+        return _this;
     };
 
     /**
@@ -14297,6 +14426,37 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     *
+     * @param name
+     * @param depth
+     * @returns {MovieClip}
+     */
+    DisplayObjectContainer.prototype.createMovieClip = function (name, depth)
+    {
+        var movieClip = new MovieClip();
+        movieClip = this.addChild(movieClip, depth);
+        if (name) {
+            movieClip.setName(name);
+        }
+        return movieClip;
+    };
+
+    /**
+     * @param name
+     * @param depth
+     * @returns {Sprite}
+     */
+    DisplayObjectContainer.prototype.createSprite = function (name, depth)
+    {
+        var sprite = new Sprite();
+        sprite = this.addChild(sprite, depth);
+        if (name) {
+            sprite.setName(name);
+        }
+        return sprite;
+    };
+
+    /**
      * @param name
      * @param depth
      * @returns {SimpleButton}
@@ -14313,14 +14473,14 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param name
-     * @param depth
      * @param width
      * @param height
+     * @param depth
      * @returns {TextField}
      */
-    DisplayObjectContainer.prototype.createText = function (name, depth, width, height)
+    DisplayObjectContainer.prototype.createText = function (name, width, height, depth)
     {
-        var textField = new TextField(name, depth, width * 20, height * 20);
+        var textField = new TextField(name, depth, width, height);
         textField = this.addChild(textField, depth);
         textField.setInitParams();
         if (name) {
@@ -14330,6 +14490,15 @@ if (!("swf2js" in window)){(function(window)
         return textField;
     };
 
+    /**
+     * @returns {Shape}
+     */
+    DisplayObjectContainer.prototype.createShape = function(depth)
+    {
+        var shape = new Shape();
+        shape = this.addChild(shape, depth);
+        return shape;
+    };
 
     /**
      * @constructor
@@ -14637,6 +14806,60 @@ if (!("swf2js" in window)){(function(window)
         return _this.rendering(container, ctx, matrix, colorTransform, stage, visible);
     };
 
+    /**
+     * putFrame
+     */
+    Sprite.prototype.putFrame = function ()
+    {
+        var _this = this;
+        _this.active = true;
+
+        var stage = _this.getStage();
+        var tags = _this.getTags();
+        var length = tags.length;
+        if (length) {
+            tags.reverse();
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
+                    continue;
+                }
+                var instanceId = tags[depth];
+                var tag = stage.getInstance(instanceId);
+                if (!tag) {
+                    continue;
+                }
+                tag.putFrame();
+            }
+            tags.reverse();
+        }
+
+        clipEvent.type = "enterFrame";
+        _this.dispatchEvent(clipEvent);
+    };
+
+    /**
+     * addActions
+     */
+    Sprite.prototype.addActions = function ()
+    {
+        var _this = this;
+        var stage = _this.getStage();
+        var tags = _this.getTags();
+        var length = tags.length;
+        if (length) {
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
+                    continue;
+                }
+                var instanceId = tags[depth];
+                var instance = stage.getInstance(instanceId);
+                if (!instance) {
+                    continue;
+                }
+                instance.addActions();
+            }
+        }
+    };
 
     /**
      * @constructor
@@ -15469,10 +15692,12 @@ if (!("swf2js" in window)){(function(window)
         if (!width) {
             width = 0;
         }
+        width *= 20;
 
         if (!height) {
             height = 0;
         }
+        height *= 20;
 
         _this.fontId = 0;
         _this.bounds = {xMin: 0, xMax: width, yMin: 0, yMax: height};
@@ -16640,7 +16865,7 @@ if (!("swf2js" in window)){(function(window)
             depth += 16384;
         }
         var _this = this;
-        var textField = new TextField(name, depth, width * 20, height * 20);
+        var textField = new TextField(name, depth, width, height);
         textField.setParent(_this);
         textField.setStage(_this.getStage());
         textField.setInitParams();
@@ -18044,7 +18269,6 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         _this.active = true;
 
-        var as;
         if (_this.isAction) {
             _this.isAction = false;
             if (!_this.isLoad) {
@@ -18055,17 +18279,16 @@ if (!("swf2js" in window)){(function(window)
                 clipEvent.type = "load";
                 _this.dispatchEvent(clipEvent);
 
-                var variables = _this.variables;
-                as = variables.onLoad;
-                if (as !== undefined) {
-                    _this.setActionQueue(as);
+                var onLoad = _this.onLoad;
+                if (onLoad !== undefined) {
+                    _this.setActionQueue(onLoad);
                 }
                 _this.addTouchEvent();
             }
 
-            as = _this.getActions(_this.getCurrentFrame());
-            if (as) {
-                _this.setActionQueue(as);
+            var action = _this.getActions(_this.getCurrentFrame());
+            if (action) {
+                _this.setActionQueue(action);
             }
         }
 
