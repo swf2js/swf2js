@@ -35,6 +35,7 @@
     {
         // 透明度を変更
         this.alpha = 0.5; // 2系 model._alpha = 50;
+
         // 指の位置に合わせて移動
         this.startDrag();
     });
@@ -44,6 +45,7 @@
     {
         // 透明度をもとに戻す
         this.alpha = 1; // 2系 model._alpha = 100;
+
         // 移動終了
         this.stopDrag();
     });
@@ -68,7 +70,7 @@
     shapes.addEventListener("enterFrame", function()
     {
         // Shapeを作成
-        var shape = new swf2js.Shape();
+        var shape = this.createShape();
 
         var hue = 360 * Math.random();
         var color = "hsl(" + hue + ", 100%, 50%)";
@@ -101,9 +103,6 @@
                 this.y = (mouseY) ? mouseY + 100 * (Math.random() - 0.5) : random();
             }
         });
-
-        // Shapeを追加
-        this.addChild(shape);
     });
 </script>
 </body>
