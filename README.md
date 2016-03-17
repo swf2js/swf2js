@@ -19,9 +19,9 @@ Supports:
 * ActionScripr 3.0(development)
 
 
-## Latest Version *0.6.3*  
+## Latest Version *0.6.4*  
 
--- Release Date: 16 Mar 2016  
+-- Release Date: 17 Mar 2016  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
@@ -29,7 +29,7 @@ Supports:
 
 ## HTML - SAMPLE CODE
 
-```
+```JavaScript
 <script type="text/javascript" src="swf2js.js"></script>
 <script type="text/javascript">
     swf2js.load('SET SWF PATH');

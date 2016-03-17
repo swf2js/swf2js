@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.3)
+ * swf2js (version 0.6.4)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -633,10 +633,9 @@ if (!("swf2js" in window)){(function(window)
      */
     function unlzma(compressed)
     {
-        var data = [];
         var bitio = new BitIO();
         bitio.setData(compressed);
-        return data;
+        return [];
     }
 
     /**
@@ -879,7 +878,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * addEventListener
      */
-    window.addEventListener('resize', function ()
+    window.addEventListener("resize", function ()
     {
         _clearTimeout(resizeId);
         resizeId = _setTimeout(resizeCanvas, 300);
@@ -892,10 +891,10 @@ if (!("swf2js" in window)){(function(window)
     {
         stages = null;
         loadStages = null;
-        window.removeEventListener('unload', unload);
+        window.removeEventListener("unload", unload);
     }
 
-    window.addEventListener('unload', unload);
+    window.addEventListener("unload", unload);
 
     /**
      * tmp canvas clear
@@ -1322,7 +1321,7 @@ if (!("swf2js" in window)){(function(window)
                     break;
             }
         }
-        return new Func('ctx', str);
+        return new Func("ctx", str);
     };
 
     /**
@@ -7316,7 +7315,7 @@ if (!("swf2js" in window)){(function(window)
                     console.log("DoABC");
                     break;
                 default:
-                    console.log('[actionScript] ' + actionCode);
+                    console.log("[actionScript] " + actionCode);
                     break;
             }
         }
@@ -7473,7 +7472,7 @@ if (!("swf2js" in window)){(function(window)
             if (!targetMc) {
                 targetMc = mc;
             }
-            return targetMc.getMovieClip(target);
+            return targetMc.getDisplayObject(target);
         } else {
             if (mc.active) {
                 return mc;
@@ -7787,7 +7786,7 @@ if (!("swf2js" in window)){(function(window)
             var label = splitData[0];
             var targetMc = mc;
             if (splitData.length > 1) {
-                targetMc = mc.getMovieClip(splitData[0]);
+                targetMc = mc.getDisplayObject(splitData[0]);
                 label = splitData[1];
             }
             if (targetMc instanceof MovieClip) {
@@ -7965,7 +7964,7 @@ if (!("swf2js" in window)){(function(window)
                 if (typeof target !== "string") {
                     target += "";
                 }
-                targetMc = mc.getMovieClip(target);
+                targetMc = mc.getDisplayObject(target);
             }
             if (targetMc instanceof MovieClip) {
                 value = targetMc.getProperty(index);
@@ -7993,7 +7992,7 @@ if (!("swf2js" in window)){(function(window)
             if (_isNaN(frame)) {
                 var splitData = frame.split(":");
                 if (splitData.length > 1) {
-                    var targetMc = mc.getMovieClip(splitData[0]);
+                    var targetMc = mc.getDisplayObject(splitData[0]);
                     if (targetMc) {
                         frame = targetMc.getLabel(splitData[1]);
                     }
@@ -8029,7 +8028,7 @@ if (!("swf2js" in window)){(function(window)
         if (!movieClip) {
             movieClip = mc;
         }
-        return movieClip.getMovieClip(target);
+        return movieClip.getDisplayObject(target);
     };
 
     /**
@@ -8049,7 +8048,7 @@ if (!("swf2js" in window)){(function(window)
         if (mc) {
             var targetMc = mc;
             if (target !== undefined) {
-                targetMc = mc.getMovieClip(target);
+                targetMc = mc.getDisplayObject(target);
             }
             if (targetMc instanceof MovieClip) {
                 targetMc.setProperty(index, value);
@@ -8083,7 +8082,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         if (typeof target === "string" && target) {
-            targetMc = mc.getMovieClip(target);
+            targetMc = mc.getDisplayObject(target);
         }
 
         if (targetMc instanceof MovieClip) {
@@ -8296,7 +8295,7 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 if (object instanceof Object && method === "registerClass") {
                     value = false;
-                    var _root = mc.getMovieClip("_root");
+                    var _root = mc.getDisplayObject("_root");
                     var stage = _root.getStage();
                     var characterId = stage.exportAssets[params[0]];
                     if (characterId) {
@@ -8453,7 +8452,7 @@ if (!("swf2js" in window)){(function(window)
         stack[stack.length] = null;
 
         if (typeof object === "string") {
-            object = mc.getMovieClip(object);
+            object = mc.getDisplayObject(object);
         }
 
         if (object instanceof Object) {
@@ -11118,56 +11117,56 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(SoundTransform.prototype,
-        {
-            leftToLeft: {
-                get: function () {
-                    return this.getLeftToLeft();
-                },
-                set: function (leftToLeft) {
-                    this.setLeftToLeft(leftToLeft);
-                }
+    {
+        leftToLeft: {
+            get: function () {
+                return this.getLeftToLeft();
             },
-            leftToRight: {
-                get: function () {
-                    return this.getLeftToRight();
-                },
-                set: function (leftToRight) {
-                    this.setLeftToRight(leftToRight);
-                }
-            },
-            pan: {
-                get: function () {
-                    return this.getPan();
-                },
-                set: function (pan) {
-                    this.setPan(pan);
-                }
-            },
-            rightToLeft: {
-                get: function () {
-                    return this.getRightToLeft();
-                },
-                set: function (rightToLeft) {
-                    this.setRightToLeft(rightToLeft);
-                }
-            },
-            rightToRight: {
-                get: function () {
-                    return this.getRightToRight();
-                },
-                set: function (rightToRight) {
-                    this.setRightToRight(rightToRight);
-                }
-            },
-            volume: {
-                get: function () {
-                    return this.getVolume();
-                },
-                set: function (volume) {
-                    this.setVolume(volume);
-                }
+            set: function (leftToLeft) {
+                this.setLeftToLeft(leftToLeft);
             }
-        });
+        },
+        leftToRight: {
+            get: function () {
+                return this.getLeftToRight();
+            },
+            set: function (leftToRight) {
+                this.setLeftToRight(leftToRight);
+            }
+        },
+        pan: {
+            get: function () {
+                return this.getPan();
+            },
+            set: function (pan) {
+                this.setPan(pan);
+            }
+        },
+        rightToLeft: {
+            get: function () {
+                return this.getRightToLeft();
+            },
+            set: function (rightToLeft) {
+                this.setRightToLeft(rightToLeft);
+            }
+        },
+        rightToRight: {
+            get: function () {
+                return this.getRightToRight();
+            },
+            set: function (rightToRight) {
+                this.setRightToRight(rightToRight);
+            }
+        },
+        volume: {
+            get: function () {
+                return this.getVolume();
+            },
+            set: function (volume) {
+                this.setVolume(volume);
+            }
+        }
+    });
 
     /**
      * @returns {number}
@@ -11353,128 +11352,128 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(EventDispatcher.prototype,
-        {
-            onEnterFrame: {
-                get: function () {
-                    return this.getOnEvent("onEnterFrame");
-                },
-                set: function (as) {
-                    this.setVariable("onEnterFrame", as);
-                }
+    {
+        onEnterFrame: {
+            get: function () {
+                return this.getOnEvent("onEnterFrame");
             },
-            onPress: {
-                get: function () {
-                    return this.getOnEvent("onPress");
-                },
-                set: function (as) {
-                    this.setVariable("onPress", as);
-                }
-            },
-            onRelease: {
-                get: function () {
-                    return this.getOnEvent("onRelease");
-                },
-                set: function (as) {
-                    this.setVariable("onRelease", as);
-                }
-            },
-            onRollOver: {
-                get: function () {
-                    return this.getOnEvent("onRollOver");
-                },
-                set: function (as) {
-                    this.setVariable("onRollOver", as);
-                }
-            },
-            onRollOut: {
-                get: function () {
-                    return this.getOnEvent("onRollOut");
-                },
-                set: function (as) {
-                    this.setVariable("onRollOut", as);
-                }
-            },
-            onData: {
-                get: function () {
-                    return this.getOnEvent("onData");
-                },
-                set: function (as) {
-                    this.setVariable("onData", as);
-                }
-            },
-            onMouseDown: {
-                get: function () {
-                    return this.getOnEvent("onMouseDown");
-                },
-                set: function (as) {
-                    this.setVariable("onMouseDown", as);
-                }
-            },
-            onMouseUp: {
-                get: function () {
-                    return this.getVariable("onMouseUp");
-                },
-                set: function (as) {
-                    this.setVariable("onMouseUp", as);
-                }
-            },
-            onMouseMove: {
-                get: function () {
-                    return this.getOnEvent("onMouseMove");
-                },
-                set: function (as) {
-                    this.setVariable("onMouseMove", as);
-                }
-            },
-            onDragOut: {
-                get: function () {
-                    return this.getOnEvent("onDragOut");
-                },
-                set: function (as) {
-                    this.setVariable("onDragOut", as);
-                }
-            },
-            onDragOver: {
-                get: function () {
-                    return this.getOnEvent("onDragOver");
-                },
-                set: function (as) {
-                    this.setVariable("onDragOver", as);
-                }
-            },
-            onKeyDown: {
-                get: function () {
-                    return this.getOnEvent("onKeyDown");
-                },
-                set: function (as) {
-                    this.setVariable("onKeyDown", as);
-                }
-            },
-            onKeyUp: {
-                get: function () {
-                    return this.getOnEvent("onKeyUp");
-                },
-                set: function (as) {
-                    this.setVariable("onKeyUp", as);
-                }
-            },
-            onLoad: {
-                get: function () {
-                    return this.getOnEvent("onLoad");
-                },
-                set: function (as) {
-                    this.setVariable("onLoad", as);
-                }
-            },
-            onUnLoad: {
-                get: function () {
-                    return this.getVariable("onUnLoad");
-                },
-                set: function (as) {
-                    this.setVariable("onUnLoad", as);
-                }
+            set: function (as) {
+                this.setVariable("onEnterFrame", as);
             }
-        });
+        },
+        onPress: {
+            get: function () {
+                return this.getOnEvent("onPress");
+            },
+            set: function (as) {
+                this.setVariable("onPress", as);
+            }
+        },
+        onRelease: {
+            get: function () {
+                return this.getOnEvent("onRelease");
+            },
+            set: function (as) {
+                this.setVariable("onRelease", as);
+            }
+        },
+        onRollOver: {
+            get: function () {
+                return this.getOnEvent("onRollOver");
+            },
+            set: function (as) {
+                this.setVariable("onRollOver", as);
+            }
+        },
+        onRollOut: {
+            get: function () {
+                return this.getOnEvent("onRollOut");
+            },
+            set: function (as) {
+                this.setVariable("onRollOut", as);
+            }
+        },
+        onData: {
+            get: function () {
+                return this.getOnEvent("onData");
+            },
+            set: function (as) {
+                this.setVariable("onData", as);
+            }
+        },
+        onMouseDown: {
+            get: function () {
+                return this.getOnEvent("onMouseDown");
+            },
+            set: function (as) {
+                this.setVariable("onMouseDown", as);
+            }
+        },
+        onMouseUp: {
+            get: function () {
+                return this.getVariable("onMouseUp");
+            },
+            set: function (as) {
+                this.setVariable("onMouseUp", as);
+            }
+        },
+        onMouseMove: {
+            get: function () {
+                return this.getOnEvent("onMouseMove");
+            },
+            set: function (as) {
+                this.setVariable("onMouseMove", as);
+            }
+        },
+        onDragOut: {
+            get: function () {
+                return this.getOnEvent("onDragOut");
+            },
+            set: function (as) {
+                this.setVariable("onDragOut", as);
+            }
+        },
+        onDragOver: {
+            get: function () {
+                return this.getOnEvent("onDragOver");
+            },
+            set: function (as) {
+                this.setVariable("onDragOver", as);
+            }
+        },
+        onKeyDown: {
+            get: function () {
+                return this.getOnEvent("onKeyDown");
+            },
+            set: function (as) {
+                this.setVariable("onKeyDown", as);
+            }
+        },
+        onKeyUp: {
+            get: function () {
+                return this.getOnEvent("onKeyUp");
+            },
+            set: function (as) {
+                this.setVariable("onKeyUp", as);
+            }
+        },
+        onLoad: {
+            get: function () {
+                return this.getOnEvent("onLoad");
+            },
+            set: function (as) {
+                this.setVariable("onLoad", as);
+            }
+        },
+        onUnLoad: {
+            get: function () {
+                return this.getVariable("onUnLoad");
+            },
+            set: function (as) {
+                this.setVariable("onUnLoad", as);
+            }
+        }
+    });
 
     /**
      * @param type
@@ -11561,7 +11560,7 @@ if (!("swf2js" in window)){(function(window)
     EventDispatcher.prototype.setActionQueue = function (as)
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var actions = stage.actions;
         actions[actions.length] = {as: as, mc: _this};
@@ -11593,231 +11592,231 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(DisplayObject.prototype,
-        {
-            accessibilityProperties: {
-                value: new AccessibilityProperties()
+    {
+        accessibilityProperties: {
+            value: new AccessibilityProperties()
+        },
+        alpha: {
+            get: function () {
+                return this.getAlpha() / 100;
             },
-            alpha: {
-                get: function () {
-                    return this.getAlpha() / 100;
-                },
-                set: function (alpha) {
-                    this.setAlpha(alpha * 100);
-                }
-            },
-            _alpha: {
-                get: function () {
-                    return this.getAlpha();
-                },
-                set: function (alpha) {
-                    this.setAlpha(alpha);
-                }
-            },
-            name: {
-                get: function () {
-                    return this.getName();
-                },
-                set: function (name) {
-                    this.setName(name);
-                }
-            },
-            _name: {
-                get: function () {
-                    return this.getName();
-                },
-                set: function (name) {
-                    this.setName(name);
-                }
-            },
-            blendMode: {
-                get: function () {
-                    return this.getBlendMode();
-                },
-                set: function (blendMode) {
-                    this.setBlendMode(blendMode);
-                }
-            },
-            filters: {
-                get: function () {
-                    return this.getFilters();
-                },
-                set: function (filters) {
-                    this.setFilters(filters);
-                }
-            },
-            _visible: {
-                get: function () {
-                    return this.getVisible();
-                },
-                set: function (visible) {
-                    this.setVisible(visible);
-                }
-            },
-            visible: {
-                get: function () {
-                    return this.getVisible();
-                },
-                set: function (visible) {
-                    this.setVisible(visible);
-                }
-            },
-            _rotation: {
-                get: function () {
-                    return this.getRotation();
-                },
-                set: function (rotation) {
-                    this.setRotation(rotation);
-                }
-            },
-            rotation: {
-                get: function () {
-                    return this.getRotation();
-                },
-                set: function (rotation) {
-                    this.setRotation(rotation);
-                }
-            },
-            _height: {
-                get: function () {
-                    return this.getHeight();
-                },
-                set: function (height) {
-                    this.setHeight(height);
-                }
-            },
-            height: {
-                get: function () {
-                    return this.getHeight();
-                },
-                set: function (height) {
-                    this.setHeight(height);
-                }
-            },
-            _width: {
-                get: function () {
-                    return this.getWidth();
-                },
-                set: function (width) {
-                    this.setWidth(width);
-                }
-            },
-            width: {
-                get: function () {
-                    return this.getWidth();
-                },
-                set: function (width) {
-                    this.setWidth(width);
-                }
-            },
-            _x: {
-                get: function () {
-                    return this.getX();
-                },
-                set: function (x) {
-                    this.setX(x);
-                }
-            },
-            x: {
-                get: function () {
-                    return this.getX();
-                },
-                set: function (x) {
-                    this.setX(x);
-                }
-            },
-            _y: {
-                get: function () {
-                    return this.getY();
-                },
-                set: function (y) {
-                    this.setY(y);
-                }
-            },
-            y: {
-                get: function () {
-                    return this.getY();
-                },
-                set: function (y) {
-                    this.setY(y);
-                }
-            },
-            _xscale: {
-                get: function () {
-                    return this.getXScale();
-                },
-                set: function (xscale) {
-                    this.setXScale(xscale);
-                }
-            },
-            scaleX: {
-                get: function () {
-                    return this.getXScale();
-                },
-                set: function (xscale) {
-                    this.setXScale(xscale);
-                }
-            },
-            _yscale: {
-                get: function () {
-                    return this.getYScale();
-                },
-                set: function (yscale) {
-                    this.setYScale(yscale);
-                }
-            },
-            scaleY: {
-                get: function () {
-                    return this.getYScale();
-                },
-                set: function (yscale) {
-                    this.setYScale(yscale);
-                }
-            },
-            _xmouse: {
-                get: function () {
-                    return this.getXMouse();
-                },
-                set: function () {
-                }
-            },
-            mouseX: {
-                get: function () {
-                    return this.getXMouse();
-                },
-                set: function () {
-                }
-            },
-            _ymouse: {
-                get: function () {
-                    return this.getYMouse();
-                },
-                set: function () {
-                }
-            },
-            mouseY: {
-                get: function () {
-                    return this.getYMouse();
-                },
-                set: function () {
-                }
-            },
-            mask: {
-                get: function () {
-                    return this.getMask();
-                },
-                set: function (obj) {
-                    this.setMask(obj);
-                }
-            },
-            enabled: {
-                get: function () {
-                    return this.getEnabled();
-                },
-                set: function (enabled) {
-                    this.setEnabled(enabled);
-                }
+            set: function (alpha) {
+                this.setAlpha(alpha * 100);
             }
-        });
+        },
+        _alpha: {
+            get: function () {
+                return this.getAlpha();
+            },
+            set: function (alpha) {
+                this.setAlpha(alpha);
+            }
+        },
+        name: {
+            get: function () {
+                return this.getName();
+            },
+            set: function (name) {
+                this.setName(name);
+            }
+        },
+        _name: {
+            get: function () {
+                return this.getName();
+            },
+            set: function (name) {
+                this.setName(name);
+            }
+        },
+        blendMode: {
+            get: function () {
+                return this.getBlendMode();
+            },
+            set: function (blendMode) {
+                this.setBlendMode(blendMode);
+            }
+        },
+        filters: {
+            get: function () {
+                return this.getFilters();
+            },
+            set: function (filters) {
+                this.setFilters(filters);
+            }
+        },
+        _visible: {
+            get: function () {
+                return this.getVisible();
+            },
+            set: function (visible) {
+                this.setVisible(visible);
+            }
+        },
+        visible: {
+            get: function () {
+                return this.getVisible();
+            },
+            set: function (visible) {
+                this.setVisible(visible);
+            }
+        },
+        _rotation: {
+            get: function () {
+                return this.getRotation();
+            },
+            set: function (rotation) {
+                this.setRotation(rotation);
+            }
+        },
+        rotation: {
+            get: function () {
+                return this.getRotation();
+            },
+            set: function (rotation) {
+                this.setRotation(rotation);
+            }
+        },
+        _height: {
+            get: function () {
+                return this.getHeight();
+            },
+            set: function (height) {
+                this.setHeight(height);
+            }
+        },
+        height: {
+            get: function () {
+                return this.getHeight();
+            },
+            set: function (height) {
+                this.setHeight(height);
+            }
+        },
+        _width: {
+            get: function () {
+                return this.getWidth();
+            },
+            set: function (width) {
+                this.setWidth(width);
+            }
+        },
+        width: {
+            get: function () {
+                return this.getWidth();
+            },
+            set: function (width) {
+                this.setWidth(width);
+            }
+        },
+        _x: {
+            get: function () {
+                return this.getX();
+            },
+            set: function (x) {
+                this.setX(x);
+            }
+        },
+        x: {
+            get: function () {
+                return this.getX();
+            },
+            set: function (x) {
+                this.setX(x);
+            }
+        },
+        _y: {
+            get: function () {
+                return this.getY();
+            },
+            set: function (y) {
+                this.setY(y);
+            }
+        },
+        y: {
+            get: function () {
+                return this.getY();
+            },
+            set: function (y) {
+                this.setY(y);
+            }
+        },
+        _xscale: {
+            get: function () {
+                return this.getXScale();
+            },
+            set: function (xscale) {
+                this.setXScale(xscale);
+            }
+        },
+        scaleX: {
+            get: function () {
+                return this.getXScale();
+            },
+            set: function (xscale) {
+                this.setXScale(xscale);
+            }
+        },
+        _yscale: {
+            get: function () {
+                return this.getYScale();
+            },
+            set: function (yscale) {
+                this.setYScale(yscale);
+            }
+        },
+        scaleY: {
+            get: function () {
+                return this.getYScale();
+            },
+            set: function (yscale) {
+                this.setYScale(yscale);
+            }
+        },
+        _xmouse: {
+            get: function () {
+                return this.getXMouse();
+            },
+            set: function () {
+            }
+        },
+        mouseX: {
+            get: function () {
+                return this.getXMouse();
+            },
+            set: function () {
+            }
+        },
+        _ymouse: {
+            get: function () {
+                return this.getYMouse();
+            },
+            set: function () {
+            }
+        },
+        mouseY: {
+            get: function () {
+                return this.getYMouse();
+            },
+            set: function () {
+            }
+        },
+        mask: {
+            get: function () {
+                return this.getMask();
+            },
+            set: function (obj) {
+                this.setMask(obj);
+            }
+        },
+        enabled: {
+            get: function () {
+                return this.getEnabled();
+            },
+            set: function (enabled) {
+                this.setEnabled(enabled);
+            }
+        }
+    });
 
     /**
      * initialize
@@ -12191,7 +12190,7 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (targetPath !== "") {
-                var mc = _this.getMovieClip(targetPath);
+                var mc = _this.getDisplayObject(targetPath);
                 if (mc) {
                     scope = mc;
                 }
@@ -12817,7 +12816,7 @@ if (!("swf2js" in window)){(function(window)
             return null;
         }
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var div = _document.getElementById(stage.getName());
         var bounds = div.getBoundingClientRect();
@@ -12859,7 +12858,7 @@ if (!("swf2js" in window)){(function(window)
             return null;
         }
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var div = _document.getElementById(stage.getName());
         var bounds = div.getBoundingClientRect();
@@ -12927,7 +12926,7 @@ if (!("swf2js" in window)){(function(window)
         }
         if (version > 4) {
             if (_this instanceof MovieClip) {
-                value = _this.getMovieClip(name, parse);
+                value = _this.getDisplayObject(name, parse);
                 if (value) {
                     return value;
                 }
@@ -13029,7 +13028,7 @@ if (!("swf2js" in window)){(function(window)
      * @param parse
      * @returns {*}
      */
-    DisplayObject.prototype.getMovieClip = function (path, parse)
+    DisplayObject.prototype.getDisplayObject = function (path, parse)
     {
         var _this = this;
         var mc = _this;
@@ -13038,7 +13037,7 @@ if (!("swf2js" in window)){(function(window)
         var tag;
         var parent;
 
-        for (; ;) {
+        for (;;) {
             parent = _root.getParent();
             if (!parent) {
                 break;
@@ -13093,7 +13092,8 @@ if (!("swf2js" in window)){(function(window)
                 }
                 tags = parent.getTags();
                 if (level in tags) {
-                    tag = tags[level];
+                    var tId = tags[level];
+                    tag = stage.getInstance(tId);
                     if (tag instanceof MovieClip) {
                         return tag;
                     }
@@ -13854,38 +13854,38 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(DisplayObjectContainer.prototype,
-        {
-            mouseChildren: {
-                get: function () {
-                    return this.getMouseChildren();
-                },
-                set: function (mouseChildren) {
-                    this.setMouseChildren(mouseChildren);
-                }
+    {
+        mouseChildren: {
+            get: function () {
+                return this.getMouseChildren();
             },
-            textSnapshot: {
-                get: function () {
-                    return this.getTextSnapshot();
-                },
-                set: function () {
-                }
-            },
-            numChildren: {
-                get: function () {
-                    return this.getNumChildren();
-                },
-                set: function () {
-                }
-            },
-            tabChildren: {
-                get: function () {
-                    return this.getTabChildren();
-                },
-                set: function (tabChildren) {
-                    this.setTabChildren(tabChildren);
-                }
+            set: function (mouseChildren) {
+                this.setMouseChildren(mouseChildren);
             }
-        });
+        },
+        textSnapshot: {
+            get: function () {
+                return this.getTextSnapshot();
+            },
+            set: function () {
+            }
+        },
+        numChildren: {
+            get: function () {
+                return this.getNumChildren();
+            },
+            set: function () {
+            }
+        },
+        tabChildren: {
+            get: function () {
+                return this.getTabChildren();
+            },
+            set: function (tabChildren) {
+                this.setTabChildren(tabChildren);
+            }
+        }
+    });
 
     /**
      * @returns {boolean}
@@ -14523,46 +14523,46 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(Sprite.prototype,
-        {
-            graphics: {
-                get: function () {
-                    return this.getGraphics();
-                },
-                set: function (buttonMode) {
-                }
+    {
+        graphics: {
+            get: function () {
+                return this.getGraphics();
             },
-            hitArea: {
-                get: function () {
-                    return this.getHitArea();
-                },
-                set: function (sprite) {
-                    this.setHitArea(sprite);
-                }
-            },
-            soundTransform: {
-                get: function () {
-                    return this._soundTransform;
-                },
-                set: function () {
-                }
-            },
-            useHandCursor: {
-                get: function () {
-                    return this.getUseHandCursor();
-                },
-                set: function (useHandCursor) {
-                    this.setUseHandCursor(useHandCursor);
-                }
-            },
-            dropTarget: {
-                get: function () {
-                    return this.getDropTarget();
-                },
-                set: function () {
-                    this.setDropTarget();
-                }
+            set: function (buttonMode) {
             }
-        });
+        },
+        hitArea: {
+            get: function () {
+                return this.getHitArea();
+            },
+            set: function (sprite) {
+                this.setHitArea(sprite);
+            }
+        },
+        soundTransform: {
+            get: function () {
+                return this._soundTransform;
+            },
+            set: function () {
+            }
+        },
+        useHandCursor: {
+            get: function () {
+                return this.getUseHandCursor();
+            },
+            set: function (useHandCursor) {
+                this.setUseHandCursor(useHandCursor);
+            }
+        },
+        dropTarget: {
+            get: function () {
+                return this.getDropTarget();
+            },
+            set: function () {
+                this.setDropTarget();
+            }
+        }
+    });
 
     /**
      * @returns {Graphics}
@@ -14633,7 +14633,7 @@ if (!("swf2js" in window)){(function(window)
         var bottom = _parseFloat(args[4]);
 
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var startX = 0;
         var startY = 0;
@@ -14661,7 +14661,7 @@ if (!("swf2js" in window)){(function(window)
     Sprite.prototype.stopDrag = function ()
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         stage.dragMc = null;
         stage.dragRules = null;
@@ -14674,7 +14674,7 @@ if (!("swf2js" in window)){(function(window)
     Sprite.prototype.executeDrag = function ()
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var dragRules = stage.dragRules;
         var startX = dragRules.startX;
@@ -14744,7 +14744,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this._droptarget = null;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var parent = _this.getParent();
         if (!parent) {
@@ -15012,15 +15012,15 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(Shape.prototype,
-        {
-            graphics: {
-                get: function () {
-                    return this.getGraphics();
-                },
-                set: function () {
-                }
+    {
+        graphics: {
+            get: function () {
+                return this.getGraphics();
+            },
+            set: function () {
             }
-        });
+        }
+    });
 
     /**
      * dummy
@@ -15842,103 +15842,109 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(TextField.prototype,
-        {
-            text: {
-                get: function () {
-                    return this.getProperty("text");
-                },
-                set: function (text) {
-                    this.setProperty("text", text);
-                }
+    {
+        text: {
+            get: function () {
+                return this.getProperty("text");
             },
-            size: {
-                get: function () {
-                    return this.getProperty("size");
-                },
-                set: function (size) {
-                    this.setProperty("size", size);
-                }
+            set: function (text) {
+                this.setProperty("text", text);
+            }
+        },
+        size: {
+            get: function () {
+                return this.getProperty("size");
             },
-            type: {
-                get: function () {
-                    return this.getProperty("type");
-                },
-                set: function (type) {
-                    this.setProperty("type", type);
-                    if (type === "input") {
-                        this.setInputElement();
-                    }
-                }
+            set: function (size) {
+                this.setProperty("size", size);
+            }
+        },
+        type: {
+            get: function () {
+                return this.getProperty("type");
             },
-            multiline: {
-                get: function () {
-                    return this.getProperty("multiline");
-                },
-                set: function (multiline) {
-                    this.setProperty("multiline", multiline);
-                }
-            },
-            wordWrap: {
-                get: function () {
-                    return this.getProperty("wordWrap");
-                },
-                set: function (wordWrap) {
-                    this.setProperty("wordWrap", wordWrap);
-                }
-            },
-            border: {
-                get: function () {
-                    return this.getProperty("border");
-                },
-                set: function (border) {
-                    this.setProperty("border", border);
-                }
-            },
-            borderColor: {
-                get: function () {
-                    return this.getProperty("borderColor");
-                },
-                set: function (color) {
-                    if (typeof color === "string") {
-                        color = colorStringToInt(color);
-                    }
-                    color = intToRGBA(color);
-                    this.setProperty("borderColor", color);
-                }
-            },
-            background: {
-                get: function () {
-                    return this.getProperty("background");
-                },
-                set: function (background) {
-                    this.setProperty("background", background);
-                }
-            },
-            backgroundColor: {
-                get: function () {
-                    return this.getProperty("backgroundColor");
-                },
-                set: function (color) {
-                    if (typeof color === "string") {
-                        color = colorStringToInt(color);
-                    }
-                    color = intToRGBA(color);
-                    this.setProperty("backgroundColor", color);
-                }
-            },
-            textColor: {
-                get: function () {
-                    return this.getProperty("textColor");
-                },
-                set: function (color) {
-                    if (typeof color === "string") {
-                        color = colorStringToInt(color);
-                    }
-                    color = intToRGBA(color);
-                    this.setProperty("textColor", color);
+            set: function (type) {
+                this.setProperty("type", type);
+                if (type === "input") {
+                    this.setInputElement();
                 }
             }
-        });
+        },
+        multiline: {
+            get: function () {
+                return this.getProperty("multiline");
+            },
+            set: function (multiline) {
+                this.setProperty("multiline", multiline);
+                if (this.type === "input") {
+                    this.setInputElement();
+                }
+            }
+        },
+        wordWrap: {
+            get: function () {
+                return this.getProperty("wordWrap");
+            },
+            set: function (wordWrap) {
+                this.setProperty("wordWrap", wordWrap);
+                if (this.type === "input") {
+                    this.setInputElement();
+                }
+            }
+        },
+        border: {
+            get: function () {
+                return this.getProperty("border");
+            },
+            set: function (border) {
+                this.setProperty("border", border);
+            }
+        },
+        borderColor: {
+            get: function () {
+                return this.getProperty("borderColor");
+            },
+            set: function (color) {
+                if (typeof color === "string") {
+                    color = colorStringToInt(color);
+                }
+                color = intToRGBA(color);
+                this.setProperty("borderColor", color);
+            }
+        },
+        background: {
+            get: function () {
+                return this.getProperty("background");
+            },
+            set: function (background) {
+                this.setProperty("background", background);
+            }
+        },
+        backgroundColor: {
+            get: function () {
+                return this.getProperty("backgroundColor");
+            },
+            set: function (color) {
+                if (typeof color === "string") {
+                    color = colorStringToInt(color);
+                }
+                color = intToRGBA(color);
+                this.setProperty("backgroundColor", color);
+            }
+        },
+        textColor: {
+            get: function () {
+                return this.getProperty("textColor");
+            },
+            set: function (color) {
+                if (typeof color === "string") {
+                    color = colorStringToInt(color);
+                }
+                color = intToRGBA(color);
+                this.setProperty("textColor", color);
+            }
+        }
+    });
 
     /**
      * setInitParams
@@ -16032,10 +16038,6 @@ if (!("swf2js" in window)){(function(window)
     TextField.prototype.setInputElement = function ()
     {
         var _this = this;
-        if (_this.input) {
-            return 0;
-        }
-
         var stage = _this.getStage();
         var element = _document.createElement("textarea");
         var multiline = _this.getProperty("multiline");
@@ -16052,6 +16054,8 @@ if (!("swf2js" in window)){(function(window)
                     return false;
                 }
             };
+        } else {
+            element.onkeypress = null;
         }
 
         element.style.position = "absolute";
@@ -16511,40 +16515,40 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(SimpleButton.prototype,
-        {
-            downState: {
-                get: function () {
-                    return this.getSprite("down");
-                },
-                set: function (sprite) {
-                    this.setSprite("down", sprite);
-                }
+    {
+        downState: {
+            get: function () {
+                return this.getSprite("down");
             },
-            hitState: {
-                get: function () {
-                    return this.getSprite("hit");
-                },
-                set: function (sprite) {
-                    this.setSprite("hit", sprite);
-                }
-            },
-            overState: {
-                get: function () {
-                    return this.getSprite("over");
-                },
-                set: function (sprite) {
-                    this.setSprite("over", sprite);
-                }
-            },
-            upState: {
-                get: function () {
-                    return this.getSprite("up");
-                },
-                set: function (sprite) {
-                    this.setSprite("up", sprite);
-                }
+            set: function (sprite) {
+                this.setSprite("down", sprite);
             }
-        });
+        },
+        hitState: {
+            get: function () {
+                return this.getSprite("hit");
+            },
+            set: function (sprite) {
+                this.setSprite("hit", sprite);
+            }
+        },
+        overState: {
+            get: function () {
+                return this.getSprite("over");
+            },
+            set: function (sprite) {
+                this.setSprite("over", sprite);
+            }
+        },
+        upState: {
+            get: function () {
+                return this.getSprite("up");
+            },
+            set: function (sprite) {
+                this.setSprite("up", sprite);
+            }
+        }
+    });
 
     /**
      *
@@ -16949,7 +16953,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var stage = _this.getStage();
 
-        var mc = _this.getMovieClip(name);
+        var mc = _this.getDisplayObject(name);
         if (!mc) {
             mc = new MovieClip();
         }
@@ -17128,7 +17132,7 @@ if (!("swf2js" in window)){(function(window)
                 var tags = parent.getTags();
                 targetMc = tags[target];
             } else {
-                targetMc = _this.getMovieClip(target);
+                targetMc = _this.getDisplayObject(target);
             }
         }
 
@@ -17218,7 +17222,7 @@ if (!("swf2js" in window)){(function(window)
         if (target instanceof MovieClip) {
             targetMc = target;
         } else {
-            targetMc = _this.getMovieClip(target);
+            targetMc = _this.getDisplayObject(target);
             if (!targetMc) {
                 return 0;
             }
@@ -17253,7 +17257,7 @@ if (!("swf2js" in window)){(function(window)
         if (target instanceof MovieClip) {
             targetMc = target;
         } else {
-            targetMc = _this.getMovieClip(target);
+            targetMc = _this.getDisplayObject(target);
             if (!targetMc) {
                 return 0;
             }
@@ -17341,7 +17345,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var targetMc = _this;
         if (target) {
-            targetMc = _this.getMovieClip(target);
+            targetMc = _this.getDisplayObject(target);
         }
 
         if (targetMc) {
@@ -17441,7 +17445,7 @@ if (!("swf2js" in window)){(function(window)
                         matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
                         mc = parent;
                     }
-                    var _root = _this.getMovieClip("_root");
+                    var _root = _this.getDisplayObject("_root");
                     var stage = _root.getStage();
                     var ctx = stage.hitContext;
                     var scale = stage.getScale();
@@ -17490,7 +17494,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var parent = _this.getParent();
         if (!parent) {
-            parent = _this.getMovieClip("_root");
+            parent = _this.getDisplayObject("_root");
         }
         var tags = parent.getTags();
         depth += 16384;
@@ -17555,7 +17559,7 @@ if (!("swf2js" in window)){(function(window)
             depth += 16384;
         }
 
-        var mc = _this.getMovieClip(name);
+        var mc = _this.getDisplayObject(name);
         if (mc) {
             mc.removeMovieClip();
         }
@@ -17654,7 +17658,7 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.updateAfterEvent = function ()
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         stage.touchRender();
     };
@@ -17665,12 +17669,12 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.duplicateMovieClip = function ()
     {
         var _this = this;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var target = arguments[0];
         var name = arguments[1];
         var depth = arguments[2];
-        var targetMc = _this.getMovieClip(name);
+        var targetMc = _this.getDisplayObject(name);
         var parent;
         var object;
         if (!targetMc && stage.getVersion() > 4) {
@@ -17759,7 +17763,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var targetMc = _this;
         if (typeof name === "string") {
-            var target = _this.getMovieClip(name);
+            var target = _this.getDisplayObject(name);
             if (target) {
                 targetMc = target;
             }
@@ -18331,7 +18335,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var events = _this.events;
-        var _root = _this.getMovieClip("_root");
+        var _root = _this.getDisplayObject("_root");
         var stage = _root.getStage();
         var moveEventHits = stage.moveEventHits;
         var downEventHits = stage.downEventHits;
@@ -18603,48 +18607,48 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(MovieClipLoader.prototype,
-        {
-            onLoadComplete: {
-                get: function () {
-                    return this.getProperty("onLoadComplete");
-                },
-                set: function (onLoadComplete) {
-                    this.setProperty(onLoadComplete);
-                }
+    {
+        onLoadComplete: {
+            get: function () {
+                return this.getProperty("onLoadComplete");
             },
-            onLoadError: {
-                get: function () {
-                    return this.getProperty("onLoadError");
-                },
-                set: function (onLoadError) {
-                    this.setProperty(onLoadError);
-                }
-            },
-            onLoadInit: {
-                get: function () {
-                    return this.getProperty("onLoadInit");
-                },
-                set: function (onLoadInit) {
-                    this.setProperty(onLoadInit);
-                }
-            },
-            onLoadProgress: {
-                get: function () {
-                    return this.getProperty("onLoadProgress");
-                },
-                set: function (onLoadProgress) {
-                    this.setProperty(onLoadProgress);
-                }
-            },
-            onLoadStart: {
-                get: function () {
-                    return this.getProperty("onLoadStart");
-                },
-                set: function (onLoadStart) {
-                    this.setProperty(onLoadStart);
-                }
+            set: function (onLoadComplete) {
+                this.setProperty(onLoadComplete);
             }
-        });
+        },
+        onLoadError: {
+            get: function () {
+                return this.getProperty("onLoadError");
+            },
+            set: function (onLoadError) {
+                this.setProperty(onLoadError);
+            }
+        },
+        onLoadInit: {
+            get: function () {
+                return this.getProperty("onLoadInit");
+            },
+            set: function (onLoadInit) {
+                this.setProperty(onLoadInit);
+            }
+        },
+        onLoadProgress: {
+            get: function () {
+                return this.getProperty("onLoadProgress");
+            },
+            set: function (onLoadProgress) {
+                this.setProperty(onLoadProgress);
+            }
+        },
+        onLoadStart: {
+            get: function () {
+                return this.getProperty("onLoadStart");
+            },
+            set: function (onLoadStart) {
+                this.setProperty(onLoadStart);
+            }
+        }
+    });
 
     /**
      * @param url
@@ -18725,24 +18729,24 @@ if (!("swf2js" in window)){(function(window)
      * properties
      */
     Object.defineProperties(LoadVars.prototype,
-        {
-            onData: {
-                get: function () {
-                    return this.getProperty("onData");
-                },
-                set: function (onData) {
-                    this.setProperty("onData", onData);
-                }
+    {
+        onData: {
+            get: function () {
+                return this.getProperty("onData");
             },
-            onLoad: {
-                get: function () {
-                    return this.getProperty("onLoad");
-                },
-                set: function (onLoad) {
-                    this.setProperty("onLoad", onLoad);
-                }
+            set: function (onData) {
+                this.setProperty("onData", onData);
             }
-        });
+        },
+        onLoad: {
+            get: function () {
+                return this.getProperty("onLoad");
+            },
+            set: function (onLoad) {
+                this.setProperty("onLoad", onLoad);
+            }
+        }
+    });
 
     /**
      * @param name
@@ -19203,7 +19207,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             };
         })(audio, _this);
-        audio.addEventListener('error', onError);
+        audio.addEventListener("error", onError);
     };
 
     /**
@@ -21696,7 +21700,7 @@ if (!("swf2js" in window)){(function(window)
             stage.init();
 
             var xmlHttpRequest = new XMLHttpRequest();
-            xmlHttpRequest.open('GET', url, true);
+            xmlHttpRequest.open("GET", url, true);
             if (isXHR2) {
                 xmlHttpRequest.responseType = "arraybuffer";
             } else {
