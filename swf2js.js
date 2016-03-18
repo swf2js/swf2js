@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.4)
+ * swf2js (version 0.6.5)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -409,21 +409,6 @@ if (!("swf2js" in window)){(function(window)
             }
         }
         return operation;
-    }
-
-    /**
-     * @param a
-     * @param b
-     * @returns {*}
-     */
-    function comparison(a, b)
-    {
-        var ret;
-        while ((ret = a % b) !== 0) {
-            a = b;
-            b = ret;
-        }
-        return b;
     }
 
     /**
@@ -1309,15 +1294,8 @@ if (!("swf2js" in window)){(function(window)
                     str += "ctx.bezierCurveTo(" + a[1] + "," + a[2] + "," + a[3] + "," + a[4] + "," + a[5] + "," + a[6] + ");";
                     break;
                 case 4:
-                    str += "ctx.arc(" + a[1] + "," + a[2] + "," + a[3] + "," + a[4] + "," + a[5] + ",false);";
-                    break;
-                case 5:
-                    str += "ctx.scale(" + a[1] + "," + a[2] + ");";
-                    str += "ctx.arc(" + a[3] + "," + a[4] + "," + a[5] + ", " + a[6] + "," + a[7] + ",false);";
-                    str += "ctx.scale(1,1);";
-                    break;
-                case 6:
-                    str += "ctx.closePath();";
+                    str += "ctx.moveTo(" + (a[1] + a[3]) + "," + a[2] + ");";
+                    str += "ctx.arc(" + a[1] + "," + a[2] + "," + a[3] + ",0 , Math.PI*2, false);";
                     break;
             }
         }
@@ -10375,6 +10353,8 @@ if (!("swf2js" in window)){(function(window)
             alpha = _parseFloat(alpha);
             if (_isNaN(alpha)) {
                 alpha = 100;
+            } else {
+                alpha *= 100;
             }
             var color = intToRGBA(rgb, alpha);
             _this.pushFillRecode(color);
@@ -10412,7 +10392,10 @@ if (!("swf2js" in window)){(function(window)
             alpha = _parseFloat(alpha);
             if (_isNaN(alpha)) {
                 alpha = 100;
+            } else {
+                alpha *= 100;
             }
+
             if (!capsStyle) {
                 capsStyle = "round";
             }
@@ -10567,11 +10550,11 @@ if (!("swf2js" in window)){(function(window)
         radius *= 20;
         if (isFillDraw) {
             var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [4, x, y, radius, 0, _PI * 2];
+            fillRecodes[fillRecodes.length] = [4, x, y, radius];
         }
         if (isLineDraw) {
             var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [4, x, y, radius, 0, _PI * 2];
+            lineRecodes[lineRecodes.length] = [4, x, y, radius];
         }
         if (isFillDraw || isLineDraw) {
             _this.setBounds(x - radius, y - radius);
@@ -10591,47 +10574,19 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.drawEllipse = function (x, y, width, height)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
-        x *= 20;
-        y *= 20;
-        width *= 20;
-        height *= 20;
-        var radius = _min(width, height);
-        var _comparison = comparison(width, height);
-        var xScale = width / _comparison;
-        var yScale = height / _comparison;
-        var scale = _min(xScale, yScale) / _max(xScale, yScale);
-        var data = [5];
-        if (width === height) {
-            data[data.length] = 1;
-            data[data.length] = 1;
-        } else if (width > height) {
-            data[data.length] = 1;
-            data[data.length] = scale;
-        } else {
-            data[data.length] = scale;
-            data[data.length] = 1;
-        }
-        data[data.length] = x;
-        data[data.length] = y;
-        data[data.length] = radius;
-        data[data.length] = 0;
-        data[data.length] = _PI * 2;
-
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = data;
-        }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = data;
-        }
-        if (isFillDraw || isLineDraw) {
-            _this.setBounds(x - width, y - height);
-            _this.setBounds(x + width, y + height);
-            _this.addCacheKey(x, y, width, height);
-        }
+        var hw = width / 2;
+        var hh = height / 2;
+        var x0 = x + hw;
+        var x1 = x + width;
+        var y0 = y + hh;
+        var y1 = y + height;
+        var cw = 4 / 3 * (_SQRT2 - 1) * hw;
+        var ch = 4 / 3 * (_SQRT2 - 1) * hh;
+        _this.moveTo(x0, y);
+        _this.cubicCurveTo(x0 + cw, y, x1, y0 - ch, x1, y0);
+        _this.cubicCurveTo(x1, y0 + ch, x0 + cw, y1, x0, y1);
+        _this.cubicCurveTo(x0 - cw, y1, x, y0 + ch, x, y0);
+        _this.cubicCurveTo(x, y0 - ch, x0 - cw, y, x0, y);
         return _this;
     };
 
@@ -10665,133 +10620,29 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.drawRoundRect = function (x, y, width, height, ellipseWidth, ellipseHeight)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var hew = ellipseWidth / 2;
+        var heh = ellipseHeight / 2;
+        var cw = 4 / 3 * (_SQRT2 - 1) * hew;
+        var ch = 4 / 3 * (_SQRT2 - 1) * heh;
 
-        x *= 20;
-        y *= 20;
-        width *= 20;
-        height *= 20;
-        ellipseWidth *= 20;
-        ellipseHeight *= 20;
+        var dx0 = x + hew;
+        var dx1 = x + width;
+        var dx2 = dx1 - hew;
 
-        var halfEllipseWidth = ellipseWidth / 2;
-        var halfEllipseHeight = ellipseHeight / 2;
-        var radius = _min(halfEllipseWidth, halfEllipseHeight);
-        var _comparison = comparison(ellipseWidth, ellipseHeight);
-        var xScale = ellipseWidth / _comparison;
-        var yScale = ellipseHeight / _comparison;
-        var scale = _min(xScale, yScale) / _max(xScale, yScale);
-        var data = [];
-        var vec;
-        var xs, ys;
-        if (ellipseWidth === ellipseHeight) {
-            xs = 1;
-            ys = 1;
-        } else if (ellipseWidth > ellipseHeight) {
-            xs = 1;
-            ys = scale;
-        } else {
-            xs = scale;
-            ys = 1;
-        }
+        var dy0 = y + heh;
+        var dy1 = y + height;
+        var dy2 = dy1 - heh;
 
-        // arc
-        vec = [];
-        vec[vec.length] = 5;
-        vec[vec.length] = xs;
-        vec[vec.length] = ys;
-        vec[vec.length] = x + halfEllipseWidth;
-        vec[vec.length] = y + halfEllipseHeight;
-        vec[vec.length] = radius;
-        vec[vec.length] = _PI;
-        vec[vec.length] = (270 / 180) * _PI;
-        data[data.length] = vec;
+        _this.moveTo(dx0, y);
+        _this.lineTo(dx2, y);
+        _this.cubicCurveTo(dx2 + cw, y, dx1, dy0 - ch, dx1, dy0);
+        _this.lineTo(dx1, dy2);
+        _this.cubicCurveTo(dx1, dy2 + ch, dx2 + cw, dy1, dx2, dy1);
+        _this.lineTo(dx0, dy1);
+        _this.cubicCurveTo(dx0 - cw, dy1, x, dy2 + ch, x, dy2);
+        _this.lineTo(x, dy0);
+        _this.cubicCurveTo(x, dy0 - ch, dx0 - cw, y, dx0, y);
 
-        // lineTo
-        vec = [];
-        vec[vec.length] = 2;
-        vec[vec.length] = x + width - halfEllipseWidth;
-        vec[vec.length] = y;
-        data[data.length] = vec;
-
-        // arc
-        vec = [];
-        vec[vec.length] = 5;
-        vec[vec.length] = xs;
-        vec[vec.length] = ys;
-        vec[vec.length] = x + width - halfEllipseWidth;
-        vec[vec.length] = y + halfEllipseHeight;
-        vec[vec.length] = radius;
-        vec[vec.length] = (270 / 180) * _PI;
-        vec[vec.length] = 0;
-        data[data.length] = vec;
-
-        // lineTo
-        vec = [];
-        vec[vec.length] = 2;
-        vec[vec.length] = x + width;
-        vec[vec.length] = y + height - halfEllipseHeight;
-        data[data.length] = vec;
-
-        // arc
-        vec = [];
-        vec[vec.length] = 5;
-        vec[vec.length] = xs;
-        vec[vec.length] = ys;
-        vec[vec.length] = x + width - halfEllipseWidth;
-        vec[vec.length] = y + height - halfEllipseHeight;
-        vec[vec.length] = radius;
-        vec[vec.length] = 0;
-        vec[vec.length] = (90 / 180) * _PI;
-        data[data.length] = vec;
-
-        // lineTo
-        vec = [];
-        vec[vec.length] = 2;
-        vec[vec.length] = x + halfEllipseWidth;
-        vec[vec.length] = y + height;
-        data[data.length] = vec;
-
-        //// arc
-        vec = [];
-        vec[vec.length] = 5;
-        vec[vec.length] = xs;
-        vec[vec.length] = ys;
-        vec[vec.length] = x + halfEllipseWidth;
-        vec[vec.length] = y + height - halfEllipseHeight;
-        vec[vec.length] = radius;
-        vec[vec.length] = (45 / 180) * _PI;
-        vec[vec.length] = _PI;
-        data[data.length] = vec;
-
-        // lineTo
-        vec = [];
-        vec[vec.length] = 2;
-        vec[vec.length] = x;
-        vec[vec.length] = y - halfEllipseHeight;
-        data[data.length] = vec;
-
-        var dataLength = data.length;
-        var i = 0;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            for (i = 0; i < dataLength; i++) {
-                fillRecodes[fillRecodes.length] = data[i];
-            }
-        }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            for (i = 0; i < dataLength; i++) {
-                lineRecodes[lineRecodes.length] = data[i];
-            }
-        }
-
-        if (isFillDraw || isLineDraw) {
-            _this.setBounds(x - width, y - height);
-            _this.setBounds(x + width, y + height);
-            _this.addCacheKey(x, y, width, height, ellipseWidth, ellipseHeight);
-        }
         return _this;
     };
 
@@ -10849,25 +10700,6 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.isFillDraw = false;
-        return _this;
-    };
-
-    /**
-     * @returns {Graphics}
-     */
-    Graphics.prototype.closePath = function ()
-    {
-        var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [6];
-        }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [6];
-        }
         return _this;
     };
 
@@ -13992,15 +13824,14 @@ if (!("swf2js" in window)){(function(window)
 
             var container = _this.getContainer();
             var frame = 1;
-            if (!(frame in container)) {
-                container[frame] = [];
-            }
-
             var placeObject = new PlaceObject();
             var instanceId = _this.instanceId;
             if (_this instanceof MovieClip) {
                 var totalFrames = _this.getTotalFrames() + 1;
                 for (; frame < totalFrames; frame++) {
+                    if (!(frame in container)) {
+                        container[frame] = [];
+                    }
                     stage.setPlaceObject(placeObject, instanceId, depth, frame);
                     container[frame][depth] = child.instanceId;
                 }
@@ -14299,10 +14130,14 @@ if (!("swf2js" in window)){(function(window)
                         obj.hasEventListener("release") ||
                         obj.hasEventListener("rollOver") ||
                         obj.hasEventListener("rollOut") ||
+                        obj.hasEventListener("dragOver") ||
+                        obj.hasEventListener("dragOut") ||
                         obj.onPress !== undefined ||
                         obj.onRelease !== undefined ||
                         obj.onRollOver !== undefined ||
-                        obj.onRollOut !== undefined
+                        obj.onRollOut !== undefined ||
+                        obj.onDragOver !== undefined ||
+                        obj.onDragOut !== undefined
                     ) {
                         bounds = obj.getBounds(renderMatrix);
                         buttonHits[buttonHits.length] = {
@@ -21323,14 +21158,12 @@ if (!("swf2js" in window)){(function(window)
                     ) {
                         if (mc.getButtonStatus() === "up") {
                             mc.setButtonStatus("down");
-
                             events = mc.events;
                             dragOver = events.dragOver;
                             if (dragOver) {
                                 isRender = true;
                                 _this.executeEventAction(dragOver, mc);
                             }
-
                             onDragOver = mc.onDragOver;
                             if (onDragOver) {
                                 isRender = true;
@@ -21347,7 +21180,6 @@ if (!("swf2js" in window)){(function(window)
                                 isRender = true;
                                 _this.executeEventAction(onDragOver, button);
                             }
-
                         }
                     } else {
                         if (mc.getButtonStatus() === "down") {
@@ -21357,7 +21189,6 @@ if (!("swf2js" in window)){(function(window)
                                 isRender = true;
                                 _this.executeEventAction(dragOut, mc);
                             }
-
                             onDragOut = mc.onDragOut;
                             if (onDragOut) {
                                 isRender = true;
