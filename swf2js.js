@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.5)
+ * swf2js (version 0.6.6)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -18448,7 +18448,7 @@ if (!("swf2js" in window)){(function(window)
                 return this.getProperty("onLoadComplete");
             },
             set: function (onLoadComplete) {
-                this.setProperty(onLoadComplete);
+                this.setProperty("onLoadComplete", onLoadComplete);
             }
         },
         onLoadError: {
@@ -18456,7 +18456,7 @@ if (!("swf2js" in window)){(function(window)
                 return this.getProperty("onLoadError");
             },
             set: function (onLoadError) {
-                this.setProperty(onLoadError);
+                this.setProperty("onLoadError", onLoadError);
             }
         },
         onLoadInit: {
@@ -18464,7 +18464,7 @@ if (!("swf2js" in window)){(function(window)
                 return this.getProperty("onLoadInit");
             },
             set: function (onLoadInit) {
-                this.setProperty(onLoadInit);
+                this.setProperty("onLoadInit", onLoadInit);
             }
         },
         onLoadProgress: {
@@ -18472,7 +18472,7 @@ if (!("swf2js" in window)){(function(window)
                 return this.getProperty("onLoadProgress");
             },
             set: function (onLoadProgress) {
-                this.setProperty(onLoadProgress);
+                this.setProperty("onLoadProgress", onLoadProgress);
             }
         },
         onLoadStart: {
@@ -18480,7 +18480,7 @@ if (!("swf2js" in window)){(function(window)
                 return this.getProperty("onLoadStart");
             },
             set: function (onLoadStart) {
-                this.setProperty(onLoadStart);
+                this.setProperty("onLoadStart", onLoadStart);
             }
         }
     });
@@ -18488,46 +18488,133 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param url
      * @param target
+     * @returns {boolean}
      */
     MovieClipLoader.prototype.loadClip = function (url, target)
     {
+        if (!url || !target) {
+            return false;
+        }
 
+        var _this = this;
+        var xmlHttpRequest = new XMLHttpRequest();
+        xmlHttpRequest.open("GET", url);
+
+        if (isXHR2) {
+            xmlHttpRequest.responseType = "arraybuffer";
+        } else {
+            xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
+        }
+
+        xmlHttpRequest.onreadystatechange = function ()
+        {
+            var readyState = xmlHttpRequest.readyState;
+            if (readyState === 4) {
+
+                var onLoadStart = _this.onLoadStart;
+                if (onLoadStart !== undefined) {
+                    onLoadStart.apply(_this);
+                }
+
+                var onLoadProgress = _this.onLoadProgress;
+                if (onLoadProgress !== undefined) {
+                    onLoadProgress.apply(_this);
+                }
+
+                var status = xmlHttpRequest.status;
+                switch (status) {
+                    case 200:
+                    case 304:
+                        var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
+                        var loadStage = new Stage();
+                        loadStages[loadStage.getId()] = loadStage;
+                        loadStage.parse(data);
+                        loadStage.stop();
+
+                        var loadParentMc = loadStage.getParent();
+                        loadParentMc.setLoadStage(loadStage);
+
+                        target.addChild(loadParentMc);
+                        target._url = url;
+                        target.addActions();
+
+                        // onLoadInit
+                        var onLoadInit = _this.onLoadInit;
+                        if (onLoadInit !== undefined) {
+                            target.setActionQueue(onLoadInit);
+                        }
+
+                        // onLoadComplete
+                        var onLoadComplete = _this.onLoadComplete;
+                        if (onLoadComplete !== undefined) {
+                            onLoadComplete.apply(_this);
+                        }
+                        break;
+                    default:
+                        var onLoadError = _this.onLoadError;
+                        if (onLoadError !== undefined) {
+                            onLoadError.apply(_this);
+                        }
+                        break;
+                }
+            }
+        };
+        xmlHttpRequest.send(null);
+        return true;
     };
 
     /**
-     *
      * @param listener
+     * @returns {boolean}
      */
     MovieClipLoader.prototype.addListener = function (listener)
     {
-
+        var _this = this;
+        for (var event in listener) {
+            if (!listener.hasOwnProperty(event)) {
+                continue;
+            }
+            _this[event] = listener[event];
+        }
+        return true;
     };
 
+
     /**
-     *
-     * @param target
+     * @returns {{bytesLoaded: number, bytesTotal: number}}
      */
-    MovieClipLoader.prototype.getProgress = function (target)
+    MovieClipLoader.prototype.getProgress = function ()
     {
-
+        return {
+            bytesLoaded: 0,
+            bytesTotal: 0
+        };
     };
 
     /**
-     *
      * @param listener
+     * @returns {boolean}
      */
     MovieClipLoader.prototype.removeListener = function (listener)
     {
-
+        var _this = this;
+        for (var event in listener) {
+            if (!listener.hasOwnProperty(event)) {
+                continue;
+            }
+            _this[event] = undefined;
+        }
+        return true;
     };
 
     /**
-     *
      * @param target
+     * @returns {boolean}
      */
     MovieClipLoader.prototype.unloadClip = function (target)
     {
-
+        target.unloadMovie();
+        return true;
     };
 
     /**
