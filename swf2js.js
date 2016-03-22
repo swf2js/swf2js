@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.6)
+ * swf2js (version 0.6.7)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -430,7 +430,7 @@ if (!("swf2js" in window)){(function(window)
                 if (arguments.length) {
                     as.initVariable(arguments);
                 }
-                as.setVariable("this", this);
+                as.variables["this"] = this;
                 return as.execute(clip);
             };
         })(mc, script, parent);
@@ -2362,11 +2362,6 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
-
-        var initMovieClip = stage.initMovieClip[tag.CharacterId];
-        if (initMovieClip) {
-            mc.variables = initMovieClip.variables;
-        }
         return mc;
     };
 
@@ -3681,9 +3676,13 @@ if (!("swf2js" in window)){(function(window)
         var count = bitio.getUI16();
 
         var exportAssets = stage.exportAssets;
+        var packages = stage.packages;
         for (; count--;) {
             var id = bitio.getUI16();
             var name = bitio.getDataUntil("\0");
+            if (name.substr(0, 10) === "__Packages") {
+                packages[id] = 1;
+            }
             exportAssets[name] = id;
         }
 
@@ -5457,15 +5456,16 @@ if (!("swf2js" in window)){(function(window)
         var stage = _this.stage;
         var spriteId = bitio.getUI16();
 
-        var mc = new MovieClip();
-        mc.active = true;
-        mc.setStage(stage);
-        stage.initMovieClip[spriteId] = mc;
-
         var as = new ActionScript(bitio.getData(length - 2), undefined, undefined, true);
+        var mc = stage.getParent();
+        mc.active = true;
         var action = createActionScript(mc, as);
-        var initActions = stage.initActions;
-        initActions[initActions.length] = {as: action, mc: mc};
+        var packages = stage.packages;
+        if (spriteId in packages) {
+            action.apply(mc);
+        }
+
+        stage.initActions[spriteId] = action;
     };
 
     /**
@@ -6474,7 +6474,19 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.setVariable = function (name, value)
     {
-        this.variables[name] = value;
+        var _this = this;
+        var finish = false;
+        if (name in _this.variables) {
+            _this.variables[name] = value;
+            finish = true;
+        }
+        if (!finish) {
+            var parent = _this.parent;
+            if (parent) {
+                finish = parent.setVariable(name, value);
+            }
+        }
+        return finish;
     };
 
     /**
@@ -7825,13 +7837,9 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionSetVariable = function (stack, mc)
     {
-        var _this = this;
         var value = stack.pop();
         var name = stack.pop();
-        var _variables = _this.variables;
-        if (name in _variables) {
-            _this.setVariable(name, value);
-        } else {
+        if (!this.setVariable(name, value)) {
             mc.setProperty(name, value);
         }
     };
@@ -8255,6 +8263,10 @@ if (!("swf2js" in window)){(function(window)
                 func = object[originMethod];
             }
 
+            if (!func && object instanceof MovieClip) {
+                func = object.variables[method];
+            }
+
             if (!func) {
                 func = object[method];
             }
@@ -8375,7 +8387,7 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var name = stack.pop();
         if (_this.parent) {
-            _this.setVariable(name, value);
+            _this.variables[name] = value;
         } else {
             mc.setVariable(name, value);
         }
@@ -8390,7 +8402,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var name = stack.pop();
         if (_this.parent) {
-            _this.setVariable(name, undefined);
+            _this.variables[name] = undefined;
         } else {
             mc.setVariable(name, undefined);
         }
@@ -17028,7 +17040,7 @@ if (!("swf2js" in window)){(function(window)
                             targetMc._url = url;
 
                             var onData = targetMc.onData;
-                            if (onData) {
+                            if (typeof onData === "function") {
                                 loadStage.executeEventAction(onData, targetMc);
                             }
 
@@ -17217,7 +17229,7 @@ if (!("swf2js" in window)){(function(window)
 
                             var stage = _this.getStage();
                             var onData = targetMc.onData;
-                            if (onData) {
+                            if (typeof onData === "function") {
                                 stage.executeEventAction(onData, targetMc);
                             }
 
@@ -17426,11 +17438,6 @@ if (!("swf2js" in window)){(function(window)
                     }
                     container[frame][depth] = movieClip.instanceId;
                     stage.setPlaceObject(placeObject, instanceId, depth, frame);
-                }
-
-                var initMovieClip = stage.initMovieClip[characterId];
-                if (initMovieClip) {
-                    movieClip.variables = initMovieClip.variables;
                 }
 
                 if (object) {
@@ -17643,11 +17650,9 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var stage = _this.getStage();
-
-        _this.active = true;
         var stopFlag = _this.stopFlag;
-        var frame = _this.getCurrentFrame();
-        if (!stopFlag) {
+        if (!stopFlag && _this.active) {
+            var frame = _this.getCurrentFrame();
             var totalFrames = _this.getTotalFrames();
             if (totalFrames > 1) {
                 if (_this.isLoad) {
@@ -17695,7 +17700,15 @@ if (!("swf2js" in window)){(function(window)
                     _this.setActionQueue(as);
                 }
             }
+        } else {
+            // init action
+            var initAction = stage.initActions[_this.getCharacterId()];
+            if (typeof initAction === "function") {
+                initAction.apply(stage.getParent());
+            }
         }
+
+        _this.active = true;
     };
 
     /**
@@ -18134,11 +18147,6 @@ if (!("swf2js" in window)){(function(window)
         _this.clear();
         _this.initParams();
         _this.variables = {};
-
-        var initMovieClip = stage.initMovieClip[_this.getCharacterId()];
-        if (initMovieClip) {
-            _this.variables = initMovieClip.variables;
-        }
     };
 
     /**
@@ -18232,10 +18240,25 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.active = true;
+        var stage = _this.getStage();
 
         if (_this.isAction) {
             _this.isAction = false;
             if (!_this.isLoad) {
+                // registerClass
+                var RegClass = stage.registerClass[_this.getCharacterId()];
+                if (typeof RegClass === "function") {
+                    var regClass = new RegClass();
+                    var regVariables = regClass.variables;
+                    for (var prop in regVariables) {
+                        if (!regVariables.hasOwnProperty(prop)) {
+                            continue;
+                        }
+                        _this.variables[prop] = regVariables[prop];
+                    }
+                }
+
+                // clipEvent
                 clipEvent.type = "initialize";
                 _this.dispatchEvent(clipEvent);
                 clipEvent.type = "construct";
@@ -18244,7 +18267,7 @@ if (!("swf2js" in window)){(function(window)
                 _this.dispatchEvent(clipEvent);
 
                 var onLoad = _this.onLoad;
-                if (onLoad !== undefined) {
+                if (typeof onLoad === "function") {
                     _this.setActionQueue(onLoad);
                 }
                 _this.addTouchEvent();
@@ -18256,7 +18279,6 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var stage = _this.getStage();
         var tags = _this.getTags();
         var length = tags.length;
         if (length) {
@@ -18512,12 +18534,12 @@ if (!("swf2js" in window)){(function(window)
             if (readyState === 4) {
 
                 var onLoadStart = _this.onLoadStart;
-                if (onLoadStart !== undefined) {
+                if (typeof onLoadStart === "function") {
                     onLoadStart.apply(_this);
                 }
 
                 var onLoadProgress = _this.onLoadProgress;
-                if (onLoadProgress !== undefined) {
+                if (typeof onLoadProgress === "function") {
                     onLoadProgress.apply(_this);
                 }
 
@@ -18540,19 +18562,19 @@ if (!("swf2js" in window)){(function(window)
 
                         // onLoadInit
                         var onLoadInit = _this.onLoadInit;
-                        if (onLoadInit !== undefined) {
+                        if (typeof onLoadInit === "function") {
                             target.setActionQueue(onLoadInit);
                         }
 
                         // onLoadComplete
                         var onLoadComplete = _this.onLoadComplete;
-                        if (onLoadComplete !== undefined) {
+                        if (typeof onLoadComplete === "function") {
                             onLoadComplete.apply(_this);
                         }
                         break;
                     default:
                         var onLoadError = _this.onLoadError;
-                        if (onLoadError !== undefined) {
+                        if (typeof onLoadError === "function") {
                             onLoadError.apply(_this);
                         }
                         break;
@@ -18704,7 +18726,7 @@ if (!("swf2js" in window)){(function(window)
                 var src = decodeURIComponent(xmlHttpRequest.responseText);
                 _this.decode(src);
                 var onData = _this.onData;
-                if (onData) {
+                if (typeof onData === "function") {
                     onData.apply(src, [src]);
                 }
 
@@ -18714,13 +18736,13 @@ if (!("swf2js" in window)){(function(window)
                     case 200:
                     case 304:
                         onLoad = _this.onLoad;
-                        if (onLoad) {
+                        if (typeof onLoad === "function") {
                             onLoad.apply(src, [true]);
                         }
                         return true;
                     default:
                         onLoad = _this.onLoad;
-                        if (onLoad) {
+                        if (typeof onLoad === "function") {
                             onLoad.apply(src, [false]);
                         }
                         return false;
@@ -18901,7 +18923,7 @@ if (!("swf2js" in window)){(function(window)
             if (readyState === 4) {
                 var src = xmlHttpRequest.responseXML;
                 var onData = _this.onData;
-                if (onData) {
+                if (typeof onData === "function") {
                     onData.apply(src, [src]);
                 }
 
@@ -18911,13 +18933,13 @@ if (!("swf2js" in window)){(function(window)
                     case 200:
                     case 304:
                         onLoad = _this.onLoad;
-                        if (onLoad) {
+                        if (typeof onLoad === "function") {
                             onLoad.apply(src, [true]);
                         }
                         return true;
                     default:
                         onLoad = _this.onLoad;
-                        if (onLoad) {
+                        if (typeof onLoad === "function") {
                             onLoad.apply(src, [false]);
                         }
                         return false;
@@ -19113,7 +19135,7 @@ if (!("swf2js" in window)){(function(window)
                 audio.autoplay = false;
                 audio.loop = false;
                 var onLoad = sound.onLoad;
-                if (onLoad) {
+                if (typeof onLoad === "function") {
                     onLoad.apply(sound, [true]);
                 }
             };
@@ -19124,7 +19146,7 @@ if (!("swf2js" in window)){(function(window)
         {
             return function() {
                 var onLoad = sound.onLoad;
-                if (onLoad) {
+                if (typeof onLoad === "function") {
                     onLoad.apply(sound, [false]);
                 }
             };
@@ -19354,28 +19376,65 @@ if (!("swf2js" in window)){(function(window)
     var Key = function ()
     {
         var _this = this;
-        _this.keyDownEvent = [];
-        _this.keyUpEvent = [];
+        _this.variables = {};
     };
 
     /**
+     * properties
+     */
+    Object.defineProperties(Sound.prototype,
+    {
+        onKeyDown: {
+            get: function () {
+                return this.getProperty("onKeyDown");
+            },
+            set: function (onKeyDown) {
+                this.setProperty("onKeyDown", onKeyDown);
+            }
+        },
+        onKeyUp: {
+            get: function () {
+                return this.getProperty("onKeyUp");
+            },
+            set: function (onKeyUp) {
+                this.setProperty("onKeyUp", onKeyUp);
+            }
+        }
+    });
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    Key.prototype.getProperty = function (name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * @param name
+     * @param value
+     */
+    Key.prototype.setProperty = function (name, value)
+    {
+        this.variables[String(name)] = value;
+    };
+
+    /**
+     *
      * @param listener
+     * @returns {boolean}
      */
     Key.prototype.addListener = function (listener)
     {
         var _this = this;
-        var onKeyDown = listener.onKeyDown;
-        var onKeyUp = listener.onKeyUp;
-
-        if (onKeyDown) {
-            var keyDownEvent = _this.keyDownEvent;
-            keyDownEvent[keyDownEvent.length] = {as: onKeyDown, mc: listener};
+        for (var event in listener) {
+            if (!listener.hasOwnProperty(event)) {
+                continue;
+            }
+            _this[event] = listener[event];
         }
-
-        if (onKeyUp) {
-            var keyUpEvent = _this.keyUpEvent;
-            keyUpEvent[keyUpEvent.length] = {as: onKeyUp, mc: listener};
-        }
+        return true;
     };
 
     /**
@@ -19438,13 +19497,9 @@ if (!("swf2js" in window)){(function(window)
     function keyUpAction(event)
     {
         _keyEvent = event;
-        var keyUpEvent = keyClass.keyUpEvent;
-        var length = keyUpEvent.length;
-        if (length) {
-            for (var i = 0; i < length; i++) {
-                var obj = keyUpEvent[i];
-                obj.as.apply(obj.mc);
-            }
+        var onKeyUp = keyClass.onKeyUp;
+        if (typeof onKeyUp === "function") {
+            onKeyUp.apply(keyClass, [event]);
         }
     }
 
@@ -19457,14 +19512,10 @@ if (!("swf2js" in window)){(function(window)
         var keyCode = keyClass.getCode();
         var i;
         var length;
-        var keyDownEvent = keyClass.keyDownEvent;
         var obj;
-        length = keyDownEvent.length;
-        if (length) {
-            for (i = 0; i < length; i++) {
-                obj = keyDownEvent[i];
-                obj.as.apply(obj.mc);
-            }
+        var onKeyDown = keyClass.onKeyDown;
+        if (typeof onKeyDown === "function") {
+            onKeyDown.apply(keyClass, [event]);
         }
 
         var idx;
@@ -19647,8 +19698,8 @@ if (!("swf2js" in window)){(function(window)
         _this.matrix = [1, 0, 0, 1, 0, 0];
         _this.characters = [];
         _this.initActions = [];
-        _this.initMovieClip = [];
         _this.exportAssets = [];
+        _this.packages = [];
         _this.registerClass = [];
         _this.buttonHits = [];
         _this.downEventHits = [];
@@ -20359,10 +20410,8 @@ if (!("swf2js" in window)){(function(window)
         _this.deleteNode();
         var div = _document.getElementById(_this.getName());
         if (div) {
-            // _root
-            _this.doInitActions();
-
             var mc = _this.getParent();
+            mc.putFrame();
             mc.addActions();
             _this.executeAction();
 
@@ -20490,23 +20539,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * doInitActions
-     */
-    Stage.prototype.doInitActions = function ()
-    {
-        var initActions = this.initActions;
-        var length = initActions.length;
-        if (length) {
-            for (var i = 0; i < length; i++) {
-                var obj = initActions[i];
-                var as = obj.as;
-                var mc = obj.mc;
-                as.apply(mc);
-            }
-        }
-    };
-
-    /**
      * executeAction
      */
     Stage.prototype.executeAction = function ()
@@ -20592,7 +20624,6 @@ if (!("swf2js" in window)){(function(window)
         _this.sounds = [];
         _this.loadSounds = [];
         _this.actions = [];
-        _this.initMovieClip = [];
     };
 
     /**
@@ -21052,7 +21083,7 @@ if (!("swf2js" in window)){(function(window)
             isRender = true;
         }
         onPress = mc.onPress;
-        if (onPress) {
+        if (typeof onPress === "function") {
             _this.executeEventAction(onPress, mc);
             isRender = true;
         }
@@ -21061,7 +21092,7 @@ if (!("swf2js" in window)){(function(window)
         if (button) {
             if (isTouch) {
                 onRollOver = button.onRollOver;
-                if (onRollOver) {
+                if (typeof onRollOver === "function") {
                     _this.executeEventAction(onRollOver, button);
                 }
             }
@@ -21109,7 +21140,7 @@ if (!("swf2js" in window)){(function(window)
             }
 
             onPress = button.onPress;
-            if (onPress) {
+            if (typeof onPress === "function") {
                 _this.executeEventAction(onPress, button);
             }
 
@@ -21252,7 +21283,7 @@ if (!("swf2js" in window)){(function(window)
                                 _this.executeEventAction(dragOver, mc);
                             }
                             onDragOver = mc.onDragOver;
-                            if (onDragOver) {
+                            if (typeof nDragOver === "function") {
                                 isRender = true;
                                 _this.executeEventAction(onDragOver, mc);
                             }
@@ -21263,7 +21294,7 @@ if (!("swf2js" in window)){(function(window)
                             sprite = button.getSprite();
                             sprite.startSound();
                             onDragOver = button.onDragOver;
-                            if (onDragOver) {
+                            if (typeof onDragOver === "function") {
                                 isRender = true;
                                 _this.executeEventAction(onDragOver, button);
                             }
@@ -21277,7 +21308,7 @@ if (!("swf2js" in window)){(function(window)
                                 _this.executeEventAction(dragOut, mc);
                             }
                             onDragOut = mc.onDragOut;
-                            if (onDragOut) {
+                            if (typeof onDragOut === "function") {
                                 isRender = true;
                                 _this.executeEventAction(onDragOut, mc);
                             }
@@ -21288,7 +21319,7 @@ if (!("swf2js" in window)){(function(window)
                             if (button.getButtonStatus() === "down") {
                                 button.setButtonStatus("up");
                                 onDragOut = button.onDragOut;
-                                if (onDragOut) {
+                                if (typeof onDragOut === "function") {
                                     isRender = true;
                                     _this.executeEventAction(onDragOut, button);
                                 }
@@ -21322,7 +21353,7 @@ if (!("swf2js" in window)){(function(window)
                         }
 
                         onRollOver = mc.onRollOver;
-                        if (onRollOver) {
+                        if (typeof onRollOver === "function") {
                             isRender = true;
                             _this.executeEventAction(onRollOver, mc);
                         }
@@ -21337,7 +21368,7 @@ if (!("swf2js" in window)){(function(window)
                         if (!overObj || overObj.button !== button) {
                             _this.executeButtonAction(button, mc, "CondIdleToOverUp");
                             onRollOver = button.onRollOver;
-                            if (onRollOver) {
+                            if (typeof onRollOver === "function") {
                                 isRender = true;
                                 _this.executeEventAction(onRollOver, button);
                             }
@@ -21360,7 +21391,7 @@ if (!("swf2js" in window)){(function(window)
                         }
 
                         onRollOut = mc.onRollOut;
-                        if (onRollOut) {
+                        if (typeof onRollOut === "function") {
                             isRender = true;
                             _this.executeEventAction(onRollOut, mc);
                         }
@@ -21369,7 +21400,7 @@ if (!("swf2js" in window)){(function(window)
                             button.setButtonStatus("up");
                             _this.executeButtonAction(button, mc, "CondOverUpToIdle");
                             onRollOut = button.onRollOut;
-                            if (onRollOut) {
+                            if (typeof onRollOut === "function") {
                                 isRender = true;
                                 _this.executeEventAction(onRollOut, button);
                             }
@@ -21450,7 +21481,7 @@ if (!("swf2js" in window)){(function(window)
                         isRender = true;
                     }
                     onRelease = mc.onRelease;
-                    if (onRelease) {
+                    if (typeof onRelease === "function") {
                         _this.executeEventAction(onRelease, mc);
                         isRender = true;
                     }
@@ -21460,7 +21491,7 @@ if (!("swf2js" in window)){(function(window)
                 if (button) {
                     if (canAction) {
                         onRelease = button.onRelease;
-                        if (onRelease) {
+                        if (typeof onRelease === "function") {
                             _this.executeEventAction(onRelease, button);
                         }
                     }
