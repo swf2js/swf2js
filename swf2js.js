@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.9)
+ * swf2js (version 0.6.10)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -2135,11 +2135,13 @@ if (!("swf2js" in window)){(function(window)
                 var length = prevTags.length;
                 if (length) {
                     var parentId = mc.instanceId;
-                    for (var d = 0; d < length; d++) {
-                        if (!(d in prevTags) || d in newDepth) {
+                    for (var d in prevTags) {
+                        if (!prevTags.hasOwnProperty(d)) {
                             continue;
                         }
-
+                        if (d in newDepth) {
+                            continue;
+                        }
                         container[frame][d] = prevTags[d];
                         stage.copyPlaceObject(parentId, d, frame);
                         originTags[frame][d] = originTags[prevFrame][d];
@@ -2249,7 +2251,6 @@ if (!("swf2js" in window)){(function(window)
             if (char instanceof Array) {
                 obj = _this.buildMovieClip(tag, char, parent);
             } else {
-
                 switch (tagType) {
                     case 11: // DefineText
                     case 33: // DefineText2
@@ -15634,6 +15635,7 @@ if (!("swf2js" in window)){(function(window)
 
         var hit = false;
         var _multiplicationMatrix = multiplicationMatrix;
+        var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
         for (var i = 0; i < length; i++) {
             var record = records[i];
             var shapes = record.getData();
@@ -15642,7 +15644,7 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            var matrix2 = _multiplicationMatrix(matrix, record.getMatrix());
+            var matrix2 = _multiplicationMatrix(rMatrix, record.getMatrix());
             setTransform(ctx, matrix2);
             for (var idx = 0; idx < shapeLength; idx++) {
                 var styleObj = shapes[idx];
@@ -15768,6 +15770,9 @@ if (!("swf2js" in window)){(function(window)
             },
             set: function (multiline) {
                 this.setProperty("multiline", multiline);
+                if (multiline) {
+                    this.wordWrap = multiline;
+                }
                 if (this.type === "input") {
                     this.setInputElement();
                 }
@@ -15834,6 +15839,22 @@ if (!("swf2js" in window)){(function(window)
                 }
                 color = intToRGBA(color);
                 this.setProperty("textColor", color);
+            }
+        },
+        align: {
+            get: function () {
+                return this.getProperty("align");
+            },
+            set: function (align) {
+                this.setProperty("align", align);
+            }
+        },
+        onChanged: {
+            get: function () {
+                return this.getProperty("onChanged");
+            },
+            set: function (onChanged) {
+                this.setProperty("onChanged", onChanged);
             }
         }
     });
@@ -15930,7 +15951,8 @@ if (!("swf2js" in window)){(function(window)
     TextField.prototype.setInputElement = function ()
     {
         var _this = this;
-        var stage = _this.getStage();
+        var _root = _this.getDisplayObject("_root");
+        var stage = _root.getParentStage();
         var element = _document.createElement("textarea");
         var multiline = _this.getProperty("multiline");
         var align = _this.getProperty("align");
@@ -15968,10 +15990,10 @@ if (!("swf2js" in window)){(function(window)
         {
             return function ()
             {
+                textField.setProperty("text", el.value);
+                textField.inputActive = false;
                 var div = _document.getElementById(stage.getName());
                 if (div) {
-                    textField.setProperty("text", el.value);
-                    textField.inputActive = false;
                     var element = _document.getElementById(textField.getTagName());
                     if (element) {
                         try {
@@ -17067,6 +17089,7 @@ if (!("swf2js" in window)){(function(window)
                             loadStage.setParent(targetMc);
                             targetMc.setLoadStage(loadStage);
                             loadStage.parse(data);
+                            loadStage.stop();
 
                             if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
                                 stage.stop();
@@ -17079,11 +17102,6 @@ if (!("swf2js" in window)){(function(window)
                                 delete loadStages[loadStage.getId()];
                                 stages[stage.getId()] = loadStage;
                                 stage = null;
-                            } else {
-                                loadStage.stop();
-                                // var loadParentMc = loadStage.getParent();
-                                // loadParentMc.setLoadStage(loadStage);
-                                // targetMc.addChild(loadParentMc);
                             }
                             targetMc._url = url;
 
@@ -20188,7 +20206,15 @@ if (!("swf2js" in window)){(function(window)
         if (_this.setSwfHeader(bitio, swftag)) {
             var mc = _this.getParent();
             mc._url = location.href;
+
+            // parse
             var tags = swftag.parse(mc);
+
+            // mc reset
+            mc.container = [];
+            mc.instances = [];
+
+            // build
             swftag.build(tags, mc);
         }
 
