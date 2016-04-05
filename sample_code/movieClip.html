@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
-<script type="text/javascript" src="swf2js.js"></script>
-<title>swf2js sample4</title>
+   <meta charset="UTF-8"/>
+   <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
+   <title>swf2js</title>
+   <script type="text/javascript" src="../swf2js.js"></script>
 </head>
-<body style="margin: 0; padding:0; background-color: #000000;">
+<body style="margin: 0; padding: 0; background-color: #000000;">
 <script type="text/javascript">
 
     // root作成                           (width, height, fps)
@@ -20,7 +20,7 @@
     var model = _root.createEmptyMovieClip("model", 10);
 
     // 外部swfを読み込み
-    model.loadMovie("./swf/model.swf");
+    model.loadMovie("../swf/model.swf");
 
     // 座標をセット
     model.x = 50; // 2系 model._x = 50;
@@ -50,6 +50,7 @@
         this.stopDrag();
     });
 
+
     // ***********************
     // CreateJSライクな書き方
     // ***********************
@@ -58,7 +59,7 @@
     var shapes = _root.createEmptyMovieClip("shapes", 1);
 
     /**
-     * ランダム座標値
+     * ランダム座業値
      * @returns {number}
      */
     var random = function()
@@ -72,6 +73,7 @@
         // Shapeを作成
         var shape = this.createShape();
 
+        // ランダムに色を設定
         var hue = 360 * Math.random();
         var color = "hsl(" + hue + ", 100%, 50%)";
 
@@ -104,6 +106,7 @@
             }
         });
     });
+
 </script>
 </body>
 </html>

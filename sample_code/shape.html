@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
+    <title>swf2js</title>
+    <script type="text/javascript" src="../swf2js.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000;">
+<script type="text/javascript">
+
+    // root
+    var _root = swf2js.createRootMovieClip(240, 240, 60);
+
+    // Shape
+    var shape = _root.createShape();
+
+    // Graphics
+    shape.graphics
+            .beginFill("DarkRed", 0.8)
+            .drawCircle(0, 0, 30);
+
+    // 座標
+    shape.x = 120;
+    shape.y = 120;
+
+
+</script>
+</body>
+</html>

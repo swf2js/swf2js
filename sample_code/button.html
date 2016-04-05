@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
+    <title>swf2js</title>
+    <script type="text/javascript" src="../swf2js.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000;">
+<script type="text/javascript">
+
+    // root作成                           (width, height, fps)
+    var _root = swf2js.createRootMovieClip(240, 240, 60);
+
+    var movieClip = _root.createEmptyMovieClip("mc", 0);
+
+    var button = movieClip.createButton("btn", 0);
+    button.x = 120;
+    button.y = 120;
+
+    var shape;
+
+    // hit state
+    var hitState = button.hitState;
+    shape = hitState.createShape();
+    shape.graphics
+            .beginFill("red")
+            .drawCircle(0, 0, 30);
+
+    // up state
+    var upState = button.upState;
+    shape = upState.createShape();
+    shape.graphics
+            .beginFill("green")
+            .drawCircle(0, 0, 30);
+
+    // over state
+    var overState = button.overState;
+    shape = overState.createShape();
+    shape.graphics
+            .beginFill("blue")
+            .drawCircle(0, 0, 30);
+
+    // down state
+    var downState = button.downState;
+    shape = downState.createShape();
+    shape.graphics
+            .beginFill("red")
+            .drawCircle(0, 0, 30);
+
+</script>
+</body>
+</html>

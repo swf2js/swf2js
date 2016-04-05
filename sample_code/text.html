@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
+    <title>swf2js</title>
+    <script type="text/javascript" src="../swf2js.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000;">
+<script type="text/javascript">
+
+    // root作成                           (width, height, fps)
+    var _root = swf2js.createRootMovieClip(240, 240, 10);
+
+    // MovieClip
+    var movieClip = _root.createEmptyMovieClip("mc", 0);
+
+    // textField
+    var textField = movieClip.createText("text", 120, 40);
+    textField.x = 60;
+    textField.y = 100;
+
+    // typeをinputにするとテキスト入力が可能になります。
+    textField.type = "input";
+
+    // 表示するテキストをセット
+    textField.text = "テストテキスト\n変更可能。";
+    textField.align = "center";
+
+    // テキストの色をセット
+    textField.textColor = "red";
+
+    // テキストのサイズをセット
+    textField.size = 12;
+
+    // 複数行を許可する
+    textField.multiline = 1;
+    textField.wordWrap = 1;
+
+    // border lineを有効にする
+    textField.border = 1;
+    textField.borderColor = "black";
+
+
+</script>
+</body>
+</html>

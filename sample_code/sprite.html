@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,user-scalable=no,initial-scale=1.0" />
+    <title>swf2js</title>
+    <script type="text/javascript" src="../swf2js.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000;">
+<script type="text/javascript">
+
+    // root
+    var _root = swf2js.createRootMovieClip(240, 240, 60);
+
+    // Sprite
+    var sprite = _root.createSprite("sprite");
+
+    // MovieClipを子要素に追加
+    var movieClip = sprite.createMovieClip("mc");
+    movieClip.x = 10;
+    movieClip.y = 120;
+    movieClip.loadMovie("model.swf");
+
+    // Textを子要素に追加
+    var textField = sprite.createText("txt", 50, 50);
+    textField.x = 120;
+    textField.y = 10;
+    textField.text = "test text";
+    textField.type = "input";
+    textField.multiline = 1;
+    textField.wordWrap = 1;
+
+    // Shapeを生成
+    var shape;
+
+    shape = new swf2js.Shape();
+    shape.x = 60;
+    shape.y = 60;
+    shape.alpha = 0.3;
+    // graphic
+    shape.graphics
+            .beginFill("red")
+            .drawCircle(0, 0 ,50);
+
+    // Shapeを子要素として追加
+    sprite.addChild(shape);
+
+    // Buttonを子要素として追加
+    var button = sprite.createButton("btn");
+    button.x = 180;
+    button.y = 180;
+
+    // hit state
+    var hitState = button.hitState;
+    shape = hitState.createShape();
+    shape.graphics
+            .beginFill("red")
+            .drawCircle(0, 0, 50);
+
+    // up state
+    var upState = button.upState;
+    shape = upState.createShape();
+    shape.graphics
+            .beginFill("green")
+            .drawCircle(0, 0, 50);
+
+    // over state
+    var overState = button.overState;
+    shape = overState.createShape();
+    shape.graphics
+            .beginFill("blue")
+            .drawCircle(0, 0, 50);
+
+    // down state
+    var downState = button.downState;
+    shape = downState.createShape();
+    shape.graphics
+            .beginFill("red")
+            .drawCircle(0, 0, 50);
+
+
+</script>
+</body>
+</html>

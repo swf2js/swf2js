@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.10)
+ * swf2js (version 0.6.11)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -9,7 +9,7 @@
  */
 if (!("swf2js" in window)){(function(window)
 {
-    "use strict";
+    //"use strict";
     var _document = window.document;
     var _Math = Math;
     var _min = _Math.min;
@@ -42,6 +42,8 @@ if (!("swf2js" in window)){(function(window)
     var isBtoa = ("btoa" in window);
     var isWebGL = (window.WebGLRenderingContext &&
         _document.createElement("canvas").getContext("webgl")) ? true : false;
+
+    isWebGL = false;
     var requestAnimationFrame =
         window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
@@ -421,7 +423,7 @@ if (!("swf2js" in window)){(function(window)
     {
         return (function (clip, origin, chain)
         {
-            return function ()
+            var a = function ()
             {
                 var as = new ActionScript([], origin.constantPool, origin.register, origin.initAction);
                 as.cache = origin.cache;
@@ -433,6 +435,8 @@ if (!("swf2js" in window)){(function(window)
                 as.variables["this"] = this;
                 return as.execute(clip);
             };
+            a.___ccc = origin;
+            return a;
         })(mc, script, parent);
     }
 
@@ -1264,7 +1268,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         if (isWebGL) {
-            return _this.toCanvas2D(cache); // TODO WebGL
+            return _this.toCanvas2D(cache);
         } else {
             return _this.toCanvas2D(cache);
         }
@@ -1303,13 +1307,65 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * TODO
      * @param cache
      * @returns {*}
      */
     VectorToCanvas.prototype.toWebGL = function (cache)
     {
-        return cache;
+        var length = cache.length;
+        var str = "";
+        var polygons = [];
+        var curves = [];
+        var polygon = [];
+        var position = -1;
+        var lastPosition = {x:0, y:0};
+        for (var i = 0; i < length; i++) {
+            var a = cache[i];
+            switch (a[0]) {
+                case 0: // moveTo
+                    if (position > 0) {
+                        polygons[position] = polygon;
+                    }
+
+                    position++;
+                    polygons[position + 1] = [];
+                    polygon = [];
+                    polygon[polygon.length] = a[1];
+                    polygon[polygon.length] = a[2];
+                    lastPosition.x = a[1];
+                    lastPosition.y = a[2];
+                    break;
+                case 1: // quadraticCurveTo
+                    curves[curves.length] = lastPosition.x;
+                    curves[curves.length] = lastPosition.y;
+                    curves[curves.length] = a[1];
+                    curves[curves.length] = a[2];
+                    curves[curves.length] = a[3];
+                    curves[curves.length] = a[4];
+
+                    polygon[polygon.length] = a[3];
+                    polygon[polygon.length] = a[4];
+                    lastPosition.x = a[3];
+                    lastPosition.y = a[4];
+                    break;
+                case 2: // lineTo
+                    polygon[polygon.length] = a[1];
+                    polygon[polygon.length] = a[2];
+                    lastPosition.x = a[1];
+                    lastPosition.y = a[2];
+                    break;
+                case 3: // bezierCurveTo
+                    // TODO bezierCurveTo
+                    break;
+                case 4: // arc
+                    // TODO arc
+                    break;
+            }
+        }
+
+
+
+
     };
     var vtc = new VectorToCanvas();
 
@@ -1352,7 +1408,13 @@ if (!("swf2js" in window)){(function(window)
     {
         var pool = this.pool;
         var canvas = ctx.canvas;
-        ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+        if (isWebGL) {
+            ctx.clear(ctx.STENCIL_BUFFER_BIT | ctx.COLOR_BUFFER_BIT);
+        } else {
+            ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+        }
+
+
         canvas.width = 1;
         canvas.height = 1;
         pool[pool.length] = canvas;
@@ -5457,13 +5519,13 @@ if (!("swf2js" in window)){(function(window)
 
         var as = new ActionScript(bitio.getData(length - 2), undefined, undefined, true);
         var mc = stage.getParent();
-        mc.active = true;
+        mc.variables = {};
         var action = createActionScript(mc, as);
         var packages = stage.packages;
         if (spriteId in packages) {
+            mc.active = true;
             action.apply(mc);
         }
-
         stage.initActions[spriteId] = action;
     };
 
@@ -8268,7 +8330,6 @@ if (!("swf2js" in window)){(function(window)
             if (!func && object instanceof MovieClip) {
                 func = object.variables[method];
             }
-
             if (!func) {
                 func = object[method];
             }
@@ -8288,6 +8349,10 @@ if (!("swf2js" in window)){(function(window)
             if (method === "call" || method === "apply") {
                 func = object;
                 object = params.shift();
+                if (method === "apply") {
+                    var args = params.shift();
+                    params = Array.prototype.slice.call(args);
+                }
             }
 
             if (func) {
@@ -8305,7 +8370,6 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
-
         stack[stack.length] = value;
     };
 
@@ -8638,15 +8702,16 @@ if (!("swf2js" in window)){(function(window)
         var constructor;
         if (method === "") {
             constructor = object.apply(object, params);
-        } else if (method in window) {
+        }
+        if (!constructor && method in object) {
+            constructor = this.CreateNewActionScript(object[method], mc, params);
+        }
+        if (!constructor && method in window) {
             if (method === "CSSStyleDeclaration") {
                 constructor = undefined;
             } else {
                 constructor = this.CreateNewActionScript(window[method], mc, params);
             }
-        } else if (method in object) {
-            var func = object[method];
-            constructor = this.CreateNewActionScript(func, mc, params);
         }
         stack[stack.length] = constructor;
     };
@@ -8734,6 +8799,7 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var name = stack.pop();
         var object = stack.pop();
+
         if (object) {
             if (typeof object === "string") {
                 var target = mc.getProperty(object);
@@ -9034,11 +9100,10 @@ if (!("swf2js" in window)){(function(window)
     {
         var object = stack.pop();
         var func = stack.pop();
-        if (object instanceof func) {
-            stack[stack.length] = object;
-        } else {
-            stack[stack.length] = null;
-        }
+        stack[stack.length] = (typeof func === "function" &&
+            object instanceof func.prototype.constructor)
+                ? object
+                : null;
     };
 
     /**
@@ -17115,6 +17180,7 @@ if (!("swf2js" in window)){(function(window)
                                 targetMc.dispatchEvent(clipEvent);
                             }
 
+                            targetMc.reset();
                             targetMc.addActions();
                             break;
                     }
@@ -17142,6 +17208,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         // delete
+        targetMc.reset();
         targetMc.setLoadStage(null);
         targetMc.setStage(_this.getStage());
         targetMc.container = [];
@@ -17153,7 +17220,6 @@ if (!("swf2js" in window)){(function(window)
         targetMc._totalframes = 1;
         targetMc._url = null;
         targetMc._lockroot = true;
-        targetMc.reset();
 
         var loadStage = targetMc.getStage();
         delete loadStages[loadStage.getId()];
@@ -17483,15 +17549,36 @@ if (!("swf2js" in window)){(function(window)
             var characterId = exportAssets[id];
             var tag = stage.getCharacter(characterId);
             if (tag) {
-                var swfTag = new SwfTag(stage, null);
-                var RegClass = stage.registerClass[characterId];
-                movieClip = (RegClass) ? new RegClass() : new MovieClip();
+                movieClip = new MovieClip();
                 movieClip.setStage(stage);
-                movieClip.setCharacterId(characterId);
                 movieClip.setParent(_this);
+                movieClip.setCharacterId(characterId);
                 movieClip.setLevel(depth);
                 movieClip.setName(name);
                 movieClip.setTarget(_this.getTarget() + "/" + name);
+
+                // init action
+                var initAction = stage.initActions[characterId];
+                if (typeof initAction === "function") {
+                    movieClip.active = true;
+                    initAction.apply(movieClip);
+                    movieClip.reset();
+                }
+
+                // registerClass
+                var RegClass = stage.registerClass[characterId];
+                if (RegClass) {
+                    var regMovieClip = new RegClass();
+                    var variables = regMovieClip.variables;
+                    for (var key in variables) {
+                        if (!variables.hasOwnProperty(key)) {
+                            continue;
+                        }
+                        movieClip.setProperty(key, variables[key]);
+                    }
+                }
+
+                var swfTag = new SwfTag(stage, null);
                 swfTag.build(tag, movieClip);
 
                 var placeObject = new PlaceObject();
@@ -17514,6 +17601,7 @@ if (!("swf2js" in window)){(function(window)
                         movieClip.setProperty(prop, object[prop]);
                     }
                 }
+
                 movieClip.addActions();
             }
         }
@@ -17677,7 +17765,7 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var level = targetMc.getLevel();
-        if (targetMc instanceof MovieClip && level > 16384) {
+        if (targetMc instanceof MovieClip && level >= 16384) {
             var depth = targetMc.getDepth() + 16384;
             var parent = targetMc.getParent();
             var container = parent.getContainer();
@@ -17753,6 +17841,8 @@ if (!("swf2js" in window)){(function(window)
             tags.reverse();
         }
 
+        _this.active = true;
+
         if (_this.isLoad) {
             clipEvent.type = "enterFrame";
             _this.dispatchEvent(clipEvent);
@@ -17769,11 +17859,9 @@ if (!("swf2js" in window)){(function(window)
             // init action
             var initAction = stage.initActions[_this.getCharacterId()];
             if (typeof initAction === "function") {
-                initAction.apply(stage.getParent());
+                initAction.apply(_this);
             }
         }
-
-        _this.active = true;
     };
 
     /**
@@ -19493,11 +19581,13 @@ if (!("swf2js" in window)){(function(window)
     Key.prototype.addListener = function (listener)
     {
         var _this = this;
-        for (var event in listener) {
-            if (!listener.hasOwnProperty(event)) {
-                continue;
-            }
-            _this[event] = listener[event];
+        var onKeyDown = listener.onKeyDown;
+        if (onKeyDown) {
+            _this.onKeyDown = onKeyDown;
+        }
+        var onKeyUp = listener.onKeyUp;
+        if (onKeyUp) {
+            _this.onKeyUp = onKeyUp;
         }
         return true;
     };
@@ -19750,7 +19840,6 @@ if (!("swf2js" in window)){(function(window)
         // options
         _this.optionWidth = 0;
         _this.optionHeight = 0;
-        _this.cacheMode = true;
         _this.callback = null;
         _this.renderMode = isWebGL;
         _this.tagId = null;
@@ -19777,7 +19866,6 @@ if (!("swf2js" in window)){(function(window)
         _this.videos = [];
         _this.actions = [];
         _this.instances = [];
-        _this.controllers = [];
         _this.placeObjects = [];
         _this.isAction = true;
         _this.queue = null;
@@ -19939,7 +20027,6 @@ if (!("swf2js" in window)){(function(window)
             _this.callback = options.callback || _this.callback;
             _this.tagId = options.tagId || _this.tagId;
             _this.renderMode = options.renderMode || _this.renderMode;
-            _this.cacheMode = options.cacheMode || _this.cacheMode;
         }
     };
 
@@ -20390,6 +20477,13 @@ if (!("swf2js" in window)){(function(window)
             _this.init();
         };
 
+
+        var length = data.length;
+        var src = "";
+        for (var i = 0; i < length; i++) {
+            src += _fromCharCode(data[i]);
+        }
+
         var jpegData = swftag.parseJpegData(data);
         image.src = "data:image/jpeg;base64," + swftag.base64encode(jpegData);
     };
@@ -20687,7 +20781,6 @@ if (!("swf2js" in window)){(function(window)
         _this.parent = mc;
         _this.characters = [];
         _this.instances = [];
-        _this.controllers = [];
         _this.buttonHits = [];
         _this.downEventHits = [];
         _this.moveEventHits = [];
@@ -20899,7 +20992,6 @@ if (!("swf2js" in window)){(function(window)
             callback: options.callback | _this.callback,
             tagId: options.tagId | _this.tagId,
             renderMode: options.renderMode | _this.renderMode,
-            cacheMode: options.cacheMode | _this.cacheMode,
             stage: _this
         });
     };
@@ -21808,6 +21900,18 @@ if (!("swf2js" in window)){(function(window)
     Swf2js.prototype.createRootMovieClip = function(width, height, fps, options)
     {
         var stage = new Stage();
+        if (!width) {
+            width = 240;
+        }
+
+        if (!height) {
+            height = 240;
+        }
+        
+        if (!fps) {
+            fps = 60;
+        }
+
         stage.setBaseWidth(width);
         stage.setBaseHeight(height);
         stage.setFps(fps);
