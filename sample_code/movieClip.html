@@ -22,13 +22,17 @@
     // 外部swfを読み込み
     model.loadMovie("../swf/model.swf");
 
-    // 座標をセット
-    model.x = 50; // 2系 model._x = 50;
-    model.y = 10; // 2系 model._y = 50;
+    // 読み込が完了したら初期値をセット
+    model.addEventListener("data", function()
+    {
+        // 座標をセット
+        this.x = 50; // 2系 this._x = 50;
+        this.y = 50; // 2系 this._y = 50;
 
-    // 画面に合わせてサイズ調整
-    model.scaleX = 65; // 2系 model._xscale = 65;
-    model.scaleY = 65; // 2系 model._yscale = 65;
+        // 画面に合わせてサイズ調整
+        this.scaleX = 65; // 2系 this._xscale = 65;
+        this.scaleY = 65; // 2系 this._yscale = 65;
+    });
 
     // タッチした時のイベントを登録
     model.addEventListener("press", function()
