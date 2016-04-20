@@ -11649,7 +11649,7 @@ if (!("swf2js" in window)){(function(window)
         _this._depth = null;
         _this._framesloaded = 0;
         _this._target = "";
-        _this._lockroot = true;
+        _this._lockroot = undefined;
         _this._enabled = true;
         _this._blendMode = null;
         _this._filters = null;
@@ -13001,16 +13001,19 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var mc = _this;
         var _root = mc;
-        var tags;
-        var tag;
-        var parent;
+        var tags, tag, stage, parent;
 
-        while (true) {
-            parent = _root.getParent();
-            if (!parent) {
-                break;
+        if (!_this._lockroot) {
+            while (true) {
+                parent = _root.getParent();
+                if (!parent) {
+                    break;
+                }
+                _root = parent;
             }
-            _root = parent;
+        } else {
+            stage = _this.getStage();
+            _root = stage.getParent();
         }
 
         if (typeof path !== "string") {
@@ -13022,7 +13025,7 @@ if (!("swf2js" in window)){(function(window)
         if (path === "this") {
             return this;
         }
-        var stage = _root.getStage();
+        stage = _root.getStage();
         if (path === "_global") {
             return stage.getGlobal();
         }
@@ -14225,7 +14228,6 @@ if (!("swf2js" in window)){(function(window)
                 variables.onDragOver !== undefined ||
                 variables.onDragOut !== undefined
             ) {
-                // var renderMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
                 var bounds = _this.getBounds(matrix);
                 buttonHits[buttonHits.length] = {
                     xMax: bounds.xMax,
@@ -14447,10 +14449,10 @@ if (!("swf2js" in window)){(function(window)
     {
         var args = arguments;
         var lock = args[0];
-        var left = +args[1];
-        var top = +args[2];
-        var right = +args[3];
-        var bottom = +args[4];
+        var left = args[1];
+        var top = args[2];
+        var right = args[3];
+        var bottom = args[4];
 
         var _this = this;
         var _root = _this.getDisplayObject("_root");
@@ -14514,16 +14516,14 @@ if (!("swf2js" in window)){(function(window)
         var moveX = x + xmouse;
         var moveY = y + ymouse;
 
-        if (!_isNaN(left)) {
-            if (_isNaN(top)) {
-                top = 0;
-            }
-            if (_isNaN(right)) {
-                right = 0;
-            }
-            if (_isNaN(bottom)) {
-                bottom = 0;
-            }
+        if (left === null || left === undefined) {
+            _this.setX(moveX);
+            _this.setY(moveY);
+        } else {
+            left = +left;
+            top = +top;
+            right = +right;
+            bottom = +bottom;
 
             // x
             if (right < moveX) {
@@ -14542,9 +14542,6 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 _this.setY(moveY);
             }
-        } else {
-            _this.setX(moveX);
-            _this.setY(moveY);
         }
     };
 
@@ -16103,7 +16100,6 @@ if (!("swf2js" in window)){(function(window)
         var type = _this.getVariable("type");
         if (type === "input") {
             var buttonHits = stage.buttonHits;
-            // var renderMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
             var bounds = _this.getBounds(matrix);
             buttonHits[buttonHits.length] = {
                 xMax: bounds.xMax,
@@ -16783,7 +16779,6 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (hitTags.length) {
-                // var hitMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
                 var bounds = _this.getBounds(matrix, status);
                 if (bounds) {
                     buttonHits[buttonHits.length] = {
@@ -17255,7 +17250,7 @@ if (!("swf2js" in window)){(function(window)
         targetMc.removeTags = [];
         targetMc._totalframes = 1;
         targetMc._url = null;
-        targetMc._lockroot = true;
+        targetMc._lockroot = undefined;
 
         var loadStage = targetMc.getStage();
         delete loadStages[loadStage.getId()];
@@ -17533,7 +17528,7 @@ if (!("swf2js" in window)){(function(window)
                     _this.setDepth(depth, swapDepth, mc);
                 }
             } else {
-                depth = arguments[0]|0;
+                depth = arguments[0];
                 if (_isNaN(depth)) {
                     depth = parent.getNextHighestDepth();
                 }
