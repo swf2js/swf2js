@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.12)
+ * swf2js (version 0.6.13)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -9064,7 +9064,7 @@ if (!("swf2js" in window)){(function(window)
             rgb = "0x" + ctx.fillStyle.substr(1);
             cacheStore.destroy(ctx);
         }
-        return rgb|0;
+        return rgb;
     };
 
     /**
@@ -10728,23 +10728,21 @@ if (!("swf2js" in window)){(function(window)
 
         var cache;
         var canvas;
-        cacheKey = cacheStore.generateKey("Graphics", 0, [xScale, yScale], colorTransform);
-        cacheKey += _this.getCacheKey();
-        cache = cacheStore.getCache(cacheKey);
-
-        if (!cache &&
-            stage.getWidth() > W &&
-            stage.getHeight() > H &&
-            cacheStore.size > (W * H)
-        ) {
-            canvas = cacheStore.getCanvas();
-            canvas.width = W;
-            canvas.height = H;
-            cache = canvas.getContext("2d");
-            var cMatrix = [xScale, 0, 0, yScale, (-xMin + halfWidth) * xScale, (-yMin + halfWidth) * yScale];
-            cache.setTransform(cMatrix[0],cMatrix[1],cMatrix[2],cMatrix[3],cMatrix[4],cMatrix[5]);
-            cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, stage.clipMc);
-            cacheStore.setCache(cacheKey, cache);
+        var isClipDepth = stage.clipMc || _this.isClipDepth;
+        if (!isClipDepth) {
+            cacheKey = cacheStore.generateKey("Graphics", 0, [xScale, yScale], colorTransform);
+            cacheKey += _this.getCacheKey();
+            cache = cacheStore.getCache(cacheKey);
+            if (!cache && stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > (W * H)) {
+                canvas = cacheStore.getCanvas();
+                canvas.width = W;
+                canvas.height = H;
+                cache = canvas.getContext("2d");
+                var cMatrix = [xScale, 0, 0, yScale, (-xMin + halfWidth) * xScale, (-yMin + halfWidth) * yScale];
+                cache.setTransform(cMatrix[0], cMatrix[1], cMatrix[2], cMatrix[3], cMatrix[4], cMatrix[5]);
+                cache = _this.executeRender(cache, _min(xScale, yScale), colorTransform, false);
+                cacheStore.setCache(cacheKey, cache);
+            }
         }
 
         if (cache) {
@@ -10760,7 +10758,7 @@ if (!("swf2js" in window)){(function(window)
             }
         } else {
             ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
-            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, stage.clipMc);
+            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth);
         }
 
         return cacheKey + "_" + rMatrix[4] + "_" + rMatrix[5];
@@ -11630,6 +11628,7 @@ if (!("swf2js" in window)){(function(window)
         _this.characterId = 0;
         _this.tagType = 0;
         _this.ratio = 0;
+        _this.isMask = false;
         _this.clipDepth = 0;
         _this.isClipDepth = false;
         _this.stageId = null;
@@ -12056,7 +12055,13 @@ if (!("swf2js" in window)){(function(window)
      */
     DisplayObject.prototype.setMask = function (obj)
     {
-        this._mask = obj;
+        var _this = this;
+        var maskMc = _this._mask;
+        if (maskMc) {
+            maskMc.isMask = false;
+        }
+        obj.isMask = true;
+        _this._mask = obj;
     };
 
     /**
@@ -13173,19 +13178,21 @@ if (!("swf2js" in window)){(function(window)
         // mask
         var maskObj = _this.getMask();
         if (maskObj) {
-            _this.renderMask(ctx, matrix, colorTransform, stage);
+            _this.renderMask(ctx, stage);
         }
 
         // filter
-        var filters = _this.getFilters();
-        if (visible && !stage.clipMc && filters !== null && filters.length) {
-            isFilter = true;
-        }
+        if (visible && !stage.clipMc) {
+            var filters = _this.getFilters();
+            if (filters !== null && filters.length) {
+                isFilter = true;
+            }
 
-        // blend
-        var blendMode = _this.getBlendMode();
-        if (visible && blendMode !== null && blendMode !== "normal") {
-            isBlend = true;
+            // blend
+            var blendMode = _this.getBlendMode();
+            if (blendMode !== null && blendMode !== "normal") {
+                isBlend = true;
+            }
         }
 
         // filter or blend
@@ -13298,11 +13305,9 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param ctx
-     * @param matrix
-     * @param colorTransform
      * @param stage
      */
-    DisplayObject.prototype.renderMask = function (ctx, matrix, colorTransform, stage)
+    DisplayObject.prototype.renderMask = function (ctx, stage)
     {
         var _this = this;
         var maskObj = _this.getMask();
@@ -13310,9 +13315,20 @@ if (!("swf2js" in window)){(function(window)
             ctx.save();
             ctx.beginPath();
             stage.clipMc = true;
-            var maskMatrix = _this.multiplicationMatrix(matrix, maskObj.getMatrix());
-            var maskColorTransform = _this.multiplicationColor(colorTransform, maskObj.getColorTransform());
-            maskObj.render(ctx, maskMatrix, maskColorTransform, stage, true);
+
+            var mc = maskObj;
+            var matrix = [1,0,0,1,0,0];
+            var _multiplicationMatrix = _this.multiplicationMatrix;
+            while (true) {
+                var parent = mc.getParent();
+                if (!parent.getParent()) {
+                    break;
+                }
+                matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
+                mc = parent;
+            }
+            maskObj.render(ctx, matrix, [1,1,1,1,0,0,0,0], stage, true);
+            ctx.clip();
             stage.clipMc = false;
         }
     };
@@ -13658,6 +13674,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.active = false;
+        _this.isMask = false;
         _this._matrix = null;
         _this._colorTransform = null;
         _this._filters = null;
@@ -14196,6 +14213,7 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
+        _this.isMask = false;
         _this._depth = null;
         _this._matrix = null;
         _this._colorTransform = null;
@@ -14207,11 +14225,13 @@ if (!("swf2js" in window)){(function(window)
      * @param matrix
      * @param stage
      * @param visible
+     * @param mask
      */
-    DisplayObjectContainer.prototype.setHitRange = function (matrix, stage, visible)
+    DisplayObjectContainer.prototype.setHitRange = function (matrix, stage, visible, mask)
     {
         var _this = this;
-        if (_this.getEnabled()) {
+        var isVisible = _min(_this.getVisible(), visible);
+        if (_this.getEnabled() && isVisible) {
             var buttonHits = stage.buttonHits;
             var variables = _this.variables;
             var events = _this.events;
@@ -14228,7 +14248,8 @@ if (!("swf2js" in window)){(function(window)
                 variables.onDragOver !== undefined ||
                 variables.onDragOut !== undefined
             ) {
-                var bounds = _this.getBounds(matrix);
+                var rMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
+                var bounds = _this.getBounds(rMatrix);
                 buttonHits[buttonHits.length] = {
                     xMax: bounds.xMax,
                     xMin: bounds.xMin,
@@ -14236,7 +14257,8 @@ if (!("swf2js" in window)){(function(window)
                     yMin: bounds.yMin,
                     parent: _this,
                     matrix: _this.cloneArray(matrix),
-                    active: (visible) ? false : true
+                    active: true
+                    // active: (mask) ? false : true
                 };
             }
         }
@@ -14609,11 +14631,9 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @param stage
      * @param visible
-     * @param oMatrix
      */
-    Sprite.prototype.render = function (ctx, matrix, colorTransform, stage, visible, oMatrix)
+    Sprite.prototype.render = function (ctx, matrix, colorTransform, stage, visible)
     {
-        var cacheKey = "";
         var _this = this;
         _this.isLoad = true;
         stage.doneTags.unshift(_this);
@@ -14633,22 +14653,26 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
+        // matrix & colorTransform
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var rMatrix = _multiplicationMatrix(matrix, _this.getMatrix());
+        var _multiplicationColor = _this.multiplicationColor;
+        var rColorTransform = _multiplicationColor(colorTransform, _this.getColorTransform());
+        var isVisible = _min(_this.getVisible(), visible);
+
         // pre render
-        var obj = _this.preRender(ctx, matrix, colorTransform, stage, visible);
+        var obj = _this.preRender(ctx, rMatrix, rColorTransform, stage, visible);
+        var cacheKey = obj.cacheKey;
         var preCtx = obj.preCtx;
         var preMatrix = obj.preMatrix;
 
         // render
-        var container = _this.getTags();
-        var maskObj = _this.getMask();
-        var myStage = _this.getStage();
-
-        // render
         var clips = [];
+        var container = _this.getTags();
         var length = container.length;
-        var _multiplicationColor = _this.multiplicationColor;
-        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var maskObj = _this.getMask();
         if (length) {
+            var myStage = _this.getStage();
             for (var depth in container) {
                 if (!container.hasOwnProperty(depth)) {
                     continue;
@@ -14656,7 +14680,7 @@ if (!("swf2js" in window)){(function(window)
 
                 var instanceId = container[depth];
                 var instance = myStage.getInstance(instanceId);
-                if (!instance || instance === maskObj) {
+                if (!instance) {
                     continue;
                 }
 
@@ -14681,40 +14705,39 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
 
-                var rMatrix = _multiplicationMatrix(preMatrix, instance.getMatrix());
-                var oMatrix2;
-                if (obj.isFilter || obj.isBlend) {
-                    oMatrix2 = _this.multiplicationMatrix(oMatrix, instance.getMatrix());
-                } else {
-                    oMatrix2 = _this.cloneArray(rMatrix);
-                }
-                var rColorTransform = _multiplicationColor(colorTransform, instance.getColorTransform());
-                var isVisible = _min(instance.getVisible(), visible);
-                if (instance.isClipDepth) {
-                    if (rMatrix[0] === 0) {
-                        rMatrix[0] = 0.00000000000001;
-                    }
-                    if (rMatrix[3] === 0) {
-                        rMatrix[3] = 0.00000000000001;
-                    }
-                }
-
                 if (isVisible) {
                     switch (true) {
                         case instance instanceof TextField:
                         case instance instanceof DisplayObjectContainer:
-                            instance.setHitRange(oMatrix2, stage, cLen);
+                            instance.setHitRange(rMatrix, stage, visible, cLen);
                             break;
                         case instance instanceof SimpleButton:
-                            instance.setHitRange(oMatrix2, stage);
+                            if (!instance.clipDepth) {
+                                instance.setHitRange(rMatrix, stage, visible, cLen);
+                            }
                             break;
                         default:
                             break;
                     }
                 }
 
-                cacheKey += instance.render(preCtx, rMatrix, rColorTransform, stage, isVisible, oMatrix2);
+                // mask
+                if (instance.isMask) {
+                    continue;
+                }
+
+                if (instance.isClipDepth) {
+                    if (preMatrix[0] === 0) {
+                        preMatrix[0] = 0.00000000000001;
+                    }
+                    if (preMatrix[3] === 0) {
+                        preMatrix[3] = 0.00000000000001;
+                    }
+                }
+
+                cacheKey += instance.render(preCtx, preMatrix, rColorTransform, stage, isVisible);
                 if (stage.isClipDepth) {
+                    preCtx.clip();
                     stage.isClipDepth = false;
                 }
             }
@@ -14727,7 +14750,7 @@ if (!("swf2js" in window)){(function(window)
         // post render
         if (obj.isFilter || obj.isBlend) {
             obj.cacheKey = cacheKey;
-            _this.postRender(ctx, matrix, colorTransform, stage, obj);
+            _this.postRender(ctx, rMatrix, rColorTransform, stage, obj);
         }
 
         return cacheKey;
@@ -14787,10 +14810,10 @@ if (!("swf2js" in window)){(function(window)
         var tags = _this.getTags();
         var length = tags.length;
         var hit = false;
+        var rMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
 
         if (length) {
             var loadStage = _this.getStage();
-            var _multiplicationMatrix = _this.multiplicationMatrix;
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
@@ -14798,9 +14821,7 @@ if (!("swf2js" in window)){(function(window)
 
                 var instanceId = tags[depth];
                 var obj = loadStage.getInstance(instanceId);
-                var renderMatrix = _multiplicationMatrix(matrix, obj.getMatrix());
-                hit = obj.renderHitTest(ctx, renderMatrix, stage, x, y);
-
+                hit = obj.renderHitTest(ctx, rMatrix, stage, x, y);
                 if (hit) {
                     return hit;
                 }
@@ -14809,7 +14830,7 @@ if (!("swf2js" in window)){(function(window)
 
         var graphics = _this.graphics;
         if (graphics.isDraw) {
-            return graphics.renderHitTest(ctx, matrix, stage, x, y);
+            return graphics.renderHitTest(ctx, rMatrix, stage, x, y);
         }
 
         return hit;
@@ -14948,7 +14969,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stage
-     * @paarm clipEvent
+     * @param clipEvent
      */
     Shape.prototype.putFrame = function (stage, clipEvent)
     {
@@ -15051,23 +15072,34 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         stage.doneTags.unshift(_this);
 
-        var obj = _this.preRender(ctx, matrix, colorTransform, stage, visible);
-        var cache = null;
-        var cacheKey = obj.cacheKey;
-        var alpha = colorTransform[3] + (colorTransform[7] / 255);
-        if (!alpha || !visible) {
-            return cacheKey;
+        // colorTransform
+        var _multiplicationColor = _this.multiplicationColor;
+        var rColorTransform = _multiplicationColor(colorTransform, _this.getColorTransform());
+        var isVisible = _min(_this.getVisible(), visible);
+        var alpha = rColorTransform[3] + (rColorTransform[7] / 255);
+        var stageClip = stage.clipMc || stage.isClipDepth;
+        if (!stageClip && (!alpha || !isVisible)) {
+            return "";
         }
 
-        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), obj.preMatrix);
-        var isClipDepth = _this.isClipDepth || stage.isClipDepth || stage.clipMc;
+        // matrix
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
 
+        // pre render
+        var obj = _this.preRender(ctx, m2, rColorTransform, stage, isVisible);
+        var cacheKey = obj.cacheKey;
+        var cache = null;
+
+        // render
+        var m3 = _multiplicationMatrix(stage.getMatrix(), obj.preMatrix);
+        var isClipDepth = _this.isClipDepth || stageClip;
         if (isClipDepth) {
-            ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
-            _this.executeRender(ctx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage);
+            ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+            _this.executeRender(ctx, _min(m3[0], m3[3]), rColorTransform, isClipDepth, stage);
         } else {
-            var xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
-            var yScale = _sqrt(rMatrix[2] * rMatrix[2] + rMatrix[3] * rMatrix[3]);
+            var xScale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
+            var yScale = _sqrt(m3[2] * m3[2] + m3[3] * m3[3]);
             xScale = _pow(_SQRT2, _ceil(_log(xScale) / _LN2_2 - _LOG1P));
             yScale = _pow(_SQRT2, _ceil(_log(yScale) / _LN2_2 - _LOG1P));
 
@@ -15090,7 +15122,7 @@ if (!("swf2js" in window)){(function(window)
                 cacheId += "_" + _this.getRatio();
             }
 
-            cacheKey = cacheStore.generateKey("Shape", cacheId, [xScale, yScale], colorTransform);
+            cacheKey = cacheStore.generateKey("Shape", cacheId, [xScale, yScale], rColorTransform);
             cache = cacheStore.getCache(cacheKey);
             if (!cache &&
                 stage.getWidth() > W &&
@@ -15104,7 +15136,7 @@ if (!("swf2js" in window)){(function(window)
                 var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
                 cache.setTransform(cMatrix[0],cMatrix[1],cMatrix[2],cMatrix[3],cMatrix[4],cMatrix[5]);
                 cache = _this.executeRender(
-                    cache, _min(xScale, yScale), colorTransform, isClipDepth, stage
+                    cache, _min(xScale, yScale), rColorTransform, isClipDepth, stage
                 );
                 cacheStore.setCache(cacheKey, cache);
             }
@@ -15113,8 +15145,8 @@ if (!("swf2js" in window)){(function(window)
             if (cache) {
                 canvas = cache.canvas;
                 var sMatrix = [1 / xScale, 0, 0, 1 / yScale, xMin, yMin];
-                var m2 = _this.multiplicationMatrix(rMatrix, sMatrix);
-                preCtx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
+                var m4 = _multiplicationMatrix(m3, sMatrix);
+                preCtx.setTransform(m4[0],m4[1],m4[2],m4[3],m4[4],m4[5]);
                 if (isAndroid4x && !isChrome) {
                     preCtx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                     preCtx.fillRect(0, 0, W, H);
@@ -15122,16 +15154,16 @@ if (!("swf2js" in window)){(function(window)
                     preCtx.drawImage(canvas, 0, 0, W, H);
                 }
             } else {
-                preCtx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
-                _this.executeRender(preCtx, _min(rMatrix[0], rMatrix[3]), colorTransform, isClipDepth, stage);
+                preCtx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+                _this.executeRender(preCtx, _min(m3[0], m3[3]), rColorTransform, isClipDepth, stage);
             }
         }
 
         // post render
-        cacheKey += "_" + rMatrix[4] + "_" + rMatrix[5];
-        obj.cacheKey = cacheKey;
+        cacheKey += "_" + m3[4] + "_" + m3[5];
         if (obj.isFilter || obj.isBlend) {
-            _this.postRender(ctx, matrix, colorTransform, stage, obj);
+            obj.cacheKey = cacheKey;
+            _this.postRender(ctx, matrix, rColorTransform, stage, obj);
         }
 
         return cacheKey;
@@ -15148,19 +15180,22 @@ if (!("swf2js" in window)){(function(window)
     Shape.prototype.renderHitTest = function (ctx, matrix, stage, x, y)
     {
         var _this = this;
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+
         var graphics = _this.graphics;
         if (graphics.isDraw) {
-            return graphics.renderHitTest(ctx, matrix, stage, x, y);
+            return graphics.renderHitTest(ctx, m2, stage, x, y);
         }
 
         if (!_this.getData()) {
             return false;
         }
 
-        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), matrix);
-        ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
+        var m3 = _multiplicationMatrix(stage.getMatrix(), m2);
+        ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
 
-        var minScale = _min(rMatrix[0], rMatrix[3]);
+        var minScale = _min(m3[0], m3[3]);
         var shapes = _this.getData();
         var length = shapes.length;
         var hit = false;
@@ -15208,7 +15243,8 @@ if (!("swf2js" in window)){(function(window)
         if (!shapes) {
             return ctx;
         }
-        
+
+        var stageClip = stage.clipMc || stage.isClipDepth;
         var length = shapes.length;
         var color;
         var css;
@@ -15364,7 +15400,7 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        if (isClipDepth) {
+        if (isClipDepth && !stageClip) {
             ctx.clip();
 
             if (isAndroid && isChrome) {
@@ -15591,32 +15627,44 @@ if (!("swf2js" in window)){(function(window)
     StaticText.prototype.render = function (ctx, matrix, colorTransform, stage, visible)
     {
         var _this = this;
-        var alpha = colorTransform[3] + (colorTransform[7] / 255);
-        if (!alpha || !visible) {
+
+        // colorTransform
+        var _multiplicationColor = _this.multiplicationColor;
+        var rColorTransform = _multiplicationColor(colorTransform, _this.getColorTransform());
+        var isVisible = _min(_this.getVisible(), visible);
+        var alpha = rColorTransform[3] + (rColorTransform[7] / 255);
+        var stageClip = stage.clipMc || stage.isClipDepth;
+        if (!stageClip && (!alpha || !isVisible)) {
             return 0;
         }
 
-        var obj = _this.preRender(ctx, matrix, colorTransform, stage, visible);
-        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), obj.preMatrix);
-        var xScale = _sqrt(rMatrix[0] * rMatrix[0] + rMatrix[1] * rMatrix[1]);
-        var yScale = _sqrt(rMatrix[2] * rMatrix[2] + rMatrix[3] * rMatrix[3]);
+        // matrix
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+
+        // pre render
+        var obj = _this.preRender(ctx, m2, rColorTransform, stage, visible);
+        var m3 = _multiplicationMatrix(stage.getMatrix(), obj.preMatrix);
+        var xScale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
+        var yScale = _sqrt(m3[2] * m3[2] + m3[3] * m3[3]);
         xScale = _pow(_SQRT2, _ceil(_log(xScale) / _LN2_2 - _LOG1P));
         yScale = _pow(_SQRT2, _ceil(_log(yScale) / _LN2_2 - _LOG1P));
 
+        // render
         var bounds = _this.getBounds();
         var xMax = bounds.xMax;
         var xMin = bounds.xMin;
         var yMax = bounds.yMax;
         var yMin = bounds.yMin;
-
         var W = _abs(_ceil((xMax - xMin) * xScale));
         var H = _abs(_ceil((yMax - yMin) * yScale));
+        var isClipDepth = _this.isClipDepth || stageClip;
         if (W > 0 && H > 0) {
             var cacheId = _this.getCharacterId() + "_" + _this.getStage().getId();
-            var cacheKey = cacheStore.generateKey("Text", cacheId, [xScale, yScale], colorTransform);
+            var cacheKey = cacheStore.generateKey("Text", cacheId, [xScale, yScale], rColorTransform);
             var cache = cacheStore.getCache(cacheKey);
             var canvas;
-            if (!cache) {
+            if (!cache && !isClipDepth) {
                 if (stage.getWidth() > W && stage.getHeight() > H && cacheStore.size > W * H) {
                     canvas = cacheStore.getCanvas();
                     canvas.width = W;
@@ -15624,14 +15672,14 @@ if (!("swf2js" in window)){(function(window)
                     cache = canvas.getContext("2d");
                     var cMatrix = [xScale, 0, 0, yScale, -xMin * xScale, -yMin * yScale];
                     cache.setTransform(cMatrix[0],cMatrix[1],cMatrix[2],cMatrix[3],cMatrix[4],cMatrix[5]);
-                    cache = _this.executeRender(cache, cMatrix, colorTransform);
+                    cache = _this.executeRender(cache, cMatrix, rColorTransform, false, false);
                     cacheStore.setCache(cacheKey, cache);
                 }
             }
             if (cache) {
                 canvas = cache.canvas;
-                var m2 = _this.multiplicationMatrix(rMatrix, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
-                ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
+                var m4 = _multiplicationMatrix(m3, [1 / xScale, 0, 0, 1 / yScale, xMin, yMin]);
+                ctx.setTransform(m4[0],m4[1],m4[2],m4[3],m4[4],m4[5]);
                 if (isAndroid4x && !isChrome) {
                     ctx.fillStyle = stage.context.createPattern(cache.canvas, "no-repeat");
                     ctx.fillRect(0, 0, W, H);
@@ -15639,14 +15687,14 @@ if (!("swf2js" in window)){(function(window)
                     ctx.drawImage(canvas, 0, 0, W, H);
                 }
             } else {
-                ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
-                _this.executeRender(ctx, rMatrix, colorTransform);
+                ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+                _this.executeRender(ctx, m3, rColorTransform, isClipDepth, stageClip);
             }
 
-            cacheKey += "_" + rMatrix[4] + "_" + rMatrix[5];
-            obj.cacheKey = cacheKey;
+            cacheKey += "_" + m3[4] + "_" + m3[5];
             if (obj.isFilter || obj.isBlend) {
-                _this.postRender(ctx, matrix, colorTransform, stage, obj);
+                obj.cacheKey = cacheKey;
+                _this.postRender(ctx, matrix, rColorTransform, stage, obj);
             }
 
             return cacheKey;
@@ -15659,9 +15707,11 @@ if (!("swf2js" in window)){(function(window)
      * @param ctx
      * @param matrix
      * @param colorTransform
+     * @param isClipDepth
+     * @param stageClip
      * @returns {*}
      */
-    StaticText.prototype.executeRender = function (ctx, matrix, colorTransform)
+    StaticText.prototype.executeRender = function (ctx, matrix, colorTransform, isClipDepth, stageClip)
     {
         var _this = this;
         var records = _this.getRecords();
@@ -15688,11 +15738,20 @@ if (!("swf2js" in window)){(function(window)
             for (var idx = 0; idx < shapeLength; idx++) {
                 var styleObj = shapes[idx];
                 var cmd = styleObj.cmd;
-                ctx.beginPath();
-                cmd(ctx);
-                ctx.fill();
+                if (!isClipDepth) {
+                    ctx.beginPath();
+                    cmd(ctx);
+                    ctx.fill();
+                } else {
+                    cmd(ctx);
+                }
             }
         }
+
+        if (isClipDepth && !stageClip) {
+            ctx.clip();
+        }
+
         ctx.globalAlpha = 1;
         return ctx;
     };
@@ -15716,7 +15775,8 @@ if (!("swf2js" in window)){(function(window)
 
         var hit = false;
         var _multiplicationMatrix = _this.multiplicationMatrix;
-        var rMatrix = _multiplicationMatrix(stage.getMatrix(), matrix);
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+        var m3 = _multiplicationMatrix(stage.getMatrix(), m2);
         for (var i = 0; i < length; i++) {
             var record = records[i];
             var shapes = record.getData();
@@ -15725,8 +15785,8 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
 
-            var m2 = _multiplicationMatrix(rMatrix, record.getMatrix());
-            ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
+            var m4 = _multiplicationMatrix(m3, record.getMatrix());
+            ctx.setTransform(m4[0],m4[1],m4[2],m4[3],m4[4],m4[5]);
             for (var idx = 0; idx < shapeLength; idx++) {
                 var styleObj = shapes[idx];
                 var cmd = styleObj.cmd;
@@ -15832,6 +15892,14 @@ if (!("swf2js" in window)){(function(window)
             },
             set: function (size) {
                 this.setProperty("size", size);
+            }
+        },
+        font: {
+            get: function () {
+                return this.getProperty("font");
+            },
+            set: function (font) {
+                this.setProperty("font", font);
             }
         },
         type: {
@@ -16093,21 +16161,25 @@ if (!("swf2js" in window)){(function(window)
      * @param matrix
      * @param stage
      * @param visible
+     * @param mask
      */
-    TextField.prototype.setHitRange = function (matrix, stage, visible)
+    TextField.prototype.setHitRange = function (matrix, stage, visible, mask)
     {
-        var _this =  this;
-        var type = _this.getVariable("type");
-        if (type === "input") {
+        var _this = this;
+        var type = _this.variables.type;
+        var isVisible = _min(_this.getVisible(), visible);
+        if (type === "input" && isVisible) {
             var buttonHits = stage.buttonHits;
-            var bounds = _this.getBounds(matrix);
+            var m2 = _this.multiplicationMatrix(matrix, _this.getMatrix());
+            var bounds = _this.getBounds(m2);
             buttonHits[buttonHits.length] = {
                 xMax: bounds.xMax,
                 xMin: bounds.xMin,
                 yMax: bounds.yMax,
                 yMin: bounds.yMin,
                 parent: _this,
-                active: (visible) ? false : true
+                active: true
+                // active: (mask) ? false : true
             };
         }
     };
@@ -16124,12 +16196,22 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         stage.doneTags.unshift(_this);
 
-        var alpha = colorTransform[3] + (colorTransform[7] / 255);
-        if (!alpha || !visible) {
+        // colorTransform
+        var _multiplicationColor = _this.multiplicationColor;
+        var rColorTransform = _multiplicationColor(colorTransform, _this.getColorTransform());
+        var isVisible = _min(_this.getVisible(), visible);
+        var stageClip = stage.clipMc || stage.isClipDepth;
+        var alpha = rColorTransform[3] + (rColorTransform[7] / 255);
+        if (!stageClip && (!alpha || !isVisible)) {
             return 0;
         }
 
-        var obj = _this.preRender(ctx, matrix, colorTransform, stage, visible);
+        // matrix
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+
+        // pre render
+        var obj = _this.preRender(ctx, m2, rColorTransform, stage, visible);
         var textCacheKey = ["TextField"];
         var variables = _this.variables;
         var text = variables.text;
@@ -16171,8 +16253,9 @@ if (!("swf2js" in window)){(function(window)
         var H = _abs(_ceil(yMax - yMin));
         var preMatrix = obj.preMatrix;
         if (W > 0 && H > 0) {
-            var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), matrix);
-            ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
+            var isClipDepth = _this.isClipDepth || stageClip;
+            var m3 = _multiplicationMatrix(stage.getMatrix(), m2);
+            ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
 
             var color;
             var rx = xMin;
@@ -16181,23 +16264,23 @@ if (!("swf2js" in window)){(function(window)
             if (m) {
                 rx = -xMin;
                 ry = -yMin;
-                var m2 = _this.multiplicationMatrix(preMatrix, [1, 0, 0, 1, xMin, yMin]);
-                rMatrix = _this.multiplicationMatrix(stage.getMatrix(), m2);
-                ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
+                var m4 = _multiplicationMatrix(preMatrix, [1, 0, 0, 1, xMin, yMin]);
+                m3 = _multiplicationMatrix(stage.getMatrix(), m4);
+                ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
             }
 
             // border
             var border = variables.border;
-            if (border) {
+            if (border && !isClipDepth) {
                 ctx.beginPath();
                 ctx.rect(rx, ry, W, H);
-                color = _this.generateColorTransform(variables.backgroundColor, colorTransform);
+                color = _this.generateColorTransform(variables.backgroundColor, rColorTransform);
                 textCacheKey[textCacheKey.length] = color;
                 ctx.fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
-                color = _this.generateColorTransform(variables.borderColor, colorTransform);
+                color = _this.generateColorTransform(variables.borderColor, rColorTransform);
                 textCacheKey[textCacheKey.length] = color;
                 ctx.strokeStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
-                ctx.lineWidth = _min(20, 1 / _min(rMatrix[0], rMatrix[3]));
+                ctx.lineWidth = _min(20, 1 / _min(m3[0], m3[3]));
                 ctx.globalAlpha = 1;
                 ctx.fill();
                 ctx.stroke();
@@ -16209,7 +16292,7 @@ if (!("swf2js" in window)){(function(window)
                 objRGBA = intToRGBA(textColor, 100);
             }
 
-            color = _this.generateColorTransform(objRGBA, colorTransform);
+            color = _this.generateColorTransform(objRGBA, rColorTransform);
             var fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
             textCacheKey[textCacheKey.length] = fillStyle;
             ctx.fillStyle = fillStyle;
@@ -16250,7 +16333,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
 
-            if (text) {
+            if (text && !isClipDepth) {
                 ctx.save();
                 ctx.beginPath();
                 ctx.rect(rx, ry, W, H);
@@ -16260,9 +16343,9 @@ if (!("swf2js" in window)){(function(window)
                     var splitData = text.split("\n");
                     if (variables.embedFonts) {
                         var fontData = _this.getStage().getCharacter(_this.fontId);
-                        _this.renderOutLine(ctx, fontData, splitData, rMatrix, rx, W, variables);
+                        _this.renderOutLine(ctx, fontData, splitData, m3, rx, W, variables);
                     } else {
-                        _this.renderText(ctx, splitData, rMatrix, variables);
+                        _this.renderText(ctx, splitData, m3, variables);
                     }
                 }
 
@@ -16272,10 +16355,10 @@ if (!("swf2js" in window)){(function(window)
 
             textCacheKey[textCacheKey.length] = text;
             var cacheKey = cacheStore.generateKey(
-                textCacheKey.join("_"), _this.getCharacterId(), rMatrix, colorTransform);
+                textCacheKey.join("_"), _this.getCharacterId(), m3, rColorTransform);
             obj.cacheKey = cacheKey;
             if (obj.isFilter || obj.isBlend) {
-                _this.postRender(ctx, matrix, colorTransform, stage, obj);
+                _this.postRender(ctx, matrix, rColorTransform, stage, obj);
             }
             return cacheKey;
         }
@@ -16314,6 +16397,7 @@ if (!("swf2js" in window)){(function(window)
         var idx;
         var index;
         var length = splitData.length;
+        var _multiplicationMatrix = _this.multiplicationMatrix;
         for (var i = 0; i < length; i++) {
             txt = splitData[i];
             var XOffset = offset;
@@ -16354,7 +16438,7 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
 
-                var m2 = _this.multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
+                var m2 = _multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
                 ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
                 _this.renderGlyph(GlyphShapeTable[index], ctx);
                 XOffset += addXOffset;
@@ -16490,16 +16574,18 @@ if (!("swf2js" in window)){(function(window)
         var width = _ceil(xMax - xMin);
         var height = _ceil(yMax - yMin);
 
-        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), matrix);
-        ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+        var m3 = _multiplicationMatrix(stage.getMatrix(), m2);
+        ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
 
         var m = _this._matrix;
         if (m) {
             xMin = -xMin;
             yMin = -yMin;
-            var m2 = _this.multiplicationMatrix(matrix, [1, 0, 0, 1, xMin, yMin]);
-            rMatrix = _this.multiplicationMatrix(stage.getMatrix(), m2);
-            ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
+            var m4 = _multiplicationMatrix(m2, [1, 0, 0, 1, xMin, yMin]);
+            var m5 = _multiplicationMatrix(stage.getMatrix(), m4);
+            ctx.setTransform(m5[0],m5[1],m5[2],m5[3],m5[4],m5[5]);
         }
 
         ctx.beginPath();
@@ -16740,12 +16826,16 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param matrix
      * @param stage
+     * @param visible
+     * @param mask
      */
-    SimpleButton.prototype.setHitRange = function (matrix, stage)
+    SimpleButton.prototype.setHitRange = function (matrix, stage, visible, mask)
     {
         var _this = this;
-        var buttonHits = stage.buttonHits;
-        if (_this.getEnabled()) {
+        var isVisible = _min(_this.getVisible(), visible);
+        if (_this.getEnabled() && isVisible) {
+            var buttonHits = stage.buttonHits;
+
             // enter
             if (isTouch) {
                 var actions = _this.getActions();
@@ -16779,7 +16869,8 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (hitTags.length) {
-                var bounds = _this.getBounds(matrix, status);
+                var m2 = _this.multiplicationMatrix(matrix, _this.getMatrix());
+                var bounds = _this.getBounds(m2, status);
                 if (bounds) {
                     buttonHits[buttonHits.length] = {
                         button: _this,
@@ -16803,26 +16894,32 @@ if (!("swf2js" in window)){(function(window)
      * @param colorTransform
      * @param stage
      * @param visible
-     * @param oMatrix
      */
-    SimpleButton.prototype.render = function (ctx, matrix, colorTransform, stage, visible, oMatrix)
+    SimpleButton.prototype.render = function (ctx, matrix, colorTransform, stage, visible)
     {
         var _this = this;
-        var obj = _this.preRender(ctx, matrix, colorTransform, stage, visible);
 
+        // colorTransform
+        var _multiplicationColor = _this.multiplicationColor;
+        var rColorTransform = _multiplicationColor(colorTransform, _this.getColorTransform());
+
+        // matrix
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+
+        // pre render
+        var isVisible = _min(_this.getVisible(), visible);
+        var obj = _this.preRender(ctx, m2, rColorTransform, stage, isVisible);
+
+        // render
         var sprite = _this.getSprite();
-        var rMatrix = _this.multiplicationMatrix(obj.preMatrix, sprite.getMatrix());
-        var oMatrix2;
-        if (obj.isFilter || obj.isBlend) {
-            oMatrix2 = _this.multiplicationMatrix(oMatrix, sprite.getMatrix());
-        } else {
-            oMatrix2 = _this.cloneArray(matrix);
-        }
+        var rMatrix = _multiplicationMatrix(obj.preMatrix, sprite.getMatrix());
+        var rColorTransform2 = _multiplicationColor(rColorTransform, sprite.getColorTransform());
+        isVisible = _min(sprite.getVisible(), visible);
+        var cacheKey = obj.cacheKey;
+        cacheKey += sprite.render(ctx, rMatrix, rColorTransform2, stage, isVisible);
 
-        var rColorTransform = _this.multiplicationColor(colorTransform, sprite.getColorTransform());
-        var isVisible = _min(sprite.getVisible(), visible);
-        var cacheKey = sprite.render(ctx, rMatrix, rColorTransform, stage, isVisible, oMatrix2);
-
+        // post render
         if (obj.isFilter || obj.isBlend) {
             obj.cacheKey = cacheKey;
             _this.postRender(ctx, matrix, colorTransform, stage, obj);
@@ -16849,9 +16946,11 @@ if (!("swf2js" in window)){(function(window)
             return false;
         }
 
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+        var m3 = _multiplicationMatrix(m2, sprite.getMatrix());
+
         if (length) {
-            var _multiplicationMatrix = _this.multiplicationMatrix;
-            var renderMatrix = _multiplicationMatrix(matrix, sprite.getMatrix());
             var loadStage = _this.getStage();
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
@@ -16864,8 +16963,7 @@ if (!("swf2js" in window)){(function(window)
                     continue;
                 }
 
-                var rMatrix = _multiplicationMatrix(renderMatrix, tag.getMatrix());
-                var hit = tag.renderHitTest(ctx, rMatrix, stage, x, y);
+                var hit = tag.renderHitTest(ctx, m3, stage, x, y);
                 if (hit) {
                     return hit;
                 }
@@ -18390,6 +18488,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         _this.active = false;
         _this.isLoad = false;
+        _this.isMask = false;
         _this.isAction = true;
         _this.soundStopFlag = false;
         _this._droptarget = null;
@@ -19942,7 +20041,9 @@ if (!("swf2js" in window)){(function(window)
         _this.canvas = null;
         _this.preContext = null;
         _this.hitContext = null;
-        _this.matrix = [1, 0, 0, 1, 0, 0];
+        _this.matrix = [1,0,0,1,0,0];
+        _this._matrix = [1,0,0,1,0,0];
+        _this._colorTransform = [1,1,1,1,0,0,0,0];
         _this.characters = [];
         _this.initActions = [];
         _this.exportAssets = [];
@@ -20830,10 +20931,7 @@ if (!("swf2js" in window)){(function(window)
         ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
 
         var mc = _this.getParent();
-        var matrix = mc.getMatrix();
-        var colorTransform = mc.getColorTransform();
-        var visible = mc.getVisible();
-        mc.render(ctx, matrix, colorTransform, _this, visible, matrix);
+        mc.render(ctx, _this._matrix, _this._colorTransform, _this, true);
     };
 
     /**
