@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.13)
+ * swf2js (version 0.6.14)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -161,9 +161,7 @@ if (!("swf2js" in window)){(function(window)
      */
     function intToRGBA(int, alpha)
     {
-        if (!alpha) {
-            alpha = 100;
-        }
+        alpha = alpha || 100;
         return {
             R: (int & 0xff0000) >> 16,
             G: (int & 0x00ff00) >> 8,
@@ -238,8 +236,8 @@ if (!("swf2js" in window)){(function(window)
      */
     window.addEventListener("unload", function()
     {
-        stages = null;
-        loadStages = null;
+        stages = void 0;
+        loadStages = void 0;
     });
 
     /**
@@ -248,7 +246,7 @@ if (!("swf2js" in window)){(function(window)
     function clearTmp()
     {
         var canvas = tmpContext.canvas;
-        tmpContext.setTransform(1, 0, 0, 1, 0, 0);
+        tmpContext.setTransform(1,0,0,1,0,0);
         tmpContext.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
     }
 
@@ -656,7 +654,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         if (isWebGL) {
-            return _this.toCanvas2D(cache);
+            return _this.toCanvas2D(cache); // TODO toWebGL
         } else {
             return _this.toCanvas2D(cache);
         }
@@ -670,7 +668,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var length = cache.length;
         var str = "";
-        for (var i = 0; i < length; i++) {
+        var i = 0;
+        while (i < length) {
             var a = cache[i];
             switch (a[0]) {
                 case 0:
@@ -690,6 +689,7 @@ if (!("swf2js" in window)){(function(window)
                     str += "ctx.arc(" + a[1] + "," + a[2] + "," + a[3] + ",0 , Math.PI*2, false);";
                     break;
             }
+            i++;
         }
         return new Func("ctx", str);
     };
@@ -749,10 +749,6 @@ if (!("swf2js" in window)){(function(window)
                     break;
             }
         }
-
-
-
-
     };
     var vtc = new VectorToCanvas();
 
@@ -772,7 +768,6 @@ if (!("swf2js" in window)){(function(window)
     CacheStore.prototype.reset = function ()
     {
         var _this = this;
-        var _destroy = _this.destroy;
         var store = _this.store;
         for (var key in store) {
             if (!store.hasOwnProperty(key)) {
@@ -782,7 +777,7 @@ if (!("swf2js" in window)){(function(window)
             if (!(value instanceof CanvasRenderingContext2D)) {
                 continue;
             }
-            _destroy.call(_this, value);
+            _this.destroy(value);
         }
         _this.store = {};
         _this.size = 73400320;
@@ -800,10 +795,7 @@ if (!("swf2js" in window)){(function(window)
         } else {
             ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
         }
-
-
-        canvas.width = 1;
-        canvas.height = 1;
+        canvas.width = canvas.height = 1;
         pool[pool.length] = canvas;
     };
 
@@ -878,8 +870,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var length = data.length;
         var array = _this.createArray(length);
-        for (var key = 0; key < length; key = (key+1)|0) {
-            array[key] = data.charCodeAt(key) & 0xff;
+        var i = 0;
+        while (i < length) {
+            array[i] = data.charCodeAt(i) & 0xff;
+            i++;
         }
         _this.data = array;
     };
@@ -1204,10 +1198,11 @@ if (!("swf2js" in window)){(function(window)
     BitIO.prototype.byteAlign = function ()
     {
         var _this = this;
-        if (_this.bit_offset) {
-            _this.byte_offset += ((_this.bit_offset + 7) / 8) | 0;
-            _this.bit_offset = 0;
+        if (!_this.bit_offset) {
+            return;
         }
+        _this.byte_offset += ((_this.bit_offset + 7) / 8) | 0;
+        _this.bit_offset = 0;
     };
 
     /**
@@ -1396,7 +1391,7 @@ if (!("swf2js" in window)){(function(window)
         var data = _this.data;
         _this.byteAlign();
         return (data[_this.byte_offset++] | (data[_this.byte_offset++]
-        | (data[_this.byte_offset++] | (data[_this.byte_offset++]) << 8) << 8) << 8);
+            | (data[_this.byte_offset++] | (data[_this.byte_offset++]) << 8) << 8) << 8);
     };
 
     /**
@@ -1443,8 +1438,8 @@ if (!("swf2js" in window)){(function(window)
         var exp = upperBits >>> 20 & 0x7FF;
         var upperFraction = upperBits & 0xFFFFF;
         return (!upperBits && !lowerBits) ? 0 : ((sign === 0) ? 1 : -1) *
-        (upperFraction / _pow(2, 20) + lowerBits / _pow(2, 52) + 1) *
-        _pow(2, exp - 1023);
+            (upperFraction / _pow(2, 20) + lowerBits / _pow(2, 52) + 1) *
+                _pow(2, exp - 1023);
     };
 
     /**
@@ -1591,30 +1586,26 @@ if (!("swf2js" in window)){(function(window)
     BitIO.prototype.deCompress = function (size, mode)
     {
         var _this = this;
-        var key = 0;
-        var length;
-        var i;
-        var array = _this.createArray(size);
         var cacheOffset = _this.byte_offset;
         _this.byte_offset = 0;
+
         var data = _this.getData(cacheOffset);
+        var deCompress = (mode === "ZLIB") ? _this.unzip(_this.data, true) : _this.unlzma(_this.data);
 
-        var deCompress;
-        if (mode === "ZLIB") {
-            deCompress = _this.unzip(_this.data, true);
-        } else {
-            deCompress = _this.unlzma(_this.data);
-        }
-        _this.data = null;
-
-        length = data.length;
-        for (i = 0; i < length; i++) {
+        var i = 0;
+        var key = 0;
+        var array = _this.createArray(size);
+        var length = data.length;
+        while (i < length) {
             array[key++] = data[i];
+            i++;
         }
 
+        i = 0;
         length = deCompress.length;
-        for (i = 0; i < length; i++) {
+        while (i < length) {
             array[key++] = deCompress[i];
+            i++;
         }
 
         _this.data = array;
@@ -3531,7 +3522,7 @@ if (!("swf2js" in window)){(function(window)
         var stage = _this.stage;
         stage.imgUnLoadCount++;
         var image = _document.createElement("img");
-        image.onload = function ()
+        image.addEventListener("load", function()
         {
             var width = this.width;
             var height = this.height;
@@ -3556,7 +3547,7 @@ if (!("swf2js" in window)){(function(window)
 
             stage.setCharacter(CharacterId, imageContext);
             stage.imgUnLoadCount--;
-        };
+        });
 
         if (jpegTables !== null && jpegTables.length > 4) {
             var margeData = [];
@@ -3575,7 +3566,7 @@ if (!("swf2js" in window)){(function(window)
 
         image.src = "data:image/jpeg;base64," +
             _this.base64encode(_this.parseJpegData(JPEGData));
-
+        
         // for android bug
         _setTimeout(function () {}, 0);
     };
@@ -5861,6 +5852,7 @@ if (!("swf2js" in window)){(function(window)
                 obj.class2tag.topLevelClass = name;
             }
         }
+        console.log(obj);
 
         return obj;
     };
@@ -6198,7 +6190,6 @@ if (!("swf2js" in window)){(function(window)
         obj.Splitter = _this.rect();
     };
 
-    var asID = 0;
     /**
      * @param data
      * @param constantPool
@@ -6209,7 +6200,6 @@ if (!("swf2js" in window)){(function(window)
     var ActionScript = function (data, constantPool, register, initAction)
     {
         var _this = this;
-        _this.id = asID++;
         _this.cache = [];
         _this.params = [];
         _this.constantPool = constantPool || [];
@@ -6220,6 +6210,7 @@ if (!("swf2js" in window)){(function(window)
         _this.parent = null;
         _this.arg = null;
         _this.version = 7;
+        _this.superClass = null;
         if (data.length) {
             _this.__init__(data);
         }
@@ -6307,17 +6298,29 @@ if (!("swf2js" in window)){(function(window)
     ActionScript.prototype.getVariable = function (name)
     {
         var _this = this;
-        var value;
-        if (name === "arguments") {
-            return _this.arg;
-        } else {
-            value = _this.variables[name];
-            if (value === undefined) {
-                var parent = _this.parent;
+        var value, parent;
+        switch (name) {
+            case "this":
+                value = _this.variables["this"];
+                break;
+            case "super":
+                parent = _this.parent;
                 if (parent) {
-                    value = parent.getVariable(name);
+                    value = parent.superClass;
                 }
-            }
+                break;
+            case "arguments":
+                value = _this.arg;
+                break;
+            default:
+                value = _this.variables[name];
+                if (value === undefined) {
+                    parent = _this.parent;
+                    if (parent) {
+                        value = parent.getVariable(name);
+                    }
+                }
+                break;
         }
         return value;
     };
@@ -7171,7 +7174,6 @@ if (!("swf2js" in window)){(function(window)
         lineto: "lineTo",
         curveto: "curveTo",
         endfill: "endFill",
-        unloadclip: "unloadClip",
         hittest: "hitTest",
         getdepth: "getDepth",
         createemptymovieclip: "createEmptyMovieClip",
@@ -7536,6 +7538,7 @@ if (!("swf2js" in window)){(function(window)
                             value = mc.getVariable(name);
                         }
                     }
+
                     if (value === undefined) {
                         value = name;
                     }
@@ -7634,9 +7637,12 @@ if (!("swf2js" in window)){(function(window)
         if (name instanceof MovieClip) {
             value = name;
         } else {
-            value = _this.getVariable(name);
-            if (value === undefined && mc) {
-                value = mc.getProperty(name);
+            value = _this.getNativeClass(name);
+            if (value === undefined) {
+                value = _this.getVariable(name);
+                if (value === undefined && mc) {
+                    value = mc.getProperty(name);
+                }
             }
         }
         stack[stack.length] = value;
@@ -8058,7 +8064,6 @@ if (!("swf2js" in window)){(function(window)
                 params[params.length] = stack.pop();
             }
         }
-
 
         if (typeof object === "string" && object[method] === undefined) {
             var target = _this.getVariable(object);
@@ -8526,16 +8531,58 @@ if (!("swf2js" in window)){(function(window)
                 default:
                     if (mc) {
                         var _this = this;
-                        var func = _this.getVariable(object);
-                        if (!func) {
-                            func = mc.getVariable(object);
-                        }
+                        var func = _this.getVariable(object) || mc.getVariable(object);
                         obj = _this.CreateNewActionScript(func, mc, params);
                     }
                     break;
             }
         }
         stack[stack.length] = obj;
+    };
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    ActionScript.prototype.getNativeClass = function (name)
+    {
+        var value;
+        switch (name) {
+            case "MovieClip":
+                value = MovieClip;
+                break;
+            case "Sprite":
+                value = Sprite;
+                break;
+            case "SimpleButton":
+                value = SimpleButton;
+                break;
+            case "TextField":
+                value = TextField;
+                break;
+            case "Shape":
+                value = Shape;
+                break;
+            case "Sound":
+                value = Sound;
+                break;
+            case "XML":
+                value = Xml;
+                break;
+            case "LoadVars":
+                value = LoadVars;
+                break;
+            case "Color":
+                value = Color;
+                break;
+            case "TextFormat":
+                value = TextFormat;
+                break;
+            case "MovieClipLoader":
+                value = MovieClipLoader;
+                break;
+        }
+        return value;
     };
 
     /**
@@ -8778,7 +8825,8 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionPushDuplicate = function (stack)
     {
-        stack[stack.length] = stack[0];
+        var length = stack.length;
+        stack[length] = stack[length - 1];
     };
 
     /**
@@ -8852,6 +8900,7 @@ if (!("swf2js" in window)){(function(window)
 
             SubClass.prototype = su;
             SubClass.prototype.constructor = SuperClass;
+            this.superClass = su;
         }
     };
 
@@ -12304,26 +12353,8 @@ if (!("swf2js" in window)){(function(window)
                     value = _this.getVariable(target);
                 }
                 break;
-            case "Key":
-                value = keyClass;
-                break;
             case "$version":
                 value = "swf2js 8,0,0";
-                break;
-            case "MovieClip":
-                value = MovieClip;
-                break;
-            case "TextField":
-                value = TextField;
-                break;
-            case "Sprite":
-                value = Sprite;
-                break;
-            case "SimpleButton":
-                value = SimpleButton;
-                break;
-            case "Shape":
-                value = Shape;
                 break;
             case "enabled":
                 value = _this.getEnabled();
@@ -12333,6 +12364,9 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case "SharedObject":
                 value = new SharedObject();
+                break;
+            case "Key":
+                value = keyClass;
                 break;
             default:
                 value = _this.getVariable(target, parse);
@@ -14335,7 +14369,7 @@ if (!("swf2js" in window)){(function(window)
     DisplayObjectContainer.prototype.createShape = function (depth)
     {
         var shape = new Shape();
-        shape = this.addChild(shape, depth);
+        this.addChild(shape, depth);
         return shape;
     };
 
@@ -14372,7 +14406,7 @@ if (!("swf2js" in window)){(function(window)
             get: function () {
                 return this.getGraphics();
             },
-            set: function (buttonMode) {
+            set: function () {
             }
         },
         hitArea: {
@@ -15466,7 +15500,7 @@ if (!("swf2js" in window)){(function(window)
         ctx.putImageData(imgData, 0, 0);
         return ctx;
     };
-    
+
     /**
      * @param m
      * @returns {*[]}
@@ -17061,6 +17095,10 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var stage = _this.getStage();
 
+        if (name === undefined) {
+            return undefined;
+        }
+
         var mc = _this.getDisplayObject(name);
         if (!mc) {
             mc = new MovieClip();
@@ -17282,9 +17320,11 @@ if (!("swf2js" in window)){(function(window)
                             var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
                             var loadStage = new Stage();
                             loadStages[loadStage.getId()] = loadStage;
+                            targetMc._url = url;
+                            targetMc.reset();
                             loadStage.setParent(targetMc);
                             targetMc.setLoadStage(loadStage);
-                            loadStage.parse(data);
+                            loadStage.parse(data, targetUrl);
                             loadStage.stop();
 
                             if (target === 0 || (typeof target !== "number" && !targetMc.getParent())) {
@@ -17299,7 +17339,7 @@ if (!("swf2js" in window)){(function(window)
                                 stages[stage.getId()] = loadStage;
                                 stage = null;
                             }
-                            targetMc._url = url;
+
 
                             var onData = targetMc.variables.onData;
                             if (typeof onData === "function") {
@@ -17309,7 +17349,6 @@ if (!("swf2js" in window)){(function(window)
                             clipEvent.type = "data";
                             targetMc.dispatchEvent(clipEvent, rootStage);
 
-                            targetMc.reset();
                             targetMc.addActions(rootStage);
                             break;
                     }
@@ -17352,24 +17391,6 @@ if (!("swf2js" in window)){(function(window)
 
         var loadStage = targetMc.getStage();
         delete loadStages[loadStage.getId()];
-    };
-
-    /**
-     * @param target
-     * @returns {number}
-     */
-    MovieClip.prototype.unloadClip = function (target)
-    {
-        var _this = this;
-        var targetMc = null;
-        if (target instanceof MovieClip) {
-            targetMc = target;
-        } else {
-            targetMc = _this.getDisplayObject(target);
-            if (!targetMc) {
-                return 0;
-            }
-        }
     };
 
     /**
@@ -17542,14 +17563,15 @@ if (!("swf2js" in window)){(function(window)
         } else {
             if (x >= xMin && x <= xMax && y >= yMin && y <= yMax) {
                 if (bool) {
-                    var matrix = _this.getMatrix();
+                    var matrix = [1,0,0,1,0,0];
                     var mc = _this;
+                    var _multiplicationMatrix = _this.multiplicationMatrix;
                     while (true) {
                         var parent = mc.getParent();
                         if (!parent.getParent()) {
                             break;
                         }
-                        matrix = _this.multiplicationMatrix(parent.getMatrix(), matrix);
+                        matrix = _multiplicationMatrix(parent.getMatrix(), matrix);
                         mc = parent;
                     }
                     var _root = _this.getDisplayObject("_root");
@@ -17557,10 +17579,9 @@ if (!("swf2js" in window)){(function(window)
                     var ctx = stage.hitContext;
                     var scale = stage.getScale();
                     x *= scale;
-                    x *= _devicePixelRatio;
-
                     y *= scale;
                     y *= _devicePixelRatio;
+                    x *= _devicePixelRatio;
 
                     return _this.renderHitTest(ctx, matrix, stage, x, y);
                 } else {
@@ -18870,21 +18891,16 @@ if (!("swf2js" in window)){(function(window)
             xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
         }
 
+
         xmlHttpRequest.onreadystatechange = function ()
         {
+            var onLoadProgress = _this.onLoadProgress;
+            if (typeof onLoadProgress === "function") {
+                onLoadProgress.apply(_this);
+            }
+
             var readyState = xmlHttpRequest.readyState;
             if (readyState === 4) {
-
-                var onLoadStart = _this.onLoadStart;
-                if (typeof onLoadStart === "function") {
-                    onLoadStart.apply(_this);
-                }
-
-                var onLoadProgress = _this.onLoadProgress;
-                if (typeof onLoadProgress === "function") {
-                    onLoadProgress.apply(_this);
-                }
-
                 var status = xmlHttpRequest.status;
                 switch (status) {
                     case 200:
@@ -18893,15 +18909,21 @@ if (!("swf2js" in window)){(function(window)
                         var rootStage = _root.getStage();
                         var data = isXHR2 ? xmlHttpRequest.response : xmlHttpRequest.responseText;
                         var loadStage = new Stage();
+
                         loadStages[loadStage.getId()] = loadStage;
-                        loadStage.parse(data);
+                        target._url = url;
+                        target.reset();
+                        loadStage.setParent(target);
+                        target.setLoadStage(loadStage);
+                        loadStage.parse(data, url);
                         loadStage.stop();
 
-                        var loadParentMc = loadStage.getParent();
-                        loadParentMc.setLoadStage(loadStage);
+                        // onLoadComplete
+                        var onLoadComplete = _this.onLoadComplete;
+                        if (typeof onLoadComplete === "function") {
+                            onLoadComplete.apply(_this);
+                        }
 
-                        target.addChild(loadParentMc);
-                        target._url = url;
                         target.addActions(rootStage);
 
                         // onLoadInit
@@ -18910,11 +18932,6 @@ if (!("swf2js" in window)){(function(window)
                             target.setActionQueue(onLoadInit, rootStage);
                         }
 
-                        // onLoadComplete
-                        var onLoadComplete = _this.onLoadComplete;
-                        if (typeof onLoadComplete === "function") {
-                            onLoadComplete.apply(_this);
-                        }
                         break;
                     default:
                         var onLoadError = _this.onLoadError;
@@ -18926,6 +18943,12 @@ if (!("swf2js" in window)){(function(window)
             }
         };
         xmlHttpRequest.send(null);
+
+        var onLoadStart = _this.onLoadStart;
+        if (typeof onLoadStart === "function") {
+            onLoadStart.apply(_this);
+        }
+
         return true;
     };
 
@@ -18940,7 +18963,7 @@ if (!("swf2js" in window)){(function(window)
             if (!listener.hasOwnProperty(event)) {
                 continue;
             }
-            _this[event] = listener[event];
+            _this.setProperty(event, listener[event]);
         }
         return true;
     };
@@ -18968,7 +18991,7 @@ if (!("swf2js" in window)){(function(window)
             if (!listener.hasOwnProperty(event)) {
                 continue;
             }
-            _this[event] = undefined;
+            delete _this.variables[event];
         }
         return true;
     };
@@ -20478,8 +20501,9 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param data
+     * @param url
      */
-    Stage.prototype.parse = function (data)
+    Stage.prototype.parse = function (data, url)
     {
         var _this = this;
         _this.isLoad = false;
@@ -20505,6 +20529,19 @@ if (!("swf2js" in window)){(function(window)
 
             // build
             swftag.build(tags, mc);
+
+            var query = url.split("?")[1];
+            if (query) {
+                var values = query.split("&");
+                var length = values.length;
+                while (length--) {
+                    var value = values[length];
+                    var pair = value.split("=");
+                    if (pair.length > 1) {
+                        mc.setVariable(pair[0], pair[1]);
+                    }
+                }
+            }
         }
 
         _this.isLoad = true;
@@ -20569,7 +20606,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var image = _document.createElement("img");
-        image.onload = function ()
+        image.addEventListener("load", function ()
         {
             var width = this.width;
             var height = this.height;
@@ -20677,7 +20714,7 @@ if (!("swf2js" in window)){(function(window)
             _this.setPlaceObject(placeObject, obj.instanceId, 1, 1);
 
             _this.init();
-        };
+        });
 
 
         var length = data.length;
@@ -20849,10 +20886,10 @@ if (!("swf2js" in window)){(function(window)
         var div = _document.getElementById(tagId ? tagId : this.getName());
         if (div) {
             var childNodes = div.childNodes;
-            var len = childNodes.length;
-            if (len) {
-                for (var i = len; i--;) {
-                    div.removeChild(childNodes[i]);
+            var length = childNodes.length;
+            if (length) {
+                while (length--) {
+                    div.removeChild(childNodes[length]);
                 }
             }
         }
@@ -21254,15 +21291,9 @@ if (!("swf2js" in window)){(function(window)
         }
 
         _this.stop();
-        if (!frame) {
-            frame = 1;
-        }
-        if (!width) {
-            width = _this.getWidth();
-        }
-        if (!height) {
-            height = _this.getHeight();
-        }
+        frame = frame || 1;
+        width = width || _this.getWidth();
+        height = height || _this.getHeight();
 
         // resize
         var mc = _this.getParent();
@@ -21364,10 +21395,8 @@ if (!("swf2js" in window)){(function(window)
             }
 
             var hit = false;
-            if (touchX >= hitObj.xMin &&
-                touchX <= hitObj.xMax &&
-                touchY >= hitObj.yMin &&
-                touchY <= hitObj.yMax
+            if (touchX >= hitObj.xMin && touchX <= hitObj.xMax &&
+                touchY >= hitObj.yMin && touchY <= hitObj.yMax
             ) {
                 var matrix = hitObj.matrix;
                 if (matrix) {
@@ -21408,8 +21437,10 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 var length = actions.length;
                 if (length) {
-                    for (var i = 0; i < length; i++) {
+                    var i = 0;
+                    while (i < length) {
                         actions[i].apply(caller);
+                        i++;
                     }
                 }
             }
@@ -21997,11 +22028,6 @@ if (!("swf2js" in window)){(function(window)
     var Swf2js = function () {};
 
     /**
-     * @type {Shape}
-     */
-    Swf2js.prototype.Shape = Shape;
-
-    /**
      * @type {DropShadowFilter}
      */
     Swf2js.prototype.DropShadowFilter = DropShadowFilter;
@@ -22084,7 +22110,7 @@ if (!("swf2js" in window)){(function(window)
                         case 200:
                         case 304:
                             var data = (isXHR2) ? xmlHttpRequest.response : xmlHttpRequest.responseText;
-                            stage.parse(data);
+                            stage.parse(data, url);
                             cacheStore.reset();
                             break;
                         default :
@@ -22114,11 +22140,11 @@ if (!("swf2js" in window)){(function(window)
             if (!stages.hasOwnProperty(i)) {
                 continue;
             }
-            var p = stages[i];
-            p.stop();
+            var target = stages[i];
+            target.stop();
             if (i) {
-                p.deleteNode(p.tagId);
-                p = null;
+                target.deleteNode(target.tagId);
+                target = void 0;
             }
         }
 
@@ -22139,17 +22165,9 @@ if (!("swf2js" in window)){(function(window)
     Swf2js.prototype.createRootMovieClip = function(width, height, fps, options)
     {
         var stage = new Stage();
-        if (!width) {
-            width = 240;
-        }
-
-        if (!height) {
-            height = 240;
-        }
-        
-        if (!fps) {
-            fps = 60;
-        }
+        width = width || 240;
+        height = height || 240;
+        fps = fps || 60;
 
         stage.setBaseWidth(width);
         stage.setBaseHeight(height);
