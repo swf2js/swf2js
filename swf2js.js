@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.14)
+ * swf2js (version 0.6.15)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -5377,29 +5377,222 @@ if (!("swf2js" in window)){(function(window)
         obj.nsSet = _this.ABCNsSetInfo(ABCBitIO);
 
         // multiname_info;
-        obj.multiname = _this.ABCMultiNameInfo(ABCBitIO);
+        obj.multiname_info = _this.ABCMultiNameInfo(ABCBitIO);
+
+        var i = 0;
 
         // method_info
-        obj.metadataInfo = _this.ABCMethodInfo(ABCBitIO);
+        obj.method = [];
+        var methodCount = ABCBitIO.getU30();
+        if (methodCount) {
+            var method = [];
+            for (i = 0; i < methodCount; i++) {
+                method[i] = _this.ABCMethodInfo(ABCBitIO);
+            }
+            obj.method = method;
+        }
 
         // metadata_info
-        obj.metadata = _this.ABCMetadataInfo(ABCBitIO);
+        obj.metadata = [];
+        var metadataCount = ABCBitIO.getU30();
+        if (metadataCount) {
+            var metadataInfo = [];
+            for (i = 0; i < metadataCount; i++) {
+                metadataInfo[i] = _this.ABCMetadataInfo(ABCBitIO);
+            }
+            obj.metadata = metadataInfo;
+        }
 
-        // instance_info
-        obj.instance = _this.ABCInstanceInfo(ABCBitIO);
+        var classCount = ABCBitIO.getU30();
+        obj.instance = [];
+        obj.class = [];
+        if (classCount) {
+            // instance_info
+            var instance = [];
+            for (i = 0; i < classCount; i++) {
+                instance[i] = _this.ABCInstanceInfo(ABCBitIO);
+            }
+            obj.instance = instance;
 
-        // class_info
-        obj.classInfo = _this.ABCClassInfo(ABCBitIO);
+            // class_info
+            var classInfo = [];
+            for (i = 0; i < classCount; i++) {
+                classInfo[i] = _this.ABCClassInfo(ABCBitIO);
+            }
+            obj.class = classInfo;
+        }
 
         // script_info
-        obj.scriptInfo = _this.ABCScriptInfo(ABCBitIO);
+        obj.script = [];
+        var scriptCount = ABCBitIO.getU30();
+        if (scriptCount) {
+            var script = [];
+            for (i = 0; i < scriptCount; i++) {
+                script[i] = _this.ABCScriptInfo(ABCBitIO);
+            }
+            obj.script = script;
+        }
 
         // method_body_info
-        obj.methodBodyInfo = _this.ABCMethodBodyInfo(ABCBitIO);
+        obj.methodBody = [];
+        var methodBodyCount  = ABCBitIO.getU30();
+        if (methodBodyCount) {
+            var methodBody = [];
+            for (i = 0; i < methodBodyCount; i++) {
+                methodBody[i] = _this.ABCMethodBodyInfo(ABCBitIO);
+            }
+            obj.methodBody = methodBody;
+        }
 
-        // exception_info
-        obj.exceptionInfo = _this.ABCException(ABCBitIO);
+        console.log(offset, ABCBitIO.byte_offset);
+        console.log(obj);
 
+        // build names
+        obj = _this.ABCMultinameToString(obj);
+
+        // build instance
+        obj = _this.ABCBuildInstance(obj);
+
+
+
+        return obj;
+    };
+
+    /**
+     * @param obj
+     * @param methodId
+     * @constructor
+     */
+    SwfTag.prototype.ABCCreateActionScript3 = function (obj, methodId)
+    {
+        return (function (data, id)
+        {
+            return function ()
+            {
+                var as3 = new ActionScript3(data, id);
+                as3.scope = this;
+                return as3.execute();
+            };
+        })(obj, methodId);
+    };
+
+    /**
+     * @param obj
+     * @constructor
+     */
+    SwfTag.prototype.ABCBuildInstance = function (obj)
+    {
+        var _this = this;
+        var instances = obj.instance;
+        var length = instances.length;
+        var namespaces = obj.namespace;
+        var string = obj.string;
+        var stage = _this.stage;
+        var _global = stage.getGlobal();
+        var variables = _global.variables;
+        var names = obj.names;
+        for (var i = 0; i < length; i++) {
+            var instance = instances[i];
+            var pNs = instance.protectedNs;
+            var ns = namespaces[pNs];
+            var object = string[ns.name];
+            var values = object.split(":");
+            var vLength = values.length;
+            var val = variables;
+            for (var j = 0; j < vLength; j++) {
+                var value = values[j];
+                if (!(value in val)) {
+                    val[value] = {};
+                }
+                val = val[value];
+            }
+
+            var as3 = _this.ABCCreateActionScript3(obj, instance.iinit);
+
+            // extends
+            var superName = instance.superName;
+            if (superName) {
+                var SuperClass = names[superName];
+                var su = eval("new " + SuperClass + "();");
+                if (SuperClass === "MovieClip") {
+                    su.setStage(stage);
+                    su.setParent(stage.getParent());
+                }
+                as3.prototype = su;
+                as3.prototype.constructor = SuperClass;
+            }
+
+            // prototype
+            var traits = instance.trait;
+            var tLength = traits.length;
+            if (tLength) {
+                var prop = as3.prototype;
+                for (var idx = 0; idx < tLength; idx++) {
+                    var trait = traits[idx];
+                    var pName = names[trait.name];
+                    var func = _this.ABCCreateActionScript3(obj);
+                    if (prop instanceof DisplayObject) {
+                        prop.setVariable(pName, func);
+                    } else {
+                        prop[pName] = func;
+                    }
+                }
+            }
+
+            var name = names[instance.name];
+            val[name] = as3;
+        }
+        console.log(variables);
+    };
+
+    /**
+     * @param obj
+     * @returns {*}
+     * @constructor
+     */
+    SwfTag.prototype.ABCMultinameToString = function (obj)
+    {
+        var multinames = obj.multiname_info;
+        var length = multinames.length;
+        var string = obj.string;
+        var ns = obj.namespace;
+        var names = [];
+        for (var i = 1; i < length; i++) {
+            var info = multinames[i];
+            var str = "";
+
+            switch (info.kind) {
+                case 0x07: // QName
+                case 0x0D: // QNameA
+                    var namespace_info = ns[info.ns];
+                    str += string[namespace_info.name];
+                    switch (str) {
+                        case "flash.display":
+                        case "flash.events":
+                            str = "";
+                            break;
+                    }
+                    if (str !== "") {
+                        str += "::";
+                    }
+                    str += string[info.name];
+                    break;
+                case 0x0F: // RTQName
+                case 0x10: // RTQNameA
+                    break;
+                case 0x09: // Multiname
+                case 0x0E: // MultinameA
+                    break;
+                case 0x1B: // MultinameL
+                case 0x1C: // MultinameLA
+                    break;
+                case 0x11: // RTQNameL
+                case 0x12: // RTQNameLA
+                    break;
+            }
+            names[i] = str;
+        }
+        obj.names = names;
         return obj;
     };
 
@@ -5413,9 +5606,8 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                array[array.length] = ABCBitIO.getUI32();
+            for (var i = 1; i < count; i++) {
+                array[i] = ABCBitIO.getUI32();
             }
         }
         return array;
@@ -5431,9 +5623,8 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                array[array.length] = ABCBitIO.getUI32();
+            for (var i = 1; i < count; i++) {
+                array[i] = ABCBitIO.getUI32();
             }
         }
         return array;
@@ -5449,9 +5640,8 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                array[array.length] = ABCBitIO.getFloat64();
+            for (var i = 1; i < count; i++) {
+                array[i] = ABCBitIO.getFloat64();
             }
         }
         return array;
@@ -5467,9 +5657,8 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                array[array.length] = ABCBitIO.AbcReadString();
+            for (var i = 1; i < count; i++) {
+                array[i] = ABCBitIO.AbcReadString();
             }
         }
         return array;
@@ -5485,9 +5674,8 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                array[array.length] =
+            for (var i = 1; i < count; i++) {
+                array[i] =
                 {
                     kind: ABCBitIO.getUI8(),
                     name: ABCBitIO.getU30()
@@ -5507,16 +5695,15 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
+            for (var i = 1; i < count; i++) {
                 var nsCount = ABCBitIO.getU30();
                 var ns = [];
                 if (nsCount) {
                     for (var j = 0; j < nsCount; j++) {
-                        ns[ns.length] = ABCBitIO.getU30();
+                        ns[j] = ABCBitIO.getU30();
                     }
                 }
-                array[array.length] = ns;
+                array[i] = ns;
             }
         }
         return array;
@@ -5532,43 +5719,33 @@ if (!("swf2js" in window)){(function(window)
         var array = [];
         var count = ABCBitIO.getU30();
         if (count) {
-            count--;
-            for (var i = 0; i < count; i++) {
-                var kind = ABCBitIO.getUI8();
-                var mObj;
-                switch (kind) {
+            for (var i = 1; i < count; i++) {
+                var obj = {};
+                obj.kind = ABCBitIO.getUI8();
+                switch (obj.kind) {
                     case 0x07: // QName
                     case 0x0D: // QNameA
-                        mObj = {
-                            ns: ABCBitIO.getU30(),
-                            name: ABCBitIO.getU30()
-                        };
+                        obj.ns = ABCBitIO.getU30();
+                        obj.name = ABCBitIO.getU30();
                         break;
                     case 0x0F: // RTQName
                     case 0x10: // RTQNameA
-                        mObj = {
-                            name: ABCBitIO.getU30()
-                        };
+                        obj.name = ABCBitIO.getU30();
                         break;
                     case 0x09: // Multiname
                     case 0x0E: // MultinameA
-                        mObj = {
-                            name: ABCBitIO.getU30(),
-                            ns_set: ABCBitIO.getU30()
-                        };
+                        obj.name = ABCBitIO.getU30();
+                        obj.ns_set = ABCBitIO.getU30();
                         break;
                     case 0x1B: // MultinameL
                     case 0x1C: // MultinameLA
-                        mObj = {
-                            ns_set: ABCBitIO.getU30()
-                        };
+                        obj.ns_set = ABCBitIO.getU30();
                         break;
                     case 0x11: // RTQNameL
                     case 0x12: // RTQNameLA
-                        mObj = {};
                         break;
                 }
-                array[array.length] = mObj;
+                array[i] = obj;
             }
         }
         return array;
@@ -5586,35 +5763,43 @@ if (!("swf2js" in window)){(function(window)
         var count = ABCBitIO.getU30();
         obj.paramCount = count;
         obj.returnType = ABCBitIO.getU30();
-        var paramType = [];
+        obj.paramType = [];
         if (count) {
+            var paramType = [];
             for (i = 0; i < count; i++) {
                 paramType[paramType.length] = ABCBitIO.getU30();
             }
+            obj.paramType = paramType;
         }
-        obj.paramType = paramType;
+
         obj.name = ABCBitIO.getU30();
         obj.flags = ABCBitIO.getUI8();
 
-        var optionCount = ABCBitIO.getU30();
-        var options = [];
-        if (count) {
-            for (i = count - optionCount; i < optionCount; i++) {
-                options[options.length] = {
-                    val: ABCBitIO.getU30(),
-                    kind: ABCBitIO.getUI8()
-                };
+        obj.options = [];
+        if (obj.flags === 0x08) {
+            var options = [];
+            var optionCount = ABCBitIO.getU30();
+            if (optionCount) {
+                for (i = 0; i < optionCount; i++) {
+                    options[options.length] = {
+                        val: ABCBitIO.getU30(),
+                        kind: ABCBitIO.getUI8()
+                    };
+                }
             }
+            obj.options = options;
         }
-        obj.options = options;
 
-        var paramName = [];
-        if (count) {
-            for (i = 0; i < count; i++) {
-                paramName[paramName.length] = ABCBitIO.getU30();
+        obj.paramName = [];
+        if (obj.flags === 0x80) {
+            var paramName = [];
+            if (count) {
+                for (i = 0; i < count; i++) {
+                    paramName[paramName.length] = ABCBitIO.getU30();
+                }
             }
+            obj.paramName = paramName;
         }
-        obj.paramName = paramName;
 
         return obj;
     };
@@ -5628,24 +5813,20 @@ if (!("swf2js" in window)){(function(window)
     {
         var obj = {};
         obj.name = ABCBitIO.getU30();
-        var items = [];
+        obj.items = [];
+
         var count = ABCBitIO.getU30();
         if (count) {
-            var i;
-            var keys = [];
-            var values = [];
-            for (i = 0; i < count; i++) {
-                keys[keys.length] = ABCBitIO.getU30();
+            var items = [];
+            for (var i = 0; i < count; i++) {
+                items[items.length] = {
+                    key: ABCBitIO.getU30(),
+                    value: ABCBitIO.getU30()
+                };
             }
-            for (i = 0; i < count; i++) {
-                values[values.length] = ABCBitIO.getU30();
-            }
-            items[items.length] = {
-                keys: keys,
-                values: values
-            };
+            obj.items = items;
         }
-        obj.items = items;
+
         return obj;
     };
 
@@ -5659,19 +5840,20 @@ if (!("swf2js" in window)){(function(window)
         var obj = {};
         obj.name = ABCBitIO.getU30();
         obj.superName = ABCBitIO.getU30();
-        var flags = ABCBitIO.getUI8();
-        if (flags & 8) {
+        obj.flags = ABCBitIO.getUI8();
+        if (obj.flags === 0x08) {
             obj.protectedNs = ABCBitIO.getU30();
         }
 
         var count = ABCBitIO.getU30();
-        var array = [];
+        obj.interfaces = [];
         if (count) {
+            var interfaces = [];
             for (var i = 0; i < count; i++) {
-                array[array.length] = ABCBitIO.getU30();
+                interfaces[interfaces.length] = ABCBitIO.getU30();
             }
+            obj.interfaces = interfaces;
         }
-        obj.interfaces = array;
 
         obj.iinit = ABCBitIO.getU30();
         obj.trait = this.ABCTrait(ABCBitIO);
@@ -5769,41 +5951,33 @@ if (!("swf2js" in window)){(function(window)
                 var tObj = {};
                 tObj.name = ABCBitIO.getU30();
                 var kind = ABCBitIO.getUI8();
-                var data;
+                var data = {};
                 switch (kind) {
                     default:
                         break;
                     case 0: // Trait_Slot
                     case 6: // Trait_Const
-                        data = {
-                            slotId: ABCBitIO.getU30(),
-                            typeName: ABCBitIO.getU30()
-                        };
+                        data.id = ABCBitIO.getU30();
+                        data.name = ABCBitIO.getU30();
                         data.index = ABCBitIO.getU30();
-                        data.kind = -1;
-                        if (data.index !== 0) {
+                        data.kind = null;
+                        if (data.index) {
                             data.kind = ABCBitIO.getUI8();
                         }
                         break;
                     case 1: // Trait_Method
                     case 2: // Trait_Getter
                     case 3: // Trait_Setter
-                        data = {
-                            dispId: ABCBitIO.getU30(),
-                            method: ABCBitIO.getU30()
-                        };
+                        data.id = ABCBitIO.getU30();
+                        data.info = ABCBitIO.getU30();
                         break;
                     case 4: // Trait_Class
-                        data = {
-                            slotId: ABCBitIO.getU30(),
-                            method: ABCBitIO.getU30()
-                        };
+                        data.id = ABCBitIO.getU30();
+                        data.info = ABCBitIO.getU30();
                         break;
                     case 5: // Trait_Function
-                        data = {
-                            slotId: ABCBitIO.getU30(),
-                            func: ABCBitIO.getU30()
-                        };
+                        data.id = ABCBitIO.getU30();
+                        data.info = ABCBitIO.getU30();
                         break;
                 }
                 tObj.kind = kind;
@@ -6192,6 +6366,235 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param data
+     * @param id
+     * @constructor
+     */
+    var ActionScript3 = function (data, id)
+    {
+        var _this = this;
+        _this.variables = {};
+        _this.scope = null;
+        _this.parent = null;
+        _this.register = [];
+
+        // ABC code and info
+        var methodBody = data.methodBody[id];
+        _this.code = methodBody.code;
+        _this.info = data.method[methodBody.method];
+
+        // pool
+        _this.names = data.names;
+        _this.data = data;
+    };
+
+    /**
+     * @param name
+     * @param value
+     */
+    ActionScript3.prototype.setVariable = function (name, value)
+    {
+        this.variables[String(name)] = value;
+    };
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    ActionScript3.prototype.getVariable = function (name)
+    {
+        return this.variables[name];
+    };
+
+    /**
+     * execute
+     */
+    ActionScript3.prototype.execute = function ()
+    {
+        var _this = this;
+        var stack = [];
+        var code = _this.code;
+        var length = code.length;
+        var i = 0;
+        while(i < length) {
+            switch (code[i]) {
+                case 0xd4:
+                    _this.ActionGetLocal0(stack);
+                    break;
+                case 0xd5:
+                    _this.ActionGetLocal1(stack);
+                    break;
+                case 0xd6:
+                    _this.ActionGetLocal2(stack);
+                    break;
+                case 0xd7:
+                    _this.ActionGetLocal3(stack);
+                    break;
+                case 0x60:
+                    i += 1;
+                    _this.ActionGetLex(stack, code[i]);
+                    break;
+                case 0x66:
+                    i += 1;
+                    _this.ActionGetProperty(stack, code[i]);
+                    break;
+                case 0x5d:
+                    i += 1;
+                    _this.ActionFindPropStrict(stack, code[i]);
+                    break;
+                case 0x30:
+                    _this.ActionPushScope(stack);
+                    break;
+                case 0x65:
+                    i += 1;
+                    _this.ActionGetScopeObject(stack, code[i]);
+                    break;
+                case 0x58:
+                    i += 1;
+                    _this.ActionNewClass(stack, code[i]);
+                    break;
+                case 0x1d:
+                    _this.ActionPopScope(stack);
+                    break;
+                case 0x68:
+                    i += 1;
+                    _this.ActionInitProperty(stack, code[i]);
+                    break;
+
+
+
+
+
+
+
+
+
+                
+                case 0x47: // ReturnVoid
+                    return undefined;
+            }
+            i++;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionInitProperty = function(stack, index)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPopScope = function(stack)
+    {
+        stack.pop();
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionNewClass = function(stack, index)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal0 = function(stack)
+    {
+        stack[stack.length] = this.register[0];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal1 = function(stack)
+    {
+        stack[stack.length] = this.register[1];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal2 = function(stack)
+    {
+        stack[stack.length] = this.register[2];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal3 = function(stack)
+    {
+        stack[stack.length] = this.register[3];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushScope = function(stack)
+    {
+        var value = stack.pop();
+        var scope = this.scope;
+        if (value === null || value === undefined) {
+            scope = null;
+        }
+        stack[stack.length] = scope;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetLex = function(stack, index)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetScopeObject = function(stack, index)
+    {
+
+        
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetProperty = function(stack, index)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionFindPropStrict = function(stack, index)
+    {
+
+
+    };
+
+
+    
+
+
+    /**
+     * @param data
      * @param constantPool
      * @param register
      * @param initAction
@@ -6212,7 +6615,7 @@ if (!("swf2js" in window)){(function(window)
         _this.version = 7;
         _this.superClass = null;
         if (data.length) {
-            _this.__init__(data);
+            _this.initialize(data);
         }
         _this.initParam();
     };
@@ -6338,9 +6741,9 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * init
+     * @param data
      */
-    ActionScript.prototype.__init__ = function (data)
+    ActionScript.prototype.initialize = function (data)
     {
         var _this = this;
         var isEnd = false;
@@ -8078,14 +8481,17 @@ if (!("swf2js" in window)){(function(window)
         var value;
         if (object && method) {
             var func;
-            var originMethod = _this.checkMethod(method);
-            if (originMethod) {
-                func = object[originMethod];
-            }
-
-            if (!func && object instanceof MovieClip) {
+            if (object instanceof MovieClip) {
                 func = object.variables[method];
             }
+
+            if (!func) {
+                var originMethod = _this.checkMethod(method);
+                if (originMethod) {
+                    func = object[originMethod];
+                }
+            }
+
             if (!func) {
                 func = object[method];
             }
@@ -18628,6 +19034,28 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param frame
+     * @param script
+     */
+    MovieClip.prototype.addFrameScript = function (frame, script)
+    {
+        var _this = this;
+        if (typeof frame === "string") {
+            frame = _this.getLabel(frame);
+        }
+
+        frame = frame|0;
+        if (frame > 0 && _this.getTotalFrames() >= frame) {
+            var actions = _this.actions;
+            if (!(frame in actions)) {
+                actions[frame] = [];
+            }
+            var length = actions[frame].length;
+            actions[frame][length] = script;
+        }
+    };
+
+    /**
      * @param stage
      */
     MovieClip.prototype.addActions = function (stage)
@@ -20048,7 +20476,7 @@ if (!("swf2js" in window)){(function(window)
         _this.name = "swf2js_" + _this.id;
         _this.intervalId = 0;
 
-        _this.fps = 0;
+        _this.frameRate = 0;
         _this.fileSize = 0;
         _this.stopFlag = true;
 
@@ -20213,7 +20641,7 @@ if (!("swf2js" in window)){(function(window)
                 }, 0);
             };
         };
-        _this.intervalId = _setInterval(enterFrame(_this), _this.getFps());
+        _this.intervalId = _setInterval(enterFrame(_this), _this.getFrameRate());
     };
 
     /**
@@ -20461,18 +20889,17 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    Stage.prototype.getFps = function ()
+    Stage.prototype.getFrameRate = function ()
     {
-        // return 16;
-        return this.fps;
+        return this.frameRate;
     };
 
     /**
      * @param fps
      */
-    Stage.prototype.setFps = function (fps)
+    Stage.prototype.setFrameRate = function (fps)
     {
-        this.fps = (1000 / fps) | 0;
+        this.frameRate = (1000 / fps) | 0;
     };
 
     /**
@@ -20591,7 +21018,7 @@ if (!("swf2js" in window)){(function(window)
 
         _this.setBaseWidth(_ceil((bounds.xMax - bounds.xMin) / 20));
         _this.setBaseHeight(_ceil((bounds.yMax - bounds.yMin) / 20));
-        _this.setFps(frameRate);
+        _this.setFrameRate(frameRate);
 
         _this.loadStatus++;
 
@@ -21168,6 +21595,8 @@ if (!("swf2js" in window)){(function(window)
         style = canvas.style;
         style.zIndex = 0;
         style.position = "absolute";
+        style.top = 0;
+        style.left = 0;
         style.zoom = 100 / _devicePixelRatio + "%";
         style["-webkit-tap-highlight-color"] = "rgba(0,0,0,0)";
 
@@ -22171,7 +22600,7 @@ if (!("swf2js" in window)){(function(window)
 
         stage.setBaseWidth(width);
         stage.setBaseHeight(height);
-        stage.setFps(fps);
+        stage.setFrameRate(fps);
         stage.setOptions(options);
         stages[stage.getId()] = stage;
         stage.init();
