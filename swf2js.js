@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.15)
+ * swf2js (version 0.6.16)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -2202,7 +2202,7 @@ if (!("swf2js" in window)){(function(window)
         obj.scroll = 0;
         obj.maxhscroll = 0;
         obj.html = data.HTML;
-        obj.htmlText = null;
+        obj.htmlText = (data.HTML) ? data.InitialText : null;
         obj.length = 0;
         obj.maxChars = 0;
         obj.multiline = data.Multiline;
@@ -2250,7 +2250,7 @@ if (!("swf2js" in window)){(function(window)
             obj.leftMargin = data.LeftMargin;
             obj.rightMargin = data.RightMargin;
             obj.indent = data.Indent;
-            obj.leading = data.Leading;
+            obj.leading = (14400 > data.Leading) ? data.Leading : data.Leading - 65535;
         }
 
         obj.size = data.FontHeight / 20;
@@ -3836,6 +3836,7 @@ if (!("swf2js" in window)){(function(window)
 
         bitio.byte_offset = endOffset;
         stage.setCharacter(obj.FontId, obj);
+        stage.fonts[obj.FontName] = obj;
     };
 
     /**
@@ -4099,13 +4100,21 @@ if (!("swf2js" in window)){(function(window)
                 if (text.indexOf("<sbr />") !== -1) {
                     text = text.replace(new RegExp("<sbr />", "gi"), "\n");
                 }
+                if (text.indexOf("<b>") !== -1) {
+                    text = text.replace(new RegExp("<b>", "gi"), "");
+                    text = text.replace(new RegExp("</b>", "gi"), "");
+                }
 
                 var span = _document.createElement("span");
                 span.innerHTML = text;
-                var tags = span.getElementsByTagName("font");
-                if (tags.length) {
-                    obj.InitialText = tags[0].innerHTML;
+
+                var tags = span.getElementsByTagName("p");
+                var length = tags.length;
+                var tagData = [];
+                for (var i = 0; i < length; i++) {
+                    tagData[i] = tags[i];
                 }
+                obj.InitialText = tagData;
             } else {
                 obj.InitialText = text;
             }
@@ -4273,6 +4282,7 @@ if (!("swf2js" in window)){(function(window)
 
             FillType = (FillType) ? 0 : 1;
         }
+
         stage.setCharacter(obj.CharacterId, obj);
     };
 
@@ -6316,7 +6326,7 @@ if (!("swf2js" in window)){(function(window)
 
         bitio.byte_offset = startOffset + length;
 
-        //obj.base64 = 'data:video/mp4;base64,' + window.btoa(VideoData);
+        // obj.base64 = 'data:image/jpeg;base64,' + window.btoa(VideoData);
         stage.videos[obj.StreamID] = obj;
     };
 
@@ -6330,7 +6340,9 @@ if (!("swf2js" in window)){(function(window)
         var bitio = _this.bitio;
         var VideoData = "";
         var data = bitio.getData(length);
+
         console.log(data);
+
         return VideoData;
     };
 
@@ -8909,6 +8921,9 @@ if (!("swf2js" in window)){(function(window)
             obj = new (Function.prototype.bind.apply(window[object], params))();
         } else {
             switch (object) {
+                case "Object":
+                    obj = {};
+                    break;
                 case "MovieClip":
                     obj = new MovieClip();
                     var stage = mc.getStage();
@@ -12651,7 +12666,8 @@ if (!("swf2js" in window)){(function(window)
         }
 
         var value;
-        switch (target) {
+        var prop = (typeof target === "string") ? target.toLowerCase() : target;
+        switch (prop) {
             case 0:
             case "_x":
                 value = _this.getX();
@@ -12765,13 +12781,13 @@ if (!("swf2js" in window)){(function(window)
             case "enabled":
                 value = _this.getEnabled();
                 break;
-            case "blendMode":
+            case "blendmode":
                 value = _this.getBlendMode();
                 break;
-            case "SharedObject":
+            case "sharedobject":
                 value = new SharedObject();
                 break;
-            case "Key":
+            case "key":
                 value = keyClass;
                 break;
             default:
@@ -12800,7 +12816,8 @@ if (!("swf2js" in window)){(function(window)
             target = obj.target;
         }
 
-        switch (target) {
+        var prop = (typeof target === "string") ? target.toLowerCase() : target;
+        switch (prop) {
             case 0:
             case "_x":
                 _this.setX(value);
@@ -12892,7 +12909,7 @@ if (!("swf2js" in window)){(function(window)
                     _this.setVariable(target, value);
                 }
                 break;
-            case "blendMode":
+            case "blendmode":
                 _this.setBlendMode(value);
                 break;
             case "enabled":
@@ -16573,9 +16590,22 @@ if (!("swf2js" in window)){(function(window)
         element.style.backgroundColor = "transparent";
         element.style.zIndex = 0x7fffffff;
         element.style.textAlign = align;
-        element.value = text;
-        element.id = _this.getTagName();
+        if (typeof text === "string") {
+            element.value = text;
+        } else {
+            var str = "";
+            var length = text.length;
+            for (var i = 0; i < length; i++) {
+                var txt = text[i];
+                str += txt.innerText;
+                if ((i + 1) !== length) {
+                    str += "\n";
+                }
+            }
+            element.value = str;
+        }
 
+        element.id = _this.getTagName();
         var onBlur = function (stage, textField, el)
         {
             return function ()
@@ -16593,6 +16623,7 @@ if (!("swf2js" in window)){(function(window)
                 }
             };
         };
+
         element.onblur = onBlur(stage, _this, element);
         _this.input = element;
     };
@@ -16678,7 +16709,14 @@ if (!("swf2js" in window)){(function(window)
                     _this.span = span;
                 }
                 span.innerHTML = text;
-                text = span.innerText;
+
+                var tags = span.getElementsByTagName("p");
+                var length = tags.length;
+                var tagData = [];
+                for (var i = 0; i < length; i++) {
+                    tagData[i] = tags[i];
+                }
+                text = tagData;
             }
         }
 
@@ -16776,16 +16814,16 @@ if (!("swf2js" in window)){(function(window)
             if (text && !isClipDepth) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.rect(rx, ry, W, H);
+                ctx.rect(rx, ry, W, (H-40));
                 ctx.clip();
 
                 if (_this.inputActive === false) {
-                    var splitData = text.split("\n");
+                    var splitData = (typeof text === "string") ? text.split("\n") : text;
                     if (variables.embedFonts) {
                         var fontData = _this.getStage().getCharacter(_this.fontId);
-                        _this.renderOutLine(ctx, fontData, splitData, m3, rx, W, variables);
+                        _this.renderOutLine(ctx, fontData, splitData, m3, rx, W, fillStyle);
                     } else {
-                        _this.renderText(ctx, splitData, m3, variables);
+                        _this.renderText(ctx, splitData, m3, fontType, fillStyle);
                     }
                 }
 
@@ -16813,11 +16851,12 @@ if (!("swf2js" in window)){(function(window)
      * @param matrix
      * @param offset
      * @param width
-     * @param variables
+     * @param fillStyle
      */
-    TextField.prototype.renderOutLine = function (ctx, fontData, splitData, matrix, offset, width, variables)
+    TextField.prototype.renderOutLine = function (ctx, fontData, splitData, matrix, offset, width, fillStyle)
     {
         var _this = this;
+        var variables = _this.variables;
         var fontScale = _this.fontScale;
         var leading = (fontData.FontAscent + fontData.FontDescent) * fontScale;
         var rightMargin = variables.rightMargin * fontScale;
@@ -16838,20 +16877,32 @@ if (!("swf2js" in window)){(function(window)
         var index;
         var length = splitData.length;
         var _multiplicationMatrix = _this.multiplicationMatrix;
+
         for (var i = 0; i < length; i++) {
-            txt = splitData[i];
             var XOffset = offset;
-            var txtLength = txt.length;
             var textWidth = 0;
-
-            for (idx = 0; idx < txtLength; idx++) {
-                index = CodeTable.indexOf(txt[idx].charCodeAt(0));
-                if (index === -1) {
-                    continue;
+            var txtLength = 0;
+            var obj = splitData[i];
+            var firstChild;
+            if (typeof obj !== "string") {
+                firstChild = obj.firstChild;
+                textWidth = _this.getDomWidth(firstChild, CodeTable, FontAdvanceTable);
+                txt = obj.innerText;
+                align = variables.align;
+                if (obj.align) {
+                    align = obj.align;
                 }
-                textWidth += (FontAdvanceTable[index] * fontScale);
+            } else {
+                txt = obj;
+                txtLength = txt.length;
+                for (idx = 0; idx < txtLength; idx++) {
+                    index = CodeTable.indexOf(txt[idx].charCodeAt(0));
+                    if (index === -1) {
+                        continue;
+                    }
+                    textWidth += (FontAdvanceTable[index] * fontScale);
+                }
             }
-
 
             if (align === "right") {
                 XOffset += width - rightMargin - textWidth - 40;
@@ -16863,29 +16914,189 @@ if (!("swf2js" in window)){(function(window)
 
             var cacheXOffset = XOffset;
             var wordWidth = 0;
-            for (idx = 0; idx < txtLength; idx++) {
-                index = CodeTable.indexOf(txt[idx].charCodeAt(0));
-                if (index < 0) {
-                    continue;
-                }
+            if (typeof obj !== "string") {
+                var gridData = {
+                    XOffset: XOffset,
+                    YOffset: YOffset,
+                    cacheXOffset: cacheXOffset,
+                    cacheYOffset: cacheYOffset,
+                    wordWidth: wordWidth,
+                    addXOffset: 0,
+                    size: firstChild.size,
+                    areaWidth: areaWidth,
+                    matrix: matrix
+                };
 
-                var addXOffset = FontAdvanceTable[index] * fontScale;
-                if (wordWrap && multiline) {
-                    if (wordWidth + addXOffset > areaWidth) {
-                        XOffset = cacheXOffset;
-                        YOffset += cacheYOffset;
-                        wordWidth = 0;
+                _this.renderDomOutLine(
+                    ctx, firstChild, gridData, fillStyle,
+                    CodeTable, FontAdvanceTable, GlyphShapeTable
+                );
+            } else {
+                for (idx = 0; idx < txtLength; idx++) {
+                    index = CodeTable.indexOf(txt[idx].charCodeAt(0));
+                    if (index === -1) {
+                        continue;
                     }
-                }
 
-                var m2 = _multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
-                ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
-                _this.renderGlyph(GlyphShapeTable[index], ctx);
-                XOffset += addXOffset;
-                wordWidth += addXOffset;
+                    var addXOffset = FontAdvanceTable[index] * fontScale;
+                    if (wordWrap && multiline) {
+                        if (wordWidth + addXOffset > areaWidth) {
+                            XOffset = cacheXOffset;
+                            YOffset += cacheYOffset;
+                            wordWidth = 0;
+                        }
+                    }
+
+                    var m2 = _multiplicationMatrix(matrix, [fontScale, 0, 0, fontScale, XOffset, YOffset]);
+                    ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
+                    _this.renderGlyph(GlyphShapeTable[index], ctx);
+                    XOffset += addXOffset;
+                    wordWidth += addXOffset;
+                }
             }
+
             YOffset += leading;
         }
+    };
+
+    /**
+     * @param ctx
+     * @param child
+     * @param gridData
+     * @param fillStyle
+     * @param CodeTable
+     * @param FontAdvanceTable
+     * @param GlyphShapeTable
+     */
+    TextField.prototype.renderDomOutLine = function (
+        ctx, child, gridData, fillStyle,
+        CodeTable, FontAdvanceTable, GlyphShapeTable
+    ) {
+        var _this = this;
+        var variables = _this.variables;
+        var wordWrap = variables.wordWrap;
+        var multiline = variables.multiline;
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var stage = _this.getStage();
+        var fonts = stage.fonts;
+        var face = child.face;
+        var fontData = fonts[face];
+        var codeTable = CodeTable;
+        var faTable = FontAdvanceTable;
+        var shapeTable = GlyphShapeTable;
+        var color = fillStyle;
+        if (fontData) {
+            codeTable = fontData.CodeTable;
+            faTable = fontData.FontAdvanceTable;
+            shapeTable = fontData.GlyphShapeTable;
+        }
+
+        if (child.color) {
+            color = child.color;
+        }
+
+        if (child.size) {
+            gridData.size = child.size;
+        }
+
+        var childNodes = child.childNodes;
+        var length = childNodes.length;
+        for (var i = 0; i < length; i++) {
+            var node = childNodes[i];
+            if (node instanceof HTMLFontElement) {
+                _this.renderDomOutLine(
+                    ctx, node, gridData, color,
+                    codeTable, faTable, shapeTable
+                );
+            } else {
+                var size = gridData.size;
+                var fontScale = size / 1024;
+                var sTable;
+                var values = node.nodeValue;
+                var vLength = values.length;
+                for (var idx = 0; idx < vLength; idx++) {
+                    var txt = values[idx];
+                    var index = codeTable.indexOf(txt.charCodeAt(0));
+                    if (index === -1) {
+                        index = CodeTable.indexOf(txt.charCodeAt(0));
+                        if (index === -1) {
+                            continue;
+                        }
+                        color = fillStyle;
+                        gridData.addXOffset = FontAdvanceTable[index] * fontScale;
+                        sTable = GlyphShapeTable;
+                    } else  {
+                        gridData.addXOffset = faTable[index] * fontScale;
+                        sTable = shapeTable;
+                    }
+
+                    if (wordWrap && multiline) {
+                        if (gridData.wordWidth + gridData.addXOffset > gridData.areaWidth) {
+                            gridData.XOffset = gridData.cacheXOffset;
+                            gridData.YOffset += gridData.cacheYOffset;
+                            gridData.wordWidth = 0;
+                        }
+                    }
+
+                    var m2 = [fontScale, 0, 0, fontScale, gridData.XOffset, gridData.YOffset];
+                    var m3 = _multiplicationMatrix(gridData.matrix, m2);
+                    ctx.setTransform(m3[0], m3[1], m3[2], m3[3], m3[4], m3[5]);
+                    ctx.fillStyle = color;
+                    _this.renderGlyph(sTable[index], ctx);
+                    gridData.XOffset += gridData.addXOffset;
+                    gridData.wordWidth += gridData.addXOffset;
+                }
+            }
+        }
+    };
+
+    /**
+     * @param child
+     * @param CodeTable
+     * @param FontAdvanceTable
+     * @returns {number}
+     */
+    TextField.prototype.getDomWidth = function (child, CodeTable, FontAdvanceTable)
+    {
+        var _this = this;
+        var fontScale = _this.fontScale;
+        var stage = _this.getStage();
+        var fonts = stage.fonts;
+        var width = 0;
+        var face = child.face;
+        var fontData = fonts[face];
+        var codeTable = CodeTable;
+        var faTable = FontAdvanceTable;
+        if (fontData) {
+            codeTable = fontData.CodeTable;
+            faTable = fontData.FontAdvanceTable;
+        }
+
+        var childNodes = child.childNodes;
+        var length = childNodes.length;
+        for (var i = 0; i < length; i++) {
+            var node = childNodes[i];
+            if (node instanceof HTMLFontElement) {
+                width += _this.getDomWidth(node, codeTable, faTable);
+            } else {
+                var values = node.nodeValue;
+                var vLength = values.length;
+                for (var idx = 0; idx < vLength; idx++) {
+                    var txt = values[idx];
+                    var index = codeTable.indexOf(txt.charCodeAt(0));
+                    if (index === -1) {
+                        index = CodeTable.indexOf(txt.charCodeAt(0));
+                        if (index === -1) {
+                            continue;
+                        }
+                        width += (FontAdvanceTable[index] * fontScale);
+                    } else  {
+                        width += (faTable[index] * fontScale);
+                    }
+                }
+            }
+        }
+        return width;
     };
 
     /**
@@ -16912,16 +17123,15 @@ if (!("swf2js" in window)){(function(window)
      * @param ctx
      * @param splitData
      * @param matrix
-     * @param variables
+     * @param fontType
+     * @param fillStyle
      */
-    TextField.prototype.renderText = function (ctx, splitData, matrix, variables)
+    TextField.prototype.renderText = function (ctx, splitData, matrix, fontType, fillStyle)
     {
         var _this = this;
-        var txt = "";
         var bounds = _this.getBounds();
-        var xMax = bounds.xMax / 20;
         var xMin = bounds.xMin / 20;
-        var width = _ceil(xMax - xMin);
+        var variables = _this.variables;
         var wordWrap = variables.wordWrap;
         var multiline = variables.multiline;
         var leading = variables.leading / 20;
@@ -16929,8 +17139,9 @@ if (!("swf2js" in window)){(function(window)
         var leftMargin = variables.leftMargin / 20;
         var indent = variables.indent / 20;
         var align = variables.align;
-        var dx = xMin;
-        var dy = 0;
+        var width = _this.width;
+        var dx = xMin + 2;
+        var dy = 2;
         if (align === "right") {
             ctx.textAlign = "end";
             dx += width - rightMargin;
@@ -16941,43 +17152,327 @@ if (!("swf2js" in window)){(function(window)
             dx += leftMargin + indent;
         }
 
-        var size = variables.size;
         var m2 = [matrix[0] * 20, matrix[1] * 20, matrix[2] * 20, matrix[3] * 20, matrix[4], matrix[5]];
-        ctx.setTransform(m2[0],m2[1],m2[2],m2[3],m2[4],m2[5]);
+        var xScale = _sqrt(m2[0] * m2[0] + m2[1] * m2[1]);
+        var yScale = _sqrt(m2[2] * m2[2] + m2[3] * m2[3]);
+        var scale = _max(xScale, yScale);
+        ctx.setTransform(scale,m2[1],m2[2],scale,m2[4],m2[5]);
 
-        var ratio = 1 / _devicePixelRatio;
-        var m3 = _this.multiplicationMatrix(m2, [ratio, 0, 0, ratio, 0, 0]);
-        var xScale = _sqrt(m3[0] * m3[0] + m3[1] * m3[1]);
-        bounds = _this.getBounds(m3);
-        var areaWidth = (_ceil((bounds.xMax) - (bounds.xMin)) - leftMargin - rightMargin);
+        bounds = _this.getBounds(m2);
+        var areaWidth = (bounds.xMax - bounds.xMin) - ((leftMargin - rightMargin - 4) * xScale);
+        areaWidth /= scale;
+
+        var size = variables.size;
         var length = splitData.length;
         for (var i = 0; i < length; i++) {
-            txt = splitData[i];
-            if (wordWrap && multiline) {
-                var measureText = ctx.measureText(txt);
-                var txtTotalWidth = measureText.width * xScale;
-                if (txtTotalWidth > areaWidth) {
-                    var txtLength = txt.length;
-                    var joinTxt = "";
-                    var joinWidth = size;
-                    for (var t = 0; t < txtLength; t++) {
-                        var textOne = ctx.measureText(txt[t]);
-                        joinWidth += textOne.width * xScale;
-                        joinTxt += txt[t];
-                        if (joinWidth > areaWidth || (t + 1) === txtLength) {
-                            ctx.fillText(joinTxt, dx, dy, width);
-                            joinWidth = size;
-                            joinTxt = "";
-                            dy += leading + size;
+            var txt = "";
+            var obj = splitData[i];
+            if (typeof obj !== "string") {
+                txt = obj.innerText;
+            } else {
+                txt = obj;
+            }
+
+            if (txt === "") {
+                dy += leading + size;
+                continue;
+            }
+
+            var measureText = ctx.measureText(txt);
+            var txtTotalWidth = measureText.width;
+            if (typeof obj === "string") {
+                if (wordWrap && multiline) {
+                    if (txtTotalWidth > areaWidth) {
+                        var txtLength = txt.length;
+                        var joinTxt = "";
+                        var joinWidth = 2 * scale;
+                        for (var t = 0; t < txtLength; t++) {
+                            var txtOne = txt[t];
+                            var textOne = ctx.measureText(txtOne);
+                            joinWidth += textOne.width;
+                            joinTxt += txtOne;
+                            var nextOne = txt[t+1];
+                            if (nextOne) {
+                                textOne = ctx.measureText(nextOne);
+                                joinWidth += textOne.width;
+                            }
+                            if (joinWidth > areaWidth || (t + 1) === txtLength) {
+                                ctx.fillText(joinTxt, dx, dy, _ceil(joinWidth));
+                                joinWidth = 2 * scale;
+                                joinTxt = "";
+                                dy += leading + size;
+                            } else if (nextOne) {
+                                joinWidth -= textOne.width;
+                            }
                         }
+                    } else {
+                        ctx.fillText(txt, dx, dy, txtTotalWidth);
+                        dy += leading + size;
                     }
                 } else {
-                    ctx.fillText(txt, dx, dy, width);
+                    ctx.fillText(txt, dx, dy, txtTotalWidth);
                     dy += leading + size;
                 }
             } else {
-                ctx.fillText(txt, dx, dy, width);
-                dy += leading + size;
+                var firstChild = obj.firstChild;
+                var gridData = {
+                    startDx: dx,
+                    dx: dx,
+                    cloneDy: dy,
+                    dy: dy,
+                    color: fillStyle,
+                    fontType: fontType,
+                    fillStyle: fillStyle,
+                    size: size,
+                    scale: scale,
+                    originSize: size,
+                    txtTotalWidth: txtTotalWidth,
+                    areaWidth: areaWidth,
+                    joinWidth: 0,
+                    joinTxt: "",
+                    offset: 0,
+                    offsetArray: []
+                };
+
+                if (gridData.offsetArray.length === 0) {
+                    _this.offsetDomText(ctx, firstChild, gridData);
+                }
+
+                // reset
+                gridData.dx = dx;
+                gridData.dy = dy;
+                gridData.cloneDy = dy;
+                gridData.size = size;
+                gridData.joinWidth = 0;
+                gridData.joinTxt = "";
+                gridData.offset = 0;
+                if (gridData.offsetArray.length > 0) {
+                    var offsetY = gridData.offsetArray[0];
+                    if (offsetY) {
+                        gridData.dy += offsetY;
+                        gridData.cloneDy = gridData.dy;
+                    }
+                }
+
+                _this.renderDomText(ctx, firstChild, gridData);
+
+                dy = gridData.dy;
+            }
+        }
+    };
+
+    /**
+     * @param ctx
+     * @param child
+     * @param gridData
+     */
+    TextField.prototype.offsetDomText = function(ctx, child, gridData)
+    {
+        var _this = this;
+        var variables = _this.variables;
+        var wordWrap = variables.wordWrap;
+        var multiline = variables.multiline;
+        var leading = variables.leading / 20;
+
+        if (child.face) {
+            gridData.face = child.face;
+        }
+
+        if (child.size) {
+            var size = child.size|0;
+            var changeSize = gridData.originSize - size;
+            if (changeSize) {
+                gridData.dy += changeSize;
+                if (changeSize > 0) {
+                    gridData.dy -= 4;
+                } else {
+                    var offsetArray = gridData.offsetArray;
+                    var offset = gridData.offset;
+                    var offsetSize = offsetArray[offset];
+                    if (offsetSize) {
+                        offsetArray[offset] = _max(offsetSize, ~changeSize);
+                    } else {
+                        offsetArray[offset] = ~changeSize;
+                    }
+                    gridData.dy += 6;
+                }
+            }
+            gridData.size = size;
+        }
+
+        var childNodes = child.childNodes;
+        var length = childNodes.length;
+        for (var i = 0; i < length; i++) {
+            var node = childNodes[i];
+            if (node instanceof HTMLFontElement) {
+                _this.offsetDomText(ctx, node, gridData);
+            } else {
+                var txt = node.nodeValue;
+                if (wordWrap && multiline) {
+                    if (gridData.txtTotalWidth > gridData.areaWidth) {
+                        var txtLength = txt.length;
+                        for (var t = 0; t < txtLength; t++) {
+                            var textOne = ctx.measureText(txt[t]);
+                            gridData.joinWidth += textOne.width;
+                            gridData.joinTxt += txt[t];
+                            var isOver = (gridData.joinWidth > gridData.areaWidth);
+                            if (isOver || (t + 1) === txtLength) {
+                                if ((gridData.dx + textOne.width) > gridData.areaWidth) {
+                                    gridData.dx = gridData.startDx;
+                                    gridData.dy += leading + gridData.size;
+                                    gridData.cloneDy = gridData.dy;
+                                    gridData.joinWidth = 2 * gridData.scale;
+                                    isOver = false;
+                                    gridData.offset++;
+                                }
+
+                                gridData.joinTxt = "";
+                                if (isOver) {
+                                    gridData.dx = gridData.startDx;
+                                    gridData.joinWidth = 22 * gridData.scale;
+                                    gridData.dy += leading + gridData.size;
+                                    gridData.cloneDy = gridData.dy;
+                                    gridData.offset++;
+                                }
+                            }
+                        }
+                    } else {
+                        gridData.dy += leading + gridData.size;
+                        gridData.cloneDy = gridData.dy;
+                        gridData.offset++;
+                    }
+                } else {
+                    gridData.dy += leading + gridData.size;
+                    gridData.cloneDy = gridData.dy;
+                    gridData.offset++;
+                }
+
+                var mText = ctx.measureText(txt);
+                gridData.dx += mText.width;
+                gridData.size = gridData.originSize;
+                gridData.dy = gridData.cloneDy;
+            }
+        }
+    };
+
+    /**
+     * @param ctx
+     * @param child
+     * @param gridData
+     */
+    TextField.prototype.renderDomText = function(ctx, child, gridData)
+    {
+        var _this = this;
+        var variables = _this.variables;
+        var wordWrap = variables.wordWrap;
+        var multiline = variables.multiline;
+        var leading = variables.leading / 20;
+
+        if (child.face) {
+            gridData.face = child.face;
+        }
+
+        if (child.color) {
+            gridData.color = child.color;
+        }
+
+        if (child.size) {
+            var size = child.size|0;
+            var changeSize = gridData.originSize - size;
+            if (changeSize) {
+                gridData.dy += changeSize;
+                if (changeSize > 0) {
+                    gridData.dy -= 4;
+                } else {
+                    gridData.dy += 8;
+                }
+            }
+            gridData.size = size;
+        }
+
+        var offsetY;
+        var childNodes = child.childNodes;
+        var length = childNodes.length;
+        for (var i = 0; i < length; i++) {
+            var node = childNodes[i];
+            if (node instanceof HTMLFontElement) {
+                _this.renderDomText(ctx, node, gridData);
+            } else {
+                ctx.fillStyle = gridData.color;
+                ctx.font = gridData.fontType + gridData.size + "px " + gridData.face;
+
+                var txt = node.nodeValue;
+                if (wordWrap && multiline) {
+                    if (gridData.txtTotalWidth > gridData.areaWidth) {
+                        var txtLength = txt.length;
+                        for (var t = 0; t < txtLength; t++) {
+                            var textOne = ctx.measureText(txt[t]);
+                            gridData.joinWidth += textOne.width;
+                            gridData.joinTxt += txt[t];
+                            var isOver = (gridData.joinWidth > gridData.areaWidth);
+                            if (isOver || (t + 1) === txtLength) {
+                                if ((gridData.dx + textOne.width) > gridData.areaWidth) {
+                                    isOver = 0;
+                                    gridData.joinWidth = gridData.size;
+                                    gridData.dx = gridData.startDx;
+                                    gridData.offset++;
+                                    gridData.dy += leading + gridData.size;
+                                    if (gridData.offsetArray.length > 0) {
+                                        offsetY = gridData.offsetArray[gridData.offset];
+                                        if (offsetY) {
+                                            gridData.dy += offsetY;
+                                        }
+                                    }
+                                    gridData.cloneDy = gridData.dy;
+                                }
+
+                                ctx.fillText(gridData.joinTxt, gridData.dx, gridData.dy, _ceil(gridData.joinWidth));
+                                gridData.joinTxt = "";
+                                if (isOver) {
+                                    gridData.dx = gridData.startDx;
+                                    gridData.joinWidth = gridData.size;
+                                    gridData.offset++;
+                                    gridData.dy += leading + gridData.size;
+                                    if (gridData.offsetArray.length > 0) {
+                                        offsetY = gridData.offsetArray[gridData.offset];
+                                        if (offsetY) {
+                                            gridData.dy += offsetY;
+                                        }
+                                    }
+                                    gridData.cloneDy = gridData.dy;
+                                }
+                            }
+                        }
+                    } else {
+                        ctx.fillText(txt, gridData.dx, gridData.dy, _ceil(gridData.txtTotalWidth));
+                        gridData.offset++;
+                        gridData.dy += leading + gridData.size;
+                        if (gridData.offsetArray.length > 0) {
+                            offsetY = gridData.offsetArray[gridData.offset];
+                            if (offsetY) {
+                                gridData.dy += offsetY;
+                            }
+                        }
+                        gridData.cloneDy = gridData.dy;
+                    }
+                } else {
+                    ctx.fillText(txt, gridData.dx, gridData.dy, _ceil(gridData.txtTotalWidth));
+                    gridData.offset++;
+                    gridData.dy += leading + gridData.size;
+                    if (gridData.offsetArray.length > 0) {
+                        offsetY = gridData.offsetArray[gridData.offset];
+                        if (offsetY) {
+                            gridData.dy += offsetY;
+                        }
+                    }
+                    gridData.cloneDy = gridData.dy;
+                }
+
+                var mText = ctx.measureText(txt);
+                gridData.dx += mText.width;
+                gridData.color = gridData.fillStyle;
+                gridData.size = gridData.originSize;
+                gridData.dy = gridData.cloneDy;
             }
         }
     };
@@ -17357,7 +17852,7 @@ if (!("swf2js" in window)){(function(window)
         var rColorTransform2 = _multiplicationColor(rColorTransform, sprite.getColorTransform());
         isVisible = _min(sprite.getVisible(), visible);
         var cacheKey = obj.cacheKey;
-        cacheKey += sprite.render(ctx, rMatrix, rColorTransform2, stage, isVisible);
+        cacheKey += sprite.render(obj.preCtx, rMatrix, rColorTransform2, stage, isVisible);
 
         // post render
         if (obj.isFilter || obj.isBlend) {
@@ -20512,6 +21007,7 @@ if (!("swf2js" in window)){(function(window)
         _this.actions = [];
         _this.instances = [];
         _this.placeObjects = [];
+        _this.fonts = [];
         _this.isAction = true;
         _this.queue = null;
         _this._global = new Global();
