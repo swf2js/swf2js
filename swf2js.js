@@ -17140,16 +17140,16 @@ if (!("swf2js" in window)){(function(window)
         var indent = variables.indent / 20;
         var align = variables.align;
         var width = _this.width;
-        var dx = xMin + 2;
-        var dy = 2;
+        var dx = xMin;
+        var dy = 0;
         if (align === "right") {
             ctx.textAlign = "end";
-            dx += width - rightMargin;
+            dx += width - rightMargin - 2;
         } else if (align === "center") {
             ctx.textAlign = "center";
-            dx += leftMargin + indent + ((width - leftMargin - indent - rightMargin) / 2);
+            dx += 2 + leftMargin + indent + ((width - leftMargin - indent - rightMargin) / 2);
         } else {
-            dx += leftMargin + indent;
+            dx += 2 + leftMargin + indent;
         }
 
         var m2 = [matrix[0] * 20, matrix[1] * 20, matrix[2] * 20, matrix[3] * 20, matrix[4], matrix[5]];
@@ -17159,7 +17159,7 @@ if (!("swf2js" in window)){(function(window)
         ctx.setTransform(scale,m2[1],m2[2],scale,m2[4],m2[5]);
 
         bounds = _this.getBounds(m2);
-        var areaWidth = (bounds.xMax - bounds.xMin) - ((leftMargin - rightMargin - 4) * xScale);
+        var areaWidth = (bounds.xMax - bounds.xMin) - ((leftMargin - rightMargin) * xScale);
         areaWidth /= scale;
 
         var size = variables.size;
