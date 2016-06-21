@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.17)
+ * swf2js (version 0.6.18)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -6568,8 +6568,7 @@ if (!("swf2js" in window)){(function(window)
 
     };
 
-    var asiD = 0;
-
+    var asID = 0;
     /**
      * @param data
      * @param constantPool
@@ -6580,7 +6579,7 @@ if (!("swf2js" in window)){(function(window)
     var ActionScript = function (data, constantPool, register, initAction)
     {
         var _this = this;
-        _this.id = asiD++;
+        _this.id = asID++;
         _this.cache = [];
         _this.params = [];
         _this.constantPool = constantPool || [];
@@ -7967,8 +7966,10 @@ if (!("swf2js" in window)){(function(window)
                     var name = params[key];
                     if (typeof name === "string") {
                         value = _this.getVariable(name);
-                    }
-                    if (value === undefined) {
+                        if (value === undefined && !(name in _this.variables)) {
+                            value = name;
+                        }
+                    } else {
                         value = name;
                     }
                 }
@@ -8903,11 +8904,12 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript.prototype.ActionGetMember = function (stack, mc)
     {
+        var _this = this;
         var property;
         var name = stack.pop();
         var object = stack.pop();
         if (typeof object === "string") {
-            var target = this.stringToObject(object, mc);
+            var target = _this.stringToObject(object, mc);
             if (target ) {
                 object = target;
             }
@@ -8930,6 +8932,11 @@ if (!("swf2js" in window)){(function(window)
                             var id = name.split("instance")[1];
                             property = stage.getInstance(id);
                         }
+
+                        if (property === undefined && _this.checkMethod(name)) {
+                            property = object[name];
+                        }
+
                     } else {
                         property = object[name];
                     }
@@ -13104,6 +13111,68 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
+    DisplayObject.prototype.getDepth = function ()
+    {
+        var _this = this;
+        var _depth = _this._depth;
+        var depth = (_depth !== null) ? _depth : _this.getLevel();
+        return depth - 16384;
+    };
+
+    /**
+     * @param depth
+     * @param swapDepth
+     * @param swapMc
+     */
+    DisplayObject.prototype.setDepth = function (depth, swapDepth, swapMc)
+    {
+        var _this = this;
+        var parent = _this.getParent();
+        var _depth = _this._depth;
+        var level = (_depth !== null) ? _depth : _this.getLevel();
+        var totalFrame = parent.getTotalFrames() + 1;
+
+        if (!swapMc) {
+            _this._depth = depth;
+        } else {
+            _this._depth = swapDepth;
+            swapMc._depth = depth;
+        }
+
+        var container = parent.container;
+        var instanceId = _this.instanceId;
+        for (var frame = 1; frame < totalFrame; frame++) {
+            if (!(frame in container)) {
+                container[frame] = [];
+            }
+
+            var tags = container[frame];
+            if (swapMc) {
+                if (level in tags && tags[level] === instanceId) {
+                    tags[depth] = swapMc.instanceId;
+                }
+
+                if (swapDepth in tags && tags[swapDepth] === swapMc.instanceId) {
+                    tags[swapDepth] = instanceId;
+                }
+            } else {
+                if (!(level in tags) || level in tags && tags[level] === instanceId) {
+                    delete tags[level];
+                    tags[depth] = instanceId;
+                }
+            }
+
+            container[frame] = tags;
+        }
+        _this.setController(false, false, false, false);
+        if (swapMc) {
+            swapMc.setController(false, false, false, false);
+        }
+    };
+
+    /**
+     * @returns {number}
+     */
     DisplayObject.prototype.getX = function ()
     {
         var matrix = this.getMatrix();
@@ -15325,6 +15394,8 @@ if (!("swf2js" in window)){(function(window)
         var container = _this.getTags();
         var length = container.length;
         var maskObj = _this.getMask();
+
+
         if (length) {
             var myStage = _this.getStage();
             for (var depth in container) {
@@ -16931,11 +17002,15 @@ if (!("swf2js" in window)){(function(window)
         // matrix
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
-        var m3 = _multiplicationMatrix(stage.getMatrix(), m2);
-        ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+
 
         // pre render
         var obj = _this.preRender(ctx, m2, rColorTransform, stage, visible);
+        var preCtx = obj.preCtx;
+        var preMatrix = obj.preMatrix;
+        var m3 = _multiplicationMatrix(stage.getMatrix(), preMatrix);
+        preCtx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+
         var textCacheKey = ["TextField"];
         var variables = _this.variables;
         var text = variables.text;
@@ -16977,7 +17052,7 @@ if (!("swf2js" in window)){(function(window)
                 text = span.innerText;
             }
         }
-        ctx.textBaseline = "top";
+        preCtx.textBaseline = "top";
         if (text === undefined) {
             text = "";
         }
@@ -16989,7 +17064,6 @@ if (!("swf2js" in window)){(function(window)
         var yMin = bounds.yMin;
         var W = _abs(_ceil(xMax - xMin));
         var H = _abs(_ceil(yMax - yMin));
-        var preMatrix = obj.preMatrix;
 
         // auto size
         var scale = stage.getScale();
@@ -17051,7 +17125,7 @@ if (!("swf2js" in window)){(function(window)
                     for (i = 0; i < length; i++) {
                         txtObj = splitData[i];
                         if (typeof txtObj === "string") {
-                            measureText = ctx.measureText(txtObj);
+                            measureText = preCtx.measureText(txtObj);
                             var checkW = _ceil(measureText.width * 20);
                             if (checkW > W) {
                                 txtTotalHeight += _ceil(_ceil(checkW / W) * addH);
@@ -17062,7 +17136,7 @@ if (!("swf2js" in window)){(function(window)
                     for (i = 0; i < length; i++) {
                         txtObj = splitData[i];
                         if (typeof txtObj === "string") {
-                            measureText = ctx.measureText(txtObj);
+                            measureText = preCtx.measureText(txtObj);
                             txtTotalWidth = _max(txtTotalWidth, _ceil(measureText.width * 20));
                             txtTotalHeight += addH;
                         }
@@ -17072,7 +17146,7 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var offsetX = 0;
+        var offsetX = 40;
         switch (autoMode) {
             case "center":
                 offsetX = _ceil((_max(txtTotalWidth, W) - _min(txtTotalWidth, W)) / 2);
@@ -17096,27 +17170,27 @@ if (!("swf2js" in window)){(function(window)
                 ry = -yMin;
                 var m4 = _multiplicationMatrix(preMatrix, [1, 0, 0, 1, xMin, yMin]);
                 m3 = _multiplicationMatrix(stage.getMatrix(), m4);
-                ctx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
+                preCtx.setTransform(m3[0],m3[1],m3[2],m3[3],m3[4],m3[5]);
             }
 
             // border
             var border = variables.border;
             if (border && !isClipDepth) {
-                ctx.beginPath();
-                ctx.rect(rx - offsetX, ry, W, H);
+                preCtx.beginPath();
+                preCtx.rect(rx - offsetX, ry, W, H);
                 color = _this.generateColorTransform(variables.borderColor, rColorTransform);
                 textCacheKey[textCacheKey.length] = color;
-                ctx.strokeStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
-                ctx.lineWidth = _min(20, 1 / _min(m3[0], m3[3]));
-                ctx.globalAlpha = 1;
-                ctx.fillStyle = "rgba(0,0,0,0)";
+                preCtx.strokeStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
+                preCtx.lineWidth = _min(20, 1 / _min(m3[0], m3[3]));
+                preCtx.globalAlpha = 1;
+                preCtx.fillStyle = "rgba(0,0,0,0)";
                 if (variables.background) {
                     color = _this.generateColorTransform(variables.backgroundColor, rColorTransform);
                     textCacheKey[textCacheKey.length] = color;
-                    ctx.fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
+                    preCtx.fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
                 }
-                ctx.fill();
-                ctx.stroke();
+                preCtx.fill();
+                preCtx.stroke();
             }
 
             var textColor = variables.textColor;
@@ -17128,7 +17202,7 @@ if (!("swf2js" in window)){(function(window)
             color = _this.generateColorTransform(objRGBA, rColorTransform);
             var fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
             textCacheKey[textCacheKey.length] = fillStyle;
-            ctx.fillStyle = fillStyle;
+            preCtx.fillStyle = fillStyle;
 
             // font type
             var fontType = "";
@@ -17141,7 +17215,7 @@ if (!("swf2js" in window)){(function(window)
 
             var fontStyle = fontType + variables.size + "px " + variables.font;
             textCacheKey[textCacheKey.length] = fontStyle;
-            ctx.font = fontStyle;
+            preCtx.font = fontStyle;
 
             if (_this.input !== null) {
                 var input = _this.input;
@@ -17166,21 +17240,21 @@ if (!("swf2js" in window)){(function(window)
             }
 
             if (text && !isClipDepth) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(rx - offsetX, ry, W, (H-40));
-                ctx.clip();
+                preCtx.save();
+                preCtx.beginPath();
+                preCtx.rect(rx - offsetX, ry, W, (H-40));
+                preCtx.clip();
 
                 if (_this.inputActive === false) {
                     if (variables.embedFonts) {
-                        _this.renderOutLine(ctx, fontData, splitData, m3, rx - offsetX, W, fillStyle);
+                        _this.renderOutLine(preCtx, fontData, splitData, m3, rx - offsetX, W, fillStyle);
                     } else {
-                        _this.renderText(ctx, splitData, m3, fontType, fillStyle, offsetX);
+                        _this.renderText(preCtx, splitData, m3, fontType, fillStyle);
                     }
                 }
 
-                ctx.restore();
-                ctx.globalAlpha = 1;
+                preCtx.restore();
+                preCtx.globalAlpha = 1;
             }
 
             textCacheKey[textCacheKey.length] = text;
@@ -17261,7 +17335,7 @@ if (!("swf2js" in window)){(function(window)
             if (align === "right") {
                 XOffset += width - rightMargin - textWidth - 40;
             } else if (align === "center") {
-                XOffset += (indent + leftMargin) + ((width - indent - leftMargin - rightMargin - textWidth) / 2);
+                XOffset += indent + leftMargin + 40 + ((width - indent - leftMargin - rightMargin - textWidth) / 2);
             } else {
                 XOffset += indent + leftMargin + 40;
             }
@@ -17465,9 +17539,10 @@ if (!("swf2js" in window)){(function(window)
      */
     TextField.prototype.renderGlyph = function (records, ctx)
     {
-        if (!("data" in records)) {
+        if (!records.data) {
             records.data = vtc.convert(records);
         }
+
         var shapes = records.data;
         var shapeLength = shapes.length;
         for (var idx = 0; idx < shapeLength; idx++) {
@@ -17485,7 +17560,6 @@ if (!("swf2js" in window)){(function(window)
      * @param matrix
      * @param fontType
      * @param fillStyle
-     * @param _x
      */
     TextField.prototype.renderText = function (ctx, splitData, matrix, fontType, fillStyle, _x)
     {
@@ -17509,7 +17583,7 @@ if (!("swf2js" in window)){(function(window)
         var scale = _max(xScale, yScale);
         ctx.setTransform(scale,m2[1],m2[2],scale,m2[4],m2[5]);
 
-        var dx = xMin - (_x/20);
+        var dx = xMin;
         var dy = (bounds.yMin / 20) + 2;
         if (align === "right") {
             ctx.textAlign = "end";
@@ -17763,47 +17837,65 @@ if (!("swf2js" in window)){(function(window)
                 ctx.fillStyle = gridData.color;
                 ctx.font = gridData.fontType + gridData.size + "px " + gridData.face;
 
-                var txt = node.nodeValue;
-                if (wordWrap && multiline) {
-                    if (gridData.txtTotalWidth > gridData.areaWidth) {
-                        var txtLength = txt.length;
-                        for (var t = 0; t < txtLength; t++) {
-                            var textOne = ctx.measureText(txt[t]);
-                            gridData.joinWidth += textOne.width;
-                            gridData.joinTxt += txt[t];
-                            var isOver = (gridData.joinWidth > gridData.areaWidth);
-                            if (isOver || (t + 1) === txtLength) {
-                                if ((gridData.dx + textOne.width) > gridData.areaWidth) {
-                                    isOver = 0;
-                                    gridData.joinWidth = gridData.size;
-                                    gridData.dx = gridData.startDx;
-                                    gridData.offset++;
-                                    gridData.dy += leading + gridData.size;
-                                    if (gridData.offsetArray.length > 0) {
-                                        offsetY = gridData.offsetArray[gridData.offset];
-                                        if (offsetY) {
-                                            gridData.dy += offsetY;
+                var text = node.nodeValue;
+                var splits = text.split("\n");
+                var sLen= splits.length;
+                for (var idx = 0; idx < sLen; idx++) {
+                    gridData.dx = gridData.startDx;
+                    var txt = splits[idx];
+                    
+                    if (wordWrap && multiline) {
+                        if (gridData.txtTotalWidth > gridData.areaWidth) {
+                            var txtLength = txt.length;
+                            for (var t = 0; t < txtLength; t++) {
+                                var textOne = ctx.measureText(txt[t]);
+                                gridData.joinWidth += textOne.width;
+                                gridData.joinTxt += txt[t];
+                                var isOver = (gridData.joinWidth > gridData.areaWidth);
+                                if (isOver || (t + 1) === txtLength) {
+                                    if ((gridData.dx + textOne.width) > gridData.areaWidth) {
+                                        isOver = 0;
+                                        gridData.joinWidth = gridData.size;
+                                        gridData.dx = gridData.startDx;
+                                        gridData.offset++;
+                                        gridData.dy += leading + gridData.size;
+                                        if (gridData.offsetArray.length > 0) {
+                                            offsetY = gridData.offsetArray[gridData.offset];
+                                            if (offsetY) {
+                                                gridData.dy += offsetY;
+                                            }
                                         }
+                                        gridData.cloneDy = gridData.dy;
                                     }
-                                    gridData.cloneDy = gridData.dy;
-                                }
 
-                                ctx.fillText(gridData.joinTxt, gridData.dx, gridData.dy, _ceil(gridData.joinWidth));
-                                gridData.joinTxt = "";
-                                if (isOver) {
-                                    gridData.dx = gridData.startDx;
-                                    gridData.joinWidth = gridData.size;
-                                    gridData.offset++;
-                                    gridData.dy += leading + gridData.size;
-                                    if (gridData.offsetArray.length > 0) {
-                                        offsetY = gridData.offsetArray[gridData.offset];
-                                        if (offsetY) {
-                                            gridData.dy += offsetY;
+                                    ctx.fillText(gridData.joinTxt, gridData.dx, gridData.dy, _ceil(gridData.joinWidth));
+                                    gridData.joinTxt = "";
+                                    if (isOver) {
+                                        gridData.dx = gridData.startDx;
+                                        gridData.joinWidth = gridData.size;
+                                        gridData.offset++;
+                                        gridData.dy += leading + gridData.size;
+                                        if (gridData.offsetArray.length > 0) {
+                                            offsetY = gridData.offsetArray[gridData.offset];
+                                            if (offsetY) {
+                                                gridData.dy += offsetY;
+                                            }
                                         }
+                                        gridData.cloneDy = gridData.dy;
                                     }
-                                    gridData.cloneDy = gridData.dy;
                                 }
                             }
+                        } else {
+                            ctx.fillText(txt, gridData.dx, gridData.dy, _ceil(gridData.txtTotalWidth));
+                            gridData.offset++;
+                            gridData.dy += leading + gridData.size;
+                            if (gridData.offsetArray.length > 0) {
+                                offsetY = gridData.offsetArray[gridData.offset];
+                                if (offsetY) {
+                                    gridData.dy += offsetY;
+                                }
+                            }
+                            gridData.cloneDy = gridData.dy;
                         }
                     } else {
                         ctx.fillText(txt, gridData.dx, gridData.dy, _ceil(gridData.txtTotalWidth));
@@ -17817,24 +17909,13 @@ if (!("swf2js" in window)){(function(window)
                         }
                         gridData.cloneDy = gridData.dy;
                     }
-                } else {
-                    ctx.fillText(txt, gridData.dx, gridData.dy, _ceil(gridData.txtTotalWidth));
-                    gridData.offset++;
-                    gridData.dy += leading + gridData.size;
-                    if (gridData.offsetArray.length > 0) {
-                        offsetY = gridData.offsetArray[gridData.offset];
-                        if (offsetY) {
-                            gridData.dy += offsetY;
-                        }
-                    }
-                    gridData.cloneDy = gridData.dy;
-                }
 
-                var mText = ctx.measureText(txt);
-                gridData.dx += mText.width;
-                gridData.color = gridData.fillStyle;
-                gridData.size = gridData.originSize;
-                gridData.dy = gridData.cloneDy;
+                    var mText = ctx.measureText(txt);
+                    gridData.dx += mText.width;
+                    gridData.color = gridData.fillStyle;
+                    gridData.size = gridData.originSize;
+                    gridData.dy = gridData.cloneDy;
+                }
             }
         }
     };
@@ -19090,7 +19171,6 @@ if (!("swf2js" in window)){(function(window)
                     parent = stage.getParent();
                 }
                 depth = parent.getNextHighestDepth();
-                depth += 16384;
             }
             object = arguments[2];
             targetMc = _this;
@@ -19103,29 +19183,37 @@ if (!("swf2js" in window)){(function(window)
         var cloneMc;
         if (targetMc !== undefined && targetMc.getCharacterId() !== 0) {
             stage = targetMc.getStage();
-            cloneMc = new MovieClip();
-            cloneMc.setStage(stage);
-
-            var char = stage.getCharacter(targetMc.characterId);
-            var swftag = new SwfTag(stage);
-            swftag.build(char, cloneMc);
-            swftag = null;
-
             parent = targetMc.getParent();
             if (!parent) {
                 parent = stage.getParent();
             }
 
-            cloneMc.setParent(parent);
+            var char = stage.getCharacter(targetMc.characterId);
+            var swftag = new SwfTag(stage);
+            if (char instanceof Array) {
+                cloneMc = new MovieClip();
+                cloneMc.setStage(stage);
+                cloneMc.setParent(parent);
+                cloneMc.setLevel(depth);
+                cloneMc.setTotalFrames(targetMc.getTotalFrames());
+                cloneMc.setCharacterId(targetMc.characterId);
+                swftag.build(char, cloneMc);
+            } else {
+                var tag = {
+                    CharacterId: targetMc.characterId,
+                    Ratio: 0,
+                    Depth: depth
+                };
+                cloneMc = swftag.buildObject(tag, parent);
+            }
+
             cloneMc.setName(target);
-            cloneMc.setLevel(depth);
-            cloneMc.setTotalFrames(targetMc.getTotalFrames());
-            cloneMc.setCharacterId(targetMc.characterId);
-            cloneMc.events = targetMc.events;
-            cloneMc._matrix = targetMc._matrix;
-            cloneMc._colorTransform = targetMc._colorTransform;
-            cloneMc._filters = targetMc._filters;
-            cloneMc._blendMode = targetMc._blendMode;
+            if (targetMc._matrix) {
+                cloneMc._blendMode = targetMc._blendMode;
+                cloneMc._filters = targetMc._filters;
+                cloneMc._matrix = _this.cloneArray(targetMc._matrix);
+                cloneMc._colorTransform = _this.cloneArray(targetMc._colorTransform);
+            }
 
             var totalFrame = parent.getTotalFrames() + 1;
             var container = parent.getContainer();
@@ -19181,6 +19269,7 @@ if (!("swf2js" in window)){(function(window)
         var depth = targetMc.getDepth() + 16384;
         var level = targetMc.getLevel();
         if (targetMc instanceof MovieClip && depth >= 16384) {
+            targetMc.reset();
             targetMc.removeFlag = true;
             var parent = targetMc.getParent();
             var container = parent.getContainer();
@@ -19205,8 +19294,8 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
             }
-            var stage = _this.getStage();
-            stage.removePlaceObject(instanceId);
+            // var stage = _this.getStage();
+            // stage.removePlaceObject(instanceId);
         }
     };
 
@@ -19474,72 +19563,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {number}
-     */
-    MovieClip.prototype.getDepth = function ()
-    {
-        var _this = this;
-        var _depth = _this._depth;
-        var depth = (_depth !== null) ? _depth : _this.getLevel();
-        return depth - 16384;
-    };
-
-    /**
-     * @param depth
-     * @param swapDepth
-     * @param swapMc
-     */
-    MovieClip.prototype.setDepth = function (depth, swapDepth, swapMc)
-    {
-        var _this = this;
-        var parent = _this.getParent();
-        var _depth = _this._depth;
-        var level = (_depth !== null) ? _depth : _this.getLevel();
-        var totalFrame = parent.getTotalFrames() + 1;
-
-        if (!swapMc) {
-            _this._depth = depth;
-        } else {
-            _this._depth = swapDepth;
-            swapMc._depth = depth;
-        }
-
-        var container = parent.container;
-        var instanceId = _this.instanceId;
-        for (var frame = 1; frame < totalFrame; frame++) {
-            if (!(frame in container)) {
-                continue;
-            }
-
-            var tags = container[frame];
-            if (!tags.length) {
-                continue;
-            }
-
-            if (swapMc) {
-                if (level in tags && tags[level] === instanceId) {
-                    tags[depth] = swapMc.instanceId;
-                }
-
-                if (swapDepth in tags && tags[swapDepth] === swapMc.instanceId) {
-                    tags[swapDepth] = instanceId;
-                }
-            } else {
-                if (level in tags && tags[level] === instanceId) {
-                    delete tags[level];
-                    tags[depth] = instanceId;
-                }
-            }
-
-            container[frame] = tags;
-        }
-        _this.setController(false, false, false, false);
-        if (swapMc) {
-            swapMc.setController(false, false, false, false);
-        }
-    };
-
-    /**
      * addLabel
      * @param frame
      * @param name
@@ -19770,6 +19793,9 @@ if (!("swf2js" in window)){(function(window)
             var instance = stage.getInstance(id);
             if (instance instanceof MovieClip && instance.getDepth() >= 0) {
                 instance.removeMovieClip();
+                if (instance.getDepth() < 0) {
+                    instance.removeFlag = false;
+                }
             } else {
                 instance.reset();
             }
@@ -19902,11 +19928,11 @@ if (!("swf2js" in window)){(function(window)
             return function ()
             {
                 var as = new ActionScript([], origin.constantPool, origin.register, origin.initAction);
-                as.parentId = origin.id;
+                as.parentId = origin.id; // todo
                 as.cache = origin.cache;
                 as.scope = clip;
                 as.parent = (chain) ? chain : null;
-                if (arguments.length) {
+                if (as.register.length) {
                     as.initVariable(arguments);
                 }
                 as.variables["this"] = this;
@@ -21946,7 +21972,7 @@ if (!("swf2js" in window)){(function(window)
 
             // build
             swftag.build(tags, mc);
-
+            
             var query = url.split("?")[1];
             if (query) {
                 var values = query.split("&");
