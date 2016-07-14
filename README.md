@@ -61,6 +61,10 @@ Facebook: https://www.facebook.com/swf2js
 Twitter: https://twitter.com/swf2js  
 
 
+## License  
+
+MIT License.
+
 
 
 
