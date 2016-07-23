@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.18)
+ * swf2js (version 0.6.19)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -42,7 +42,7 @@ if (!("swf2js" in window)){(function(window)
     var isWebGL = (window.WebGLRenderingContext &&
         _document.createElement("canvas").getContext("webgl")) ? true : false;
 
-    isWebGL = false;
+    isWebGL = false; // TODO
     var requestAnimationFrame =
         window.requestAnimationFrame ||
         window.webkitRequestAnimationFrame ||
@@ -204,7 +204,7 @@ if (!("swf2js" in window)){(function(window)
     /**
      * unload event
      */
-    window.addEventListener("unload", function()
+    window.addEventListener("unload", function ()
     {
         stages = void 0;
         loadStages = void 0;
@@ -714,7 +714,10 @@ if (!("swf2js" in window)){(function(window)
                     break;
             }
         }
+
+        return new this.FUNCTION("ctx", str);
     };
+
     var vtc = new VectorToCanvas();
 
     /**
@@ -5430,8 +5433,6 @@ if (!("swf2js" in window)){(function(window)
 
         // build instance
         obj = _this.ABCBuildInstance(obj);
-
-
 
         return obj;
     };
@@ -16135,6 +16136,10 @@ if (!("swf2js" in window)){(function(window)
             ctx.clip();
 
             if (isAndroid && isChrome) {
+                if (!canvas) {
+                    canvas = ctx.canvas;
+                }
+
                 var cWidth = canvas.width;
                 var cHeight = canvas.height;
 
@@ -21972,7 +21977,7 @@ if (!("swf2js" in window)){(function(window)
 
             // build
             swftag.build(tags, mc);
-            
+
             var query = url.split("?")[1];
             if (query) {
                 var values = query.split("&");
