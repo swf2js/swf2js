@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.19)
+ * swf2js (version 0.6.20)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -21647,6 +21647,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.stopFlag = false;
+
         var enterFrame = function (stage) {
             return function () {
                 requestAnimationFrame(function () {
@@ -22427,10 +22428,20 @@ if (!("swf2js" in window)){(function(window)
         _this.doneTags = [];
 
         var ctx = _this.preContext;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = _this.getBackgroundColor();
         ctx.globalCompositeOperation = "source-over";
-        ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        var backgroundColor = _this.getBackgroundColor();
+        if (!backgroundColor) {
+            // pre clear
+            var canvas = ctx.canvas;
+            ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+            // main clear
+            var mainCtx = _this.context;
+            mainCtx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+        } else {
+            ctx.fillStyle = backgroundColor;
+            ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
+        }
 
         var mc = _this.getParent();
         mc.render(ctx, _this._matrix, _this._colorTransform, _this, true);
