@@ -22431,17 +22431,11 @@ if (!("swf2js" in window)){(function(window)
         ctx.globalCompositeOperation = "source-over";
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         var backgroundColor = _this.getBackgroundColor();
-        if (!backgroundColor) {
-            // pre clear
-            var canvas = ctx.canvas;
-            ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
-            // main clear
-            var mainCtx = _this.context;
-            mainCtx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
-        } else {
-            ctx.fillStyle = backgroundColor;
-            ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
-        }
+
+        var canvas = ctx.canvas;
+        ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+        var mainCtx = _this.context;
+        mainCtx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
 
         var mc = _this.getParent();
         mc.render(ctx, _this._matrix, _this._colorTransform, _this, true);
