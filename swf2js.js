@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.20)
+ * swf2js (version 0.6.21)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -22608,7 +22608,7 @@ if (!("swf2js" in window)){(function(window)
         style = div.style;
         style.position = "relative";
         style.top = "0";
-        style.backgroundColor = "#000000";
+        style.backgroundColor = "transparent";
         style.overflow = "hidden";
         style["-webkit-backface-visibility"] = "hidden";
 
