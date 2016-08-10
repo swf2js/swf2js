@@ -21544,7 +21544,7 @@ if (!("swf2js" in window)){(function(window)
         _this.isTouchEvent = false;
         _this.isLoad = false;
         _this.jpegTables = null;
-        _this.backgroundColor = "rgb(255,255,255)";
+        _this.backgroundColor = "transparent";
         _this.version = 8;
         _this.loadStatus = 0;
         _this.isClipDepth = false;
@@ -22431,7 +22431,7 @@ if (!("swf2js" in window)){(function(window)
         ctx.globalCompositeOperation = "source-over";
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         var backgroundColor = _this.getBackgroundColor();
-        if (!backgroundColor) {
+        if (!backgroundColor || backgroundColor === "transparent") {
             // pre clear
             var canvas = ctx.canvas;
             ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
