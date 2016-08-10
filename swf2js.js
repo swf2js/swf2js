@@ -18508,11 +18508,11 @@ if (!("swf2js" in window)){(function(window)
      * @param g
      * @param b
      */
-    MovieClip.prototype.setBackgroundColor = function (r, g, b)
+    MovieClip.prototype.setBackgroundColor = function (r, g, b, a)
     {
         var _this = this;
         var stage = _this.getStage();
-        stage.setBackgroundColor(r, g, b);
+        stage.setBackgroundColor(r, g, b, a);
     };
 
     /**
@@ -21544,7 +21544,7 @@ if (!("swf2js" in window)){(function(window)
         _this.isTouchEvent = false;
         _this.isLoad = false;
         _this.jpegTables = null;
-        _this.backgroundColor = "rgb(255,255,255)";
+        _this.backgroundColor = "rgba(255,255,255,0)";
         _this.version = 8;
         _this.loadStatus = 0;
         _this.isClipDepth = false;
@@ -21627,9 +21627,9 @@ if (!("swf2js" in window)){(function(window)
      * @param g
      * @param b
      */
-    Stage.prototype.setBackgroundColor = function (r, g, b)
+    Stage.prototype.setBackgroundColor = function (r, g, b, a)
     {
-        this.backgroundColor = "rgb(" + r + "," + g + "," + b + ")";
+        this.backgroundColor = "rgba(" + r + "," + g + "," + b + "," + a + ")";
     };
 
     /**
@@ -22431,17 +22431,11 @@ if (!("swf2js" in window)){(function(window)
         ctx.globalCompositeOperation = "source-over";
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         var backgroundColor = _this.getBackgroundColor();
-        if (!backgroundColor) {
-            // pre clear
-            var canvas = ctx.canvas;
-            ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
-            // main clear
-            var mainCtx = _this.context;
-            mainCtx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
-        } else {
-            ctx.fillStyle = backgroundColor;
-            ctx.fillRect(0, 0, _this.getWidth() + 1, _this.getHeight() + 1);
-        }
+
+        var canvas = ctx.canvas;
+        ctx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
+        var mainCtx = _this.context;
+        mainCtx.clearRect(0, 0, canvas.width + 1, canvas.height + 1);
 
         var mc = _this.getParent();
         mc.render(ctx, _this._matrix, _this._colorTransform, _this, true);
@@ -22608,7 +22602,7 @@ if (!("swf2js" in window)){(function(window)
         style = div.style;
         style.position = "relative";
         style.top = "0";
-        style.backgroundColor = "#000000";
+        style.backgroundColor = "rgba(0,0,0,0)";
         style.overflow = "hidden";
         style["-webkit-backface-visibility"] = "hidden";
 
