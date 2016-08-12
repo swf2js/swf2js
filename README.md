@@ -21,9 +21,9 @@ Supports:
 * ActionScripr 3.0(development)
 
 
-## Latest Version *0.6.21*  
+## Latest Version *0.6.22*  
 
--- Release Date: 11 Aug 2016  
+-- Release Date: 12 Aug 2016  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  

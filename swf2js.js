@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.21)
+ * swf2js (version 0.6.22)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -20046,6 +20046,30 @@ if (!("swf2js" in window)){(function(window)
         }
         var length = actions[frame].length;
         actions[frame][length] = _this.createActionScript(actionScript);
+    };
+
+    /**
+     * @param frame
+     * @param action
+     */
+    MovieClip.prototype.overWriteAction = function (frame, action)
+    {
+        this.actions[frame] = [action];
+    };
+
+    /**
+     * @param frame
+     * @param action
+     */
+    MovieClip.prototype.addAction = function (frame, action)
+    {
+        var _this = this;
+        var actions = _this.actions;
+        if (!(frame in actions)) {
+            actions[frame] = [];
+        }
+        var length = actions[frame].length;
+        actions[frame][length] = action;
     };
 
     /**
