@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.22)
+ * swf2js (version 0.6.23)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -5425,14 +5425,14 @@ if (!("swf2js" in window)){(function(window)
             obj.methodBody = methodBody;
         }
 
-        console.log(offset, ABCBitIO.byte_offset);
-        console.log(obj);
-
         // build names
         obj = _this.ABCMultinameToString(obj);
 
         // build instance
         obj = _this.ABCBuildInstance(obj);
+
+        console.log(offset, ABCBitIO.byte_offset);
+        console.log(obj);
 
         return obj;
     };
@@ -20054,7 +20054,14 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.overWriteAction = function (frame, action)
     {
-        this.actions[frame] = [action];
+        var _this = this;
+        if (typeof frame === "string") {
+            frame = _this.getLabel(frame);
+        }
+        frame = frame|0;
+        if (frame > 0 && _this.getTotalFrames() >= frame) {
+            _this.actions[frame] = [action];
+        }
     };
 
     /**
@@ -20064,12 +20071,18 @@ if (!("swf2js" in window)){(function(window)
     MovieClip.prototype.addAction = function (frame, action)
     {
         var _this = this;
-        var actions = _this.actions;
-        if (!(frame in actions)) {
-            actions[frame] = [];
+        if (typeof frame === "string") {
+            frame = _this.getLabel(frame);
         }
-        var length = actions[frame].length;
-        actions[frame][length] = action;
+        frame = frame|0;
+        if (frame > 0 && _this.getTotalFrames() >= frame) {
+            var actions = _this.actions;
+            if (!(frame in actions)) {
+                actions[frame] = [];
+            }
+            var length = actions[frame].length;
+            actions[frame][length] = action;
+        }
     };
 
     /**
