@@ -22,7 +22,7 @@ Supports:
 
 ## Latest Version *0.7.0*  
 
--- Release Date: 31 Aug 2016  
+-- Release Date: 19 Aug 2016  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  
