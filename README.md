@@ -8,7 +8,7 @@ swfをJavaScriptで直接バイナリ分解してcanvasに出力
 対応バージョン: 
 * FlashLite 1.x, 2.x
 * ActionScript 1.0, 2.0
-* ActionScripr 3.0(開発中)
+* ActionScript 3.0 (prototype)
 
 
 output in the canvas with swf binary decomposition in JavaScript.  
@@ -18,12 +18,11 @@ An open source Flash™ runtime written in pure JavaScript.
 Supports: 
 * FlashLite 1.x, 2.x
 * ActionScript 1.0, 2.0
-* ActionScripr 3.0(development)
+* ActionScript 3.0 (prototype)
 
+## Latest Version *0.7.0*  
 
-## Latest Version *0.6.23*  
-
--- Release Date: 15 Aug 2016  
+-- Release Date: 31 Aug 2016  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  

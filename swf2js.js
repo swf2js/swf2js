@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.6.23)
+ * swf2js (version 0.7.0)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -671,6 +671,7 @@ if (!("swf2js" in window)){(function(window)
         var polygon = [];
         var position = -1;
         var lastPosition = {x:0, y:0};
+        var str = "";
         for (var i = 0; i < length; i++) {
             var a = cache[i];
             switch (a[0]) {
@@ -1342,12 +1343,13 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {number}
      */
-    BitIO.prototype.getUI16BE = function ()
+    BitIO.prototype.getUI24 = function ()
     {
         var _this = this;
         var data = _this.data;
         _this.byteAlign();
-        return (((data[_this.byte_offset++]) << 8) | (data[_this.byte_offset++]));
+        return (data[_this.byte_offset++] | (data[_this.byte_offset++]
+            | (data[_this.byte_offset++]) << 8) << 8);
     };
 
     /**
@@ -1360,6 +1362,17 @@ if (!("swf2js" in window)){(function(window)
         _this.byteAlign();
         return (data[_this.byte_offset++] | (data[_this.byte_offset++]
             | (data[_this.byte_offset++] | (data[_this.byte_offset++]) << 8) << 8) << 8);
+    };
+
+    /**
+     * @returns {number}
+     */
+    BitIO.prototype.getUI16BE = function ()
+    {
+        var _this = this;
+        var data = _this.data;
+        _this.byteAlign();
+        return (((data[_this.byte_offset++]) << 8) | (data[_this.byte_offset++]));
     };
 
     /**
@@ -1427,10 +1440,35 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var value = _this.toUI16(data);
-        if (value < 0x8000) {
-            return value;
+        return (value < 0x8000) ? value : (value - 0x10000);
+    };
+
+    /**
+     * @returns {number}
+     */
+    BitIO.prototype.getSI8 = function ()
+    {
+        var _this = this;
+        var value = _this.getUI8();
+        var nBits = 8;
+        if (value >> (nBits - 1)) {
+            value -= _pow(2, nBits);
         }
-        return value - 0x10000;
+        return value;
+    };
+
+    /**
+     * @returns {*}
+     */
+    BitIO.prototype.getSI24 = function ()
+    {
+        var _this = this;
+        var value = _this.getUI24();
+        var nBits = 24;
+        if (value >> (nBits - 1)) {
+            value -= _pow(2, nBits);
+        }
+        return value;
     };
 
     /**
@@ -2119,6 +2157,19 @@ if (!("swf2js" in window)){(function(window)
                 }
             }
         }
+
+        // as3
+        var symbol = stage.symbols[tag.CharacterId];
+        if (symbol) {
+            var abc = stage.abc[symbol];
+            if (typeof abc === "function") {
+                var AVM2 = new abc();
+                abc.prototype[symbol+".buildClass"] = AVM2;
+                abc.prototype[symbol+".register"][0] = AVM2;
+                AVM2[symbol].apply(mc);
+            }
+        }
+
         return mc;
     };
 
@@ -2612,10 +2663,16 @@ if (!("swf2js" in window)){(function(window)
             case 24: // Protect
                 bitio.byteAlign();
                 break;
+            case 63: // DebugID
+                bitio.getUI8(); // UUID
+                break;
             case 64: // EnableDebugger2
                 bitio.getUI16(); // Reserved
-                var Password = bitio.getDataUntil("\0");
-                console.log("Password", Password);
+                bitio.getDataUntil("\0"); // Password
+                break;
+            case 65: // ScriptLimits
+                bitio.getUI16(); // MaxRecursionDepth
+                bitio.getUI16(); // ScriptTimeoutSeconds
                 break;
             case 69: // FileAttributes
                 _this.parseFileAttributes();
@@ -2632,10 +2689,10 @@ if (!("swf2js" in window)){(function(window)
                 break;
             case 72: // DoABC
             case 82: // DoABC2
-                obj = _this.parseDoABC(tagType, length);
+                _this.parseDoABC(tagType, length);
                 break;
             case 76: // SymbolClass
-                obj = _this.parseSymbolClass();
+                _this.parseSymbolClass();
                 break;
             case 14: // DefineSound
                 _this.parseDefineSound(tagType, length);
@@ -2665,6 +2722,16 @@ if (!("swf2js" in window)){(function(window)
             case 78: // DefineScalingGrid
                 _this.parseDefineScalingGrid();
                 break;
+            case 41: // ProductInfo
+                bitio.getUI32(); // ProductID
+                bitio.getUI32(); // Edition
+                bitio.getUI8(); // MajorVersion
+                bitio.getUI8(); // MinorVersion
+                bitio.getUI32(); // BuildLow
+                bitio.getUI32(); // BuildHigh
+                bitio.getUI32(); // CompilationDate
+                bitio.getUI32(); // TODO
+                break;
             case 3:  // FreeCharacter
             case 16: // StopSound
             case 23: // DefineButtonCxform
@@ -2672,7 +2739,6 @@ if (!("swf2js" in window)){(function(window)
             case 29: // SyncFrame
             case 31: // FreeAll
             case 38: // DefineVideo
-            case 41: // ProductInfo
             case 42: // DefineTextFormat
             case 44: // DefineBehavior
             case 47: // FrameTag
@@ -2683,8 +2749,6 @@ if (!("swf2js" in window)){(function(window)
             case 55: // GenTagObject
             case 57: // ImportAssets
             case 58: // EnableDebugger
-            case 63: // DebugID
-            case 65: // ScriptLimits
             case 66: // SetTabIndex
             case 71: // ImportAssets2
             case 87: // DefineBinaryData
@@ -5318,7 +5382,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param tagType
      * @param length
-     * @returns {{}}
      */
     SwfTag.prototype.parseDoABC = function (tagType, length)
     {
@@ -5429,35 +5492,11 @@ if (!("swf2js" in window)){(function(window)
         obj = _this.ABCMultinameToString(obj);
 
         // build instance
-        obj = _this.ABCBuildInstance(obj);
-
-        console.log(offset, ABCBitIO.byte_offset);
-        console.log(obj);
-
-        return obj;
+        _this.ABCBuildInstance(obj);
     };
 
     /**
      * @param obj
-     * @param methodId
-     * @constructor
-     */
-    SwfTag.prototype.ABCCreateActionScript3 = function (obj, methodId)
-    {
-        return (function (data, id)
-        {
-            return function ()
-            {
-                var as3 = new ActionScript3(data, id);
-                as3.scope = this;
-                return as3.execute();
-            };
-        })(obj, methodId);
-    };
-
-    /**
-     * @param obj
-     * @constructor
      */
     SwfTag.prototype.ABCBuildInstance = function (obj)
     {
@@ -5467,66 +5506,95 @@ if (!("swf2js" in window)){(function(window)
         var namespaces = obj.namespace;
         var string = obj.string;
         var stage = _this.stage;
-        var _global = stage.getGlobal();
-        var variables = _global.variables;
+        var abc = stage.abc;
         var names = obj.names;
         for (var i = 0; i < length; i++) {
             var instance = instances[i];
             var pNs = instance.protectedNs;
+            if (!pNs) {
+                pNs = instance.flags;
+            }
+
             var ns = namespaces[pNs];
             var object = string[ns.name];
             var values = object.split(":");
-            var vLength = values.length;
-            var val = variables;
-            for (var j = 0; j < vLength; j++) {
-                var value = values[j];
-                if (!(value in val)) {
-                    val[value] = {};
-                }
-                val = val[value];
-            }
+            var abcKey = values.join(".");
 
-            var as3 = _this.ABCCreateActionScript3(obj, instance.iinit);
+            // build parent
+            var AVM2 = function () {};
+            var prop = AVM2.prototype;
+
+            // constructor
+            prop[abcKey] = _this.ABCCreateActionScript3(obj, instance.iinit, abcKey);
+            prop[abcKey +".buildClass"] = null;
 
             // extends
             var superName = instance.superName;
-            if (superName) {
-                var SuperClass = names[superName];
-                var su = eval("new " + SuperClass + "();");
-                if (SuperClass === "MovieClip") {
-                    su.setStage(stage);
-                    su.setParent(stage.getParent());
-                }
-                as3.prototype = su;
-                as3.prototype.constructor = SuperClass;
-            }
+            prop[abcKey +".extends"] = names[superName];
+            prop[abcKey +".superClass"] = null;
 
             // prototype
             var traits = instance.trait;
             var tLength = traits.length;
+            var register = [];
+            var rCount = 1;
             if (tLength) {
-                var prop = as3.prototype;
                 for (var idx = 0; idx < tLength; idx++) {
                     var trait = traits[idx];
                     var pName = names[trait.name];
-                    var func = _this.ABCCreateActionScript3(obj);
-                    if (prop instanceof DisplayObject) {
-                        prop.setVariable(pName, func);
-                    } else {
-                        prop[pName] = func;
+                    var kind = trait.kind;
+
+                    var val = undefined;
+                    switch (kind) {
+                        case 0: // Slot
+                            register[rCount++] = pName;
+                            break;
+                        case 1: // Method
+                        case 2: // Getter
+                        case 3: // Setter
+                            val = _this.ABCCreateActionScript3(obj, trait.data.info, abcKey);
+                            break;
+                        case 4: // Class
+                            break;
+                        case 5: // Function
+                            break;
+                        case 6: // Const
+                            break;
                     }
+                    prop[pName] = val;
                 }
             }
 
-            var name = names[instance.name];
-            val[name] = as3;
+            // register
+            prop[abcKey +".register"] = register;
+
+            abc[abcKey] = AVM2;
         }
     };
 
     /**
      * @param obj
+     * @param methodId
+     * @param abcKey
+     */
+    SwfTag.prototype.ABCCreateActionScript3 = function (obj, methodId, abcKey)
+    {
+        var stage = this.stage;
+        return (function (data, id, ns, stage)
+        {
+            return function ()
+            {
+                var as3 = new ActionScript3(data, id, ns, stage);
+                as3.caller = this;
+                as3.args = arguments;
+                return as3.execute();
+            };
+        })(obj, methodId, abcKey, stage);
+    };
+
+    /**
+     * @param obj
      * @returns {*}
-     * @constructor
      */
     SwfTag.prototype.ABCMultinameToString = function (obj)
     {
@@ -5577,7 +5645,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCInteger = function (ABCBitIO)
     {
@@ -5594,7 +5661,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCUinteger = function (ABCBitIO)
     {
@@ -5611,7 +5677,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCDouble = function (ABCBitIO)
     {
@@ -5628,7 +5693,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCStringInfo = function (ABCBitIO)
     {
@@ -5645,7 +5709,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCNameSpaceInfo = function (ABCBitIO)
     {
@@ -5666,7 +5729,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCNsSetInfo = function (ABCBitIO)
     {
@@ -5690,7 +5752,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCMultiNameInfo = function (ABCBitIO)
     {
@@ -5732,7 +5793,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCMethodInfo = function (ABCBitIO)
     {
@@ -5785,7 +5845,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCMetadataInfo = function (ABCBitIO)
     {
@@ -5811,7 +5870,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCInstanceInfo = function (ABCBitIO)
     {
@@ -5841,7 +5899,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCClassInfo = function (ABCBitIO)
     {
@@ -5853,7 +5910,6 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param ABCBitIO
-     * @constructor
      */
     SwfTag.prototype.ABCScriptInfo = function (ABCBitIO)
     {
@@ -5866,10 +5922,10 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCMethodBodyInfo = function (ABCBitIO)
     {
+        var _this = this;
         var obj = {};
         obj.method = ABCBitIO.getU30();
         obj.maxStack = ABCBitIO.getU30();
@@ -5878,13 +5934,11 @@ if (!("swf2js" in window)){(function(window)
         obj.maxScopeDepth = ABCBitIO.getU30();
         var i;
         var count = ABCBitIO.getU30();
-        var code = [];
+        var codes = [];
         if (count) {
-            for (i = 0; i < count; i++) {
-                code[code.length] = ABCBitIO.getUI8();
-            }
+            codes = _this.ABCBuildCode(ABCBitIO, count);
         }
-        obj.code = code;
+        obj.codes = codes;
 
         count = ABCBitIO.getU30();
         var exceptions = [];
@@ -5894,15 +5948,135 @@ if (!("swf2js" in window)){(function(window)
             }
         }
         obj.exceptions = exceptions;
-        obj.trait = this.ABCTrait(ABCBitIO);
+        obj.trait = _this.ABCTrait(ABCBitIO);
         return obj;
     };
 
+    /**
+     * @param ABCBitIO
+     * @param count
+     * @returns {Array}
+     */
+    SwfTag.prototype.ABCBuildCode = function (ABCBitIO, count)
+    {
+        var array = [];
+        var cacheOffset;
+        for (var i = 0; i < count; i++) {
+            var obj = {};
+            var offset = 0;
+
+            var code = ABCBitIO.getUI8();
+            obj.code = code;
+            switch (code) {
+                case 0x86: // astype
+                case 0x41: // call
+                case 0x80: // coerce
+                case 0x42: // construct
+                case 0x49: // constructsuper
+                case 0xf1: // debugfile
+                case 0xf0: // debugline
+                case 0x94: // declocal
+                case 0xc3: // declocal_i
+                case 0x6a: // deleteproperty
+                case 0x06: // dxns
+                case 0x5e: // findproperty
+                case 0x5d: // findpropstrict
+                case 0x59: // getdescendants
+                case 0x6e: // getglobalslot
+                case 0x60: // getlex
+                case 0x62: // getlocal
+                case 0x66: // getproperty
+                case 0x65: // getscopeobject
+                case 0x6c: // getslot
+                case 0x04: // getsuper
+                case 0x92: // inclocal
+                case 0xc2: // inclocal_i
+                case 0x68: // initproperty
+                case 0xb2: // istype
+                case 0x08: // kill
+                case 0x56: // newarray
+                case 0x5a: // newcatch
+                case 0x58: // newclass
+                case 0x40: // newfunction
+                case 0x55: // newobject
+                case 0x2f: // pushdouble
+                case 0x2d: // pushint
+                case 0x31: // pushnamespace
+                case 0x25: // pushshort
+                case 0x2c: // pushstring
+                case 0x2e: // pushuint
+                case 0x63: // setlocal
+                case 0x6f: // setglobalslot
+                case 0x61: // setproperty
+                case 0x6d: // setslot
+                case 0x05: // setsuper
+                    cacheOffset = ABCBitIO.byte_offset;
+                    obj.value1 = ABCBitIO.getU30();
+                    offset += (ABCBitIO.byte_offset - cacheOffset);
+                    break;
+                case 0x1b: // lookupswitch
+                    obj.value1 = ABCBitIO.getSI24();
+                    offset += 3;
+                    cacheOffset = ABCBitIO.byte_offset;
+                    obj.value2 = ABCBitIO.getSI24();
+                    offset += (ABCBitIO.byte_offset - cacheOffset);
+                    obj.value3 = ABCBitIO.getSI24();
+                    offset += 3;
+                    break;
+                case 0x24: // pushbyte
+                    obj.value1 = ABCBitIO.getUI8();
+                    offset += 1;
+                    break;
+                case 0x32: // hasnext2
+                    obj.value1 = ABCBitIO.getSI8();
+                    obj.value2 = ABCBitIO.getSI8();
+                    offset += 2;
+                    break;
+                case 0x13: // ifeq
+                case 0x12: // iffalse
+                case 0x18: // ifge
+                case 0x17: // ifgt
+                case 0x16: // ifle
+                case 0x15: // iflt
+                case 0x0f: // ifnge
+                case 0x0e: // ifngt
+                case 0x0d: // ifnle
+                case 0x0c: // ifnlt
+                case 0x14: // ifne
+                case 0x19: // ifstricteq
+                case 0x1a: // ifstrictne
+                case 0x11: // iftrue
+                case 0x10: // jump
+                    obj.value1 = ABCBitIO.getSI24();
+                    offset += 3;
+                    break;
+                case 0x43: // callmethod
+                case 0x46: // callproperty
+                case 0x4c: // callproplex
+                case 0x4f: // callpropvoid
+                case 0x44: // callstatic
+                case 0x45: // callsuper
+                case 0x4e: // callsupervoid
+                case 0x4a: // constructprop
+                case 0xef: // debug
+                    cacheOffset = ABCBitIO.byte_offset;
+                    obj.value1 = ABCBitIO.getU30();
+                    obj.value2 = ABCBitIO.getU30();
+                    offset += (ABCBitIO.byte_offset - cacheOffset);
+                    break;
+            }
+
+            obj.offset = offset;
+            array[i] = obj;
+
+            i += offset;
+        }
+        return array;
+    };
 
     /**
      * @param ABCBitIO
      * @returns {{}}
-     * @constructor
      */
     SwfTag.prototype.ABCException = function (ABCBitIO)
     {
@@ -5918,7 +6092,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param ABCBitIO
      * @returns {Array}
-     * @constructor
      */
     SwfTag.prototype.ABCTrait = function (ABCBitIO)
     {
@@ -5980,33 +6153,20 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @returns {{}}
+     * parseSymbolClass
      */
     SwfTag.prototype.parseSymbolClass = function ()
     {
-        var obj = {};
         var bitio = this.bitio;
-
-        obj.NumSymbols = bitio.getUI16();
-
-        obj.class2tag = {
-            symbols: []
-        };
-        for (var i = 0; i < obj.NumSymbols; i++) {
-            var tagId = bitio.getUI16();
-            var name = bitio.getDataUntil("\0");
-            obj.class2tag.symbols[i] = {
-                tag: tagId,
-                name: name
-            };
-
-            if (tagId === 0) {
-                obj.class2tag.topLevelClass = name;
+        var stage = this.stage;
+        var symbols = stage.symbols;
+        var count = bitio.getUI16();
+        if (count) {
+            while (count--) {
+                var tagId = bitio.getUI16();
+                symbols[tagId] = bitio.getDataUntil("\0");
             }
         }
-        console.log(obj);
-
-        return obj;
     };
 
     /**
@@ -6347,24 +6507,50 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param data
      * @param id
+     * @param ns
+     * @param stage
      * @constructor
      */
-    var ActionScript3 = function (data, id)
+    var ActionScript3 = function (data, id, ns, stage)
     {
         var _this = this;
-        _this.variables = {};
-        _this.scope = null;
-        _this.parent = null;
-        _this.register = [];
+        _this.id = id;
 
         // ABC code and info
         var methodBody = data.methodBody[id];
-        _this.code = methodBody.code;
+        _this.codes = methodBody.codes;
         _this.info = data.method[methodBody.method];
 
-        // pool
+        // pool and data
         _this.names = data.names;
         _this.data = data;
+
+        // ns
+        _this.ns = ns;
+        _this.registerNs = ns +".register";
+        _this.extends = ns +".extends";
+        _this.superClass = ns +".superClass";
+        _this.buildClass = ns +".buildClass";
+
+        // params
+        _this.caller = null;
+        _this.scope = null;
+        _this.parent = null;
+        _this.currentIndex = 0;
+        _this.stage = stage;
+        _this.register = [];
+        _this.args = [];
+        _this.variables = {};
+    };
+
+    /**
+     * @returns {*}
+     */
+    ActionScript3.prototype.getSuperClass = function ()
+    {
+        var _this = this;
+        var scope = _this.register[0];
+        return scope[_this.superClass];
     };
 
     /**
@@ -6392,93 +6578,871 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var stack = [];
-        var code = _this.code;
-        var length = code.length;
+
+        // register
+        var stage = _this.stage;
+        var abc = stage.abc[_this.ns];
+        _this.register = abc.prototype[_this.registerNs];
+
         var i = 0;
+        var offset = 0;
+        var codes = _this.codes;
+        var length = codes.length;
         while(i < length) {
-            switch (code[i]) {
-                case 0xd4:
-                    _this.ActionGetLocal0(stack);
+            var obj = codes[i];
+            switch (obj.code) {
+                case 0xa0:
+                    _this.ActionAdd(stack);
                     break;
-                case 0xd5:
-                    _this.ActionGetLocal1(stack);
+                case 0xc5:
+                    _this.ActionAddI(stack);
                     break;
-                case 0xd6:
-                    _this.ActionGetLocal2(stack);
+                case 0x86:
+                    _this.ActionAsType(stack, obj.value1);
                     break;
-                case 0xd7:
-                    _this.ActionGetLocal3(stack);
+                case 0x87:
+                    _this.ActionAsTypeLate(stack);
                     break;
-                case 0x60:
-                    i += 1;
-                    _this.ActionGetLex(stack, code[i]);
+                case 0xa8:
+                    _this.ActionBitAnd(stack);
                     break;
-                case 0x66:
-                    i += 1;
-                    _this.ActionGetProperty(stack, code[i]);
+                case 0x97:
+                    _this.ActionBitNot(stack);
+                    break;
+                case 0xa9:
+                    _this.ActionBitOr(stack);
+                    break;
+                case 0xaa:
+                    _this.ActionBitXOr(stack);
+                    break;
+                case 0x41:
+                    _this.ActionCall(stack, obj.value1);
+                    break;
+                case 0x43:
+                    _this.ActionCallMethod(stack, obj.value1, obj.value2);
+                    break;
+                case 0x46:
+                    _this.ActionCallProperty(stack, obj.value1, obj.value2);
+                    break;
+                case 0x4c:
+                    _this.ActionCallPropLex(stack, obj.value1, obj.value2);
+                    break;
+                case 0x4f:
+                    _this.ActionCallPropVoid(stack, obj.value1, obj.value2);
+                    break;
+                case 0x44:
+                    _this.ActionCallStatic(stack, obj.value1, obj.value2);
+                    break;
+                case 0x45:
+                    _this.ActionCallSuper(stack, obj.value1, obj.value2);
+                    break;
+                case 0x4e:
+                    _this.ActionCallSuperVoid(stack, obj.value1, obj.value2);
+                    break;
+                case 0x78:
+                    _this.ActionCheckFilter(stack);
+                    break;
+                case 0x80:
+                    _this.ActionCoerce(stack, obj.value1);
+                    break;
+                case 0x82:
+                    _this.ActionCoerceA(stack);
+                    break;
+                case 0x85:
+                    _this.ActionCoerceS(stack);
+                    break;
+                case 0x42:
+                    _this.ActionConstruct(stack, obj.value1);
+                    break;
+                case 0x4a:
+                    _this.ActionConstructProp(stack, obj.value1, obj.value2);
+                    break;
+                case 0x49:
+                    _this.ActionConstructSuper(stack, obj.value1);
+                    break;
+                case 0x76:
+                    _this.ActionConvertB(stack);
+                    break;
+                case 0x73:
+                    _this.ActionConvertI(stack);
+                    break;
+                case 0x75:
+                    _this.ActionConvertD(stack);
+                    break;
+                case 0x77:
+                    _this.ActionConvertO(stack);
+                    break;
+                case 0x74:
+                    _this.ActionConvertU(stack);
+                    break;
+                case 0x70:
+                    _this.ActionConvertS(stack);
+                    break;
+                case 0xef:
+                    _this.ActionDebug(stack, obj.value1, obj.value2, obj.value3, obj.value4);
+                    break;
+                case 0xf1:
+                    _this.ActionDebugFile(stack, obj.value1);
+                    break;
+                case 0xf0:
+                    _this.ActionDebugLine(stack);
+                    break;
+                case 0x94:
+                    _this.ActionDecLocal(stack, obj.value1);
+                    break;
+                case 0xc3:
+                    _this.ActionDecLocalI(stack, obj.value1);
+                    break;
+                case 0x93:
+                    _this.ActionDecrement(stack);
+                    break;
+                case 0xc1:
+                    _this.ActionDecrementI(stack);
+                    break;
+                case 0x6a:
+                    _this.ActionDeleteProperty(stack, obj.value1);
+                    break;
+                case 0xa3:
+                    _this.ActionDivide(stack);
+                    break;
+                case 0x2a:
+                    _this.ActionDup(stack);
+                    break;
+                case 0x06:
+                    _this.ActionDxns(stack, obj.value1);
+                    break;
+                case 0x07:
+                    _this.ActionDxnsLate(stack);
+                    break;
+                case 0xab:
+                    _this.ActionEquals(stack);
+                    break;
+                case 0x72:
+                    _this.ActionEscXAttr(stack);
+                    break;
+                case 0x71:
+                    _this.ActionEscXElem(stack);
+                    break;
+                case 0x5e:
+                    _this.ActionFindProperty(stack, obj.value1);
                     break;
                 case 0x5d:
-                    i += 1;
-                    _this.ActionFindPropStrict(stack, code[i]);
+                    _this.ActionFindPropStrict(stack, obj.value1);
                     break;
-                case 0x30:
-                    _this.ActionPushScope(stack);
+                case 0x59:
+                    _this.ActionGetDescendAnts(stack, obj.value1);
+                    break;
+                case 0x64:
+                    _this.ActionGetGlobalScope(stack);
+                    break;
+                case 0x6e:
+                    _this.ActionGetGlobalsLot(stack, obj.value1);
+                    break;
+                case 0x60:
+                    _this.ActionGetLex(stack, obj.value1);
+                    break;
+                case 0x62:
+                    _this.ActionGetLocal(stack, obj.value1);
+                    break;
+                case 0xd0:
+                    _this.ActionGetLocal0(stack);
+                    break;
+                case 0xd1:
+                    _this.ActionGetLocal1(stack);
+                    break;
+                case 0xd2:
+                    _this.ActionGetLocal2(stack);
+                    break;
+                case 0xd3:
+                    _this.ActionGetLocal3(stack);
+                    break;
+                case 0x66:
+                    _this.ActionGetProperty(stack, obj.value1);
                     break;
                 case 0x65:
-                    i += 1;
-                    _this.ActionGetScopeObject(stack, code[i]);
+                    _this.ActionGetScopeObject(stack, obj.value1);
+                    break;
+                case 0x6c:
+                    _this.ActionGetSlot(stack, obj.value1);
+                    break;
+                case 0x04:
+                    _this.ActionGetSuper(stack, obj.value1);
+                    break;
+                case 0xb0:
+                    _this.ActionGreaterEquals(stack);
+                    break;
+                case 0xaf:
+                    _this.ActionGreaterThan(stack);
+                    break;
+                case 0x1f:
+                    _this.ActionHasNext(stack);
+                    break;
+                case 0x32:
+                    _this.ActionHasNext2(stack, obj.value1, obj.value2);
+                    break;
+                case 0x12:
+                    offset = _this.ActionIfFalse(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x18:
+                    offset = _this.ActionIfGe(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x17:
+                    offset = _this.ActionIfGt(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x16:
+                    offset = _this.ActionIfLe(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x15:
+                    offset = _this.ActionIfLt(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x0f:
+                    offset = _this.ActionIfNge(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x0e:
+                    offset = _this.ActionIfNgt(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x0d:
+                    offset = _this.ActionIfNle(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x0c:
+                    offset = _this.ActionIfNlt(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x14:
+                    offset = _this.ActionIfNe(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x19:
+                    offset = _this.ActionIfStrictEq(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x1a:
+                    offset = _this.ActionIfStrictNe(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0x11:
+                    offset = _this.ActionIfTrue(stack, obj.value1);
+                    i += offset;
+                    break;
+                case 0xb4:
+                    _this.ActionIn(stack, obj.value1);
+                    break;
+                case 0x92:
+                    _this.ActionIncLocal(stack, obj.value1);
+                    break;
+                case 0xc2:
+                    _this.ActionIncLocalI(stack, obj.value1);
+                    break;
+                case 0x91:
+                    _this.ActionIncrement(stack);
+                    break;
+                case 0xc0:
+                    _this.ActionIncrementI(stack);
+                    break;
+                case 0x68:
+                    _this.ActionInitProperty(stack, obj.value1);
+                    break;
+                case 0xb1:
+                    _this.ActionInstanceOf(stack);
+                    break;
+                case 0xb2:
+                    _this.ActionIsType(stack, obj.value1);
+                    break;
+                case 0xb3:
+                    _this.ActionIsTypeLate(stack);
+                    break;
+                case 0x10: // ActionJump
+                    offset = obj.value1;
+                    i += offset;
+                    break;
+                case 0x08:
+                    _this.ActionKill(stack, obj.value1);
+                    break;
+                case 0x09:
+                    _this.ActionLabel(stack);
+                    break;
+                case 0xae:
+                    _this.ActionLessEquals(stack);
+                    break;
+                case 0xad:
+                    _this.ActionLessThan(stack);
+                    break;
+                case 0x1b:
+                    _this.ActionLookupSwitch(stack, obj.value1, obj.value1, obj.value3);
+                    break;
+                case 0xa5:
+                    _this.ActionLShift(stack);
+                    break;
+                case 0xa4:
+                    _this.ActionModulo(stack);
+                    break;
+                case 0xa2:
+                    _this.ActionMultiply(stack);
+                    break;
+                case 0xc7:
+                    _this.ActionMultiplyI(stack);
+                    break;
+                case 0x90:
+                    _this.ActionNeGate(stack);
+                    break;
+                case 0xc4:
+                    _this.ActionNeGateI(stack);
+                    break;
+                case 0x57:
+                    _this.ActionNewActivation(stack);
+                    break;
+                case 0x56:
+                    _this.ActionNewArray(stack, obj.value1);
+                    break;
+                case 0x5a:
+                    _this.ActionNewCatch(stack, obj.value1);
                     break;
                 case 0x58:
-                    i += 1;
-                    _this.ActionNewClass(stack, code[i]);
+                    _this.ActionNewClass(stack, obj.value1);
+                    break;
+                case 0x40:
+                    _this.ActionNewFunction(stack, obj.value1);
+                    break;
+                case 0x55:
+                    _this.ActionNewObject(stack, obj.value1);
+                    break;
+                case 0x1e:
+                    _this.ActionNextName(stack);
+                    break;
+                case 0x23:
+                    _this.ActionNextValue(stack);
+                    break;
+                case 0x02:
+                    _this.ActionNop(stack);
+                    break;
+                case 0x96:
+                    _this.ActionNot(stack);
+                    break;
+                case 0x29:
+                    _this.ActionPop(stack);
                     break;
                 case 0x1d:
                     _this.ActionPopScope(stack);
                     break;
-                case 0x68:
-                    i += 1;
-                    _this.ActionInitProperty(stack, code[i]);
+                case 0x24:
+                    _this.ActionPushByte(stack, obj.value1);
                     break;
-
-
-
-
-
-
-
-
-
-                
+                case 0x2f:
+                    _this.ActionPushDouble(stack, obj.value1);
+                    break;
+                case 0x27:
+                    _this.ActionPushFalse(stack, obj.value1);
+                    break;
+                case 0x2d:
+                    _this.ActionPushInt(stack, obj.value1);
+                    break;
+                case 0x31:
+                    _this.ActionPushNameSpace(stack, obj.value1);
+                    break;
+                case 0x28:
+                    _this.ActionPushNan(stack);
+                    break;
+                case 0x20:
+                    _this.ActionPushNull(stack);
+                    break;
+                case 0x30:
+                    _this.ActionPushScope(stack);
+                    break;
+                case 0x25:
+                    _this.ActionPushShort(stack, obj.value1);
+                    break;
+                case 0x2c:
+                    _this.ActionPushString(stack, obj.value1);
+                    break;
+                case 0x26:
+                    _this.ActionPushTrue(stack);
+                    break;
+                case 0x2e:
+                    _this.ActionPushUInt(stack, obj.value1);
+                    break;
+                case 0x21:
+                    _this.ActionPushUndefined(stack);
+                    break;
+                case 0x1c:
+                    _this.ActionPushWith(stack);
+                    break;
+                case 0x48: // ActionReturnValue
+                    return stack.pop();
                 case 0x47: // ReturnVoid
                     return undefined;
+                case 0xa6:
+                    _this.ActionRShift(stack);
+                    break;
+                case 0x63:
+                    _this.ActionSetLocal(stack, obj.value1);
+                    break;
+                case 0xd4:
+                    _this.ActionSetLocal0(stack);
+                    break;
+                case 0xd5:
+                    _this.ActionSetLocal1(stack);
+                    break;
+                case 0xd6:
+                    _this.ActionSetLocal2(stack);
+                    break;
+                case 0xd7:
+                    _this.ActionSetLocal3(stack);
+                    break;
+                case 0x6f:
+                    _this.ActionSetGlobalSlot(stack, obj.value1);
+                    break;
+                case 0x61:
+                    _this.ActionSetProperty(stack, obj.value1);
+                    break;
+                case 0x6d:
+                    _this.ActionSetSlot(stack, obj.value1);
+                    break;
+                case 0x05:
+                    _this.ActionSetSuper(stack, obj.value1);
+                    break;
+                case 0xac:
+                    _this.ActionStrictEquals(stack);
+                    break;
+                case 0xa1:
+                    _this.ActionSubtract(stack);
+                    break;
+                case 0xc6:
+                    _this.ActionSubtractI(stack);
+                    break;
+                case 0x2b:
+                    _this.ActionSwap(stack);
+                    break;
+                case 0x03:
+                    _this.ActionThrow(stack);
+                    break;
+                case 0x95:
+                    _this.ActionTypeof(stack);
+                    break;
+                case 0xa7:
+                    _this.ActionURShift(stack);
+                    break;
             }
-            i++;
+
+            i += obj.offset;
+            i += 1;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionAdd = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 + value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionAddI = function (stack)
+    {
+        var value2 = +stack.pop();
+        var value1 = +stack.pop();
+        stack[stack.length] = value1 + value2;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionAsType = function (stack, index)
+    {
+        var type = this.names[index];
+        var value = stack.pop();
+        stack[stack.length] = (typeof value === type) ? true : null;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionAsTypeLate = function (stack)
+    {
+        var cValue = stack.pop(); // class
+        var value = stack.pop();
+        stack[stack.length] = (typeof cValue === value) ? true : null;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionBitAnd = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 & value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionBitNot = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = ~value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionBitOr = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 | value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionBitXOr = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 ^ value2;
+    };
+
+    /**
+     * @param stack
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCall = function (stack, argCount)
+    {
+        var params = [];
+        for (var i = 0; i < argCount; i++) {
+            params[params.length] = stack.pop();
+        }
+        var receiver = stack.pop();
+        var func = stack.pop();
+        var value;
+        if (typeof func === "function") {
+            value = func.apply(receiver, params);
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCallMethod = function (stack, index, argCount)
+    {
+        var params = [];
+        for (var i = 0; i < argCount; i++) {
+            params[params.length] = stack.pop();
+        }
+        var receiver = stack.pop();
+        var value;
+        if (typeof receiver === "function") {
+            value = receiver.apply(this.scope, params);
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCallProperty = function (stack, index, argCount)
+    {
+        var _this = this;
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var prop = _this.names[index];
+        var obj = stack.pop();
+
+        var value;
+        if (obj) {
+            value = obj[prop].apply(obj, params);
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCallPropLex = function (stack, index, argCount)
+    {
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+
+        var prop = this.names[index];
+        var obj = stack.pop();
+        var value;
+        if (obj) {
+            value = obj[prop];
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCallPropVoid = function (stack, index, argCount)
+    {
+        var _this = this;
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[i] = stack.pop();
+        }
+
+        var prop = _this.names[index];
+        var obj = stack.pop();
+        if (obj) {
+            var caller = (obj._extend) ? _this.caller : obj;
+            obj[prop].apply(caller, params);
         }
     };
 
     /**
      * @param stack
      * @param index
+     * @param argCount
      */
-    ActionScript3.prototype.ActionInitProperty = function(stack, index)
+    ActionScript3.prototype.ActionCallStatic = function (stack, index, argCount)
     {
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var receiver = stack.pop();
+        var value;
+        stack[stack.length] = value;
+    };
 
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionCallSuper = function (stack, index, argCount)
+    {
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var porp = this.names[index];
+        var receiver = stack.pop();
 
     };
 
     /**
      * @param stack
+     * @param index
+     * @param argCount
      */
-    ActionScript3.prototype.ActionPopScope = function(stack)
+    ActionScript3.prototype.ActionCallSuperVoid = function (stack, index, argCount)
     {
-        stack.pop();
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var porp = this.names[index];
+        var receiver = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionCheckFilter = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = value;
     };
 
     /**
      * @param stack
      * @param index
      */
-    ActionScript3.prototype.ActionNewClass = function(stack, index)
+    ActionScript3.prototype.ActionCoerce = function (stack, index)
+    {
+        var value = stack.pop();
+        var str = this.names[index];
+        stack[stack.length] = str;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionCoerceA = function(stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionCoerceS = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = String(value);
+    };
+
+    /**
+     * @param stack
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionConstruct = function (stack, argCount)
+    {
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var obj = stack.pop();
+        stack[stack.length] = obj.construct.apply(obj, params);
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionConstructProp = function (stack, index, argCount)
+    {
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[params.length] = stack.pop();
+        }
+        var prop = this.names[index];
+        var obj = stack.pop();
+        var value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionConstructSuper = function (stack, argCount)
+    {
+        var _this = this;
+        var params = [];
+        for (var i = argCount; i--;) {
+            params[i] = stack.pop();
+        }
+
+        var obj = stack.pop();
+        var SuperClass = obj[_this.extends];
+
+        var sc;
+        switch (SuperClass) {
+            case "MovieClip":
+                sc = new MovieClip();
+                var mc = _this.caller;
+                var loadStage = mc.getStage();
+                sc.setStage(loadStage);
+                sc.setParent(mc);
+                sc._extend = true;
+                break;
+            default:
+                sc = new (Function.prototype.bind.apply(SuperClass, params))();
+                break;
+        }
+
+        obj[_this.superClass] = sc;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertB = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = (value) ? true : false;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertI = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = value|0;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertD = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = +value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertO = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = (typeof value === "object") ? value : null;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertU = function (stack)
+    {
+        var value = stack.pop();
+        value = value|0;
+        if (value < 0) {
+            value *= -1;
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionConvertS = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = String(value);
+    };
+
+    /**
+     * @param stack
+     * @param type
+     * @param index
+     * @param reg
+     * @param extra
+     */
+    ActionScript3.prototype.ActionDebug = function (stack, type, index, reg, extra)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionDebugFile = function (stack, index)
     {
 
 
@@ -6487,7 +7451,253 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param stack
      */
-    ActionScript3.prototype.ActionGetLocal0 = function(stack)
+    ActionScript3.prototype.ActionDebugLine = function (stack)
+    {
+
+
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionDecLocal = function (stack, index)
+    {
+
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionDecLocalI = function (stack, index)
+    {
+
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionDecrement = function (stack)
+    {
+        var value = stack.pop();
+        value -= 1;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionDecrementI = function (stack)
+    {
+        var value = stack.pop();
+        value -= 1;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionDeleteProperty = function (stack, index)
+    {
+        var prop = this.name[index];
+        var obj = stack.pop();
+        if (obj) {
+            if (prop in obj) {
+                delete obj[prop];
+            } else {
+                // TODO
+                console.log("ActionDeleteProperty");
+            }
+        }
+        stack[stack.length] = true;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionDivide = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 / value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionDup = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionDxns = function (stack, index)
+    {
+
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionDxnsLate = function (stack)
+    {
+        var value = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionEquals = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = (value1 == value2);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionEscXAttr = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = String(value);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionEscXElem = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = String(value);
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionFindProperty = function (stack, index)
+    {
+        var prop = this.names[index];
+        var obj;
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionFindPropStrict = function (stack, index)
+    {
+        var _this = this;
+        var prop = _this.names[index];
+        var scope = _this.register[0];
+
+        var obj = null;
+        if (prop in scope) {
+            obj = prop;
+        }
+
+        if (!obj) {
+            var superClass = _this.getSuperClass();
+            if (superClass) {
+                if (prop in superClass) {
+                    obj = superClass;
+                }
+            }
+        }
+
+        if (!obj) {
+            if (prop in window) {
+                obj = window;
+            }
+        }
+
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetDescendAnts = function (stack, index)
+    {
+        var porp = this.names[index];
+        var obj;
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetGlobalScope = function (stack)
+    {
+        var obj;
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetGlobalsLot = function (stack, index)
+    {
+        var value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetLex = function (stack, index)
+    {
+        var _this = this;
+        var name = _this.names[index];
+        var obj = {};
+        switch (name) {
+            case "MouseEvent":
+                obj = clipEvent;
+                break;
+            default:
+                var caller = _this.caller;
+                if (caller instanceof DisplayObject) {
+                    var value = caller.getDisplayObject(name);
+                    if (value !== undefined) {
+                        obj = value;
+                    }
+                }
+                break;
+        }
+
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetLocal = function (stack, index)
+    {
+        var _this = this;
+        var value = _this.args[index - 1];
+        if (value === undefined) {
+            value = _this.register[index];
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal0 = function (stack)
     {
         stack[stack.length] = this.register[0];
     };
@@ -6495,37 +7705,74 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param stack
      */
-    ActionScript3.prototype.ActionGetLocal1 = function(stack)
+    ActionScript3.prototype.ActionGetLocal1 = function (stack)
     {
-        stack[stack.length] = this.register[1];
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript3.prototype.ActionGetLocal2 = function(stack)
-    {
-        stack[stack.length] = this.register[2];
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript3.prototype.ActionGetLocal3 = function(stack)
-    {
-        stack[stack.length] = this.register[3];
-    };
-
-    /**
-     * @param stack
-     */
-    ActionScript3.prototype.ActionPushScope = function(stack)
-    {
-        var value = stack.pop();
-        var scope = this.scope;
-        if (value === null || value === undefined) {
-            scope = null;
+        var _this = this;
+        var value = _this.args[0];
+        if (value === undefined) {
+            value = _this.register[1];
         }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal2 = function (stack)
+    {
+        var _this = this;
+        var value = _this.args[1];
+        if (value === undefined) {
+            value = _this.register[2];
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGetLocal3 = function (stack)
+    {
+        var _this = this;
+        var value = _this.args[2];
+        if (value === undefined) {
+            value = _this.register[3];
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetProperty = function (stack, index)
+    {
+        var _this = this;
+        var prop = _this.names[index];
+        if (!prop) {
+            prop = stack.pop();
+        }
+        var obj = stack.pop();
+        var value;
+        if (obj) {
+            value = obj[prop];
+            if (value === undefined) {
+                var caller = _this.caller;
+                if (caller instanceof DisplayObject) {
+                    value = caller.getProperty(prop);
+                }
+            }
+        }
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetScopeObject = function (stack, index)
+    {
+        var scope;
         stack[stack.length] = scope;
     };
 
@@ -6533,7 +7780,281 @@ if (!("swf2js" in window)){(function(window)
      * @param stack
      * @param index
      */
-    ActionScript3.prototype.ActionGetLex = function(stack, index)
+    ActionScript3.prototype.ActionGetSlot = function (stack, index)
+    {
+        var obj = stack.pop();
+        var value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionGetSuper = function (stack, index)
+    {
+        var prop = this.prop;
+        var obj = stack.pop();
+        var value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGreaterEquals = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = (value1 >= value2);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionGreaterThan = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = (value1 > value2);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionHasNext = function (stack)
+    {
+        var currentIndex = stack.pop();
+        var obj = stack.pop();
+
+        currentIndex++;
+        var result = 0;
+        if (obj) {
+            var index = 0;
+            for (var key in obj) {
+                if (!obj.hasOwnProperty(key)) {
+                    continue;
+                }
+
+                if (index === currentIndex) {
+                    result = currentIndex;
+                    break;
+                }
+                index++;
+            }
+        }
+
+        stack[stack.length] = result;
+    };
+
+    /**
+     * @param stack
+     * @param objectReg
+     * @param indexReg
+     */
+    ActionScript3.prototype.ActionHasNext2 = function (stack, objectReg, indexReg)
+    {
+        var _this = this;
+        var obj = _this.register[objectReg];
+        var currentIndex = _this.currentIndex;
+
+        var value = false;
+        var index = 0;
+        if (obj) {
+            for (var key in obj) {
+                if (!obj.hasOwnProperty(key)) {
+                    continue;
+                }
+
+                if (index === currentIndex) {
+                    value = true;
+                    currentIndex++;
+                    break;
+                }
+
+                index++;
+            }
+        }
+
+        if (!value) {
+            currentIndex = 0;
+        }
+
+        _this.currentIndex = currentIndex;
+        _this.register[indexReg] = index;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfFalse = function (stack, index)
+    {
+        var value = stack.pop();
+        return (value === false) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfGe = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 < value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfGt = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 > value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfLe = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value2 < value1) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfLt = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 < value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfNge = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 < value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfNgt = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value2 < value1) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfNle = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value2 < value1) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfNlt = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 < value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfNe = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 == value2) ? 0 : index;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfStrictEq  = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 === value2) ? index : 0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfStrictNe  = function (stack, index)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        return (value1 === value2) ? 0 : index;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     * @returns {number}
+     */
+    ActionScript3.prototype.ActionIfTrue = function (stack, index)
+    {
+        var value = stack.pop();
+        return (value === true) ? index : 0;
+    };
+
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionIn = function (stack)
+    {
+        var obj = stack.pop();
+        var name = stack.pop();
+        stack[stack.length] = (name in obj);
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionIncLocal = function (stack, index)
     {
 
 
@@ -6543,17 +8064,291 @@ if (!("swf2js" in window)){(function(window)
      * @param stack
      * @param index
      */
-    ActionScript3.prototype.ActionGetScopeObject = function(stack, index)
+    ActionScript3.prototype.ActionIncLocalI = function (stack, index)
     {
 
-        
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionIncrement = function (stack)
+    {
+        var value = stack.pop();
+        value++;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionIncrementI = function (stack)
+    {
+        var value = stack.pop();
+        value++;
+        stack[stack.length] = value;
     };
 
     /**
      * @param stack
      * @param index
      */
-    ActionScript3.prototype.ActionGetProperty = function(stack, index)
+    ActionScript3.prototype.ActionInitProperty = function (stack, index)
+    {
+        var value = stack.pop();
+        var prop = this.names[index];
+        var obj = stack.pop();
+        if (obj) {
+            obj[prop] = value;
+        }
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionInstanceOf = function (stack)
+    {
+        var type = stack.pop();
+        var value = stack.pop();
+        stack[stack.length] = (value instanceof type);
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionIsType = function (stack, index)
+    {
+        var value = stack.pop();
+        var type = this.name[index];
+        stack[stack.length] = (value == type);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionIsTypeLate = function (stack)
+    {
+        var type = stack.pop();
+        var value = stack.pop();
+        stack[stack.length] = (value == type);
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionKill = function (stack, index)
+    {
+        delete this.register[index];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionLabel = function (stack)
+    {
+
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionLessEquals = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] =  (value1 <= value2);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionLessThan = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] =  (value1 < value2);
+    };
+
+    /**
+     * @param stack
+     * @param offset
+     * @param count
+     * @param array
+     */
+    ActionScript3.prototype.ActionLookupSwitch = function (stack, offset, count, array)
+    {
+        var index = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionLShift = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 << value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionModulo = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 % value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionMultiply = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 * value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionMultiplyI = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 * value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNeGate = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = -value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNeGateI = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = -value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNewActivation = function (stack)
+    {
+        var newactivation;
+        stack[stack.length] = newactivation;
+    };
+
+    /**
+     * @param stack
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionNewArray = function (stack, argCount)
+    {
+        var array = [];
+        for (var i = argCount; i--;) {
+            array[i] = stack.pop();
+        }
+        stack[stack.length] = array;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionNewCatch = function (stack, index)
+    {
+        var catchScope;
+        stack[stack.length] = catchScope;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionNewClass = function (stack, index)
+    {
+        var basetype = stack.pop();
+        stack[stack.length] = basetype;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionNewFunction = function (stack, index)
+    {
+        var _this = this;
+        var caller = _this.caller;
+        stack[stack.length] = caller.createActionScript3(_this.data, index, _this.ns);
+    };
+
+    /**
+     * @param stack
+     * @param argCount
+     */
+    ActionScript3.prototype.ActionNewObject = function (stack, argCount)
+    {
+        var obj = {};
+        for (var i = argCount; i--;) {
+            var value = stack.pop();
+            var prop = stack.pop();
+            obj[prop] = value;
+        }
+        stack[stack.length] = obj;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNextName = function (stack)
+    {
+        var index = +stack.pop();
+        var obj = stack.pop();
+
+        var name;
+        if (obj) {
+            var count = 0;
+            for (var prop in obj) {
+                if (!obj.hasOwnProperty(prop)) {
+                    continue;
+                }
+
+                if (count === index) {
+                    name = prop;
+                    break;
+                }
+                count++;
+            }
+        }
+        stack[stack.length] = name;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNextValue = function (stack)
+    {
+        var index = stack.pop();
+        var obj = stack.pop();
+        var value;
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionNop = function (stack)
     {
 
 
@@ -6561,15 +8356,333 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
-     * @param index
      */
-    ActionScript3.prototype.ActionFindPropStrict = function(stack, index)
+    ActionScript3.prototype.ActionNot = function (stack)
     {
+        var value = stack.pop();
+        stack[stack.length] = (!value);
+    };
 
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPop = function (stack)
+    {
+        stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPopScope = function (stack)
+    {
 
     };
 
-    var asID = 0;
+    /**
+     * @param stack
+     * @param value
+     */
+    ActionScript3.prototype.ActionPushByte = function (stack, value)
+    {
+        stack[stack.length] = value|0;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionPushDouble = function (stack, index)
+    {
+        var data = this.data;
+        var double = data.double;
+        var value = double[index];
+        stack[stack.length] = +value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushFalse = function (stack)
+    {
+        stack[stack.length] = false;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionPushInt = function (stack, index)
+    {
+        var data = this.data;
+        var integer = data.integer;
+        var value = integer[index];
+        stack[stack.length] = +value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionPushNameSpace = function (stack, index)
+    {
+        var data = this.data;
+        var names = data.names;
+        var value = names[index];
+        stack[stack.length] = +value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushNan = function (stack)
+    {
+        stack[stack.length] = NaN;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushNull = function (stack)
+    {
+        stack[stack.length] = null;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushScope = function (stack)
+    {
+        var scope = stack.pop();
+        if (scope) {
+            this.scope = scope;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param value
+     */
+    ActionScript3.prototype.ActionPushShort = function (stack, value)
+    {
+        stack[stack.length] = value;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionPushString = function (stack, index)
+    {
+        var data = this.data;
+        var string = data.string;
+        stack[stack.length] = ""+string[index];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushTrue = function (stack)
+    {
+        stack[stack.length] = true;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionPushUInt = function (stack, index)
+    {
+        var data = this.data;
+        var uinteger = data.uinteger;
+        stack[stack.length] = uinteger[index];
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushUndefined = function (stack)
+    {
+        stack[stack.length] = undefined;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionPushWith = function (stack)
+    {
+        var obj = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionRShift = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 >> value2;
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionSetLocal = function (stack, index)
+    {
+        this.register[index] = stack.pop();
+    };
+    
+    
+        /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSetLocal0 = function (stack)
+    {
+        this.register[0] = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSetLocal1 = function (stack)
+    {
+        this.register[1] = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSetLocal2 = function (stack)
+    {
+        this.register[2] = stack.pop();
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSetLocal3 = function (stack)
+    {
+        this.register[3] = stack.pop();
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionSetGlobalSlot = function (stack, index)
+    {
+        var value = stack.pop();
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionSetProperty = function (stack, index)
+    {
+        var _this = this;
+        var value = stack.pop();
+        var prop = _this.names[index];
+        if (!prop) {
+            prop = stack.pop();
+        }
+        var obj = stack.pop();
+        if (obj) {
+            obj[prop] = value;
+        }
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionSetSlot = function (stack, index)
+    {
+        var value = stack.pop();
+        var obj = stack.pop();
+    };
+
+    /**
+     * @param stack
+     * @param index
+     */
+    ActionScript3.prototype.ActionSetSuper = function (stack, index)
+    {
+        var value = stack.pop();
+        var prop = this.names[index];
+        var obj = stack.pop()
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionStrictEquals = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = (value1 === value2);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSubtract = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value1 - value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSubtractI = function (stack)
+    {
+        var value2 = +stack.pop();
+        var value1 = +stack.pop();
+        stack[stack.length] = value1 - value2;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionSwap = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value2;
+        stack[stack.length] = value1;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionThrow = function (stack)
+    {
+        var value = stack.pop();
+        console.log(value);
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionTypeof = function (stack)
+    {
+        var value = stack.pop();
+        stack[stack.length] = typeof value;
+    };
+
+    /**
+     * @param stack
+     */
+    ActionScript3.prototype.ActionURShift = function (stack)
+    {
+        var value2 = stack.pop();
+        var value1 = stack.pop();
+        stack[stack.length] = value2 >> value1;
+    };
+
     /**
      * @param data
      * @param constantPool
@@ -6580,7 +8693,6 @@ if (!("swf2js" in window)){(function(window)
     var ActionScript = function (data, constantPool, register, initAction)
     {
         var _this = this;
-        _this.id = asID++;
         _this.cache = [];
         _this.params = [];
         _this.constantPool = constantPool || [];
@@ -8268,7 +10380,6 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param stack
      * @param mc
-     * @constructor
      */
     ActionScript.prototype.ActionSetProperty = function (stack, mc)
     {
@@ -8660,7 +10771,6 @@ if (!("swf2js" in window)){(function(window)
      * @param args
      * @param mc
      * @returns {Array}
-     * @constructor
      */
     ActionScript.prototype.ActionNativeFunction = function (args, mc)
     {
@@ -9465,7 +11575,6 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param stack
-     * @constructor
      */
     ActionScript.prototype.ActionCastOp = function (stack)
     {
@@ -11773,6 +13882,23 @@ if (!("swf2js" in window)){(function(window)
      * @type {string}
      */
     Swf2jsEvent.prototype.ACTIVATE = "activate";
+    Swf2jsEvent.prototype.CLICK = "press";
+    Swf2jsEvent.prototype.CONTEXT_MENU = "contextMenu";
+    Swf2jsEvent.prototype.DOUBLE_CLICK = "doubleClick";
+    Swf2jsEvent.prototype.MIDDLE_CLICK = "middleClick";
+    Swf2jsEvent.prototype.MIDDLE_MOUSE_DOWN = "middleMouseDown";
+    Swf2jsEvent.prototype.MIDDLE_MOUSE_UP = "middleMouseUp";
+    Swf2jsEvent.prototype.MOUSE_DOWN = "mouseDown";
+    Swf2jsEvent.prototype.MOUSE_MOVE = "mouseMove";
+    Swf2jsEvent.prototype.MOUSE_OUT = "mouseOut";
+    Swf2jsEvent.prototype.MOUSE_OVER = "mouseOver";
+    Swf2jsEvent.prototype.MOUSE_UP = "mouseUp";
+    Swf2jsEvent.prototype.MOUSE_WHEEL = "mouseWheel";
+    Swf2jsEvent.prototype.RIGHT_CLICK = "rightClick";
+    Swf2jsEvent.prototype.RIGHT_MOUSE_DOWN = "rightMouseDown";
+    Swf2jsEvent.prototype.RIGHT_MOUSE_UP = "rightMouseUp";
+    Swf2jsEvent.prototype.ROLL_OUT = "rollOut";
+    Swf2jsEvent.prototype.ROLL_OVER = "rollOver";
 
     /**
      * @param type
@@ -14417,6 +16543,19 @@ if (!("swf2js" in window)){(function(window)
             }
             _this.variables.text = _this.initialText;
         }
+    };
+
+    /**
+     * trace
+     */
+    DisplayObject.prototype.trace = function ()
+    {
+        var params = ["[trace]"];
+        var length = arguments.length;
+        for (var i = 0; i < length; i++) {
+            params[params.length] = arguments[i];
+        }
+        console.log.apply(window, params);
     };
 
     /**
@@ -19923,6 +22062,26 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param obj
+     * @param methodId
+     * @param abcKey
+     */
+    MovieClip.prototype.createActionScript3 = function (obj, methodId, abcKey)
+    {
+        var stage = this.getStage();
+        return (function (data, id, ns, stage, parent)
+        {
+            return function ()
+            {
+                var as3 = new ActionScript3(data, id, ns, stage);
+                as3.caller = parent;
+                as3.args = arguments;
+                return as3.execute();
+            };
+        })(obj, methodId, abcKey, stage, this);
+    };
+
+    /**
      * @param script
      * @param parent
      */
@@ -19947,24 +22106,36 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param frame
-     * @param script
+     * addFrameScript
      */
-    MovieClip.prototype.addFrameScript = function (frame, script)
+    MovieClip.prototype.addFrameScript = function ()
     {
         var _this = this;
-        if (typeof frame === "string") {
-            frame = _this.getLabel(frame);
-        }
-
-        frame = frame|0;
-        if (frame > 0 && _this.getTotalFrames() >= frame) {
-            var actions = _this.actions;
-            if (!(frame in actions)) {
-                actions[frame] = [];
+        var args = arguments;
+        var length = args.length;
+        for (var i = 0; i < length; i++) {
+            var frame = args[i++];
+            var script = args[i];
+            if (typeof frame === "string") {
+                frame = _this.getLabel(frame);
+            } else {
+                frame += 1;
             }
-            var length = actions[frame].length;
-            actions[frame][length] = script;
+
+            frame = frame|0;
+            if (frame > 0 && _this.getTotalFrames() >= frame) {
+                var actions = _this.actions;
+                if (!(frame in actions)) {
+                    actions[frame] = [];
+                }
+
+                if (script === null) {
+                    actions[frame] = [];
+                } else {
+                    var aLen = actions[frame].length;
+                    actions[frame][aLen] = script;
+                }
+            }
         }
     };
 
@@ -21591,6 +23762,8 @@ if (!("swf2js" in window)){(function(window)
         _this.dragRules = null;
         _this.scaleMode = "showAll";
         _this.align = "";
+        _this.abc = [];
+        _this.symbols = [];
 
         // render
         _this.doneTags = [];
@@ -22015,6 +24188,17 @@ if (!("swf2js" in window)){(function(window)
 
             // build
             swftag.build(tags, mc);
+            // as3
+            var symbol = _this.symbols[0];
+            if (symbol) {
+                var abc = _this.abc[symbol];
+                if (typeof abc === "function") {
+                    var AVM2 = new abc();
+                    abc.prototype[symbol+".buildClass"] = AVM2;
+                    abc.prototype[symbol+".register"][0] = AVM2;
+                    AVM2[symbol].apply(mc);
+                }
+            }
 
             var query = url.split("?")[1];
             if (query) {
