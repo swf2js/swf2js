@@ -20,9 +20,9 @@ Supports:
 * ActionScript 1.0, 2.0
 * ActionScript 3.0 (prototype)
 
-## Latest Version *0.7.0*  
+## Latest Version *0.7.1*  
 
--- Release Date: 19 Aug 2016  
+-- Release Date: 21 Aug 2016  
 
 * [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)  
 * [Todo](https://github.com/ienaga/swf2js/wiki/Todo)  

@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.0)
+ * swf2js (version 0.7.1)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -26,7 +26,7 @@ if (!("swf2js" in window)){(function(window)
     var _SQRT2 = _Math.SQRT2;
     var _LN2 = _Math.LN2;
     var _LN2_2 = _LN2 / 2;
-    var _LOG1P = _Math.log1p(_LN2);
+    var _LOG1P = 0.29756328478758615;
     var _PI = _Math.PI;
     var _Number = Number;
     var _fromCharCode = String.fromCharCode;
@@ -41,7 +41,6 @@ if (!("swf2js" in window)){(function(window)
     var isBtoa = ("btoa" in window);
     var isWebGL = (window.WebGLRenderingContext &&
         _document.createElement("canvas").getContext("webgl")) ? true : false;
-
     isWebGL = false; // TODO
     var requestAnimationFrame =
         window.requestAnimationFrame ||
@@ -1450,9 +1449,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var value = _this.getUI8();
-        var nBits = 8;
-        if (value >> (nBits - 1)) {
-            value -= _pow(2, nBits);
+        if (value >> 7) { // nBits = 8;
+            value -= _pow(2, 8);
         }
         return value;
     };
@@ -1464,9 +1462,21 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var value = _this.getUI24();
-        var nBits = 24;
-        if (value >> (nBits - 1)) {
-            value -= _pow(2, nBits);
+        if (value >> 23) { // nBits = 24;
+            value -= _pow(2, 24);
+        }
+        return value;
+    };
+
+    /**
+     * @returns {*}
+     */
+    BitIO.prototype.getSI32 = function ()
+    {
+        var _this = this;
+        var value = _this.getUI32();
+        if (value >> 31) { // nBits = 32;
+            value -= _pow(2, 32);
         }
         return value;
     };
@@ -5628,6 +5638,7 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 case 0x09: // Multiname
                 case 0x0E: // MultinameA
+                    str = string[info.name];
                     break;
                 case 0x1B: // MultinameL
                 case 0x1C: // MultinameLA
@@ -5652,7 +5663,7 @@ if (!("swf2js" in window)){(function(window)
         var count = ABCBitIO.getU30();
         if (count) {
             for (var i = 1; i < count; i++) {
-                array[i] = ABCBitIO.getUI32();
+                array[i] = ABCBitIO.getSI32();
             }
         }
         return array;
@@ -5944,7 +5955,7 @@ if (!("swf2js" in window)){(function(window)
         var exceptions = [];
         if (count) {
             for (i = 0; i < count; i++) {
-                exceptions[exceptions.length] = this.ABCException(ABCBitIO);
+                exceptions[exceptions.length] = _this.ABCException(ABCBitIO);
             }
         }
         obj.exceptions = exceptions;
@@ -5986,7 +5997,6 @@ if (!("swf2js" in window)){(function(window)
                 case 0x60: // getlex
                 case 0x62: // getlocal
                 case 0x66: // getproperty
-                case 0x65: // getscopeobject
                 case 0x6c: // getslot
                 case 0x04: // getsuper
                 case 0x92: // inclocal
@@ -6023,6 +6033,7 @@ if (!("swf2js" in window)){(function(window)
                     obj.value3 = ABCBitIO.getSI24();
                     offset += 3;
                     break;
+                case 0x65: // getscopeobject
                 case 0x24: // pushbyte
                     obj.value1 = ABCBitIO.getUI8();
                     offset += 1;
@@ -6514,10 +6525,22 @@ if (!("swf2js" in window)){(function(window)
     var ActionScript3 = function (data, id, ns, stage)
     {
         var _this = this;
+
+        // params
         _this.id = id;
+        _this.caller = null;
+        _this.scope = null;
+        _this.parent = null;
+        _this.activation = null;
+        _this.currentIndex = 0;
+        _this.stage = stage;
+        _this.register = [];
+        _this.args = [];
+        _this.variables = {};
 
         // ABC code and info
         var methodBody = data.methodBody[id];
+        _this.body = methodBody;
         _this.codes = methodBody.codes;
         _this.info = data.method[methodBody.method];
 
@@ -6532,15 +6555,19 @@ if (!("swf2js" in window)){(function(window)
         _this.superClass = ns +".superClass";
         _this.buildClass = ns +".buildClass";
 
-        // params
-        _this.caller = null;
-        _this.scope = null;
-        _this.parent = null;
-        _this.currentIndex = 0;
-        _this.stage = stage;
-        _this.register = [];
-        _this.args = [];
-        _this.variables = {};
+        // trait
+        var trait = methodBody.trait;
+        var length = trait.length;
+        for (var i = 0; i < length; i++) {
+            var obj = trait[i];
+            var kind = obj.kind;
+            switch (kind) {
+                case 0:
+                    var key = _this.names[obj.name];
+                    _this.setVariable(key, undefined);
+                    break;
+            }
+        }
     };
 
     /**
@@ -6570,6 +6597,53 @@ if (!("swf2js" in window)){(function(window)
     {
         return this.variables[name];
     };
+
+    /**
+     * @param name
+     * @returns {*}
+     */
+    ActionScript3.prototype.getProperty = function (name)
+    {
+        var _this = this;
+        var value;
+        switch (name) {
+            case "MouseEvent":
+                value = clipEvent;
+                break;
+            case "graphics":
+                value = _this.caller.graphics;
+                break;
+            default:
+                value = _this.getVariable(name);
+
+                if (value === undefined) {
+                    var obj = _this.register[0];
+                    if (obj) {
+                        value = obj[name];
+                    }
+                }
+
+                if (value === undefined) {
+                    var parent = _this.parent;
+                    if (parent) {
+                        value = parent.getProperty(name);
+                    }
+                }
+
+                if (value === undefined) {
+                    var caller = _this.caller;
+                    if (caller instanceof DisplayObject) {
+                        value = _this.getProperty(name);
+                        if (value === undefined) {
+                            value = caller.getDisplayObject(name);
+                        }
+                    }
+                }
+                break;
+        }
+        return value;
+    };
+
 
     /**
      * execute
@@ -7661,23 +7735,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var name = _this.names[index];
-        var obj = {};
-        switch (name) {
-            case "MouseEvent":
-                obj = clipEvent;
-                break;
-            default:
-                var caller = _this.caller;
-                if (caller instanceof DisplayObject) {
-                    var value = caller.getDisplayObject(name);
-                    if (value !== undefined) {
-                        obj = value;
-                    }
-                }
-                break;
-        }
-
-        stack[stack.length] = obj;
+        stack[stack.length] = _this.getProperty(name);
     };
 
     /**
@@ -7760,6 +7818,7 @@ if (!("swf2js" in window)){(function(window)
                 var caller = _this.caller;
                 if (caller instanceof DisplayObject) {
                     value = caller.getProperty(prop);
+
                 }
             }
         }
@@ -7772,8 +7831,8 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionGetScopeObject = function (stack, index)
     {
-        var scope;
-        stack[stack.length] = scope;
+        var activation = this.activation;
+        stack[stack.length] = (index in activation) ? activation : null;
     };
 
     /**
@@ -7783,8 +7842,8 @@ if (!("swf2js" in window)){(function(window)
     ActionScript3.prototype.ActionGetSlot = function (stack, index)
     {
         var obj = stack.pop();
-        var value;
-        stack[stack.length] = value;
+        var name = obj[index];
+        stack[stack.length] = this.getProperty(name);
     };
 
     /**
@@ -8245,8 +8304,21 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionNewActivation = function (stack)
     {
-        var newactivation;
-        stack[stack.length] = newactivation;
+        var _this = this;
+        var trait = _this.body.trait;
+        var length = trait.length;
+        var activation = [];
+        for (var i = 0; i < length; i++) {
+            var obj = trait[i];
+            var kind = obj.kind;
+            switch (kind) {
+                case 0:
+                    activation[i + 1] = _this.names[obj.name];
+                    break;
+            }
+        }
+        _this.activation = activation;
+        stack[stack.length] = activation;
     };
 
     /**
@@ -8288,9 +8360,17 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionNewFunction = function (stack, index)
     {
-        var _this = this;
-        var caller = _this.caller;
-        stack[stack.length] = caller.createActionScript3(_this.data, index, _this.ns);
+        stack[stack.length] = (function (self, id)
+        {
+            return function ()
+            {
+                var as3 = new ActionScript3(self.data, id, self.ns, self.stage);
+                as3.caller = self.caller;
+                as3.parent = self;
+                as3.args = arguments;
+                return as3.execute();
+            };
+        })(this, index);
     };
 
     /**
@@ -8601,6 +8681,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var value = stack.pop();
         var obj = stack.pop();
+        var name = obj[index];
+        this.setVariable(name, value);
     };
 
     /**
