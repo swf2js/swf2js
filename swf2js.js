@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.1)
+ * swf2js (version 0.7.2)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -652,10 +652,47 @@ if (!("swf2js" in window)){(function(window)
                     str += "ctx.moveTo(" + (a[1] + a[3]) + "," + a[2] + ");";
                     str += "ctx.arc(" + a[1] + "," + a[2] + "," + a[3] + ",0 , Math.PI*2, false);";
                     break;
+
+                // Graphics
+                case 5: // fillStyle
+                    str += "var r = Math.max(0, Math.min(("+ a[1] +" * ct[0]) + ct[4], 255))|0;";
+                    str += "var g = Math.max(0, Math.min(("+ a[2] +" * ct[1]) + ct[5], 255))|0;";
+                    str += "var b = Math.max(0, Math.min(("+ a[3] +" * ct[2]) + ct[6], 255))|0;";
+                    str += "var a = Math.max(0, Math.min(("+ a[4] +" * 255 * ct[3]) + ct[7], 255)) / 255;";
+                    str += "ctx.fillStyle = 'rgba('+r+', '+g+', '+b+', '+a+')';";
+                    break;
+                case 6: // strokeStyle
+                    str += "var r = Math.max(0, Math.min(("+ a[1] +" * ct[0]) + ct[4], 255))|0;";
+                    str += "var g = Math.max(0, Math.min(("+ a[2] +" * ct[1]) + ct[5], 255))|0;";
+                    str += "var b = Math.max(0, Math.min(("+ a[3] +" * ct[2]) + ct[6], 255))|0;";
+                    str += "var a = Math.max(0, Math.min(("+ a[4] +" * 255 * ct[3]) + ct[7], 255)) / 255;";
+                    str += "ctx.strokeStyle = 'rgba('+r+', '+g+', '+b+', '+a+')';";
+                    break;
+                case 7: // fill
+                    str += "if (!isClip) { ctx.fill(); }";
+                    break;
+                case 8: // stroke
+                    str += "if (!isClip) { ctx.stroke(); }";
+                    break;
+                case 9: // width
+                    str += "ctx.lineWidth = "+ a[1] +";";
+                    break;
+                case 10: // lineCap
+                    str += "ctx.lineCap = '"+ a[1] +"';";
+                    break;
+                case 11: // lineJoin
+                    str += "ctx.lineJoin = '"+ a[1] +"';";
+                    break;
+                case 12: // miterLimit
+                    str += "ctx.lineJoin = '"+ a[1] +"';";
+                    break;
+                case 13: // beginPath
+                    str += "ctx.beginPath();";
+                    break;
             }
             i++;
         }
-        return new this.FUNCTION("ctx", str);
+        return new this.FUNCTION("ctx", "ct", "isClip", str);
     };
 
     /**
@@ -1418,8 +1455,57 @@ if (!("swf2js" in window)){(function(window)
         var exp = upperBits >>> 20 & 0x7FF;
         var upperFraction = upperBits & 0xFFFFF;
         return (!upperBits && !lowerBits) ? 0 : ((sign === 0) ? 1 : -1) *
-            (upperFraction / _pow(2, 20) + lowerBits / _pow(2, 52) + 1) *
+            (upperFraction / 1048576 + lowerBits / 4503599627370496 + 1) *
                 _pow(2, exp - 1023);
+    };
+
+    /**
+     * @returns {number}
+     */
+    BitIO.prototype.getFloat64LittleEndian = function ()
+    {
+        var _this = this;
+        var signBits = 1;
+        var exponentBits = 11;
+        var fractionBits = 52;
+        var min = -1022;
+        var max = 1023;
+
+        var data = _this.data;
+        var str = "";
+        for (var i = 0; i < 8; i++) {
+            var bits = data[_this.byte_offset++].toString(2);
+            while (bits.length < 8) {
+                bits = "0" + bits;
+            }
+            str = bits + str;
+        }
+
+        var sign = (str.charAt(0) === "1") ? -1 : 1;
+        var exponent = parseInt(str.substr(signBits, exponentBits), 2) - max;
+        var significandBase = str.substr(signBits + exponentBits, fractionBits);
+        var significandBin = "1"+ significandBase;
+
+        var val = 1;
+        var significand = 0;
+        if (exponent === -max) {
+            if (significandBase.indexOf("1") === -1) {
+                return 0;
+            } else {
+                exponent = min;
+                significandBin = "0"+ significandBase;
+            }
+        }
+
+        var l = 0;
+        while (l < significandBin.length) {
+            var sb = significandBin.charAt(l);
+            significand += val * +sb;
+            val = val / 2;
+            l++;
+        }
+
+        return sign * significand * _pow(2, exponent);
     };
 
     /**
@@ -1450,7 +1536,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var value = _this.getUI8();
         if (value >> 7) { // nBits = 8;
-            value -= _pow(2, 8);
+            value -= 256; // Math.pow(2, 8)
         }
         return value;
     };
@@ -1463,20 +1549,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var value = _this.getUI24();
         if (value >> 23) { // nBits = 24;
-            value -= _pow(2, 24);
-        }
-        return value;
-    };
-
-    /**
-     * @returns {*}
-     */
-    BitIO.prototype.getSI32 = function ()
-    {
-        var _this = this;
-        var value = _this.getUI32();
-        if (value >> 31) { // nBits = 32;
-            value -= _pow(2, 32);
+            value -= 16777216; // Math.pow(2, 24)
         }
         return value;
     };
@@ -1518,6 +1591,21 @@ if (!("swf2js" in window)){(function(window)
             if (!(num & 0x80)) {
                 break;
             }
+        }
+        return value;
+    };
+
+    /**
+     * @returns {number}
+     */
+    BitIO.prototype.getS30 = function ()
+    {
+        var _this = this;
+        var startOffset = _this.byte_offset;
+        var value = _this.getU30();
+        var nBits = (_this.byte_offset - startOffset) * 8;
+        if (value >> (nBits - 1)) {
+            value -= _pow(2, nBits);
         }
         return value;
     };
@@ -5520,13 +5608,29 @@ if (!("swf2js" in window)){(function(window)
         var names = obj.names;
         for (var i = 0; i < length; i++) {
             var instance = instances[i];
-            var pNs = instance.protectedNs;
-            if (!pNs) {
-                pNs = instance.flags;
+            var flag = instance.flags;
+
+            var iObj = null;
+            switch (flag) {
+                case 0x01: // ClassSealed
+                    console.log("0x01");
+                    break;
+                case 0x02: // ClassFinal
+                    console.log("0x02");
+                    break;
+                case 0x04: // ClassInterface
+                    console.log("0x04");
+                    break;
+                case 0x08: // ClassProtectedNs
+                    var pNs = instance.protectedNs;
+                    iObj = namespaces[pNs];
+                    break;
+                default: // 0x00
+                    console.log(flag, instance, obj);
+                    break;
             }
 
-            var ns = namespaces[pNs];
-            var object = string[ns.name];
+            var object = string[iObj.name];
             var values = object.split(":");
             var abcKey = values.join(".");
 
@@ -5663,7 +5767,7 @@ if (!("swf2js" in window)){(function(window)
         var count = ABCBitIO.getU30();
         if (count) {
             for (var i = 1; i < count; i++) {
-                array[i] = ABCBitIO.getSI32();
+                array[i] = ABCBitIO.getS30();
             }
         }
         return array;
@@ -5679,7 +5783,7 @@ if (!("swf2js" in window)){(function(window)
         var count = ABCBitIO.getU30();
         if (count) {
             for (var i = 1; i < count; i++) {
-                array[i] = ABCBitIO.getUI32();
+                array[i] = ABCBitIO.getU30();
             }
         }
         return array;
@@ -5695,7 +5799,7 @@ if (!("swf2js" in window)){(function(window)
         var count = ABCBitIO.getU30();
         if (count) {
             for (var i = 1; i < count; i++) {
-                array[i] = ABCBitIO.getFloat64();
+                array[i] = ABCBitIO.getFloat64LittleEndian();
             }
         }
         return array;
@@ -6035,7 +6139,7 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 case 0x65: // getscopeobject
                 case 0x24: // pushbyte
-                    obj.value1 = ABCBitIO.getUI8();
+                    obj.value1 = ABCBitIO.getSI8();
                     offset += 1;
                     break;
                 case 0x32: // hasnext2
@@ -8693,7 +8797,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var value = stack.pop();
         var prop = this.names[index];
-        var obj = stack.pop()
+        var obj = stack.pop();
     };
 
     /**
@@ -13007,6 +13111,76 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @type {number}
+     */
+    Graphics.prototype.MOVE_TO = 0;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.CURVE_TO = 1;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.LINE_TO = 2;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.CUBIC = 3;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.ARC = 4;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.FILL_STYLE = 5;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.STROKE_STYLE = 6;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.FILL = 7;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.STROKE = 8;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.LINE_WIDTH = 9;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.LINE_CAP = 10;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.LINE_JOIN = 11;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.MITER_LIMIT = 12;
+
+    /**
+     * @type {number}
+     */
+    Graphics.prototype.BEGIN_PATH = 13;
+
+    /**
      * @param a
      * @param b
      * @returns []
@@ -13063,11 +13237,12 @@ if (!("swf2js" in window)){(function(window)
         var no = _Number.MAX_VALUE;
         _this.bounds = {xMin: no, xMax: -no, yMin: no, yMax: -no};
         _this.maxWidth = 0;
+        _this.cmd = null;
         _this.isDraw = false;
         _this.isFillDraw = false;
         _this.isLineDraw = false;
         _this.cacheKey = "";
-        _this.fillRecodes = [];
+        _this.recodes = [];
         _this.lineRecodes = [];
         return _this;
     };
@@ -13119,60 +13294,6 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param color
-     */
-    Graphics.prototype.pushFillRecode = function (color)
-    {
-        var recodes = this.fillRecodes;
-        recodes[recodes.length] = {
-            recodes: [],
-            style: color,
-            cmd: null
-        };
-    };
-
-    /**
-     * @returns {Array}
-     */
-    Graphics.prototype.getFillRecode = function ()
-    {
-        var recodes = this.fillRecodes;
-        var obj = recodes[recodes.length - 1];
-        obj.cmd = null;
-        return obj.recodes;
-    };
-
-    /**
-     * @param color
-     * @param width
-     * @param capsStyle
-     * @param jointStyle
-     */
-    Graphics.prototype.pushLineRecode = function (color, width, capsStyle, jointStyle)
-    {
-        var recodes = this.lineRecodes;
-        recodes[recodes.length] = {
-            recodes: [],
-            Width: width,
-            capsStyle: capsStyle,
-            jointStyle: jointStyle,
-            style: color,
-            cmd: null
-        };
-    };
-
-    /**
-     * @returns {Array}
-     */
-    Graphics.prototype.getLineRecode = function ()
-    {
-        var recodes = this.lineRecodes;
-        var obj = recodes[recodes.length - 1];
-        obj.cmd = null;
-        return obj.recodes;
-    };
-
-    /**
      * @param str
      * @returns {string}
      */
@@ -13197,6 +13318,7 @@ if (!("swf2js" in window)){(function(window)
         if (typeof rgb === "string") {
             rgb = _this.colorStringToInt(rgb);
         }
+
         rgb |= 0;
         alpha = +alpha;
         if (_isNaN(alpha)) {
@@ -13204,11 +13326,17 @@ if (!("swf2js" in window)){(function(window)
         } else {
             alpha *= 100;
         }
+
         var color = _this.intToRGBA(rgb, alpha);
-        _this.pushFillRecode(color);
+        var recodes = _this.recodes;
+        if (!_this.isFillDraw) {
+            recodes[recodes.length] = [_this.BEGIN_PATH];
+        }
+        recodes[recodes.length] = [_this.FILL_STYLE, color.R, color.G, color.B, color.A];
+
         _this.addCacheKey(rgb, alpha);
-        _this.isDraw = true;
         _this.isFillDraw = true;
+        _this.isDraw = true;
         return _this;
     };
 
@@ -13226,10 +13354,23 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.lineStyle = function (width, rgb, alpha, pixelHinting, noScale, capsStyle, jointStyle, miterLimit)
     {
         var _this = this;
+        var lineRecodes = _this.lineRecodes;
+
         width = +width;
         if (!_isNaN(width)) {
+            if (rgb === undefined) {
+                rgb = 0;
+            }
+
             if (typeof rgb === "string") {
                 rgb = _this.colorStringToInt(rgb);
+            }
+
+            if (!capsStyle) {
+                capsStyle = "round";
+            }
+            if (!jointStyle) {
+                jointStyle = "round";
             }
 
             rgb |= 0;
@@ -13240,19 +13381,34 @@ if (!("swf2js" in window)){(function(window)
                 alpha *= 100;
             }
 
-            if (!capsStyle) {
-                capsStyle = "round";
-            }
-            if (!jointStyle) {
-                jointStyle = "round";
-            }
             var color = _this.intToRGBA(rgb, alpha);
+            if (width < 0.5) {
+                width += 0.2;
+            }
+
             width *= 20;
             _this.maxWidth = _max(_this.maxWidth, width);
-            _this.pushLineRecode(color, width, capsStyle, jointStyle);
+
+            if (_this.isLineDraw) {
+                lineRecodes[lineRecodes.length] = [_this.STROKE];
+            }
+            lineRecodes[lineRecodes.length] = [_this.BEGIN_PATH];
+            lineRecodes[lineRecodes.length] = [_this.STROKE_STYLE, color.R, color.G, color.B, color.A];
+            lineRecodes[lineRecodes.length] = [_this.LINE_WIDTH, width];
+            lineRecodes[lineRecodes.length] = [_this.LINE_CAP, capsStyle];
+            lineRecodes[lineRecodes.length] = [_this.LINE_JOIN, jointStyle];
             _this.addCacheKey(rgb, alpha);
-            _this.isDraw = true;
             _this.isLineDraw = true;
+            _this.isDraw = true;
+        } else if (_this.isLineDraw) {
+            _this.isLineDraw = false;
+            lineRecodes[lineRecodes.length] = [_this.STROKE];
+            var length = lineRecodes.length;
+            var recodes = _this.recodes;
+            for (var i = 0; i < length; i++) {
+                recodes[recodes.length] = lineRecodes[i];
+            }
+            _this.lineRecodes = [];
         }
         return _this;
     };
@@ -13265,19 +13421,20 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.moveTo = function (x, y)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var recodes = _this.recodes;
         x *= 20;
         y *= 20;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [0, x, y];
+
+        if (_this.isFillDraw) {
+            recodes[recodes.length] = [_this.MOVE_TO, x, y];
         }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [0, x, y];
+
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.lineRecodes;
+            lineRecodes[lineRecodes.length] = [_this.MOVE_TO, x, y];
         }
-        if (isFillDraw || isLineDraw) {
+
+        if (_this.isFillDraw || _this.isLineDraw) {
             _this.setBounds(x, y);
             _this.addCacheKey(x, y);
         }
@@ -13292,19 +13449,20 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.lineTo = function (x, y)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var recodes = _this.recodes;
         x *= 20;
         y *= 20;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [2, x, y];
+
+        if (_this.isFillDraw) {
+            recodes[recodes.length] = [_this.LINE_TO, x, y];
         }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [2, x, y];
+
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.lineRecodes;
+            lineRecodes[lineRecodes.length] = [_this.LINE_TO, x, y];
         }
-        if (isFillDraw || isLineDraw) {
+
+        if (_this.isFillDraw || _this.isLineDraw) {
             _this.setBounds(x, y);
             _this.addCacheKey(x, y);
         }
@@ -13321,21 +13479,22 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.curveTo = function (cx, cy, dx, dy)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var recodes = _this.recodes;
         cx *= 20;
         cy *= 20;
         dx *= 20;
         dy *= 20;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [1, cx, cy, dx, dy];
+
+        if (_this.isFillDraw) {
+            recodes[recodes.length] = [_this.CURVE_TO, cx, cy, dx, dy];
         }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [1, cx, cy, dx, dy];
+
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.lineRecodes;
+            lineRecodes[lineRecodes.length] = [_this.CURVE_TO, cx, cy, dx, dy];
         }
-        if (isFillDraw || isLineDraw) {
+
+        if (_this.isFillDraw || _this.isLineDraw) {
             _this.setBounds(cx, cy);
             _this.setBounds(dx, dy);
             _this.addCacheKey(cx, cy, dx, dy);
@@ -13355,24 +13514,27 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.cubicCurveTo = function (cp1x, cp1y, cp2x, cp2y, x, y)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var recodes = _this.recodes;
         cp1x *= 20;
         cp1y *= 20;
         cp2x *= 20;
         cp2y *= 20;
         x *= 20;
         y *= 20;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [3, cp1x, cp1y, cp2x, cp2y, x, y];
+
+        if (_this.isFillDraw) {
+            recodes[recodes.length] = [_this.CUBIC, cp1x, cp1y, cp2x, cp2y, x, y];
         }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [3, cp1x, cp1y, cp2x, cp2y, x, y];
+
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.lineRecodes;
+            lineRecodes[lineRecodes.length] = [_this.CUBIC, cp1x, cp1y, cp2x, cp2y, x, y];
         }
-        if (isFillDraw || isLineDraw) {
+
+        if (_this.isFillDraw || _this.isLineDraw) {
             _this.setBounds(x, y);
+            _this.setBounds(cp1x, cp1y);
+            _this.setBounds(cp2x, cp2y);
             _this.addCacheKey(cp1x, cp1y, cp2x, cp2y, x, y);
         }
         return _this;
@@ -13387,20 +13549,21 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.drawCircle = function (x, y, radius)
     {
         var _this = this;
-        var isFillDraw = _this.isFillDraw;
-        var isLineDraw = _this.isLineDraw;
+        var recodes = _this.recodes;
         x *= 20;
         y *= 20;
         radius *= 20;
-        if (isFillDraw) {
-            var fillRecodes = _this.getFillRecode();
-            fillRecodes[fillRecodes.length] = [4, x, y, radius];
+
+        if (_this.isFillDraw) {
+            recodes[recodes.length] = [_this.ARC, x, y, radius];
         }
-        if (isLineDraw) {
-            var lineRecodes = _this.getLineRecode();
-            lineRecodes[lineRecodes.length] = [4, x, y, radius];
+
+        if (_this.isLineDraw) {
+            var lineRecodes = _this.lineRecodes;
+            lineRecodes[lineRecodes.length] = [_this.ARC, x, y, radius];
         }
-        if (isFillDraw || isLineDraw) {
+
+        if (_this.isFillDraw || _this.isLineDraw) {
             _this.setBounds(x - radius, y - radius);
             _this.setBounds(x + radius, y + radius);
             _this.addCacheKey(x, y, radius);
@@ -13543,6 +13706,10 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.endFill = function ()
     {
         var _this = this;
+        if (_this.isFillDraw) {
+            var recodes = _this.recodes;
+            recodes[recodes.length] = [_this.FILL];
+        }
         _this.isFillDraw = false;
         return _this;
     };
@@ -13630,65 +13797,33 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.executeRender = function (ctx, minScale, colorTransform, isClip)
     {
         var _this = this;
-        var fillRecodes = _this.fillRecodes;
-        var lineRecodes = _this.lineRecodes;
-        var length;
-        var i;
-        var obj;
-        var recodes;
-        var color;
-        var cmd;
+        var recodes = _this.recodes;
+        var length = recodes.length;
 
-        length = fillRecodes.length;
         if (length) {
-            for (i = 0; i < length; i++) {
-                obj = fillRecodes[i];
-                recodes = obj.recodes;
-                if (!recodes.length) {
-                    continue;
+            var cmd = _this.cmd;
+            if (!cmd) {
+                var lineRecodes = _this.lineRecodes;
+                var lLen = lineRecodes.length;
+                if (lLen) {
+                    for (var i = 0; i < lLen; i++) {
+                        recodes[recodes.length] = lineRecodes[i];
+                    }
+                    _this.lineRecodes = [];
                 }
+                cmd = vtc.buildCommand(recodes);
+                _this.cmd = cmd;
+            }
 
-                color = _this.generateColorTransform(obj.style, colorTransform);
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
-
-                ctx.beginPath();
-                ctx.fillStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
-                cmd(ctx);
-                if (isClip) {
-                    ctx.clip();
-                } else {
+            ctx.beginPath();
+            cmd(ctx, colorTransform, isClip);
+            if (isClip) {
+                ctx.clip();
+            } else {
+                if (_this.isFillDraw) {
                     ctx.fill();
                 }
-            }
-        }
-
-        if (!isClip) {
-            length = lineRecodes.length;
-            if (length) {
-                for (i = 0; i < length; i++) {
-                    obj = lineRecodes[i];
-                    recodes = obj.recodes;
-                    if (!recodes.length) {
-                        continue;
-                    }
-
-                    color = _this.generateColorTransform(obj.style, colorTransform);
-                    cmd = obj.cmd;
-                    if (cmd === null) {
-                        cmd = vtc.buildCommand(recodes);
-                        obj.cmd = cmd;
-                    }
-
-                    ctx.beginPath();
-                    ctx.strokeStyle = "rgba(" + color.R + "," + color.G + "," + color.B + "," + color.A + ")";
-                    ctx.lineWidth = _max(obj.Width, 1 / minScale);
-                    ctx.lineCap = obj.capsStyle;
-                    ctx.lineJoin = obj.jointStyle;
-                    cmd(ctx);
+                if (_this.isLineDraw) {
                     ctx.stroke();
                 }
             }
@@ -13713,59 +13848,28 @@ if (!("swf2js" in window)){(function(window)
     Graphics.prototype.renderHitTest = function (ctx, matrix, stage, x, y)
     {
         var _this = this;
-        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), matrix);
-        var fillRecodes = _this.fillRecodes;
-        var lineRecodes = _this.lineRecodes;
-        var recodes;
-        var cmd;
-        var i;
-        var length;
-        var obj;
-        var hit = false;
 
-        ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
-        length = fillRecodes.length;
-        if (length) {
-            for (i = 0; i < length; i++) {
-                obj = fillRecodes[i];
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    recodes = obj.recodes;
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
-
-                ctx.beginPath();
-                cmd(ctx);
-                hit = ctx.isPointInPath(x, y);
-                if (hit) {
-                    return hit;
-                }
-            }
+        var cmd = _this.cmd;
+        if (!cmd) {
+            var recodes = _this.recodes;
+            cmd = vtc.buildCommand(recodes);
+            _this.cmd = cmd;
         }
 
-        length = lineRecodes.length;
-        if (length) {
-            var minScale = _min(rMatrix[0], rMatrix[3]);
-            for (i = 0; i < length; i++) {
-                obj = lineRecodes[i];
-                cmd = obj.cmd;
-                if (cmd === null) {
-                    recodes = obj.recodes;
-                    cmd = vtc.buildCommand(recodes);
-                    obj.cmd = cmd;
-                }
+        var rMatrix = _this.multiplicationMatrix(stage.getMatrix(), matrix);
+        ctx.setTransform(rMatrix[0],rMatrix[1],rMatrix[2],rMatrix[3],rMatrix[4],rMatrix[5]);
 
-                ctx.beginPath();
-                ctx.lineWidth = _max(obj.Width, 1 / minScale);
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                cmd(ctx);
-                hit = ctx.isPointInStroke(x, y);
-                if (hit) {
-                    return hit;
-                }
-            }
+        ctx.beginPath();
+        cmd(ctx, [1,1,1,1,0,0,0,0], true);
+
+        var hit = ctx.isPointInPath(x, y);
+        if (hit) {
+            return hit;
+        }
+
+        hit = ctx.isPointInStroke(x, y);
+        if (hit) {
+            return hit;
         }
 
         return hit;
