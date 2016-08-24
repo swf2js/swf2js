@@ -65,5 +65,77 @@ Twitter: https://twitter.com/swf2js
 MIT License.
 
 
+## State
 
+
+### ActionScript
+
+* ActionScript 1.x - ◯
+* ActionScript 2.x - 80%
+* ActionScript 3.x - built-in function
+
+
+### Compression
+
+* ZLIB : ◯
+* LZMA : × (0.7.x TBR)
+
+
+### WebGL
+
+* WebGL : × (0.8 TBR)
+
+
+
+### Filter
+
+* DropShadow : ◯
+* Blur : ◯
+* Glow : ◯
+* Bevel : ◯
+* GradientGlow : × (0.8.x TBR)
+* Convolution : × (0.8.x TBR)
+* ColorMatrix : × (0.8.x TBR)
+* GradientBevel : × (0.8.x TBR)
+
+
+### Blend Mode
+
+* Layer : × (0.8.x TBR)
+* Multiply : ◯
+* Screen : ◯
+* Lighten : ◯
+* Darken : ◯
+* Difference : ◯
+* Add : ◯
+* Subtract : ◯
+* Invert : ◯
+* Alpha : ◯
+* Erase : ◯
+* Overlay : ◯
+* Hardlight : ◯
+
+
+### Audio
+
+* MP3 : ◯
+* WAV : ◯
+* WAV(ADPCM) : × (0.9.x TBR)
+
+
+### Video
+
+* Flv : × (0.9.x TBR)
+* H.264 : × (0.9.x TBR)
+
+
+
+### Browser
+
+* Chrome : ◯
+* FireFox : ◯
+* Safari : ◯
+* Edge : ◯
+* Android : ◯
+* iPhone : ◯
 
