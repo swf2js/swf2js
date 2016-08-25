@@ -71,7 +71,7 @@ MIT License.
 ### ActionScript
 
 * ActionScript 1.x - ◯
-* ActionScript 2.x - 80%
+* ActionScript 2.x - ◯
 * ActionScript 3.x - built-in function
 
 
