@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.3)
+ * swf2js (version 0.7.4)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -1651,10 +1651,12 @@ if (!("swf2js" in window)){(function(window)
                     break;
                 case 34:
                 case 35:
+                case 36:
                 case 37:
                 case 38:
                 case 39:
                 case 43:
+                case 45:
                     continue;
             }
 
@@ -2267,24 +2269,6 @@ if (!("swf2js" in window)){(function(window)
                     var action = mc.createActionScript(actionRecord.Actions);
                     mc.addEventListener(eventName, action);
                 }
-            }
-        }
-
-        // as3
-        var symbol = stage.symbols[tag.CharacterId];
-        if (symbol) {
-            var symbols = symbol.split(".");
-            var classMethod = symbols.pop();
-            var sLen = symbols.length;
-            var classObj = stage.avm2;
-            for (var sIdx = 0; sIdx < sLen; sIdx++) {
-                classObj = classObj[symbols[sIdx]];
-            }
-
-            var pack = classObj[classMethod];
-            var AVM2 = pack[classMethod];
-            if (typeof AVM2 === "function") {
-                AVM2.apply(mc);
             }
         }
 
@@ -5629,8 +5613,6 @@ if (!("swf2js" in window)){(function(window)
         var namespaces = obj.namespace;
         var string = obj.string;
         var stage = _this.stage;
-        var abc = stage.abc;
-        var avm2 = stage.avm2;
         var names = obj.names;
         for (var i = 0; i < length; i++) {
             var instance = instances[i];
@@ -5654,7 +5636,7 @@ if (!("swf2js" in window)){(function(window)
             var ns = values.pop();
 
             // build parent
-            var AVM2 = function () {};
+            var AVM2 = function (mc) { this["__swf2js__::builder"] = mc; };
             var prop = AVM2.prototype;
 
             // constructor
@@ -5708,8 +5690,8 @@ if (!("swf2js" in window)){(function(window)
             prop[localName].register = register;
 
             // build
-            var classObj = avm2;
             var abc = stage.abc;
+            var classObj = stage.avm2;
             if (ns) {
                 var nss = ns.split(".");
                 var nLen = nss.length;
@@ -5722,8 +5704,9 @@ if (!("swf2js" in window)){(function(window)
                     abc = abc[nss[nIdx]];
                 }
             }
-            classObj[className] = new AVM2();
+
             abc[className] = AVM2;
+            classObj[className] = new AVM2();
         }
     };
 
@@ -6673,6 +6656,12 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @constructor
+     */
+    var Activation = function () {};
+
+
+    /**
      * @param data
      * @param id
      * @param ns
@@ -6686,10 +6675,8 @@ if (!("swf2js" in window)){(function(window)
         // params
         _this.id = id;
         _this.caller = null;
-        _this.scope = null;
         _this.parent = null;
         _this.activation = null;
-        _this.superClass = null;
         _this.scopeStack = [];
         _this.currentIndex = 0;
         _this.stage = stage;
@@ -6722,8 +6709,8 @@ if (!("swf2js" in window)){(function(window)
             var kind = obj.kind;
             switch (kind) {
                 case 0:
-                    var key = _this.names[obj.name];
-                    _this.setVariable(key, undefined);
+                    // var key = _this.names[obj.name];
+
                     break;
             }
         }
@@ -6773,6 +6760,7 @@ if (!("swf2js" in window)){(function(window)
         beginGradientFill: 1,
         beginBitmapFill: 1,
         graphics: 1,
+        buttonMode: 1,
         clear: 1,
         moveTo: 1,
         lineTo: 1,
@@ -6830,12 +6818,27 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @returns {*}
      */
+    ActionScript3.prototype.getBuilder = function ()
+    {
+        return this.AVM2["__swf2js__::builder"];
+    };
+
+    /**
+     * @returns {*}
+     */
     ActionScript3.prototype.getSuperClass = function ()
     {
         var _this = this;
-        var ns = _this.ns;
-        var AVM2 = _this.AVM2;
-        return AVM2["__swf2js__:"+ns].superClass;
+        return _this.AVM2["__swf2js__:"+_this.ns].superClass;
+    };
+
+    /**
+     * @param superClass
+     */
+    ActionScript3.prototype.setSuperClass = function (superClass)
+    {
+        var _this = this;
+        _this.AVM2["__swf2js__:"+_this.ns].superClass = superClass;
     };
 
     /**
@@ -6843,29 +6846,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.getParent = function ()
     {
-        var parent = this.parent;
-        if (parent) {
-            return (parent.parent) ? parent.getParent() : parent;
-        }
-        return undefined;
-    };
-
-    /**
-     * @param name
-     * @param value
-     */
-    ActionScript3.prototype.setVariable = function (name, value)
-    {
-        this.variables[String(name)] = value;
-    };
-
-    /**
-     * @param name
-     * @returns {*}
-     */
-    ActionScript3.prototype.getVariable = function (name)
-    {
-        return this.variables[name];
+        return this.parent;
     };
 
     /**
@@ -6875,43 +6856,45 @@ if (!("swf2js" in window)){(function(window)
     ActionScript3.prototype.getProperty = function (name)
     {
         var _this = this;
-        var value = undefined;
+        var stage = _this.stage;
+        var value;
 
-        // local
-        value = _this.getVariable(name);
-
-        // property
-        if (value === undefined) {
-            var caller = _this.caller;
-            if (caller instanceof DisplayObject) {
-                if (name in _this.methods) {
-                    value = caller[name];
-                }
-
-                if (value === undefined) {
-                    value = caller.getProperty(name);
-                }
-            }
+        // local1
+        if (_this.activation) {
+            value = _this.activation[name];
         }
 
         // parent
         if (value === undefined) {
-            var parent = _this.parent;
+            var parent = _this.getParent();
             if (parent) {
                 value = parent.getProperty(name);
             }
         }
 
-        // global
+        // property
+        if (value === undefined) {
+            var builder = _this.getBuilder();
+            if (builder) {
+                if (name in _this.methods) {
+                    value = builder[name];
+                }
+
+                if (value === undefined) {
+                    value = builder.getProperty(name);
+                }
+            }
+        }
+
+        // local2
         if (value === undefined && name.indexOf("::") !== -1) {
             var values = name.split("::");
             var className = values.pop();
             var path = values.pop();
             if (path !== "private") {
                 var pathArr = path.split(".");
-
                 var pLen = pathArr.length;
-                var classObj = _this.stage.avm2;
+                var classObj = stage.avm2;
                 for (var pIdx = 0; pIdx < pLen; pIdx++) {
                     classObj = classObj[pathArr[pIdx]];
                 }
@@ -6921,8 +6904,13 @@ if (!("swf2js" in window)){(function(window)
                     value = _this.AVM2[className];
                 }
             } else {
-                value = _this.AVM2[className];
+                value = _this.AVM2["private::"+ className];
             }
+        }
+
+        // global
+        if (value === undefined) {
+            value = stage.avm2[name];
         }
 
         return value;
@@ -6943,18 +6931,17 @@ if (!("swf2js" in window)){(function(window)
             var stage = _this.stage;
 
             for (var i = 0; i < paramCount; i++) {
-                var kind;
+                var value = undefined;
+
                 if (i in options) {
                     var option = options[i];
-                    kind = option.kind;
                     var val = option.val;
-                    var value = undefined;
-                    switch (kind) {
+                    switch (option.kind) {
                         case 0x01: // string
                             value = data.string[val];
                             break;
                         default:
-                            console.log("options", kind);
+                            console.log("options", option);
                             break;
                     }
                 }
@@ -6963,16 +6950,17 @@ if (!("swf2js" in window)){(function(window)
                     var pType = paramType[i];
                     if (pType) {
                         var mName = data.multiname_info[pType];
-                        kind = mName.kind;
                         var className = null;
                         var path = "";
-                        switch (kind) {
+                        switch (mName.kind) {
                             case 0x07: // QName
                                 var ns = data.namespace[mName.ns];
-                                var nsKind = ns.kind;
-                                switch (nsKind) {
+                                switch (ns.kind) {
                                     case 0x16:
                                         path = data.string[ns.name];
+                                        break;
+                                    default:
+                                        console.log("SetOptions", ns);
                                         break;
                                 }
 
@@ -6980,13 +6968,15 @@ if (!("swf2js" in window)){(function(window)
                                 break;
                         }
 
-                        var values = path.split(".");
-                        var pLen = values.length;
-                        var classObj = stage.avm2;
-                        for (var idx = 0; idx < pLen; idx++) {
-                            classObj = classObj[values[idx]];
+                        if (path) {
+                            var values = path.split(".");
+                            var pLen = values.length;
+                            var classObj = stage.avm2;
+                            for (var idx = 0; idx < pLen; idx++) {
+                                classObj = classObj[values[idx]];
+                            }
+                            value = classObj[className];
                         }
-                        value = classObj[className];
                     }
                 }
 
@@ -7548,11 +7538,12 @@ if (!("swf2js" in window)){(function(window)
     ActionScript3.prototype.ActionCall = function (stack, argCount)
     {
         var params = [];
-        for (var i = 0; i < argCount; i++) {
-            params[params.length] = stack.pop();
+        for (var i = argCount; i--;) {
+            params[i] = stack.pop();
         }
         var receiver = stack.pop();
         var func = stack.pop();
+
         var value;
         if (typeof func === "function") {
             value = func.apply(receiver, params);
@@ -7574,7 +7565,7 @@ if (!("swf2js" in window)){(function(window)
         var receiver = stack.pop();
         var value;
         if (typeof receiver === "function") {
-            value = receiver.apply(this.scope, params);
+            value = receiver.apply(this.caller, params);
         }
         stack[stack.length] = value;
     };
@@ -7594,7 +7585,7 @@ if (!("swf2js" in window)){(function(window)
         var prop = _this.names[index];
         var obj = stack.pop();
 
-        var value = undefined;
+        var value;
         if (obj) {
             var func = null;
             if (obj instanceof DisplayObject) {
@@ -7606,7 +7597,7 @@ if (!("swf2js" in window)){(function(window)
                     func = obj.getProperty(prop);
                 }
             } else {
-                func = obj[prop]
+                func = obj[prop];
             }
 
             if (func) {
@@ -7624,16 +7615,18 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionCallPropLex = function (stack, index, argCount)
     {
+        var _this = this;
         var params = [];
         for (var i = argCount; i--;) {
             params[params.length] = stack.pop();
         }
 
-        var prop = this.names[index];
+        var prop = _this.names[index];
         var obj = stack.pop();
+
         var value;
         if (obj) {
-            value = obj[prop];
+            value = obj[prop].apply(_this.getBuilder(), params);
         }
         stack[stack.length] = value;
     };
@@ -7651,53 +7644,65 @@ if (!("swf2js" in window)){(function(window)
             params[i] = stack.pop();
         }
 
-        var prop = _this.names[index];
         var obj = stack.pop();
+        var name = _this.names[index];
+        var values = name.split("::"); // implements
+        var prop = values.pop();
+        var ns = values.pop();
 
-        var func = null;
-        var parent = _this.getParent();
-        var caller = (parent) ? parent.caller : _this.caller;
+        var func = obj[prop];
+        if (!func && obj instanceof MovieClip) {
+            var stage = obj.getStage();
+            var symbol = stage.symbols[obj.getCharacterId()];
+            if (symbol) {
+                var names = symbol.split(".");
+                var classMethod = names.pop();
+                var length = names.length;
+                var classObj = stage.avm2;
+                for (i = 0; i < length; i++) {
+                    classObj = classObj[names[i]];
+                }
 
-        // static
-        var values = prop.split("::");
-        if (values.length > 1) {
-            console.log("static -> ActionCallPropVoid", prop);
-        //     var className = values.pop();
-        //     func = _this.AVM2[className];
-        }
-
-        if (obj instanceof DisplayObject) {
-            if (prop in _this.methods) {
-                func = obj[prop];
-            }
-
-            if (!func) {
-                func = obj.getProperty(prop);
-            }
-
-            if (func) {
-                caller = (obj._extend) ? caller : obj;
-            }
-        } else {
-            func = obj[prop];
-
-            if (func) {
-                caller = obj;
+                if (classObj) {
+                    var AVM2 = classObj[classMethod];
+                    func = AVM2[prop];
+                }
             }
         }
 
-        if (!func && !(obj instanceof DisplayObject)) {
-            if (prop in _this.methods) {
-                func = caller[prop];
-            }
+        if (!func) {
+            while (true) {
+                var SuperClass = obj.super;
+                if (!SuperClass) {
+                    break;
+                }
 
-            if (!func) {
-                func = caller.getProperty(prop);
+                if (SuperClass instanceof MovieClip) {
+                    obj = _this.caller;
+                    func = obj[prop];
+                    break;
+                }
+
+                func = SuperClass[prop];
+                if (func) {
+                    break;
+                }
+
+                obj = SuperClass;
             }
+        }
+
+        // fscommand
+        if (prop === "fscommand") {
+            obj = _this.stage;
+        }
+
+        if (ns) {
+            // console.log("ActionCallPropVoid::Namespace", ns, prop, this, obj);
         }
 
         if (func) {
-            func.apply(caller, params);
+            func.apply(obj, params);
         }
     };
 
@@ -7816,14 +7821,20 @@ if (!("swf2js" in window)){(function(window)
         var prop = _this.names[index];
         var obj = stack.pop();
 
-        var func;
-        if (obj instanceof DisplayObject) {
-            func = obj.getProperty(prop);
+        var value;
+        var stage = _this.stage;
+        var DoABC = stage.abc[prop];
+        if (DoABC) {
+            var builder = _this.getBuilder();
+            var AVM2 = new DoABC(builder);
+            stage.avm2[prop] = AVM2;
+            AVM2[prop].apply(builder, params);
+            value = AVM2;
         } else {
-            func = obj[prop];
+            value = new (Function.prototype.bind.apply(obj[prop], params))();
         }
 
-        stack[stack.length] = new (Function.prototype.bind.apply(func, params))();
+        stack[stack.length] = value;
     };
 
     /**
@@ -7841,42 +7852,47 @@ if (!("swf2js" in window)){(function(window)
         var obj = stack.pop();
         var SuperClassName = obj["__swf2js__:"+_this.ns].extends;
         var values = SuperClassName.split("::");
+        var prop = values.pop();
+        var ns = values.pop();
         var stage = _this.stage;
-        var abc = stage.avm2;
-        var SuperClass;
-        var sc;
-        if (values.length > 1) {
-            var ns = values[0];
-            var cName = values[1];
+        var abcObj = stage.abc;
+        var avmObj = stage.avm2;
+
+        if (ns) {
             var names = ns.split(".");
-            var nLen = names.length;
-            var classObj = abc;
-            for (i = 0; i < nLen; i++) {
-                classObj = classObj[names[i]];
-            }
-
-            if (classObj) {
-                SuperClass = classObj[cName];
-            }
-
-            switch (SuperClass) {
-                case MovieClip:
-                    sc = new MovieClip();
-                    sc.setStage(stage);
-                    sc._extend = true;
-                    break;
-            }
-        } else {
-            if (SuperClassName in window) {
-                sc = new (Function.prototype.bind.apply(window[SuperClassName], params))();
-            } else {
-                SuperClass = abc[SuperClassName];
-                console.log(SuperClass);
-                sc = new (Function.prototype.bind.apply(SuperClass, params))();
+            var length = names.length;
+            for (i = 0; i < length; i++) {
+                abcObj = abcObj[names[i]];
+                avmObj = avmObj[names[i]];
             }
         }
 
-        obj["__swf2js__:"+_this.ns].superClass = sc;
+        var sClass = null;
+        var SuperClass = abcObj[prop];
+        var builder = _this.getBuilder();
+        switch (SuperClass) {
+            case MovieClip:
+                sClass = new MovieClip();
+                sClass.setStage(stage);
+                sClass._extend = true;
+                break;
+            case Sound:
+                sClass = new Sound();
+                sClass.movieClip = builder;
+                break;
+            default:
+                if (SuperClass in window) { // Object
+                    sClass = new (Function.prototype.bind.apply(window[SuperClassName], params))();
+                } else {
+                    sClass = new SuperClass(builder);
+                    avmObj[prop] = sClass;
+                    sClass[prop].apply(builder, params);
+                }
+                break;
+        }
+
+        obj["super"] = sClass;
+        obj["__swf2js__:"+_this.ns].superClass = sClass;
     };
 
     /**
@@ -8109,58 +8125,66 @@ if (!("swf2js" in window)){(function(window)
     ActionScript3.prototype.ActionFindPropStrict = function (stack, index)
     {
         var _this = this;
-        var prop = _this.names[index];
-
-        // scope
+        var name = _this.names[index];
+        var values = name.split("::");
+        var prop = values.pop();
+        var ns = values.pop();
         var obj = null;
-        var scopeStack = _this.scopeStack;
-        if (scopeStack.length) {
-            var length = scopeStack.length;
-            for (var i = 0; i < length; i++) {
-                var scope = scopeStack[i];
-                if (!(prop in scope)) {
-                    continue;
-                }
-                obj = scope;
-                break;
+
+        // caller
+        var caller = _this.caller;
+        if (caller && !(caller instanceof MovieClip)) {
+            if (name in caller) {
+                obj = caller;
             }
         }
 
-        var value = null;
         if (!obj) {
-            var superClass = _this.getSuperClass();
-            if (superClass instanceof DisplayObject) {
-                if (prop in _this.methods) {
-                    obj = superClass;
-                }
-
-                if (!obj) {
-                    value = superClass.getProperty(prop);
-                    if (value) {
-                        obj = caller;
+            var AVM2 = _this.AVM2;
+            if (ns) {
+                var names = ns.split(".");
+                var length = names.length;
+                if (length > 1) {
+                    var avmObj = _this.stage.avm2;
+                    for (var i = 0; i < length; i++) {
+                        avmObj = avmObj[names[i]];
                     }
+                    AVM2 = avmObj;
                 }
-            } else if (prop in superClass) {
-                obj = superClass;
             }
 
-            if (!obj) {
-                if (prop in window) {
-                    obj = window;
-                }
+            // local
+            if (prop in AVM2) {
+                obj = AVM2;
             }
         }
 
-        // global
+        // find avm
         if (!obj) {
             var avm2s = _this.stage.avm2;
             if (prop in avm2s) {
-                if (prop in avm2s[prop]) {
-                    obj = avm2s[prop];
-                } else {
-                    obj = avm2s;
+                obj = avm2s[prop];
+            }
+        }
+
+        // builder
+        if (!obj) {
+            var builder = _this.getBuilder();
+            if (builder) {
+                if (builder instanceof MovieClip) {
+                    if (prop in _this.methods) {
+                        obj = builder;
+                    }
+
+                    if (builder.getProperty() !== undefined) {
+                        obj = builder;
+                    }
                 }
             }
+        }
+
+        if (!obj) {
+            // console.log("ActionFindPropStrict::ERROR", name, AVM2, this);
         }
 
         stack[stack.length] = obj;
@@ -8172,6 +8196,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionGetDescendAnts = function (stack, index)
     {
+        console.log("ActionGetDescendAnts");
         var porp = this.names[index];
         var obj;
         stack[stack.length] = obj;
@@ -8182,8 +8207,9 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionGetGlobalScope = function (stack)
     {
-        var obj;
-        stack[stack.length] = obj;
+        var _this = this;
+        var scopeStack = _this.scopeStack;
+        stack[stack.length] = scopeStack[scopeStack.length - 1];
     };
 
     /**
@@ -8192,6 +8218,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionGetGlobalsLot = function (stack, index)
     {
+        console.log("ActionGetGlobalsLot");
         var value;
         stack[stack.length] = value;
     };
@@ -8204,8 +8231,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var name = _this.names[index];
-        var value = _this.getProperty(name);
-        stack[stack.length] = value
+        stack[stack.length] = _this.getProperty(name);
     };
 
     /**
@@ -8284,19 +8310,20 @@ if (!("swf2js" in window)){(function(window)
 
         var value = undefined;
         if (obj && prop) {
-            value = _this.getProperty(prop);
-            if (value === undefined) {
-                if (obj instanceof DisplayObject) {
-                    if (prop in _this.methods) {
-                        value = obj[prop];
-                    }
-
-                    if (!value) {
-                        value = obj.getProperty(prop);
-                    }
-                } else {
+            if (obj instanceof DisplayObject) {
+                if (prop in _this.methods) {
                     value = obj[prop];
                 }
+
+                if (!value) {
+                    value = obj.getProperty(prop);
+                }
+            } else {
+                value = obj[prop];
+            }
+
+            if (value === undefined) {
+                value = _this.getProperty(prop);
             }
         }
 
@@ -8325,7 +8352,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var obj = stack.pop();
         var name = obj[index];
-        stack[stack.length] = this.getProperty(name);
+        stack[stack.length] = this.activation[name];
     };
 
     /**
@@ -8597,8 +8624,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionIncLocal = function (stack, index)
     {
-
-
+        this.register[index]+=1;
     };
 
     /**
@@ -8607,7 +8633,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionIncLocalI = function (stack, index)
     {
-
+        this.register[index]+=1;
     };
 
     /**
@@ -8793,7 +8819,7 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var trait = _this.body.trait;
         var length = trait.length;
-        var activation = [];
+        var activation = new Activation();
         for (var i = 0; i < length; i++) {
             var obj = trait[i];
             var kind = obj.kind;
@@ -8803,6 +8829,7 @@ if (!("swf2js" in window)){(function(window)
                     break;
             }
         }
+
         _this.activation = activation;
         stack[stack.length] = activation;
     };
@@ -9156,31 +9183,24 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var prop = _this.names[index];
         var obj = stack.pop();
+
         if (obj) {
             if (obj instanceof DisplayObject) {
                 if (prop in _this.methods) {
                     obj[prop] = value;
                 } else {
-                    obj.setProperty(prop, value);
+                    console.log("ActionSetProperty", prop);
                 }
+            } else if (prop in obj) {
+                obj[prop] = value;
             } else {
-                if (obj === _this.AVM2) {
-                    if (prop in obj) {
-                        obj[prop] = value;
+                var builder = _this.getBuilder();
+                if (builder instanceof DisplayObject) {
+                    if (prop in _this.methods) {
+                        builder[prop] = value;
                     } else {
-                        var caller = _this.caller;
-                        if (caller instanceof DisplayObject) {
-                            if (prop in _this.methods) {
-                                caller[prop] = value;
-                            } else {
-                                caller.setProperty(prop, value);
-                            }
-                        } else {
-                            _this.caller[prop] = value;
-                        }
+                        obj[prop] = value;
                     }
-                } else {
-                    obj[prop] = value;
                 }
             }
         }
@@ -9195,7 +9215,7 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var obj = stack.pop();
         var name = obj[index];
-        this.setVariable(name, value);
+        this.activation[name] = value;
     };
 
     /**
@@ -9207,6 +9227,7 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var prop = this.names[index];
         var obj = stack.pop();
+        
     };
 
     /**
@@ -14485,8 +14506,8 @@ if (!("swf2js" in window)){(function(window)
     Swf2jsEvent.prototype.MIDDLE_MOUSE_UP = "middleMouseUp";
     Swf2jsEvent.prototype.MOUSE_DOWN = "mouseDown";
     Swf2jsEvent.prototype.MOUSE_MOVE = "mouseMove";
-    Swf2jsEvent.prototype.MOUSE_OUT = "mouseOut";
-    Swf2jsEvent.prototype.MOUSE_OVER = "mouseOver";
+    Swf2jsEvent.prototype.MOUSE_OUT = "rollOut"; // mouseOut
+    Swf2jsEvent.prototype.MOUSE_OVER = "rollOver"; // mouseOver
     Swf2jsEvent.prototype.MOUSE_UP = "mouseUp";
     Swf2jsEvent.prototype.MOUSE_WHEEL = "mouseWheel";
     Swf2jsEvent.prototype.RIGHT_CLICK = "rightClick";
@@ -16326,7 +16347,7 @@ if (!("swf2js" in window)){(function(window)
             }
         }
 
-        var value = undefined;
+        var value;
         if (version > 4) {
             var registerClass = variables.registerClass;
             if (registerClass &&
@@ -17861,6 +17882,14 @@ if (!("swf2js" in window)){(function(window)
                 this.setHitArea(sprite);
             }
         },
+        buttonMode: {
+            get: function () {
+                return this.getButtonMode();
+            },
+            set: function (buttonMode) {
+                this.setButtonMode(buttonMode);
+            }
+        },
         soundTransform: {
             get: function () {
                 return this._soundTransform;
@@ -17907,7 +17936,7 @@ if (!("swf2js" in window)){(function(window)
      */
     Sprite.prototype.setHitArea = function (displayObject)
     {
-        this._buttonMode = displayObject;
+        this._hitArea = displayObject;
     };
 
     /**
@@ -19766,7 +19795,6 @@ if (!("swf2js" in window)){(function(window)
         var _multiplicationMatrix = _this.multiplicationMatrix;
         var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
 
-
         // pre render
         var obj = _this.preRender(ctx, m2, rColorTransform, stage, visible);
         var preCtx = obj.preCtx;
@@ -21508,14 +21536,23 @@ if (!("swf2js" in window)){(function(window)
      */
     MovieClip.prototype.getURL = function (url, target, method)
     {
+        var _this = this;
         if (typeof url === "string") {
             var cmd = url.substr(0, 9);
             if (cmd === "FSCommand") {
-                return true;
+                var values = cmd.split(":");
+                cmd = values.pop();
+                var str = arguments[1];
+                if (str === undefined) {
+                    str = "";
+                }
+
+                var stage = _this.getStage();
+                var FSCommand = stage.abc.flash.system.fscommand;
+                return FSCommand.apply(stage, [cmd, str]);
             }
         }
 
-        var _this = this;
         if (target && typeof target === "string") {
             switch (target.toLowerCase()) {
                 case "_self":
@@ -21700,7 +21737,7 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @returns {{xMin: *, xMax: *, yMin: *, yMax: *}}
-     * @private
+     * @returns {*}
      */
     MovieClip.prototype.getHitBounds = function ()
     {
@@ -22093,7 +22130,6 @@ if (!("swf2js" in window)){(function(window)
         var initAction = stage.initActions[_this.getCharacterId()];
         if (typeof initAction === "function") {
             initAction.apply(_this);
-
         }
     };
 
@@ -22574,7 +22610,6 @@ if (!("swf2js" in window)){(function(window)
         _this.clear();
         _this.initParams();
         _this.variables = {};
-        _this.resetAVM2();
     };
 
     /**
@@ -22751,6 +22786,9 @@ if (!("swf2js" in window)){(function(window)
         if (_this.isAction) {
             _this.isAction = false;
             if (!_this.isLoad) {
+                // as3
+                _this.buildAVM2();
+
                 // registerClass
                 var RegClass = myStage.registerClass[_this.getCharacterId()];
                 if (typeof RegClass === "function") {
@@ -22956,24 +22994,35 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * resetAVM2
+     * buildAVM2
      */
-    MovieClip.prototype.resetAVM2 = function ()
+    MovieClip.prototype.buildAVM2 = function ()
     {
         var _this = this;
         var stage = _this.getStage();
         var symbol = stage.symbols[_this.getCharacterId()];
         if (symbol) {
             var symbols = symbol.split(".");
-            var className = symbols.pop();
-            var sLen = symbols.length;
+            var classMethod = symbols.pop();
+            var length = symbols.length;
             var classObj = stage.avm2;
-            var AVM2 = stage.abc;
-            for (var sIdx = 0; sIdx < sLen; sIdx++) {
-                classObj = classObj[symbols[sIdx]];
-                AVM2 = AVM2[symbols[sIdx]];
+            var abcObj = stage.abc;
+            for (var i = 0; i < length; i++) {
+                classObj = classObj[symbols[i]];
+                abcObj = abcObj[symbols[i]];
             }
-            classObj[className] = new AVM2();
+
+            // build abc
+            var DoABC = abcObj[classMethod];
+            var ABCObj = new DoABC(_this);
+            classObj[classMethod] = ABCObj;
+
+            // AVM2 init
+            var AVM2 = ABCObj[classMethod];
+            if (typeof AVM2 === "function") {
+                _this.actions = [];
+                AVM2.apply(_this);
+            }
         }
     };
 
@@ -24308,6 +24357,75 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @constructor
+     * @param stage
+     */
+    var packages = function (stage)
+    {
+        this.stage = stage;
+
+    };
+
+    /**
+     * @type {*}
+     */
+    packages.prototype =
+    {
+        "flash": {
+            "display": {
+                "MovieClip": MovieClip,
+                "Sprite": Sprite,
+                "DisplayObjectContainer": DisplayObjectContainer,
+                "InteractiveObject": InteractiveObject,
+                "DisplayObject": DisplayObject,
+                "Graphics": Graphics
+            },
+            "events": {
+                "EventDispatcher": EventDispatcher,
+                "MouseEvent": clipEvent
+            },
+            "text": {
+                "StaticText": StaticText
+            },
+            "media": {
+                "Sound": Sound
+            },
+            "system": {
+                "fscommand": function ()
+                {
+                    var arg = arguments;
+                    var cmd = arg[0];
+                    var str = arg[1];
+                    if (str === undefined) {
+                        str = "";
+                    }
+
+                    switch (cmd) {
+                        case "quit":
+                        case "fullscreen":
+                        case "allowscale":
+                        case "showmenu":
+                        case "exec":
+                        case "trapallkeys":
+                            break;
+                        default:
+                            if (cmd) {
+                                var method = (this.tagId) ? this.tagId : this.getName();
+                                var func = function () {
+                                    location.href = "javascript:"+ method +"_DoFSCommand("+ cmd +","+ str +");";
+                                };
+                                func();
+                            }
+                            break;
+                    }
+
+                    return true;
+                }
+            }
+        }
+    };
+
+    /**
+     * @constructor
      */
     var Stage = function ()
     {
@@ -24327,9 +24445,9 @@ if (!("swf2js" in window)){(function(window)
         _this.renderMode = isWebGL;
         _this.tagId = null;
         _this.FlashVars = {};
-        _this.quality = "medium"; // low = 0.5, medium = 0.8, high = 1.0
+        _this.quality = "medium"; // low = 0.25, medium = 0.75, high = 1.0
         _this.bgcolor = null;
-
+        
         // event
         _this.mouse = new Mouse();
 
@@ -24360,7 +24478,6 @@ if (!("swf2js" in window)){(function(window)
         _this.placeObjects = [];
         _this.fonts = [];
         _this.isAction = true;
-        _this.queue = null;
         _this._global = new Global();
         _this.touchObj = null;
         _this.touchStatus = "up";
@@ -24386,26 +24503,8 @@ if (!("swf2js" in window)){(function(window)
         _this.dragRules = null;
         _this.scaleMode = "showAll";
         _this.align = "";
-        _this.avm2 = {
-            "flash": {
-                "display": {
-                    "MovieClip": MovieClip,
-                    "Sprite": Sprite,
-                    "DisplayObjectContainer": DisplayObjectContainer,
-                    "InteractiveObject": InteractiveObject,
-                    "DisplayObject": DisplayObject,
-                    "Graphics": Graphics
-                },
-                "events": {
-                    "EventDispatcher": EventDispatcher,
-                    "MouseEvent" : clipEvent
-                },
-                "text": {
-                    "StaticText": StaticText
-                }
-            }
-        };
-        _this.abc = {};
+        _this.avm2 = new packages(_this);
+        _this.abc = new packages(_this);
         _this.symbols = [];
 
         // render
@@ -24844,24 +24943,6 @@ if (!("swf2js" in window)){(function(window)
 
             // build
             swftag.build(tags, mc);
-
-            // as3
-            var symbol = _this.symbols[0];
-            if (symbol) {
-                var symbols = symbol.split(".");
-                var classMethod = symbols.pop();
-                var sLen = symbols.length;
-                var classObj = _this.avm2;
-                for (var sIdx = 0; sIdx < sLen; sIdx++) {
-                    classObj = classObj[symbols[sIdx]];
-                }
-
-                var pack = classObj[classMethod];
-                var AVM2 = pack[classMethod];
-                if (typeof AVM2 === "function") {
-                    AVM2.apply(mc);
-                }
-            }
 
             var query = url.split("?")[1];
             if (query) {
