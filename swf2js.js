@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.4)
+ * swf2js (version 0.7.5)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -21540,7 +21540,7 @@ if (!("swf2js" in window)){(function(window)
         if (typeof url === "string") {
             var cmd = url.substr(0, 9);
             if (cmd === "FSCommand") {
-                var values = cmd.split(":");
+                var values = url.split(":");
                 cmd = values.pop();
                 var str = arguments[1];
                 if (str === undefined) {
@@ -24392,14 +24392,13 @@ if (!("swf2js" in window)){(function(window)
             "system": {
                 "fscommand": function ()
                 {
-                    var arg = arguments;
-                    var cmd = arg[0];
-                    var str = arg[1];
-                    if (str === undefined) {
-                        str = "";
+                    var command = arguments[0];
+                    var args = arguments[1];
+                    if (args === undefined) {
+                        args = "";
                     }
 
-                    switch (cmd) {
+                    switch (command) {
                         case "quit":
                         case "fullscreen":
                         case "allowscale":
@@ -24408,12 +24407,12 @@ if (!("swf2js" in window)){(function(window)
                         case "trapallkeys":
                             break;
                         default:
-                            if (cmd) {
-                                var method = (this.tagId) ? this.tagId : this.getName();
-                                var func = function () {
-                                    location.href = "javascript:"+ method +"_DoFSCommand("+ cmd +","+ str +");";
-                                };
-                                func();
+                            if (command) {
+                                var _this = this;
+                                var method = (_this.tagId) ? _this.tagId : _this.getName();
+                                var body = method +"_DoFSCommand(command, args);";
+                                var fscommand = new Func("command", "args", body);
+                                fscommand(command, args);
                             }
                             break;
                     }
