@@ -6,7 +6,7 @@ JavaScript製FlashPlayer「swf2js」Flash(swf)をHTML5に変換してiPhone、An
 swfをJavaScriptで直接バイナリ分解してcanvasに出力  
 分解と変換をリアルタイムで行っているので動的なswfも再生可能。  
 対応バージョン: 
-* FlashLite 1.x, 2.x
+* FlashLite 1.x, 2.x, 3.x, 4,x
 * ActionScript 1.0, 2.0
 * ActionScript 3.0 (prototype)
 
@@ -16,12 +16,12 @@ play the swf on the iPhone.
 An open source Flash™ runtime written in pure JavaScript.
 
 Supports: 
-* FlashLite 1.x, 2.x
+* FlashLite 1.x, 2.x, 3.x, 4,x
 * ActionScript 1.0, 2.0
 * ActionScript 3.0 (prototype)
 
 
-## Latest Version *0.7.5*  
+## Latest Version *0.7.6*  
 
 -- Release Date: 08 Sep 2016  
 
@@ -59,10 +59,6 @@ http://gamebiz.jp/?p=131364
 Facebook: https://www.facebook.com/swf2js  
 Twitter: https://twitter.com/swf2js  
 
-
-## License  
-
-MIT License.
 
 
 ## State
@@ -138,4 +134,5 @@ MIT License.
 * Edge : ◯
 * Android : ◯
 * iPhone : ◯
+* Internet Explorer 10,11 : ◯
 
