@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.5)
+ * swf2js (version 0.7.6)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -66,7 +66,7 @@ if (!("swf2js" in window)){(function(window)
     var xmlHttpRequest = new XMLHttpRequest();
     var isXHR2 = (typeof xmlHttpRequest.responseType !== "undefined");
     var isArrayBuffer = window.ArrayBuffer;
-    var quality = (isWebGL) ? 1 : 0.75;
+    var quality = (isWebGL) ? 1 : 0.8;
     var devicePixelRatio = window.devicePixelRatio || 1;
     var _devicePixelRatio = devicePixelRatio * quality;
     var _event = null;
@@ -131,6 +131,13 @@ if (!("swf2js" in window)){(function(window)
         Object.getPrototypeOf = function (obj)
         {
             return obj.__proto__;
+        };
+    }
+
+    if (typeof Object.setPrototypeOf !== "function") {
+        Object.setPrototypeOf = function (obj, proto) {
+            obj.__proto__ = proto;
+            return obj;
         };
     }
 
@@ -5493,6 +5500,8 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         var bitio = _this.bitio;
+        var stage = _this.stage;
+        stage.abcFlag = true;
         var startOffset = bitio.byte_offset;
 
         var obj = {};
@@ -7345,7 +7354,7 @@ if (!("swf2js" in window)){(function(window)
                     _this.ActionPop(stack);
                     break;
                 case 0x1d:
-                    _this.ActionPopScope(stack);
+                    _this.ActionPopScope();
                     break;
                 case 0x24:
                     _this.ActionPushByte(stack, obj.value1);
@@ -8308,13 +8317,15 @@ if (!("swf2js" in window)){(function(window)
         }
         var obj = stack.pop();
 
-        var value = undefined;
+        var value;
         if (obj && prop) {
             if (obj instanceof DisplayObject) {
                 if (prop in _this.methods) {
                     value = obj[prop];
                 }
-
+                if (!value && prop === "parent") {
+                    value = obj;
+                }
                 if (!value) {
                     value = obj.getProperty(prop);
                 }
@@ -8326,7 +8337,6 @@ if (!("swf2js" in window)){(function(window)
                 value = _this.getProperty(prop);
             }
         }
-
         stack[stack.length] = value;
     };
 
@@ -8969,9 +8979,9 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
-     * @param stack
+     *
      */
-    ActionScript3.prototype.ActionPopScope = function (stack)
+    ActionScript3.prototype.ActionPopScope = function ()
     {
         this.scopeStack.pop();
     };
@@ -14297,9 +14307,11 @@ if (!("swf2js" in window)){(function(window)
             return hit;
         }
 
-        hit = ctx.isPointInStroke(x, y);
-        if (hit) {
-            return hit;
+        if ("isPointInStroke" in ctx) {
+            hit = ctx.isPointInStroke(x, y);
+            if (hit) {
+                return hit;
+            }
         }
 
         return hit;
@@ -14518,12 +14530,14 @@ if (!("swf2js" in window)){(function(window)
 
     /**
      * @param type
+     * @param target
      * @constructor
      */
     var ClipEvent = function (type)
     {
         var _this = this;
         _this.type = type;
+        _this.target = null;
         Swf2jsEvent.call(this);
     };
 
@@ -14727,7 +14741,11 @@ if (!("swf2js" in window)){(function(window)
         var type = event.type;
         if (_this.hasEventListener(type)) {
             var events = _this.events[type];
-            _this.setActionQueue(events, stage);
+            var cEvent = new ClipEvent();
+            cEvent.type = type;
+            cEvent.target = this;
+            var args = [cEvent];
+            _this.setActionQueue(events, stage, args);
         }
     };
 
@@ -14773,11 +14791,12 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param as
      * @param stage
+     * @param args
      */
-    EventDispatcher.prototype.setActionQueue = function (as, stage)
+    EventDispatcher.prototype.setActionQueue = function (as, stage, args)
     {
         var actions = stage.actions;
-        actions[actions.length] = {as: as, mc: this};
+        actions[actions.length] = {as: as, mc: this, args: args};
     };
 
     /**
@@ -15029,6 +15048,22 @@ if (!("swf2js" in window)){(function(window)
             set: function (enabled) {
                 this.setEnabled(enabled);
             }
+        },
+        _parent: {
+            get: function () {
+                return this.getParent();
+            },
+            set: function (parent) {
+                this.setParent(parent);
+            }
+        },
+        parent: {
+            get: function () {
+                return this.getParent();
+            },
+            set: function (parent) {
+                this.setParent(parent);
+            }
         }
     });
 
@@ -15052,6 +15087,7 @@ if (!("swf2js" in window)){(function(window)
         _this.variables = {};
         _this.buttonStatus = "up";
         _this.removeFlag = false;
+        _this.parentId = null;
 
         // properties
         _this.__visible = true;
@@ -15070,7 +15106,6 @@ if (!("swf2js" in window)){(function(window)
         _this._blendMode = null;
         _this._filters = null;
         _this._filterCacheKey = null;
-        _this._parent = null;
         _this._parentPlace = null;
         _this._mask = null;
         _this._matrix = null;
@@ -15404,12 +15439,13 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var stage = _this.getLoadStage();
         var parent;
+        var pId = _this.parentId;
         if (stage) {
-            parent = stage.getInstance(_this._parent);
+            parent = stage.getInstance(pId);
         }
         if (!parent) {
             stage = _this.getParentStage();
-            parent = stage.getInstance(_this._parent);
+            parent = stage.getInstance(pId);
         }
         return parent;
     };
@@ -15423,7 +15459,7 @@ if (!("swf2js" in window)){(function(window)
         if (parent instanceof DisplayObjectContainer) {
             parent.setInstance(_this);
         }
-        _this._parent = parent.instanceId;
+        _this.parentId = parent.instanceId;
     };
 
     /**
@@ -18183,7 +18219,6 @@ if (!("swf2js" in window)){(function(window)
         var length = container.length;
         var maskObj = _this.getMask();
 
-
         if (length) {
             var myStage = _this.getStage();
             for (var depth in container) {
@@ -18320,13 +18355,13 @@ if (!("swf2js" in window)){(function(window)
     Sprite.prototype.renderHitTest = function (ctx, matrix, stage, x, y)
     {
         var _this = this;
+        var loadStage = _this.getStage();
         var tags = _this.getTags();
         var length = tags.length;
         var hit = false;
         var rMatrix = _this.multiplicationMatrix(matrix, _this.getMatrix());
 
         if (length) {
-            var loadStage = _this.getStage();
             for (var depth in tags) {
                 if (!tags.hasOwnProperty(depth)) {
                     continue;
@@ -18436,6 +18471,80 @@ if (!("swf2js" in window)){(function(window)
         }
 
         return {xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax};
+    };
+
+    /**
+     * @param ctx
+     * @param matrix
+     * @param stage
+     * @param x
+     * @param y
+     * @returns {*}
+     */
+    Sprite.prototype.hitCheck = function (ctx, matrix, stage, x, y)
+    {
+        var _this = this;
+        if (!_this.getEnabled() || !_this.getVisible()) {
+            return false;
+        }
+
+        var hitObj;
+        var hit = false;
+        var tags = _this.getTags();
+        var length = tags.length;
+        var matrix2 = _this.multiplicationMatrix(matrix, _this.getMatrix());
+        if (length) {
+            var loadStage = _this.getStage();
+            tags.reverse();
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
+                    continue;
+                }
+
+                var tagId = tags[depth];
+                var instance = loadStage.getInstance(tagId);
+                if (instance instanceof Shape ||
+                    instance instanceof StaticText ||
+                    instance instanceof TextField
+                ) {
+                    hit = instance.renderHitTest(ctx, matrix2, stage, x, y);
+                } else {
+                    hit = instance.hitCheck(ctx, matrix2, stage, x, y);
+                }
+
+                if (hit) {
+                    hitObj = hit;
+                    if (typeof hit !== "object") {
+                        var events = _this.events;
+                        if (events.press !== undefined ||
+                            events.release !== undefined ||
+                            events.releaseOutside !== undefined ||
+                            events.rollOver !== undefined ||
+                            events.rollOut !== undefined ||
+                            events.dragOver !== undefined ||
+                            events.dragOut !== undefined
+                        ) {
+                            stage.isHit = hit;
+                            hitObj = {parent : _this};
+                        }
+                    }
+
+                    tags.reverse();
+                    return hitObj;
+                }
+            }
+            tags.reverse();
+        }
+
+        var graphics = _this.graphics;
+        if (graphics.isDraw) {
+            hit = graphics.renderHitTest(ctx, matrix2, stage, x, y);
+            if (hit) {
+                hitObj = {parent : _this};
+            }
+        }
+
+        return hitObj;
     };
 
     /**
@@ -18738,9 +18847,11 @@ if (!("swf2js" in window)){(function(window)
                 return hit;
             }
 
-            hit = ctx.isPointInStroke(x, y);
-            if (hit) {
-                return hit;
+            if ("isPointInStroke" in ctx) {
+                hit = ctx.isPointInStroke(x, y);
+                if (hit) {
+                    return hit;
+                }
             }
         }
 
@@ -21141,6 +21252,80 @@ if (!("swf2js" in window)){(function(window)
     };
 
     /**
+     * @param ctx
+     * @param matrix
+     * @param stage
+     * @param x
+     * @param y
+     * @returns {*}
+     */
+    SimpleButton.prototype.hitCheck = function (ctx, matrix, stage, x, y)
+    {
+        var _this = this;
+
+        var sprite = _this.getSprite("hit");
+        var tags = sprite.getContainer();
+        var length = tags.length;
+        if (!length) {
+            return false;
+        }
+
+        var _multiplicationMatrix = _this.multiplicationMatrix;
+        var m2 = _multiplicationMatrix(matrix, _this.getMatrix());
+        var m3 = _multiplicationMatrix(m2, sprite.getMatrix());
+
+        var hitObj = false;
+        var hit = false;
+        if (length) {
+            var loadStage = _this.getStage();
+            tags.reverse();
+            for (var depth in tags) {
+                if (!tags.hasOwnProperty(depth)) {
+                    continue;
+                }
+
+                var tagId = tags[depth];
+                var instance = loadStage.getInstance(tagId);
+                if (instance instanceof Shape ||
+                    instance instanceof StaticText ||
+                    instance instanceof TextField
+                ) {
+                    hit = instance.renderHitTest(ctx, m3, stage, x, y);
+                } else {
+                    hit = instance.hitCheck(ctx, m3, stage, x, y);
+                }
+
+                if (hit) {
+                    hitObj = hit;
+                    if (typeof hit !== "object") {
+                        var events = _this.events;
+                        if (events.press !== undefined ||
+                            events.release !== undefined ||
+                            events.releaseOutside !== undefined ||
+                            events.rollOver !== undefined ||
+                            events.rollOut !== undefined ||
+                            events.dragOver !== undefined ||
+                            events.dragOut !== undefined
+                        ) {
+                            stage.isHit = hit;
+                            hitObj = {
+                                parent : _this.getParent(),
+                                button : _this
+                            };
+                        }
+                    }
+
+                    tags.reverse();
+                    return hitObj;
+                }
+            }
+            tags.reverse();
+        }
+
+        return false;
+    };
+
+    /**
      * @see MovieClip.addActions
      */
     SimpleButton.prototype.addActions = function (stage)
@@ -21474,7 +21659,6 @@ if (!("swf2js" in window)){(function(window)
                                 stages[stage.getId()] = loadStage;
                                 stage = null;
                             }
-
 
                             var onData = targetMc.variables.onData;
                             if (typeof onData === "function") {
@@ -22094,8 +22278,6 @@ if (!("swf2js" in window)){(function(window)
                     }
                 }
             }
-            // var stage = _this.getStage();
-            // stage.removePlaceObject(instanceId);
         }
     };
 
@@ -24505,6 +24687,7 @@ if (!("swf2js" in window)){(function(window)
         _this.avm2 = new packages(_this);
         _this.abc = new packages(_this);
         _this.symbols = [];
+        _this.abcFlag = false;
 
         // render
         _this.doneTags = [];
@@ -25163,8 +25346,9 @@ if (!("swf2js" in window)){(function(window)
         var oWidth = _this.optionWidth;
         var oHeight = _this.optionHeight;
 
-        var innerWidth = window.innerWidth;
-        var innerHeight = window.innerHeight;
+        var element = _document.documentElement;
+        var innerWidth = _max(element.clientWidth, window.innerWidth || 0);
+        var innerHeight = _max(element.clientHeight, window.innerHeight || 0);
 
         var parent = div.parentNode;
         if (parent.tagName !== "BODY") {
@@ -25177,6 +25361,7 @@ if (!("swf2js" in window)){(function(window)
         var baseWidth = _this.getBaseWidth();
         var baseHeight = _this.getBaseHeight();
         var scale = _min((screenWidth / baseWidth), (screenHeight / baseHeight));
+
         var width = baseWidth * scale;
         var height = baseHeight * scale;
 
@@ -25434,13 +25619,14 @@ if (!("swf2js" in window)){(function(window)
                 i++;
 
                 var mc = obj.mc;
+                var args = obj.args || [];
                 if (!mc.active) {
                     continue;
                 }
 
                 var actions = obj.as;
                 if (typeof actions === "function") {
-                    actions.apply(mc);
+                    actions.apply(mc, args);
                 } else {
                     var length = actions.length;
                     if (!length) {
@@ -25453,7 +25639,7 @@ if (!("swf2js" in window)){(function(window)
                         }
                         var action = actions[idx];
                         if (typeof action === "function") {
-                            action.apply(mc);
+                            action.apply(mc, args);
                         }
                         idx++;
                     }
@@ -25668,7 +25854,7 @@ if (!("swf2js" in window)){(function(window)
         var loadingId = _this.getName() + "_loading";
         var css = "<style>";
         css += "#" + loadingId + " {\n";
-        css += "z-index: 999;\n";
+        // css += "z-index: 999;\n";
         css += "position: absolute;\n";
         css += "top: 50%;\n";
         css += "left: 50%;\n";
@@ -25811,9 +25997,8 @@ if (!("swf2js" in window)){(function(window)
 
         var div = _document.getElementById(_this.getName());
         var bounds = div.getBoundingClientRect();
-        var docBody = _document.body;
-        var x = docBody.scrollLeft + bounds.left;
-        var y = docBody.scrollTop + bounds.top;
+        var x = window.pageXOffset + bounds.left;
+        var y = window.pageYOffset + bounds.top;
         var touchX = 0;
         var touchY = 0;
 
@@ -25829,6 +26014,7 @@ if (!("swf2js" in window)){(function(window)
         touchX -= x;
         touchY -= y;
         var scale = _this.getScale();
+
         touchX /= scale;
         touchY /= scale;
 
@@ -25839,7 +26025,14 @@ if (!("swf2js" in window)){(function(window)
         var chkX = touchX * scale * _devicePixelRatio;
         var chkY = touchY * scale * _devicePixelRatio;
 
-        // reset
+        if (_this.abcFlag) {
+            var parent = _this.getParent();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, hitWidth, hitHeight);
+            var ret = parent.hitCheck(ctx, [1,0,0,1,0,0], _this, chkX, chkY);
+            return (typeof ret === "object") ? ret : false;
+        }
+
         for (var i = length; i--;) {
             if (!(i in buttonHits)) {
                 continue;
@@ -25884,12 +26077,14 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @param actions
      * @param caller
+     * @param event
      */
-    Stage.prototype.executeEventAction = function (actions, caller)
+    Stage.prototype.executeEventAction = function (actions, caller, event)
     {
+        var args = event || [];
         if (actions) {
             if (typeof actions === "function") {
-                actions.apply(caller);
+                actions.apply(caller, args);
             } else {
                 var length = actions.length;
                 if (length) {
@@ -25897,7 +26092,7 @@ if (!("swf2js" in window)){(function(window)
                     while (i < length) {
                         var action = actions[i];
                         if (typeof action === "function") {
-                            action.apply(caller);
+                            action.apply(caller, args);
                         }
                         i++;
                     }
@@ -25966,12 +26161,15 @@ if (!("swf2js" in window)){(function(window)
         var onPress;
         var rollOver;
         var onRollOver;
+        var cEvent = new ClipEvent();
 
         events = mc.events;
         if (isTouch) {
             rollOver = events.rollOver;
             if (rollOver) {
-                _this.executeEventAction(rollOver, mc);
+                cEvent.type = "rollOver";
+                cEvent.target = mc;
+                _this.executeEventAction(rollOver, mc, [cEvent]);
                 isRender = true;
             }
 
@@ -25985,7 +26183,9 @@ if (!("swf2js" in window)){(function(window)
         events = mc.events;
         press = events.press;
         if (press) {
-            _this.executeEventAction(press, mc);
+            cEvent.type = "press";
+            cEvent.target = mc;
+            _this.executeEventAction(press, mc, [cEvent]);
             isRender = true;
         }
         onPress = mc.variables.onPress;
@@ -26001,7 +26201,9 @@ if (!("swf2js" in window)){(function(window)
             if (isTouch) {
                 rollOver = events.rollOver;
                 if (rollOver) {
-                    _this.executeEventAction(rollOver, button);
+                    cEvent.type = "rollOver";
+                    cEvent.target = button;
+                    _this.executeEventAction(rollOver, button, [cEvent]);
                 }
 
                 onRollOver = button.variables.onRollOver;
@@ -26054,7 +26256,9 @@ if (!("swf2js" in window)){(function(window)
 
             press = events.press;
             if (press) {
-                _this.executeEventAction(press, button);
+                cEvent.type = "press";
+                cEvent.target = button;
+                _this.executeEventAction(press, button, [cEvent]);
             }
 
             onPress = button.variables.onPress;
@@ -26149,6 +26353,8 @@ if (!("swf2js" in window)){(function(window)
         var length = moveEventHits.length;
         var mc, as, button, events;
         var dragOver, onDragOver, dragOut, onDragOut, rollOver, onRollOver, rollOut, onRollOut;
+        var cEvent = new ClipEvent();
+
         if (length) {
             event.preventDefault();
             for (var i = 0; i < length; i++) {
@@ -26200,8 +26406,10 @@ if (!("swf2js" in window)){(function(window)
                             events = mc.events;
                             dragOver = events.dragOver;
                             if (dragOver) {
+                                cEvent.type = "dragOver";
+                                cEvent.target = mc;
                                 isRender = true;
-                                _this.executeEventAction(dragOver, mc);
+                                _this.executeEventAction(dragOver, mc, [cEvent]);
                             }
                             onDragOver = mc.variables.onDragOver;
                             if (typeof onDragOver === "function") {
@@ -26214,6 +26422,15 @@ if (!("swf2js" in window)){(function(window)
                             button.setButtonStatus("down");
                             sprite = button.getSprite();
                             sprite.startSound();
+
+                            events = button.events;
+                            dragOver = events.dragOver;
+                            if (dragOver) {
+                                cEvent.type = "dragOver";
+                                cEvent.target = button;
+                                isRender = true;
+                                _this.executeEventAction(dragOver, button, [cEvent]);
+                            }
                             onDragOver = button.variables.onDragOver;
                             if (typeof onDragOver === "function") {
                                 isRender = true;
@@ -26227,8 +26444,10 @@ if (!("swf2js" in window)){(function(window)
                             events = mc.events;
                             dragOut = events.dragOut;
                             if (dragOut) {
+                                cEvent.type = "dragOut";
+                                cEvent.target = mc;
                                 isRender = true;
-                                _this.executeEventAction(dragOut, mc);
+                                _this.executeEventAction(dragOut, mc, [cEvent]);
                             }
                             onDragOut = mc.variables.onDragOut;
                             if (typeof onDragOut === "function") {
@@ -26241,6 +26460,15 @@ if (!("swf2js" in window)){(function(window)
                         if (button) {
                             if (button.getButtonStatus() === "down") {
                                 button.setButtonStatus("up");
+
+                                events = button.events;
+                                dragOut = events.dragOut;
+                                if (dragOut) {
+                                    cEvent.type = "dragOut";
+                                    cEvent.target = button;
+                                    isRender = true;
+                                    _this.executeEventAction(dragOut, button, [cEvent]);
+                                }
                                 onDragOut = button.variables.onDragOut;
                                 if (typeof onDragOut === "function") {
                                     isRender = true;
@@ -26272,8 +26500,10 @@ if (!("swf2js" in window)){(function(window)
                         events = mc.events;
                         rollOver = events.rollOver;
                         if (rollOver) {
+                            cEvent.type = "rollOver";
+                            cEvent.target = mc;
                             isRender = true;
-                            _this.executeEventAction(rollOver, mc);
+                            _this.executeEventAction(rollOver, mc, [cEvent]);
                         }
 
                         onRollOver = mc.variables.onRollOver;
@@ -26292,6 +26522,15 @@ if (!("swf2js" in window)){(function(window)
                         if (!overObj || overObj.button !== button) {
                             isRender = true;
                             _this.executeButtonAction(button, mc, "CondIdleToOverUp");
+
+                            events = button.events;
+                            rollOver = events.rollOver;
+                            if (rollOver) {
+                                cEvent.type = "rollOver";
+                                cEvent.target = button;
+                                isRender = true;
+                                _this.executeEventAction(rollOver, button, [cEvent]);
+                            }
                             onRollOver = button.variables.onRollOver;
                             if (typeof onRollOver === "function") {
                                 _this.executeEventAction(onRollOver, button);
@@ -26318,8 +26557,10 @@ if (!("swf2js" in window)){(function(window)
                         events = mc.events;
                         rollOut = events.rollOut;
                         if (rollOut) {
+                            cEvent.type = "rollOut";
+                            cEvent.target = mc;
                             isRender = true;
-                            _this.executeEventAction(rollOut, mc);
+                            _this.executeEventAction(rollOut, mc, [cEvent]);
                         }
 
                         onRollOut = mc.variables.onRollOut;
@@ -26332,6 +26573,16 @@ if (!("swf2js" in window)){(function(window)
                     if (button && (!hitObj || hitObj.button !== button)) {
                         button.setButtonStatus("up");
                         _this.executeButtonAction(button, mc, "CondOverUpToIdle");
+
+                        events = button.events;
+                        rollOut = events.rollOut;
+                        if (rollOut) {
+                            cEvent.type = "rollOut";
+                            cEvent.target = button;
+                            isRender = true;
+                            _this.executeEventAction(rollOut, button, [cEvent]);
+                        }
+
                         onRollOut = button.variables.onRollOut;
                         if (typeof onRollOut === "function") {
                             isRender = true;
@@ -26362,6 +26613,7 @@ if (!("swf2js" in window)){(function(window)
     Stage.prototype.touchEnd = function (event)
     {
         var _this = this;
+        var cEvent = new ClipEvent();
         var button, mc, as, events, release, onRelease, releaseOutside, onReleaseOutside;
         var touchObj = _this.touchObj;
         if (touchObj) {
@@ -26412,7 +26664,9 @@ if (!("swf2js" in window)){(function(window)
                         events = mc.events;
                         release = events.release;
                         if (release) {
-                            _this.executeEventAction(release, mc);
+                            cEvent.type = "release";
+                            cEvent.target = mc;
+                            _this.executeEventAction(release, mc, [cEvent]);
                             isRender = true;
                         }
                         onRelease = mc.variables.onRelease;
@@ -26424,6 +26678,14 @@ if (!("swf2js" in window)){(function(window)
 
                     if (button) {
                         if (button === hitObj.button) {
+                            events = button.events;
+                            release = events.release;
+                            if (release) {
+                                cEvent.type = "release";
+                                cEvent.target = button;
+                                _this.executeEventAction(release, button, [cEvent]);
+                            }
+
                             onRelease = button.variables.onRelease;
                             if (typeof onRelease === "function") {
                                 _this.executeEventAction(onRelease, button);
@@ -26454,7 +26716,9 @@ if (!("swf2js" in window)){(function(window)
                 events = mc.events;
                 releaseOutside = events.releaseOutside;
                 if (releaseOutside) {
-                    _this.executeEventAction(releaseOutside, mc);
+                    cEvent.type = "releaseOutside";
+                    cEvent.target = mc;
+                    _this.executeEventAction(releaseOutside, mc, [cEvent]);
                     isRender = true;
                 }
                 onReleaseOutside = mc.variables.onReleaseOutside;
@@ -26466,6 +26730,16 @@ if (!("swf2js" in window)){(function(window)
 
             if (button && (!hitObj || button !== hitObj.button)) {
                 isRender = true;
+
+                events = button.events;
+                releaseOutside = events.releaseOutside;
+                if (releaseOutside) {
+                    cEvent.type = "releaseOutside";
+                    cEvent.target = button;
+                    _this.executeEventAction(releaseOutside, button, [cEvent]);
+                    isRender = true;
+                }
+
                 onReleaseOutside = button.variables.onReleaseOutside;
                 if (typeof onReleaseOutside === "function") {
                     _this.executeEventAction(onReleaseOutside, button);
@@ -26499,7 +26773,9 @@ if (!("swf2js" in window)){(function(window)
                 rollOver = events.rollOver;
                 if (rollOver) {
                     isRender = true;
-                    _this.executeEventAction(rollOver, mc);
+                    cEvent.type = "rollOver";
+                    cEvent.target = mc;
+                    _this.executeEventAction(rollOver, mc, [cEvent]);
                 }
 
                 onRollOver = mc.variables.onRollOver;
@@ -26512,6 +26788,15 @@ if (!("swf2js" in window)){(function(window)
             button = hitObj.button;
             if (button) {
                 if (!touchObj || button !== touchObj.button) {
+                    events = button.events;
+                    rollOver = events.rollOver;
+                    if (rollOver) {
+                        isRender = true;
+                        cEvent.type = "rollOver";
+                        cEvent.target = button;
+                        _this.executeEventAction(rollOver, button, [cEvent]);
+                    }
+
                     onRollOver = button.variables.onRollOver;
                     if (typeof onRollOver === "function") {
                         isRender = true;
@@ -26644,6 +26929,7 @@ if (!("swf2js" in window)){(function(window)
             } else {
                 xmlHttpRequest.overrideMimeType("text/plain; charset=x-user-defined");
             }
+
             xmlHttpRequest.onreadystatechange = function ()
             {
                 var readyState = xmlHttpRequest.readyState;
