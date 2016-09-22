@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.6)
+ * swf2js (version 0.7.7)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -6803,7 +6803,8 @@ if (!("swf2js" in window)){(function(window)
         scaleY: 1,
         mouseX: 1,
         mouseY: 1,
-        mask: 1
+        mask: 1,
+        mouseEnabled: 1
     };
 
     /**
@@ -6888,7 +6889,6 @@ if (!("swf2js" in window)){(function(window)
                 if (name in _this.methods) {
                     value = builder[name];
                 }
-
                 if (value === undefined) {
                     value = builder.getProperty(name);
                 }
@@ -7655,9 +7655,13 @@ if (!("swf2js" in window)){(function(window)
 
         var obj = stack.pop();
         var name = _this.names[index];
+
         var values = name.split("::"); // implements
         var prop = values.pop();
         var ns = values.pop();
+        if (ns) {
+            // console.log(ns, obj, prop);
+        }
 
         var func = obj[prop];
         if (!func && obj instanceof MovieClip) {
@@ -7674,7 +7678,16 @@ if (!("swf2js" in window)){(function(window)
 
                 if (classObj) {
                     var AVM2 = classObj[classMethod];
-                    func = AVM2[prop];
+                    while (true) {
+                        func = AVM2[prop];
+                        if (func) {
+                            break;
+                        }
+                        AVM2 = AVM2.super;
+                        if (!AVM2 || AVM2 instanceof MovieClip) {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -7706,10 +7719,6 @@ if (!("swf2js" in window)){(function(window)
             obj = _this.stage;
         }
 
-        if (ns) {
-            // console.log("ActionCallPropVoid::Namespace", ns, prop, this, obj);
-        }
-
         if (func) {
             func.apply(obj, params);
         }
@@ -7722,6 +7731,7 @@ if (!("swf2js" in window)){(function(window)
      */
     ActionScript3.prototype.ActionCallStatic = function (stack, index, argCount)
     {
+        console.log("ActionCallStatic");
         var params = [];
         for (var i = argCount; i--;) {
             params[params.length] = stack.pop();
@@ -9205,6 +9215,11 @@ if (!("swf2js" in window)){(function(window)
                 obj[prop] = value;
             } else {
                 var builder = _this.getBuilder();
+                var caller = _this.caller;
+                if (caller instanceof MovieClip) {
+                    builder = caller;
+                }
+
                 if (builder instanceof DisplayObject) {
                     if (prop in _this.methods) {
                         builder[prop] = value;
@@ -15111,6 +15126,9 @@ if (!("swf2js" in window)){(function(window)
         _this._matrix = null;
         _this._colorTransform = null;
         _this._extend = false;
+
+        // avm2
+        _this.avm2 = null;
     };
 
     // filters
@@ -17240,6 +17258,7 @@ if (!("swf2js" in window)){(function(window)
     var InteractiveObject = function ()
     {
         var _this = this;
+        _this._mouseEnabled = true;
         DisplayObject.call(_this);
     };
 
@@ -17250,6 +17269,36 @@ if (!("swf2js" in window)){(function(window)
     InteractiveObject.prototype = Object.create(DisplayObject.prototype);
     InteractiveObject.prototype.constructor = InteractiveObject;
 
+    /**
+     * properties
+     */
+    Object.defineProperties(DisplayObject.prototype,
+    {
+        mouseEnabled: {
+            get: function () {
+                return this.getMouseEnabled();
+            },
+            set: function (mouseEnabled) {
+                this.setMouseEnabled(mouseEnabled);
+            }
+        }
+    });
+
+    /**
+     * @returns {boolean}
+     */
+    InteractiveObject.prototype.getMouseEnabled = function ()
+    {
+        return this._mouseEnabled;
+    };
+
+    /**
+     * @param mouseEnabled
+     */
+    InteractiveObject.prototype.setMouseEnabled = function (mouseEnabled)
+    {
+        this._mouseEnabled = mouseEnabled;
+    };
 
     /**
      * @constructor
@@ -17754,6 +17803,7 @@ if (!("swf2js" in window)){(function(window)
         _this._colorTransform = null;
         _this._filters = null;
         _this._blendMode = null;
+        _this.mouseEnabled = true;
     };
 
     /**
@@ -18484,7 +18534,10 @@ if (!("swf2js" in window)){(function(window)
     Sprite.prototype.hitCheck = function (ctx, matrix, stage, x, y)
     {
         var _this = this;
-        if (!_this.getEnabled() || !_this.getVisible()) {
+        if (!_this.getEnabled() ||
+            !_this.getVisible() ||
+            !_this.getMouseEnabled()
+        ) {
             return false;
         }
 
@@ -22814,6 +22867,7 @@ if (!("swf2js" in window)){(function(window)
         _this._filters = null;
         _this._blendMode = null;
         _this.buttonStatus = "up";
+        _this.mouseEnabled = true;
         _this.setVisible(true);
         _this.setEnabled(true);
     };
@@ -23198,7 +23252,7 @@ if (!("swf2js" in window)){(function(window)
             var DoABC = abcObj[classMethod];
             var ABCObj = new DoABC(_this);
             classObj[classMethod] = ABCObj;
-
+            _this.avm2 = ABCObj;
             // AVM2 init
             var AVM2 = ABCObj[classMethod];
             if (typeof AVM2 === "function") {
@@ -24626,7 +24680,7 @@ if (!("swf2js" in window)){(function(window)
         _this.renderMode = isWebGL;
         _this.tagId = null;
         _this.FlashVars = {};
-        _this.quality = "medium"; // low = 0.25, medium = 0.75, high = 1.0
+        _this.quality = "medium"; // low = 0.25, medium = 0.8, high = 1.0
         _this.bgcolor = null;
         
         // event
@@ -25361,48 +25415,49 @@ if (!("swf2js" in window)){(function(window)
         var baseWidth = _this.getBaseWidth();
         var baseHeight = _this.getBaseHeight();
         var scale = _min((screenWidth / baseWidth), (screenHeight / baseHeight));
-
         var width = baseWidth * scale;
         var height = baseHeight * scale;
 
-        // div
-        var style = div.style;
-        style.width = width + "px";
-        style.height = height + "px";
-        style.top = 0;
-        style.left = ((screenWidth / 2) - (width / 2)) + "px";
+        if (width !== _this.getWidth() || height !== _this.getHeight()) {
+            // div
+            var style = div.style;
+            style.width = width + "px";
+            style.height = height + "px";
+            style.top = 0;
+            style.left = ((screenWidth / 2) - (width / 2)) + "px";
 
-        width *= devicePixelRatio;
-        height *= devicePixelRatio;
+            width *= devicePixelRatio;
+            height *= devicePixelRatio;
 
-        _this.setScale(scale);
-        _this.setWidth(width);
-        _this.setHeight(height);
+            _this.setScale(scale);
+            _this.setWidth(width);
+            _this.setHeight(height);
 
-        // main
-        var canvas = _this.context.canvas;
-        canvas.width = width;
-        canvas.height = height;
+            // main
+            var canvas = _this.context.canvas;
+            canvas.width = width;
+            canvas.height = height;
 
-        // pre
-        var preCanvas = _this.preContext.canvas;
-        preCanvas.width = width;
-        preCanvas.height = height;
+            // pre
+            var preCanvas = _this.preContext.canvas;
+            preCanvas.width = width;
+            preCanvas.height = height;
 
-        var hitCanvas = _this.hitContext.canvas;
-        hitCanvas.width = width;
-        hitCanvas.height = height;
+            var hitCanvas = _this.hitContext.canvas;
+            hitCanvas.width = width;
+            hitCanvas.height = height;
 
-        // tmp
-        if (isAndroid && isChrome) {
-            var tmpCanvas = tmpContext.canvas;
-            tmpCanvas.width = width;
-            tmpCanvas.height = height;
+            // tmp
+            if (isAndroid && isChrome) {
+                var tmpCanvas = tmpContext.canvas;
+                tmpCanvas.width = width;
+                tmpCanvas.height = height;
+            }
+
+            var mc = _this.getParent();
+            var mScale = scale * _devicePixelRatio / 20;
+            _this.setMatrix(mc.cloneArray([mScale, 0, 0, mScale, 0, 0]));
         }
-
-        var mc = _this.getParent();
-        var mScale = scale * _devicePixelRatio / 20;
-        _this.setMatrix(mc.cloneArray([mScale, 0, 0, mScale, 0, 0]));
     };
 
     /**
@@ -25674,11 +25729,13 @@ if (!("swf2js" in window)){(function(window)
         var _this = this;
         var preContext = _this.preContext;
         var preCanvas = preContext.canvas;
-        var ctx = _this.context;
         var width = preCanvas.width;
         var height = preCanvas.height;
-        ctx.setTransform(1,0,0,1,0,0);
-        ctx.drawImage(preCanvas, 0, 0, width, height);
+        if (width > 0 && height > 0) {
+            var ctx = _this.context;
+            ctx.setTransform(1,0,0,1,0,0);
+            ctx.drawImage(preCanvas, 0, 0, width, height);
+        }
     };
 
     /**
