@@ -116,13 +116,13 @@ Twitter: https://twitter.com/swf2js
 
 * MP3 : ◯
 * WAV : ◯
-* WAV(ADPCM) : × (0.9.x TBR)
+* WAV(ADPCM) : × (0.9 TBR)
 
 
 ### Video
 
-* Flv : × (0.9.x TBR)
-* H.264 : × (0.9.x TBR)
+* Flv : × (0.9 TBR)
+* H.264 : × (0.9 TBR)
 
 
 
