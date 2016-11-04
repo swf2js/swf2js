@@ -11,11 +11,12 @@ swfをJavaScriptで直接バイナリ分解してcanvasに出力
 * ActionScript 3.0 (prototype)
 
 
-output in the canvas with swf binary decomposition in JavaScript.  
-play the swf on the iPhone.  
-An open source Flash™ runtime written in pure JavaScript.
+Swf2Js is an open source Flash™ runtime written in pure JavaScript.
+It reads binary code from an SWF file, and outputs the result in a web canvas.
 
-Supports: 
+Swf2Js allows flash apps to run on the iphone !
+
+It supports: 
 * FlashLite 1.x, 2.x, 3.x, 4,x
 * ActionScript 1.0, 2.0
 * ActionScript 3.0 (prototype)
@@ -25,7 +26,7 @@ Supports:
 
 -- Release Date: 23 Sep 2016  
 
-* [ReleaseNotes](https://github.com/ienaga/swf2js/wiki/Release-Notes)    
+* [Release Notes](https://github.com/ienaga/swf2js/wiki/Release-Notes)    
 
 
 ## HTML - SAMPLE CODE
@@ -38,9 +39,20 @@ Supports:
 ```
 
 
-## Demonstration Site  
+## Examples
+Action Script 3
+* [AS3 Tiger](http://ienaga.github.io/swf2js/sample.html?sample/tiger.swf)
 
-https://swf2js.wordpress.com/  
+Action Script 2
+* [Kanji test (typing game)](http://ienaga.github.io/swf2js/sample.html?sample/yomi.swf)
+* [3Lines game](http://ienaga.github.io/swf2js/sample.html?sample/lines.swf)
+
+Flash Lite2.x
+* [A Clock](http://ienaga.github.io/swf2js/sample.html?sample/analog20.swf)
+
+Flash Lite1.x
+* [Girl Model](http://ienaga.github.io/swf2js/sample.html?sample/model.swf)
+* [Whack-A-Mole game](http://ienaga.github.io/swf2js/sample.html?sample/mogura.swf)
 
 
 ## API  
@@ -48,7 +60,7 @@ https://swf2js.wordpress.com/
 https://swf2js.wordpress.com/api/   
 
 
-## Game Using  
+## Games using it  
 
 [覇者もん for GREE and Mobage]  
 http://gamebiz.jp/?p=131364  
@@ -61,7 +73,7 @@ Twitter: https://twitter.com/swf2js
 
 
 
-## State
+## Project status
 
 
 ### ActionScript
@@ -83,7 +95,7 @@ Twitter: https://twitter.com/swf2js
 
 
 
-### Filter
+### Filters
 
 * DropShadow : ◯
 * Blur : ◯
@@ -95,7 +107,7 @@ Twitter: https://twitter.com/swf2js
 * GradientBevel : × (0.8.x TBR)
 
 
-### Blend Mode
+### Blend Modes
 
 * Layer : × (0.8.x TBR)
 * Multiply : ◯
@@ -126,7 +138,7 @@ Twitter: https://twitter.com/swf2js
 
 
 
-### Browser
+### Browser support
 
 * Chrome : ◯
 * FireFox : ◯
