@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.7)
+ * swf2js (version 0.7.8)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -2759,6 +2759,7 @@ if (!("swf2js" in window)){(function(window)
             case 35: // DefineBitsJPEG3
             case 90: // DefineBitsJPEG4
                 _this.parseDefineBits(tagType, length, _this.jpegTables);
+                _this.jpegTables = null;
                 break;
             case 8: // JPEGTables
                 _this.jpegTables = _this.parseJPEGTables(length);
