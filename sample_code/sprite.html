@@ -19,7 +19,7 @@
     var movieClip = sprite.createMovieClip("mc");
     movieClip.x = 10;
     movieClip.y = 120;
-    movieClip.loadMovie("model.swf");
+    movieClip.loadMovie("../swf/model.swf");
 
     // Textを子要素に追加
     var textField = sprite.createText("txt", 50, 50);
@@ -33,7 +33,7 @@
     // Shapeを生成
     var shape;
 
-    shape = new swf2js.Shape();
+    shape = sprite.createShape();
     shape.x = 60;
     shape.y = 60;
     shape.alpha = 0.3;
