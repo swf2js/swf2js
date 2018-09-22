@@ -53,6 +53,14 @@ Flash Lite1.x
 * [Whack-A-Mole game](http://ienaga.github.io/swf2js/sample.html?sample/mogura.swf)
 
 
+## How to test locally
+
+```
+python3 -m http.server
+```
+
+Then open http://localhost:8000 on your browser
+
 ## API  
 
 https://swf2js.wordpress.com/api/   
