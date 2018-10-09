@@ -39,18 +39,18 @@ It supports:
 
 ## Examples
 Action Script 3
-* [AS3 Tiger](http://ienaga.github.io/swf2js/sample.html?sample/tiger.swf)
+* [AS3 Tiger](http://swf2js.org/sample.html?sample/tiger.swf)
 
 Action Script 2
 * [Kanji test (typing game)](http://ienaga.github.io/swf2js/sample.html?sample/yomi.swf)
-* [3Lines game](http://ienaga.github.io/swf2js/sample.html?sample/lines.swf)
+* [3Lines game](http://swf2js.org/sample.html?sample/lines.swf)
 
 Flash Lite2.x
-* [A Clock](http://ienaga.github.io/swf2js/sample.html?sample/analog20.swf)
+* [A Clock](http://swf2js.org/sample.html?sample/analog20.swf)
 
 Flash Lite1.x
-* [Girl Model](http://ienaga.github.io/swf2js/sample.html?sample/model.swf)
-* [Whack-A-Mole game](http://ienaga.github.io/swf2js/sample.html?sample/mogura.swf)
+* [Girl Model](http://swf2js.org/sample.html?sample/model.swf)
+* [Whack-A-Mole game](http://swf2js.org/sample.html?sample/mogura.swf)
 
 
 ## How to test locally
