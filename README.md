@@ -42,7 +42,7 @@ Action Script 3
 * [AS3 Tiger](http://swf2js.org/sample.html?sample/tiger.swf)
 
 Action Script 2
-* [Kanji test (typing game)](http://ienaga.github.io/swf2js/sample.html?sample/yomi.swf)
+* [Kanji test (typing game)](http://swf2js.org/sample.html?sample/yomi.swf)
 * [3Lines game](http://swf2js.org/sample.html?sample/lines.swf)
 
 Flash Lite2.x
