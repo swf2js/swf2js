@@ -1,6 +1,14 @@
 JavaScript製FlashPlayer「swf2js」Flash(swf)をHTML5に変換してiPhone、Androidで再生可能に!
 ======
 
+
+## Production Version  
+  
+Production version of inquiry from here.
+  
+* [SONICMOOV](https://www.sonicmoov.com/)      
+
+
 swfをJavaScriptで直接バイナリ分解してcanvasに出力  
 分解と変換をリアルタイムで行っているので動的なswfも再生可能。  
 対応バージョン: 
@@ -14,6 +22,9 @@ It reads binary code from an SWF file, and outputs the result in a web canvas.
 
 Swf2Js allows flash apps to run on the iphone !
 
+
+## Free Version  
+  
 It supports: 
 * FlashLite 1.x, 2.x, 3.x, 4,x
 * ActionScript 1.0, 2.0
