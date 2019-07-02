@@ -49,18 +49,18 @@ It supports:
 
 ## Examples
 Action Script 3
-* [AS3 Tiger](http://swf2js.org/sample.html?sample/tiger.swf)
+* [AS3 Tiger](https://swf2js.github.io/swf2js.org/sample.html?sample/tiger.swf)
 
 Action Script 2
-* [Kanji test (typing game)](http://swf2js.org/sample.html?sample/yomi.swf)
-* [3Lines game](http://swf2js.org/sample.html?sample/lines.swf)
+* [Kanji test (typing game)](https://swf2js.github.io/swf2js.org/sample.html?sample/yomi.swf)
+* [3Lines game](https://swf2js.github.io/swf2js.org/sample.html?sample/lines.swf)
 
 Flash Lite2.x
-* [A Clock](http://swf2js.org/sample.html?sample/analog20.swf)
+* [A Clock](https://swf2js.github.io/swf2js.org/sample.html?sample/analog20.swf)
 
 Flash Lite1.x
-* [Girl Model](http://swf2js.org/sample.html?sample/model.swf)
-* [Whack-A-Mole game](http://swf2js.org/sample.html?sample/mogura.swf)
+* [Girl Model](https://swf2js.github.io/swf2js.org/sample.html?sample/model.swf)
+* [Whack-A-Mole game](https://swf2js.github.io/swf2js.org/sample.html?sample/mogura.swf)
 
 
 ## How to test locally
