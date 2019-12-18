@@ -8,6 +8,12 @@ Production version of inquiry from here.
   
 * [SONICMOOV](https://www.sonicmoov.com/)      
 
+
+#### よく質問があるのでこちらにも記載いたします。  
+Q：「swf2jsの開発はやっていますか？」  
+A：「はい。行っています。直し、無料版として公開する予定は未定です。  
+　　　有料版としてSONICMOOV社で相談を受けております。」
+
 ## Free Version  
 
 swfをJavaScriptで直接バイナリ分解してcanvasに出力  
