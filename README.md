@@ -25,8 +25,8 @@ swf2js is now complete as an emulator and will evolve into the Next2D project.
 #### [Chinese]
 swf2js作为一个模拟器现在已经完成，并将发展成为Next2D项目。
 
-[Next2D WebSite](https://next2d.app)
-[Next2D NoCode Tool](https://tool.next2d.app)
+[Next2D WebSite](https://next2d.app) \
+[Next2D NoCode Tool](https://tool.next2d.app) \
 [GitHub](https://github.com/Next2D)
 
 ## Website and Demo
