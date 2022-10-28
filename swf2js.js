@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.8)
+ * swf2js (version 0.7.9)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -3715,7 +3715,7 @@ if (!("swf2js" in window)){(function(window)
 
         image.src = "data:image/jpeg;base64," +
             _this.base64encode(_this.parseJpegData(JPEGData));
-        
+
         // for android bug
         _setTimeout(function () {}, 0);
     };
@@ -9151,8 +9151,8 @@ if (!("swf2js" in window)){(function(window)
     {
         this.register[index] = stack.pop();
     };
-    
-    
+
+
         /**
      * @param stack
      */
@@ -9253,7 +9253,7 @@ if (!("swf2js" in window)){(function(window)
         var value = stack.pop();
         var prop = this.names[index];
         var obj = stack.pop();
-        
+
     };
 
     /**
@@ -16299,8 +16299,7 @@ if (!("swf2js" in window)){(function(window)
         var stage = _root.getStage();
         var div = _document.getElementById(stage.getName());
         var bounds = div.getBoundingClientRect();
-        var docBody = _document.body;
-        var x = docBody.scrollLeft + bounds.left;
+        var x = window.pageXOffset + bounds.left;
         var touchX = 0;
         if (isTouch) {
             var changedTouche = _event.changedTouches[0];
@@ -16340,8 +16339,7 @@ if (!("swf2js" in window)){(function(window)
         var stage = _root.getStage();
         var div = _document.getElementById(stage.getName());
         var bounds = div.getBoundingClientRect();
-        var docBody = _document.body;
-        var y = docBody.scrollTop + bounds.top;
+        var y = window.pageYOffset + bounds.top;
         var touchY = 0;
         if (isTouch) {
             var changedTouche = _event.changedTouches[0];
@@ -20799,7 +20797,7 @@ if (!("swf2js" in window)){(function(window)
                 for (var idx = 0; idx < sLen; idx++) {
                     gridData.dx = gridData.startDx;
                     var txt = splits[idx];
-                    
+
                     if (wordWrap && multiline) {
                         if (gridData.txtTotalWidth > gridData.areaWidth) {
                             var txtLength = txt.length;
@@ -24683,7 +24681,7 @@ if (!("swf2js" in window)){(function(window)
         _this.FlashVars = {};
         _this.quality = "medium"; // low = 0.25, medium = 0.8, high = 1.0
         _this.bgcolor = null;
-        
+
         // event
         _this.mouse = new Mouse();
 
@@ -26448,7 +26446,7 @@ if (!("swf2js" in window)){(function(window)
                     canvas.style.cursor = "auto";
                 }
             }
-            
+
             if (touchObj) {
                 button = touchObj.button;
                 mc = touchObj.parent;
