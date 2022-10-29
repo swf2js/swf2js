@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.10)
+ * swf2js (version 0.7.11)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -24273,6 +24273,7 @@ if (!("swf2js" in window)){(function(window)
     {
         var _this = this;
         _this.variables = {};
+        _this.codes = [];
         _this._listeners = [];
     };
 
@@ -24321,6 +24322,7 @@ if (!("swf2js" in window)){(function(window)
     Key.prototype.SPACE = 32;
     Key.prototype.TAB = 9;
     Key.prototype.UP = 38;
+    Key.prototype.codes = [];
 
     /**
      * @param name
@@ -24365,7 +24367,13 @@ if (!("swf2js" in window)){(function(window)
      */
     Key.prototype.isDown = function (code)
     {
-        return (this.getCode() === code);
+        var codes = keyClass.codes;
+        for (var idx = 0; idx < codes.length; ++idx) {
+            if (codes[idx] !== code) {
+                continue;
+            }
+            return true;
+        }
     };
 
     /**
@@ -24423,6 +24431,12 @@ if (!("swf2js" in window)){(function(window)
         if (typeof onKeyUp === "function") {
             onKeyUp.apply(keyClass, [event]);
         }
+
+        var keyCode = keyClass.getCode();
+        var index = keyClass.codes.indexOf(keyCode);
+        if (index > -1) {
+            keyClass.codes.splice(index, 1);
+        }
     }
 
     /**
@@ -24432,6 +24446,10 @@ if (!("swf2js" in window)){(function(window)
     {
         _keyEvent = event;
         var keyCode = keyClass.getCode();
+        if (keyClass.codes.indexOf(keyCode) === -1) {
+            keyClass.codes.push(keyCode);
+        }
+
         var i;
         var length;
         var obj;
