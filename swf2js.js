@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.9)
+ * swf2js (version 0.7.10)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -24437,6 +24437,8 @@ if (!("swf2js" in window)){(function(window)
         var obj;
         var onKeyDown = keyClass.onKeyDown;
         if (typeof onKeyDown === "function") {
+            event.stopPropagation();
+            event.preventDefault();
             onKeyDown.apply(keyClass, [event]);
         }
 
@@ -24538,9 +24540,15 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 if (isEnd) {
+                    event.stopPropagation();
+                    event.preventDefault();
                     break;
                 }
             }
+        }
+
+        if (isEnd || typeof onKeyDown === "function") {
+            return false;
         }
     }
 
