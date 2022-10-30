@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.11)
+ * swf2js (version 0.7.12)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -24372,6 +24372,9 @@ if (!("swf2js" in window)){(function(window)
             if (codes[idx] !== code) {
                 continue;
             }
+            if (_keyEvent) {
+                _keyEvent.preventDefault();
+            }
             return true;
         }
     };
@@ -24455,11 +24458,11 @@ if (!("swf2js" in window)){(function(window)
         var obj;
         var onKeyDown = keyClass.onKeyDown;
         if (typeof onKeyDown === "function") {
-            event.stopPropagation();
             event.preventDefault();
             onKeyDown.apply(keyClass, [event]);
         }
 
+        var keyHit = false;
         var idx;
         length = stages.length;
         for (var pIdx = 0; pIdx < length; pIdx++) {
@@ -24558,14 +24561,14 @@ if (!("swf2js" in window)){(function(window)
                 }
 
                 if (isEnd) {
-                    event.stopPropagation();
+                    keyHit = true;
                     event.preventDefault();
                     break;
                 }
             }
         }
 
-        if (isEnd || typeof onKeyDown === "function") {
+        if (keyHit || typeof onKeyDown === "function") {
             return false;
         }
     }
