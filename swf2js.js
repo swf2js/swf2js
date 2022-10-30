@@ -24453,16 +24453,16 @@ if (!("swf2js" in window)){(function(window)
             keyClass.codes.push(keyCode);
         }
 
+        var keyHit = false;
         var i;
         var length;
         var obj;
         var onKeyDown = keyClass.onKeyDown;
         if (typeof onKeyDown === "function") {
-            event.preventDefault();
+            keyHit = true;
             onKeyDown.apply(keyClass, [event]);
         }
 
-        var keyHit = false;
         var idx;
         length = stages.length;
         for (var pIdx = 0; pIdx < length; pIdx++) {
@@ -24474,6 +24474,7 @@ if (!("swf2js" in window)){(function(window)
             var keyDownEventHits = stage.keyDownEventHits;
             var kLen = keyDownEventHits.length;
             if (kLen) {
+                keyHit = true;
                 for (idx = 0; idx < kLen; idx++) {
                     obj = keyDownEventHits[idx];
                     stage.executeEventAction(obj.as, obj.mc);
@@ -24557,18 +24558,19 @@ if (!("swf2js" in window)){(function(window)
                     stage.buttonAction(hitObj.parent, cond.ActionScript);
                     stage.touchRender();
                     isEnd = true;
+                    keyHit = true;
                     break;
                 }
 
                 if (isEnd) {
                     keyHit = true;
-                    event.preventDefault();
                     break;
                 }
             }
         }
 
         if (keyHit || typeof onKeyDown === "function") {
+            event.preventDefault();
             return false;
         }
     }
