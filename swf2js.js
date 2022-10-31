@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.12)
+ * swf2js (version 0.7.13)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -23773,9 +23773,10 @@ if (!("swf2js" in window)){(function(window)
     /**
      * @constructor
      */
-    var Sound = function ()
+    var Sound = function (target)
     {
         var _this = this;
+        _this.target = target;
         _this.variables = {};
         _this.sounds = [];
         _this.volume = 100;
@@ -23999,7 +24000,7 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
             var audio = sounds[id];
-            audio.volume = volume / 100;
+            audio.volume = _min(0, _max(1, volume / 100));
         }
     };
 
