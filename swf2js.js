@@ -23953,28 +23953,28 @@ if (!("swf2js" in window)){(function(window)
     Sound.prototype.attachSound = function (id)
     {
         var _this = this;
-        var sounds = _this.sounds;
-        if (!(id in sounds)) {
-            var movieClip = _this.movieClip;
-            var stage = movieClip.getStage();
-            var exportAssets = stage.exportAssets;
-            if (id in exportAssets) {
-                var characterId = exportAssets[id];
-                var tag = stage.sounds[characterId];
-                if (tag) {
-                    var audio = _document.createElement("audio");
-                    audio.onload = function ()
-                    {
-                        this.load();
-                        this.preload = "auto";
-                        this.autoplay = false;
-                        this.loop = false;
-                    };
-                    audio.src = tag.base64;
-                    sounds[id] = audio;
-                }
+        var sounds = [];
+        var movieClip = _this.movieClip;
+        var stage = movieClip.getStage();
+        var exportAssets = stage.exportAssets;
+        if (id in exportAssets) {
+            var characterId = exportAssets[id];
+            var tag = stage.sounds[characterId];
+            if (tag) {
+                var audio = _document.createElement("audio");
+                audio.onload = function ()
+                {
+                    this.load();
+                    this.preload = "auto";
+                    this.autoplay = false;
+                    this.loop = false;
+                };
+                audio.src = tag.base64;
+                sounds[id] = audio;
             }
         }
+
+        _this.sounds = sounds;
     };
 
     /**
