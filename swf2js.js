@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.14)
+ * swf2js (version 0.7.15)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -23769,7 +23769,6 @@ if (!("swf2js" in window)){(function(window)
         return _this.load(resultXML);
     };
 
-
     /**
      * @constructor
      */
@@ -24000,7 +23999,7 @@ if (!("swf2js" in window)){(function(window)
                 continue;
             }
             var audio = sounds[id];
-            audio.volume = _min(0, _max(1, volume / 100));
+            audio.volume = _max(0, _min(1, volume / 100));
         }
     };
 
