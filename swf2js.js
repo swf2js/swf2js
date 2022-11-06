@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.15)
+ * swf2js (version 0.7.16)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -15157,6 +15157,108 @@ if (!("swf2js" in window)){(function(window)
         var array = target.split("/");
         str += array.join(".");
         return str;
+    };
+
+    DisplayObject.prototype.invert = function (matrix)
+    {
+        const newMatrix = [];
+        let a, b, c, d ,tx, ty, det;
+
+        a  = matrix[0];
+        b  = matrix[1];
+        c  = matrix[2];
+        d  = matrix[3];
+        tx = matrix[4] / 20;
+        ty = matrix[5] / 20;
+
+        switch (true) {
+
+            case (b === 0 && c === 0):
+
+                newMatrix[0]  = 1 / a;
+                newMatrix[1]  = 0;
+                newMatrix[2]  = 0;
+                newMatrix[3]  = 1 / d;
+                newMatrix[4] = -newMatrix[0] * tx;
+                newMatrix[5] = -newMatrix[3] * ty;
+
+                break;
+
+            default:
+
+                det = a * d - b * c;
+
+                switch (true) {
+
+                    case det === 0:
+                        this.identity();
+                        break;
+
+                    default:
+
+                        const rdet = 1 / det;
+
+                        newMatrix[0]  = d  * rdet;
+                        newMatrix[1]  = -b * rdet;
+                        newMatrix[2]  = -c * rdet;
+                        newMatrix[3]  = a  * rdet;
+                        newMatrix[4] = -(newMatrix[0] * tx + newMatrix[2] * ty);
+                        newMatrix[5] = -(newMatrix[1] * tx + newMatrix[3] * ty);
+                        break;
+
+                }
+
+                break;
+
+        }
+
+        return newMatrix;
+    };
+
+    DisplayObject.prototype.globalToLocal = function (point)
+    {
+        let matrix = this.getMatrix();
+
+        let parent = this._parent;
+        while (parent) {
+
+            matrix = this.multiplicationMatrix(
+                parent.getMatrix(),
+                matrix
+            );
+
+            parent = parent._parent;
+        }
+
+        matrix = this.invert(matrix);
+
+        const x = point.x * matrix[0] + point.y * matrix[2] + matrix[4];
+        const y = point.x * matrix[1] + point.y * matrix[3] + matrix[5];
+
+        point.x = x;
+        point.y = y;
+    };
+
+    DisplayObject.prototype.localToGlobal = function (point)
+    {
+        let matrix = this.getMatrix();
+
+        let parent = this._parent;
+        while (parent) {
+
+            matrix = this.multiplicationMatrix(
+                parent.getMatrix(),
+                matrix
+            );
+
+            parent = parent._parent;
+        }
+
+        const x = point.x * matrix[0] + point.y * matrix[2] + matrix[4];
+        const y = point.x * matrix[1] + point.y * matrix[3] + matrix[5];
+
+        point.x = x;
+        point.y = y;
     };
 
     /**
