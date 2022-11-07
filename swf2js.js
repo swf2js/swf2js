@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.16)
+ * swf2js (version 0.7.17)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -15230,6 +15230,9 @@ if (!("swf2js" in window)){(function(window)
             parent = parent._parent;
         }
 
+        matrix[4] /= 20;
+        matrix[5] /= 20;
+
         matrix = this.invert(matrix);
 
         const x = point.x * matrix[0] + point.y * matrix[2] + matrix[4];
@@ -15253,6 +15256,9 @@ if (!("swf2js" in window)){(function(window)
 
             parent = parent._parent;
         }
+
+        matrix[4] /= 20;
+        matrix[5] /= 20;
 
         const x = point.x * matrix[0] + point.y * matrix[2] + matrix[4];
         const y = point.x * matrix[1] + point.y * matrix[3] + matrix[5];
