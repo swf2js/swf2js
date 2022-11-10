@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.17)
+ * swf2js (version 0.7.18)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -17047,6 +17047,10 @@ if (!("swf2js" in window)){(function(window)
         var canvas = cache.canvas;
         var width = canvas.width;
         var height = canvas.height;
+        if (!width || !height) {
+            return ;
+        }
+
         cache.setTransform(1, 0, 0, 1, 0, 0);
 
         switch (mode) {
