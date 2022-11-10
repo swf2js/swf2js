@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.18)
+ * swf2js (version 0.7.19)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -16147,6 +16147,13 @@ if (!("swf2js" in window)){(function(window)
     {
         xscale = +xscale;
         if (!_isNaN(xscale)) {
+            if (!xscale) {
+                try {
+                    throw new Error("xscale 0");
+                } catch (e) {
+                    console.log(e);
+                }
+            }
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
@@ -16182,6 +16189,13 @@ if (!("swf2js" in window)){(function(window)
     {
         yscale = +yscale;
         if (!_isNaN(yscale)) {
+            if (!yscale) {
+                try {
+                    throw new Error("yscale 0");
+                } catch (e) {
+                    console.log(e);
+                }
+            }
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
@@ -16346,6 +16360,13 @@ if (!("swf2js" in window)){(function(window)
     {
         width = +width;
         if (!_isNaN(width)) {
+            if (!width) {
+                try {
+                    throw new Error("width 0");
+                } catch (e) {
+                    console.log(e);
+                }
+            }
             var _this = this;
             var _matrix = _this.getOriginMatrix();
             var bounds = _this.getBounds(_matrix);
@@ -16379,6 +16400,13 @@ if (!("swf2js" in window)){(function(window)
     {
         height = +height;
         if (!_isNaN(height)) {
+            if (!height) {
+                try {
+                    throw new Error("height 0");
+                } catch (e) {
+                    console.log(e);
+                }
+            }
             var _this = this;
             var _matrix = _this.getOriginMatrix();
             var bounds = _this.getBounds(_matrix);
