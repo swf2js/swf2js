@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.19)
+ * swf2js (version 0.7.20)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -21979,8 +21979,10 @@ if (!("swf2js" in window)){(function(window)
             _document.body.appendChild(form);
             form.submit();
         } else {
-            var func = new Func("location.href = '" + url + "';");
-            func();
+            var a = _document.createElement("a");
+            a.href = url;
+            a.target = target;
+            a.click();
         }
     };
 
