@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.22)
+ * swf2js (version 0.7.23)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -15128,6 +15128,8 @@ if (!("swf2js" in window)){(function(window)
         _this._colorTransform = null;
         _this._extend = false;
         _this._viewRotation = null;
+        _this._viewXScale = null;
+        _this._viewYScale = null;
 
         // avm2
         _this.avm2 = null;
