@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.21)
+ * swf2js (version 0.7.22)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -15127,6 +15127,7 @@ if (!("swf2js" in window)){(function(window)
         _this._matrix = null;
         _this._colorTransform = null;
         _this._extend = false;
+        _this._viewRotation = null;
 
         // avm2
         _this.avm2 = null;
@@ -16129,6 +16130,10 @@ if (!("swf2js" in window)){(function(window)
      */
     DisplayObject.prototype.getXScale = function ()
     {
+        if (this._viewXScale !== null) {
+            return this._viewXScale;
+        }
+
         var matrix = this.getMatrix();
         var xScale = _sqrt(matrix[0] * matrix[0] + matrix[1] * matrix[1]) * 100;
         if (0 > matrix[0]) {
@@ -16144,24 +16149,14 @@ if (!("swf2js" in window)){(function(window)
     {
         xscale = +xscale;
         if (!_isNaN(xscale)) {
-            if (!xscale) {
-                try {
-                    throw new Error("xscale 0");
-                } catch (e) {
-                    console.log(e);
-                }
-            }
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
-            var adjustment = 1;
-            if (0 > matrix[0]) {
-                adjustment = -1;
-            }
             var radianX = _atan2(matrix[1], matrix[0]);
+            this._viewXScale = xscale;
             xscale /= 100;
-            matrix[0] = xscale * _cos(radianX) * adjustment;
-            matrix[1] = xscale * _sin(radianX) * adjustment;
+            matrix[0] = xscale * _cos(radianX);
+            matrix[1] = xscale * _sin(radianX);
             _this.setMatrix(matrix);
         }
     };
@@ -16171,6 +16166,10 @@ if (!("swf2js" in window)){(function(window)
      */
     DisplayObject.prototype.getYScale = function ()
     {
+        if (this._viewYScale !== null) {
+            return this._viewYScale;
+        }
+
         var matrix = this.getMatrix();
         var yScale = _sqrt(matrix[2] * matrix[2] + matrix[3] * matrix[3]) * 100;
         if (0 > matrix[3]) {
@@ -16186,24 +16185,14 @@ if (!("swf2js" in window)){(function(window)
     {
         yscale = +yscale;
         if (!_isNaN(yscale)) {
-            if (!yscale) {
-                try {
-                    throw new Error("yscale 0");
-                } catch (e) {
-                    console.log(e);
-                }
-            }
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
-            var adjustment = 1;
-            if (0 > matrix[3]) {
-                adjustment = -1;
-            }
             var radianY = _atan2(-matrix[2], matrix[3]);
+            this._viewYScale = yscale;
             yscale /= 100;
-            matrix[2] = -yscale * _sin(radianY) * adjustment;
-            matrix[3] = yscale * _cos(radianY) * adjustment;
+            matrix[2] = -yscale * _sin(radianY);
+            matrix[3] = yscale * _cos(radianY);
             _this.setMatrix(matrix);
         }
     };
@@ -16301,6 +16290,10 @@ if (!("swf2js" in window)){(function(window)
      */
     DisplayObject.prototype.getRotation = function ()
     {
+        if (this._viewRotation !== null) {
+            return this._viewRotation * 180 / _PI;
+        }
+
         var matrix = this.getMatrix();
         var rotation = _atan2(matrix[1], matrix[0]) * 180 / _PI;
         switch (rotation) {
@@ -16335,7 +16328,9 @@ if (!("swf2js" in window)){(function(window)
             matrix[1] = ScaleX * _sin(radianX);
             matrix[2] = -ScaleY * _sin(radianY);
             matrix[3] = ScaleY * _cos(radianY);
+
             _this.setMatrix(matrix);
+            this._viewRotation = rotation;
         }
     };
 
@@ -16357,13 +16352,6 @@ if (!("swf2js" in window)){(function(window)
     {
         width = +width;
         if (!_isNaN(width)) {
-            if (!width) {
-                try {
-                    throw new Error("width 0");
-                } catch (e) {
-                    console.log(e);
-                }
-            }
             var _this = this;
             var _matrix = _this.getOriginMatrix();
             var bounds = _this.getBounds(_matrix);
@@ -16397,13 +16385,6 @@ if (!("swf2js" in window)){(function(window)
     {
         height = +height;
         if (!_isNaN(height)) {
-            if (!height) {
-                try {
-                    throw new Error("height 0");
-                } catch (e) {
-                    console.log(e);
-                }
-            }
             var _this = this;
             var _matrix = _this.getOriginMatrix();
             var bounds = _this.getBounds(_matrix);
