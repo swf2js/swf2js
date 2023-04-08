@@ -1,6 +1,6 @@
 /*jshint bitwise: false*/
 /**
- * swf2js (version 0.7.23)
+ * swf2js (version 0.7.24)
  * Develop: https://github.com/ienaga/swf2js
  * ReadMe: https://github.com/ienaga/swf2js/blob/master/README.md
  * Web: https://swf2js.wordpress.com
@@ -16150,11 +16150,14 @@ if (!("swf2js" in window)){(function(window)
     DisplayObject.prototype.setXScale = function (xscale)
     {
         xscale = +xscale;
-        if (!_isNaN(xscale)) {
+        if (!_isNaN(xscale) && this._viewXScale !== xscale) {
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
             var radianX = _atan2(matrix[1], matrix[0]);
+            if (radianX === -_PI) {
+                radianX = 0;
+            }
             this._viewXScale = xscale;
             xscale /= 100;
             matrix[0] = xscale * _cos(radianX);
@@ -16186,11 +16189,14 @@ if (!("swf2js" in window)){(function(window)
     DisplayObject.prototype.setYScale = function (yscale)
     {
         yscale = +yscale;
-        if (!_isNaN(yscale)) {
+        if (!_isNaN(yscale) && this._viewYScale !== yscale) {
             var _this = this;
             var _matrix = _this.getMatrix();
             var matrix = _this.cloneArray(_matrix);
             var radianY = _atan2(-matrix[2], matrix[3]);
+            if (radianY === -_PI) {
+                radianY = 0;
+            }
             this._viewYScale = yscale;
             yscale /= 100;
             matrix[2] = -yscale * _sin(radianY);
